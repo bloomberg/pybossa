@@ -17,6 +17,9 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from pybossa.util import is_owner_or_coowner
+
+
 class ProjectAuth(object):
     _specific_actions = ['publish']
 
@@ -57,4 +60,4 @@ class ProjectAuth(object):
 
     def _only_admin_or_owner(self, user, project):
         return (not user.is_anonymous() and
-                (project.owner_id == user.id or user.admin))
+                (is_owner_or_coowner(project, user) or user.admin))

@@ -47,7 +47,7 @@ from pybossa.model.webhook import Webhook
 from pybossa.model.blogpost import Blogpost
 from pybossa.util import (Pagination, admin_required, get_user_id_or_ip, rank,
                           handle_content_type, redirect_content_type,
-                          get_avatar_url)
+                          get_avatar_url, is_owner_or_coowner)
 from pybossa.auth import ensure_authorized_to
 from pybossa.cache import projects as cached_projects
 from pybossa.cache import users as cached_users
@@ -60,6 +60,7 @@ from pybossa.cookies import CookieHandler
 from pybossa.password_manager import ProjectPasswdManager
 from pybossa.jobs import import_tasks, webhook
 from pybossa.forms.projects_view_forms import *
+from pybossa.forms.admin_view_forms import SearchForm
 from pybossa.importers import BulkImportException
 from pybossa.pro_features import ProFeatureHandler
 
@@ -301,6 +302,7 @@ def task_presenter_editor(short_name):
     ensure_authorized_to('update', project)
 
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
 
     form = TaskPresenterForm(request.body)
     form.id.data = project.id
@@ -357,7 +359,8 @@ def task_presenter_editor(short_name):
                             n_completed_tasks=ps.n_completed_tasks,
                             n_volunteers=ps.n_volunteers,
                             presenters=pres_tmpls,
-                            pro_features=pro)
+                            pro_features=pro,
+                            is_owner_or_coowner=owner_or_coowner)
             return handle_content_type(response)
 
         tmpl_uri = "projects/snippets/%s.html" \
@@ -387,7 +390,8 @@ def task_presenter_editor(short_name):
                     n_completed_tasks=ps.n_completed_tasks,
                     n_volunteers=ps.n_volunteers,
                     errors=errors,
-                    pro_features=pro)
+                    pro_features=pro,
+                    is_owner_or_coowner=owner_or_coowner)
     return handle_content_type(response)
 
 
@@ -400,6 +404,7 @@ def delete(short_name):
     ensure_authorized_to('read', project)
     ensure_authorized_to('delete', project)
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
     project_sanitized, owner_sanitized = sanitize_project_owner(project, owner,
                                                                 current_user,
                                                                 ps)
@@ -412,6 +417,7 @@ def delete(short_name):
                         overall_progress=ps.overall_progress,
                         last_activity=ps.last_activity,
                         pro_features=pro,
+                        is_owner_or_coowner=owner_or_coowner,
                         csrf=generate_csrf())
         return handle_content_type(response)
     project_repo.delete(project)
@@ -460,6 +466,7 @@ def update(short_name):
     ensure_authorized_to('update', project)
 
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
 
     title = project_title(project, "Update")
     if request.method == 'GET':
@@ -527,7 +534,8 @@ def update(short_name):
                     n_completed_tasks=ps.n_completed_tasks,
                     n_volunteers=ps.n_volunteers,
                     title=title,
-                    pro_features=pro)
+                    pro_features=pro,
+                    is_owner_or_coowner=owner_or_coowner)
     return handle_content_type(response)
 
 
@@ -545,6 +553,7 @@ def details(short_name):
     template = '/projects/project.html'
     pro = pro_features()
 
+    owner_or_coowner = is_owner_or_coowner(project, current_user)
     title = project_title(project, None)
     project = add_custom_contrib_button_to(project, get_user_id_or_ip(), ps=ps)
     project_sanitized, owner_sanitized = sanitize_project_owner(project, owner,
@@ -559,7 +568,8 @@ def details(short_name):
                      "last_activity": ps.last_activity,
                      "n_completed_tasks": ps.n_completed_tasks,
                      "n_volunteers": ps.n_volunteers,
-                     "pro_features": pro}
+                     "pro_features": pro,
+                     "is_owner_or_coowner": owner_or_coowner}
     if current_app.config.get('CKAN_URL'):
         template_args['ckan_name'] = current_app.config.get('CKAN_NAME')
         template_args['ckan_url'] = current_app.config.get('CKAN_URL')
@@ -577,6 +587,7 @@ def settings(short_name):
     ensure_authorized_to('read', project)
     ensure_authorized_to('update', project)
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
     project = add_custom_contrib_button_to(project, get_user_id_or_ip(), ps=ps)
     owner_serialized = cached_users.get_user_summary(owner.name)
     response = dict(template='/projects/settings.html',
@@ -589,7 +600,8 @@ def settings(short_name):
                     n_completed_tasks=ps.n_completed_tasks,
                     n_volunteers=ps.n_volunteers,
                     title=title,
-                    pro_features=pro)
+                    pro_features=pro,
+                    is_owner_or_coowner=owner_or_coowner)
     return handle_content_type(response)
 
 
@@ -604,6 +616,7 @@ def import_task(short_name):
     title = project_title(project, "Import Tasks")
     loading_text = gettext("Importing tasks, this may take a while, wait...")
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
     dict_project = add_custom_contrib_button_to(project, get_user_id_or_ip(), ps=ps)
     project_sanitized, owner_sanitized = sanitize_project_owner(dict_project,
                                                                 owner,
@@ -617,7 +630,8 @@ def import_task(short_name):
                          n_volunteers=ps.n_volunteers,
                          n_completed_tasks=ps.n_completed_tasks,
                          target='project.import_task',
-                         pro_features=pro)
+                         pro_features=pro,
+                         is_owner_or_coowner=owner_or_coowner)
 
     importer_type = request.form.get('form_name') or request.args.get('type')
     all_importers = importer.get_all_importer_names()
@@ -677,6 +691,7 @@ def setup_autoimporter(short_name):
         raise abort(403)
 
     project, owner, ps = project_by_shortname(short_name)
+    owner_or_coowner = is_owner_or_coowner(project)
 
     dict_project = add_custom_contrib_button_to(project, get_user_id_or_ip(), ps=ps)
     template_args = dict(project=dict_project,
@@ -686,7 +701,8 @@ def setup_autoimporter(short_name):
                          n_volunteers=ps.n_volunteers,
                          n_completed_tasks=ps.n_completed_tasks,
                          pro_features=pro,
-                         target='project.setup_autoimporter')
+                         target='project.setup_autoimporter',
+                         is_owner_or_coowner=owner_or_coowner)
     ensure_authorized_to('read', project)
     ensure_authorized_to('update', project)
     importer_type = request.form.get('form_name') or request.args.get('type')
@@ -928,6 +944,7 @@ def tasks(short_name):
         ensure_authorized_to('read', project)
 
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
     project = add_custom_contrib_button_to(project, get_user_id_or_ip())
     feature_handler = ProFeatureHandler(current_app.config.get('PRO_FEATURES'))
     autoimporter_enabled = feature_handler.autoimporter_enabled_for(current_user)
@@ -948,7 +965,8 @@ def tasks(short_name):
                     last_activity=ps.last_activity,
                     n_completed_tasks=ps.n_completed_tasks,
                     n_volunteers=ps.n_volunteers,
-                    pro_features=pro)
+                    pro_features=pro,
+                    is_owner_or_coowner=owner_or_coowner)
 
     return handle_content_type(response)
 
@@ -958,6 +976,7 @@ def tasks_browse(short_name, page=1):
     project, owner, ps = project_by_shortname(short_name)
     title = project_title(project, "Tasks")
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
 
     def respond():
         per_page = 10
@@ -984,7 +1003,8 @@ def tasks_browse(short_name, page=1):
                     overall_progress=ps.overall_progress,
                     n_volunteers=ps.n_volunteers,
                     n_completed_tasks=ps.n_completed_tasks,
-                    pro_features=pro)
+                    pro_features=pro,
+                    is_owner_or_coowner=owner_or_coowner)
 
         return handle_content_type(data)
 
@@ -1006,6 +1026,7 @@ def delete_tasks(short_name):
     ensure_authorized_to('read', project)
     ensure_authorized_to('update', project)
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
     if request.method == 'GET':
         title = project_title(project, "Delete")
         n_volunteers = cached_projects.n_volunteers(project.id)
@@ -1026,6 +1047,7 @@ def delete_tasks(short_name):
                         last_activity=ps.last_activity,
                         title=title,
                         pro_features=pro,
+                        is_owner_or_coowner=owner_or_coowner,
                         csrf=generate_csrf())
         return handle_content_type(response)
     else:
@@ -1044,6 +1066,7 @@ def export_to(short_name):
     title = project_title(project, gettext("Export"))
     loading_text = gettext("Exporting data..., this may take a while")
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
 
     if project.needs_password():
         redirect_to_password = _check_if_redirect_to_password(project)
@@ -1064,7 +1087,8 @@ def export_to(short_name):
                                n_volunteers=ps.n_volunteers,
                                n_completed_tasks=ps.n_completed_tasks,
                                overall_progress=ps.overall_progress,
-                               pro_features=pro)
+                               pro_features=pro,
+                               is_owner_or_coowner=owner_or_coowner)
 
     def respond_json(ty):
         if ty not in supported_tables:
@@ -1178,6 +1202,7 @@ def show_stats(short_name):
     project, owner, ps = project_by_shortname(short_name)
     title = project_title(project, "Statistics")
     pro = pro_features(owner)
+    owner_or_coowner = is_owner_or_coowner(project)
 
     if project.needs_password():
         redirect_to_password = _check_if_redirect_to_password(project)
@@ -1202,7 +1227,8 @@ def show_stats(short_name):
                         overall_progress=ps.overall_progress,
                         n_volunteers=ps.n_volunteers,
                         n_completed_tasks=ps.n_completed_tasks,
-                        pro_features=pro)
+                        pro_features=pro,
+                        is_owner_or_coowner=owner_or_coowner)
         return handle_content_type(response)
 
     dates_stats = ps.info['dates_stats']
@@ -1263,7 +1289,8 @@ def show_stats(short_name):
                     n_volunteers=ps.n_volunteers,
                     n_completed_tasks=ps.n_completed_tasks,
                     avg_contrib_time=formatted_contrib_time,
-                    pro_features=pro)
+                    pro_features=pro,
+                    is_owner_or_coowner=owner_or_coowner)
 
     return handle_content_type(response)
 
@@ -1277,6 +1304,7 @@ def task_settings(short_name):
     ensure_authorized_to('read', project)
     ensure_authorized_to('update', project)
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
     project = add_custom_contrib_button_to(project, get_user_id_or_ip(), ps=ps)
     return render_template('projects/task_settings.html',
                            project=project,
@@ -1285,7 +1313,8 @@ def task_settings(short_name):
                            overall_progress=ps.overall_progress,
                            n_volunteers=ps.n_volunteers,
                            n_completed_tasks=ps.n_completed_tasks,
-                           pro_features=pro)
+                           pro_features=pro,
+                           is_owner_or_coowner=owner_or_coowner)
 
 
 @blueprint.route('/<short_name>/tasks/redundancy', methods=['GET', 'POST'])
@@ -1298,6 +1327,7 @@ def task_n_answers(short_name):
     ensure_authorized_to('read', project)
     ensure_authorized_to('update', project)
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
     project_sanitized, owner_sanitized = sanitize_project_owner(project,
                                                                 owner,
                                                                 current_user,
@@ -1308,7 +1338,8 @@ def task_n_answers(short_name):
                         form=form,
                         project=project_sanitized,
                         owner=owner_sanitized,
-                        pro_features=pro)
+                        pro_features=pro,
+                        is_owner_or_coowner=owner_or_coowner)
         return handle_content_type(response)
     elif request.method == 'POST' and form.validate():
         task_repo.update_tasks_redundancy(project, form.n_answers.data)
@@ -1325,7 +1356,8 @@ def task_n_answers(short_name):
                         form=form,
                         project=project_sanitized,
                         owner=owner_sanitized,
-                        pro_features=pro)
+                        pro_features=pro,
+                        is_owner_or_coowner=owner_or_coowner)
         return handle_content_type(response)
 
 
@@ -1337,6 +1369,7 @@ def task_scheduler(short_name):
     title = project_title(project, gettext('Task Scheduler'))
     form = TaskSchedulerForm(request.body)
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
 
 
     def respond():
@@ -1349,7 +1382,8 @@ def task_scheduler(short_name):
                         form=form,
                         project=project_sanitized,
                         owner=owner_sanitized,
-                        pro_features=pro)
+                        pro_features=pro,
+                        is_owner_or_coowner=owner_or_coowner)
         return handle_content_type(response)
 
     ensure_authorized_to('read', project)
@@ -1393,6 +1427,7 @@ def task_priority(short_name):
     title = project_title(project, gettext('Task Priority'))
     form = TaskPriorityForm(request.body)
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
 
     def respond():
         project_sanitized, owner_sanitized = sanitize_project_owner(project,
@@ -1404,7 +1439,8 @@ def task_priority(short_name):
                         form=form,
                         project=project_sanitized,
                         owner=owner_sanitized,
-                        pro_features=pro)
+                        pro_features=pro,
+                        is_owner_or_coowner=owner_or_coowner)
         return handle_content_type(response)
     ensure_authorized_to('read', project)
     ensure_authorized_to('update', project)
@@ -1440,6 +1476,7 @@ def task_priority(short_name):
 @blueprint.route('/<short_name>/blog')
 def show_blogposts(short_name):
     project, owner, ps = project_by_shortname(short_name)
+    owner_or_coowner = is_owner_or_coowner(project)
 
     if current_user.is_authenticated() and current_user.id == owner.id:
         blogposts = blog_repo.filter_by(project_id=project.id)
@@ -1469,7 +1506,8 @@ def show_blogposts(short_name):
                     n_task_runs=ps.n_task_runs,
                     n_completed_tasks=ps.n_completed_tasks,
                     n_volunteers=ps.n_volunteers,
-                    pro_features=pro)
+                    pro_features=pro,
+                    is_owner_or_coowner=owner_or_coowner)
     return handle_content_type(response)
 
 
@@ -1493,6 +1531,7 @@ def show_blogpost(short_name, id):
     else:
         ensure_authorized_to('read', blogpost)
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
     project = add_custom_contrib_button_to(project, get_user_id_or_ip(), ps=ps)
     return render_template('projects/blog_post.html',
                            project=project,
@@ -1503,7 +1542,8 @@ def show_blogpost(short_name, id):
                            n_task_runs=ps.n_task_runs,
                            n_completed_tasks=ps.n_completed_tasks,
                            n_volunteers=ps.n_volunteers,
-                           pro_features=pro)
+                           pro_features=pro,
+                           is_owner_or_coowner=owner_or_coowner)
 
 
 @blueprint.route('/<short_name>/new-blogpost', methods=['GET', 'POST'])
@@ -1523,10 +1563,12 @@ def new_blogpost(short_name):
                         n_task_runs=ps.n_task_runs,
                         n_completed_tasks=cached_projects.n_completed_tasks(dict_project.get('id')),
                         n_volunteers=cached_projects.n_volunteers(dict_project.get('id')),
-                        pro_features=pro)
+                        pro_features=pro,
+                        is_owner_or_coowner=owner_or_coowner)
         return handle_content_type(response)
 
     project, owner, ps = project_by_shortname(short_name)
+    owner_or_coowner = is_owner_or_coowner(project)
 
 
     form = BlogpostForm(request.form)
@@ -1565,6 +1607,7 @@ def update_blogpost(short_name, id):
     project, owner, ps = project_by_shortname(short_name)
 
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
     blogpost = blog_repo.get_by(id=id, project_id=project.id)
     if blogpost is None:
         raise abort(404)
@@ -1578,7 +1621,8 @@ def update_blogpost(short_name, id):
                                n_task_runs=ps.n_task_runs,
                                n_completed_tasks=cached_projects.n_completed_tasks(project.id),
                                n_volunteers=cached_projects.n_volunteers(project.id),
-                               pro_features=pro)
+                               pro_features=pro,
+                               is_owner_or_coowner=owner_or_coowner)
 
     form = BlogpostForm()
 
@@ -1639,6 +1683,7 @@ def auditlog(short_name):
         raise abort(403)
 
     project, owner, ps = project_by_shortname(short_name)
+    owner_or_coowner = is_owner_or_coowner(project)
 
 
     ensure_authorized_to('read', Auditlog, project_id=project.id)
@@ -1651,7 +1696,8 @@ def auditlog(short_name):
                            n_task_runs=ps.n_task_runs,
                            n_completed_tasks=ps.n_completed_tasks,
                            n_volunteers=ps.n_volunteers,
-                           pro_features=pro)
+                           pro_features=pro,
+                           is_owner_or_coowner=owner_or_coowner)
 
 
 @blueprint.route('/<short_name>/publish', methods=['GET', 'POST'])
@@ -1693,7 +1739,7 @@ def project_stream_uri_private(short_name):
     if current_app.config.get('SSE'):
         project, owner, ps = project_by_shortname(short_name)
 
-        if (current_user.id == project.owner_id or current_user.admin):
+        if is_owner_or_coowner(project) or current_user.admin:
             return Response(project_event_stream(short_name, 'private'),
                             mimetype="text/event-stream",
                             direct_passthrough=True)
@@ -1736,6 +1782,7 @@ def webhook_handler(short_name, oid=None):
 
 
     ensure_authorized_to('read', Webhook, project_id=project.id)
+    owner_or_coowner = is_owner_or_coowner(project)
     redirect_to_password = _check_if_redirect_to_password(project)
     if redirect_to_password:
         return redirect_to_password
@@ -1762,7 +1809,8 @@ def webhook_handler(short_name, oid=None):
                            n_task_runs=ps.n_task_runs,
                            n_completed_tasks=ps.n_completed_tasks,
                            n_volunteers=ps.n_volunteers,
-                           pro_features=pro)
+                           pro_features=pro,
+                           is_owner_or_coowner=owner_or_coowner)
 
 
 @blueprint.route('/<short_name>/results')
@@ -1776,6 +1824,7 @@ def results(short_name):
     ensure_authorized_to('read', project)
 
     pro = pro_features()
+    owner_or_coowner = is_owner_or_coowner(project)
 
     title = project_title(project, None)
     project = add_custom_contrib_button_to(project, get_user_id_or_ip(), ps=ps)
@@ -1794,7 +1843,8 @@ def results(short_name):
                      "n_completed_tasks": ps.n_completed_tasks,
                      "n_volunteers": ps.n_volunteers,
                      "pro_features": pro,
-                     "n_results": ps.n_results}
+                     "n_results": ps.n_results,
+                     "is_owner_or_coowner": owner_or_coowner}
 
     response = dict(template = '/projects/results.html', **template_args)
 
@@ -1822,6 +1872,7 @@ def reset_secret_key(short_name):
     msg = gettext('New secret key generated')
     flash(msg, 'success')
     return redirect_content_type(url_for('.update', short_name=short_name))
+
 
 @blueprint.route('/<short_name>/transferownership', methods=['GET', 'POST'])
 @login_required
@@ -1869,3 +1920,80 @@ def transfer_ownership(short_name):
                         form=form,
                         target='.transfer_ownership')
         return handle_content_type(response)
+
+
+@blueprint.route('/<short_name>/coowners', methods=['GET', 'POST'])
+@login_required
+def coowners(short_name):
+    """Manage coowners of a project."""
+    form = SearchForm(request.form)
+    project = project_repo.get_by_shortname(short_name)
+    owner_or_coowner = is_owner_or_coowner(project)
+    coowners = project.coowners
+
+    ensure_authorized_to('read', project)
+    ensure_authorized_to('update', project)
+
+    response = dict(
+        template='/projects/coowners.html',
+        project=project.to_public_json(),
+        short_name=short_name,
+        coowners=[coowner.to_public_json() for coowner in coowners],
+        title=gettext("Manage Co-owners"),
+        form=form,
+        pro_features=pro_features(),
+        is_owner_or_coowner=owner_or_coowner
+    )
+
+    if request.method == 'POST' and form.user.data:
+        query = form.user.data
+        user = user_repo.get_by_name(query)
+
+        if not user or user.id == current_user.id:
+            markup = Markup('<strong>{}</strong> {} <strong>{}</strong>')
+            flash(markup.format(gettext("Ooops!"),
+                                gettext("We didn't find a user matching your query:"),
+                                form.user.data))
+        else:
+            found = {
+                "user": user.to_public_json(),
+                "is_coowner": any(user.id == coowner.id for coowner in coowners)
+            }
+            response['found'] = found
+    return handle_content_type(response)
+
+
+@blueprint.route('/<short_name>/add_coowner/<user_name>')
+@login_required
+def add_coowner(short_name, user_name=None):
+    """Add project co-owner."""
+    project = project_repo.get_by_shortname(short_name)
+    user = user_repo.get_by_name(user_name)
+
+    ensure_authorized_to('read', project)
+    ensure_authorized_to('update', project)
+
+    if project and user:
+        if user.id != current_user.id and user.id != project.owner_id:
+            if all(user.id != co.id for co in project.coowners):
+                project.coowners.append(user)
+            project_repo.update(project)
+            return redirect_content_type(url_for(".coowners", short_name=short_name))
+    return abort(404)
+
+
+@blueprint.route('/<short_name>/del_coowner/<user_name>')
+@login_required
+def del_coowner(short_name, user_name=None):
+    """Delete project co-owner."""
+    project = project_repo.get_by_shortname(short_name)
+    user = user_repo.get_by_name(user_name)
+
+    ensure_authorized_to('read', project)
+    ensure_authorized_to('update', project)
+
+    if project and user:
+        project.coowners.remove(user)
+        project_repo.update(project)
+        return redirect_content_type(url_for('.coowners', short_name=short_name))
+    return abort(404)

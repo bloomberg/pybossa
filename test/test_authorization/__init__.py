@@ -36,6 +36,7 @@ def mock_current_user(anonymous=True, admin=None, id=None, pro=False):
         mock.admin = admin
         mock.pro = pro
         mock.id = id
+        mock.coowned_projects = []
     return mock
 
 

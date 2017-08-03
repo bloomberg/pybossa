@@ -17,6 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Module for password protect a project."""
 from flask.ext.login import current_user
+from pybossa.util import is_owner_or_coowner
 
 
 class ProjectPasswdManager(object):
@@ -31,7 +32,7 @@ class ProjectPasswdManager(object):
         """Check if password is required."""
         if project.needs_password() and (current_user.is_anonymous() or not
                                          (current_user.admin or
-                                          current_user.id == project.owner_id)):
+                                          is_owner_or_coowner(project, current_user))):
             cookie = self.cookie_handler.get_cookie_from(project)
             request_passwd = user_id_or_ip not in cookie
             return request_passwd
