@@ -17,6 +17,9 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from pybossa.util import is_owner_or_coowner
+
+
 class ResultAuth(object):
     _specific_actions = []
 
@@ -41,7 +44,7 @@ class ResultAuth(object):
         if user.is_anonymous():
             return False
         project = self._get_project(result, result.project_id)
-        return (project.owner_id == user.id)
+        return is_owner_or_coowner(project, user)
 
     def _delete(self, user, result):
         return False

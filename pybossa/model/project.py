@@ -76,6 +76,7 @@ class Project(db.Model, DomainObject):
                              order_by='TaskRun.finish_time.desc()')
     category = relationship(Category)
     blogposts = relationship(Blogpost, cascade='all, delete-orphan', backref='project')
+    coowners = relationship('User', secondary='project_coowner')
 
     def needs_password(self):
         return self.get_passwd_hash() is not None

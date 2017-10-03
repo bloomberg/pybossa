@@ -597,3 +597,14 @@ def check_password_strength(
         return False, message
     else:
         return True, None
+
+
+def _is_coowner(project_id, user):
+    return any(project_id == co.project_id for co in user.coowned_projects)
+
+
+def is_owner_or_coowner(project, user=current_user):
+    if user is None:
+        return False
+    return user.is_authenticated() and \
+           (project.owner_id == user.id or _is_coowner(project.id, user))
