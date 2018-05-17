@@ -83,6 +83,7 @@ def create_app(run_as_server=True):
     import pybossa.model.event_listeners
     setup_upref_mdata(app)
     anonymizer.init_app(app)
+    setup_schedulers(app)
     return app
 
 
@@ -724,9 +725,11 @@ def setup_ldap(app):
     if app.config.get('LDAP_HOST'):
         ldap.init_app(app)
 
+
 def setup_profiler(app):
     if app.config.get('FLASK_PROFILER'):
         flask_profiler.init_app(app)
+
 
 def setup_upref_mdata(app):
     """Setup user preference and metadata choices for user accounts"""
@@ -740,3 +743,10 @@ def setup_upref_mdata(app):
         upref_mdata_choices['locations'] = upref_locations()
         upref_mdata_choices['timezones'] = mdata_timezones()
         upref_mdata_choices['user_types'] = mdata_user_types()
+
+
+def setup_schedulers(app):
+    opts = app.config.get('AVAILABLE_SCHEDULERS')
+    if opts:
+        from pybossa.forms.forms import TaskSchedulerForm
+        TaskSchedulerForm.update_sched_options(opts)
