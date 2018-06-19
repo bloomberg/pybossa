@@ -25,6 +25,7 @@ from flask.ext.login import current_user
 from flask.ext.babel import gettext
 from flask.ext.assets import Bundle
 from flask_json_multidict import get_json_multidict
+from flask_talisman import Talisman
 from pybossa import default_settings as settings
 from pybossa.extensions import *
 from pybossa.ratelimit import get_view_rate_limit
@@ -40,6 +41,9 @@ from datetime import timedelta
 def create_app(run_as_server=True):
     """Create web app."""
     app = Flask(__name__.split('.')[0])
+    Talisman(app, content_security_policy={
+        'default-src': ['*', '\'unsafe-inline\'']
+    })
     configure_app(app)
     setup_logging(app)
     setup_assets(app)
@@ -593,6 +597,7 @@ def setup_hooks(app):
         ldap_enabled = app.config.get('LDAP_HOST', False)
 
         return dict(
+            preferred_url_scheme=app.config['PREFERRED_URL_SCHEME'],
             brand=app.config['BRAND'],
             title=app.config['TITLE'],
             logo=app.config['LOGO'],
@@ -720,8 +725,14 @@ def setup_newsletter(app):
 
 def setup_assets(app):
     """Setup assets."""
+    from urlparse import urlunsplit
     from flask.ext.assets import Environment
     assets = Environment(app)
+    assets.url = urlunsplit((
+        app.config['PREFERRED_URL_SCHEME'],
+        app.config['SERVER_NAME'],
+        'static', '', ''
+    ))
 
 
 def setup_strong_password(app):
