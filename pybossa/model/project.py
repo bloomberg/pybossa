@@ -24,6 +24,7 @@ from sqlalchemy.ext.mutable import MutableDict, MutableList
 from flask import current_app
 
 from pybossa.core import db, signer
+from pybossa.contributions_guard import ContributionsGuard
 from pybossa.model import DomainObject, make_timestamp, make_uuid
 from pybossa.model.task import Task
 from pybossa.model.task_run import TaskRun
@@ -195,3 +196,6 @@ class Project(db.Model, DomainObject):
 
     def get_project_users(self):
         return self.info.get('project_users', [])
+
+    def get_timeout(self):
+        return self.info.get('timeout', ContributionsGuard.STAMP_TTL)
