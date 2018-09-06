@@ -17,6 +17,8 @@
 # along with PYBOSSA. If not, see <http://www.gnu.org/licenses/>.
 from pybossa.core import create_app
 
+print('oi')
+
 if __name__ == "__main__":  # pragma: no cover
     app = create_app()
     #logging.basicConfig(level=logging.NOTSET)
