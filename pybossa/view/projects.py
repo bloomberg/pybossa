@@ -145,6 +145,11 @@ def sanitize_project_owner(project, owner, current_user, ps=None):
             else:
                 project_sanitized = project             # dict object
         owner_sanitized = cached_users.public_get_user_summary(owner.name)
+
+    project_sanitized['info'].pop('passwd_hash', None)
+    project_sanitized.pop('secret_key', None)
+    owner_sanitized.pop('api_key', None)
+
     if ps:
         project_sanitized['n_tasks'] = ps.n_tasks
         project_sanitized['n_task_runs'] = ps.n_tasks
