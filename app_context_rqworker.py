@@ -17,8 +17,12 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 #!/usr/bin/env python
+import logging
 import sys
 from rq import Queue, Connection, Worker
+from rq.worker import logger
+
+logger.setLevel(logging.DEBUG)
 
 from pybossa.core import create_app, sentinel
 
