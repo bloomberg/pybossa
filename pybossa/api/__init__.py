@@ -28,6 +28,7 @@ This package adds GET, POST, PUT and DELETE methods for:
     * vmcp
     * completedtasks
     * completedtaskruns
+    * goldtaskruns
 
 """
 
@@ -73,6 +74,7 @@ from pybossa.sched import (get_project_scheduler_and_timeout, get_scheduler_and_
                            has_lock, release_lock, Schedulers, get_locks)
 from pybossa.api.project_by_name import ProjectByNameAPI
 from pybossa.api.pwd_manager import get_pwd_manager
+from gold_task_run import GoldTaskRunAPI
 
 blueprint = Blueprint('api', __name__)
 
@@ -133,6 +135,7 @@ register_api(TokenAPI, 'api_token', '/token', pk='token', pk_type='string')
 register_api(CompletedTaskAPI, 'api_completedtask', '/completedtask', pk='oid', pk_type='int')
 register_api(CompletedTaskRunAPI, 'api_completedtaskrun', '/completedtaskrun', pk='oid', pk_type='int')
 register_api(ProjectByNameAPI, 'api_projectbyname', '/projectbyname', pk='key', pk_type='string')
+register_api(GoldTaskRunAPI, 'api_goldtaskrun', '/goldtaskrun', pk='oid', pk_type='int')
 
 
 def add_task_signature(tasks):

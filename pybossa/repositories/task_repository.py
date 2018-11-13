@@ -496,3 +496,16 @@ class TaskRepository(Repository):
             task_expiration=task_expiration, **params)).fetchall()
         tasks_not_updated = '\n'.join([str(task.id) for task in tasks])
         return tasks_not_updated
+
+    def filter_gold_task_runs_by(self, limit=None, offset=0, yielded=False, **filters):
+        exp = filters.pop('exported', False)
+        query = self.db.session.query(TaskRun).join(Task).\
+            filter(TaskRun.task_id == Task.id).\
+            filter(Task.calibration == 1).\
+            filter(Task.exported == exp).\
+            filter_by(**filters)
+
+        query = query.order_by(TaskRun.id).limit(limit).offset(offset)
+        if yielded:
+            return query.yield_per(1)
+        return query.all()
