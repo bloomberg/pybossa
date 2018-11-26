@@ -495,3 +495,23 @@ class TaskRepository(Repository):
             task_expiration=task_expiration, **params)).fetchall()
         tasks_not_updated = '\n'.join([str(task.id) for task in tasks])
         return tasks_not_updated
+
+    def filter_gold_task_runs(self, **filters):
+        exp = filters.pop('exported', False)
+        limit = filters.pop('limit', 20)
+        offset = filters.pop('offset', 0)
+        last_id = filters.pop('last_id', None)
+        desc = filters.pop('desc', False)
+        orderby = filters.pop('orderby', 'id')
+
+        query = self.db.session.query(TaskRun).join(Task).\
+            filter(TaskRun.task_id == Task.id).\
+            filter(TaskRun.calibration == 1).\
+            filter(Task.exported == exp).\
+            filter_by(**filters)
+        if last_id:
+            query = query.filter(TaskRun.id > last_id)
+        query = self._set_orderby_desc(query, TaskRun, limit,
+                                       last_id, offset,
+                                       desc, orderby)
+        return query.all()

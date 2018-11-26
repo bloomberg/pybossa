@@ -27,7 +27,7 @@ from flask import request, Response
 from flask import current_app as app
 from flask.ext.login import current_user
 from pybossa.model.task_run import TaskRun
-from werkzeug.exceptions import Forbidden, BadRequest
+from werkzeug.exceptions import Forbidden, BadRequest, Unauthorized
 
 from api_base import APIBase
 from pybossa.util import get_user_id_or_ip
@@ -38,8 +38,8 @@ from pybossa.contributions_guard import ContributionsGuard
 from pybossa.auth import jwt_authorize_project
 from datetime import datetime
 from pybossa.sched import can_post, after_save
-
 from pybossa.model.completion_event import mark_if_complete
+from pybossa.cache.projects import get_project_data
 
 
 class TaskRunAPI(APIBase):
@@ -86,6 +86,7 @@ class TaskRunAPI(APIBase):
         self._ensure_task_was_requested(task, guard)
         self._add_user_info(taskrun)
         self._add_timestamps(taskrun, task, guard)
+        taskrun.calibration = 1 if task.calibration == 1 and task.gold_answers else 0
 
     def _forbidden_attributes(self, data):
         for key in data.keys():
@@ -155,6 +156,23 @@ class TaskRunAPI(APIBase):
             timestamp = datetime.strptime(self.DEFAULT_DATETIME, self.DATETIME_FORMAT)
         return timestamp.isoformat()
 
+    def _db_query(self, oid):
+        """Returns a list with the results of the query"""
+
+        filters = {}
+        if request.args:
+            filters = dict(request.args.items())
+
+        calibration = filters.get('calibration') if filters else 0
+        if oid or not calibration:
+            return super(TaskRunAPI, self)._db_query(oid)
+
+        project_id = filters.get('project_id')
+        if not (current_user.admin or project_id and
+            current_user.id in get_project_data(project_id)['owners_ids']):
+            raise Unauthorized("Insufficient privilege to access the request")
+
+        return task_repo.filter_gold_task_runs(**filters)
 
 def _upload_files_from_json(task_run_info, upload_path, with_encryption):
     if not isinstance(task_run_info, dict):

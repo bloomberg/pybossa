@@ -29,6 +29,7 @@ from pybossa.core import db, anonymizer
 from pybossa.auth.errcodes import *
 from pybossa.model.task_run import TaskRun
 from nose.tools import nottest
+from helper.gig_helper import make_subadmin, make_admin
 
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)
@@ -1105,3 +1106,50 @@ class TestTaskrunAPI(TestAPI):
         result = result_repo.get_by(project_id=project.id, task_id=task.id)
 
         assert result is None, result
+
+    @with_context
+    def test_gold_task_taskruns(self):
+        """Test taskrun API query for gold answers"""
+
+        admin, owner, user = UserFactory.create_batch(3)
+        make_admin(admin)
+        make_subadmin(owner)
+
+        project = ProjectFactory.create(owner=owner)
+        tasks = TaskFactory.create_batch(10, project=project, n_answers=2,
+                                  state='ongoing')
+        TaskRunFactory.create_batch(10, project=project)
+
+        gold_tasks = [tasks[2], tasks[7], tasks[9]]
+        for gt in gold_tasks:
+            gt.gold_answers = dict(a=1, b=2)
+            gt.calibration = 1
+            task_repo.update(gt)
+
+        total_gold_taskruns = 0
+        taskruns = TaskRunFactory.create_batch(10, project=project, task=gold_tasks[0], calibration=1)
+        total_gold_taskruns += len(taskruns)
+        taskruns = TaskRunFactory.create_batch(5, project=project, task=gold_tasks[1], calibration=1)
+        total_gold_taskruns += len(taskruns)
+        taskruns = TaskRunFactory.create_batch(2, project=project, task=gold_tasks[2], calibration=1)
+        total_gold_taskruns += len(taskruns)
+
+        # admin user gets all gold task runs
+        headers = dict(Authorization=admin.api_key)
+        url = '/api/taskrun?project_id=1&calibration=1'
+        res = self.app.get(url, headers=headers)
+        data = json.loads(res.data)
+        assert len(data) == total_gold_taskruns, data
+
+        # project owner gets all gold task runs
+        headers = dict(Authorization=owner.api_key)
+        url = '/api/taskrun?project_id=1&calibration=1'
+        res = self.app.get(url, headers=headers)
+        data = json.loads(res.data)
+        assert len(data) == total_gold_taskruns, data
+
+        # regular user don't get gold task runs
+        headers = dict(Authorization=user.api_key)
+        url = '/api/taskrun?project_id=1&calibration=1'
+        res = self.app.get(url, headers=headers)
+        assert_equal(res.status, '401 UNAUTHORIZED', 'regular user cannot access gold task runs')
