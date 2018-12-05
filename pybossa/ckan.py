@@ -21,6 +21,7 @@ import json
 from pybossa.model.task import Task
 from pybossa.model.task_run import TaskRun
 
+### test
 
 class Ckan(object):
 
