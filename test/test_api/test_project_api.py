@@ -598,9 +598,27 @@ class TestProjectAPI(TestAPI):
         res = self.app.put('/api/project/%s?api_key=%s' % (id_, users[1].api_key),
                            data=datajson)
         err = json.loads(res.data)
-        assert res.status_code == 415, err
+        assert res.status_code == 403, err
         assert err['status'] == 'failed', err
         assert err['action'] == 'PUT', err
+        assert err['exception_cls'] == 'Forbidden', err
+
+        empty_data = dict(
+            name=name,
+            short_name='',
+            description='',
+            owner_id=1,
+            long_description=u'Long Description\n================',
+            info=dict(passwd_hash="hello"))
+        empty_data = json.dumps(empty_data)
+
+        res = self.app.post('/api/project?api_key=' + users[1].api_key,
+                            data=empty_data)
+        err = json.loads(res.data)
+
+        assert res.status_code == 415, err
+        assert err['status'] == 'failed', err
+        assert err['action'] == 'POST', err
         assert err['exception_cls'] == 'DBIntegrityError', err
 
         # With not JSON data
@@ -708,8 +726,8 @@ class TestProjectAPI(TestAPI):
 
         out = project_repo.get_by(name=name)
         assert out, out
-        assert_equal(out.short_name, 'xxxx-project'), out
-        assert_equal(out.owner.name, 'user2')
+        assert_equal(out.short_name, u'xxxx-project'), out
+        assert_equal(out.owner.name, u'user2')
         assert_equal(out.owners_ids, [subadmin.id])
         assert_equal(out.info, {u'passwd_hash': u'hello'})
         id_ = out.id
@@ -729,19 +747,19 @@ class TestProjectAPI(TestAPI):
         name=u'XXXX Project 2'
         data = dict(
             name=name,
-            short_name='xxxx-project-2',
-            description='description',
+            short_name=u'xxxx-project-2',
+            description=u'description',
             owner_id=admin.id,
             long_description=u'Long Description\n================',
-            info=dict(passwd_hash="hello", task_presenter='taskpresenter'))
+            info=dict(passwd_hash=u'hello', task_presenter=u'taskpresenter'))
 
         newdata = json.dumps(data)
         res = self.app.post('/api/project?api_key=' + admin.api_key,
                             data=newdata)
         out = project_repo.get_by(name=name)
         assert out, out
-        assert_equal(out.short_name, 'xxxx-project-2'), out
-        assert_equal(out.owner.name, 'user1')
+        assert_equal(out.short_name, u'xxxx-project-2'), out
+        assert_equal(out.owner.name, u'user1')
         assert_equal(out.owners_ids, [1])
         assert_equal(out.info, {u'task_presenter': u'taskpresenter', u'passwd_hash': u'hello'})
         id_ = out.id
@@ -785,29 +803,6 @@ class TestProjectAPI(TestAPI):
         assert error['exception_cls'] == 'ValueError', error
         message = "Project short_name is not valid, as it's used by the system."
         assert error['exception_msg'] == message, error
-
-
-    @with_context
-    def test_project_put_invalid_short_name(self):
-        """Test API project PUT returns error if short_name is invalid (i.e. is
-            a name used by the Flask app as a URL endpoint"""
-        user = UserFactory.create()
-        CategoryFactory.create()
-        project = ProjectFactory.create(owner=user)
-        name = u'XXXX Project'
-        data = {'short_name': 'new'}
-        datajson = json.dumps(data)
-        res = self.app.put('/api/project/%s?api_key=%s' % (project.id, user.api_key),
-                            data=datajson)
-        error = json.loads(res.data)
-        assert res.status_code == 415, res.status_code
-        assert error['status'] == 'failed', error
-        assert error['action'] == 'PUT', error
-        assert error['target'] == 'project', error
-        assert error['exception_cls'] == 'ValueError', error
-        message = "Project short_name is not valid, as it's used by the system."
-        assert error['exception_msg'] == message, error
-
 
     @with_context
     def test_admin_project_post(self):
@@ -1200,6 +1195,7 @@ class TestProjectAPI(TestAPI):
         del payload['published']
         del payload['owner_id']
         del payload['secret_key']
+
         res = self.app.put(url, data=json.dumps(payload))
         clean_project_mock.assert_called_with(project.id)
 
