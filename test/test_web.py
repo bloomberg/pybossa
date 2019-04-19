@@ -688,7 +688,7 @@ class TestWeb(web.Helper):
             res = self.app.post('/account/register', data=json.dumps(userdict),
                                 content_type='application/json')
             errors = json.loads(res.data)
-            err_msg = "CSRF token missing or incorrect."
+            err_msg = "The CSRF token is missing."
             assert errors.get('description') == err_msg, err_msg
             err_msg = "Error code should be 400"
             assert errors.get('code') == 400, err_msg
@@ -706,7 +706,7 @@ class TestWeb(web.Helper):
                                 content_type='application/json',
                                 headers={'X-CSRFToken': 'wrong'})
             errors = json.loads(res.data)
-            err_msg = "CSRF token missing or incorrect."
+            err_msg = "The CSRF session token is missing."
             assert errors.get('description') == err_msg, err_msg
             err_msg = "Error code should be 400"
             assert errors.get('code') == 400, err_msg
@@ -9047,4 +9047,3 @@ class TestWebQuizModeUpdate(web.Helper):
         self.signin_user(worker)
         result = self.update_project(project, self.enabled_update)
         assert result.status_code == 403
-
