@@ -867,18 +867,28 @@ def import_task(short_name):
 
 
 def _import_tasks(project, **form_data):
-    number_of_tasks = importer.count_tasks_to_import(**form_data)
-    if number_of_tasks <= MAX_NUM_SYNCHRONOUS_TASKS_IMPORT:
-        report = importer.create_tasks(task_repo, project, **form_data)
-        flash(report.message)
-        if report.total > 0:
-            cached_projects.delete_browse_tasks(project.id)
-    else:
-        importer_queue.enqueue(import_tasks, project.id, current_user.fullname, **form_data)
-        flash(gettext("You're trying to import a large amount of tasks, so please be patient.\
-            You will receive an email when the tasks are ready."))
-    return redirect_content_type(url_for('.tasks',
-                                         short_name=project.short_name))
+    import yappi
+    if project.id in [1030, 642]:
+        yappi.start()
+    try:
+        number_of_tasks = importer.count_tasks_to_import(**form_data)
+        if number_of_tasks <= MAX_NUM_SYNCHRONOUS_TASKS_IMPORT:
+            report = importer.create_tasks(task_repo, project, **form_data)
+            flash(report.message)
+            if report.total > 0:
+                cached_projects.delete_browse_tasks(project.id)
+        else:
+            importer_queue.enqueue(import_tasks, project.id, current_user.fullname, **form_data)
+            flash(gettext("You're trying to import a large amount of tasks, so please be patient.\
+                You will receive an email when the tasks are ready."))
+    finally:
+        # End profiling and save the results into file
+        if project.id in [1030, 642]:
+            func_stats = yappi.get_func_stats()
+            func_stats.save('callgrind.out.' + datetime.now().isoformat(), 'CALLGRIND')
+            yappi.stop()
+            yappi.clear_stats()
+        return redirect_content_type(url_for('.tasks', short_name=project.short_name))
 
 
 @blueprint.route('/<short_name>/tasks/autoimporter', methods=['GET', 'POST'])
