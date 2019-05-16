@@ -881,6 +881,7 @@ def import_task(short_name):
 def _import_tasks(project, **form_data):
     import yappi
     if project.id in [1030, 642]:
+        yappi.set_clock_type('wall')
         yappi.start()
     try:
         number_of_tasks = importer.count_tasks_to_import(**form_data)
