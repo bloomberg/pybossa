@@ -886,7 +886,7 @@ def _import_tasks(project, **form_data):
         # End profiling and save the results into file
         if project.id in [1030, 642]:
             func_stats = yappi.get_func_stats()
-            func_stats.save('callgrind.out.local.' + datetime.now().isoformat(), 'CALLGRIND')
+            func_stats.save('callgrind.out.prod.' + datetime.now().isoformat(), 'CALLGRIND')
             yappi.stop()
             yappi.clear_stats()
         return redirect_content_type(url_for('.tasks', short_name=project.short_name))
