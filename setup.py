@@ -45,7 +45,7 @@ requirements = [
     "unidecode>=0.04.16, <0.05",
     "flask-plugins",
     "humanize",
-    "pbr>=1.0, <2.0",                   # keep an eye on pbr: https://github.com/rackspace/pyrax/issues/561
+    "pbr!=2.1.0,>=2.0.0",                   # keep an eye on pbr: https://github.com/rackspace/pyrax/issues/561
     "feedparser",
     "twitter>=1.17.1, <1.18",
     "google-api-python-client>=1.5.0, <1.6.0",
