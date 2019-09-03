@@ -580,7 +580,7 @@ def task_presenter_editor(short_name):
                                                conn='S3_PRES_CONN')
             tmpl = render_template_string(tmpl_string, project=project)
         else:
-            tmpl_uri = 'projects/snippets/{}.html'.format(tmpl_name)
+            tmpl_uri = 'projects/presenters/{}.html'.format(tmpl_name)
             tmpl = render_template(tmpl_uri, project=project)
 
         form.editor.data = tmpl
@@ -2171,7 +2171,9 @@ def task_scheduler(short_name):
 
         return redirect_content_type(url_for('.tasks', short_name=project.short_name))
     else:  # pragma: no cover
-        flash(gettext('Please correct the errors'), 'error')
+        current_app.logger.error('Task scheduler config error. project {}, error in {}'
+            .format(project.id, json.dumps(form.errors)))
+        flash(gettext('Please correct the errors. '), 'error')
         return respond()
 
 
