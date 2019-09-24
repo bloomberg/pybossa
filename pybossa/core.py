@@ -18,9 +18,12 @@
 """Core module for PYBOSSA."""
 import os
 import logging
+from StringIO import StringIO
 import humanize
+import yappi
+
 from flask import Flask, url_for, request, render_template, \
-    flash, _app_ctx_stack, abort
+    flash, _app_ctx_stack, abort, send_file
 from flask_login import current_user
 from flask_babel import gettext
 from flask_assets import Bundle
@@ -52,6 +55,7 @@ def create_app(run_as_server=True):
         'default-src': ['*', '\'unsafe-inline\'', '\'unsafe-eval\'', 'data:',
                         'blob:']
     }, force_https=app.config.get('FORCE_HTTPS', True))
+    setup_request_profiler(app)
     setup_theme(app)
     setup_assets(app)
     setup_cache_timeouts(app)
@@ -116,6 +120,27 @@ def configure_app(app):
         master = app.config.get('SQLALCHEMY_DATABASE_URI')
         app.config['SQLALCHEMY_BINDS']['slave'] = master
     app.url_map.strict_slashes = app.config.get('STRICT_SLASHES')
+
+
+def setup_request_profiler(app):
+    @app.before_request
+    def start_yappi():
+        if request.args.get('profileit') == '1':
+            yappi.set_clock_type('wall')
+            yappi.start()
+            g.yappiing = True
+
+    @app.after_request
+    def stop_yappi(res):
+        if request.args.get('profileit') == '1':
+            stats = yappi.get_func_stats()
+            yappi.clear_stats()
+            stream = StringIO()
+            stats.print_all(stream)
+            stream.seek(0)
+            return send_file(stream, as_attachment=True,\
+                attachment_filename = '{}.txt'.format(request.path))
+        return res
 
 
 def setup_json_serializer(app):
