@@ -9035,6 +9035,13 @@ class TestWeb(web.Helper):
         data = json.loads(res.data)
         assert data['id'] == task.id
 
+    @with_context
+    def test_profiler(self):
+        url = u'/?profileit=1'
+        res = self.app_get_json(url)
+        assert res.headers['Content-Disposition'].startswith('attachment')
+        assert 'Clock type: WALL' in res.data
+
 
 class TestWebUserMetadataUpdate(web.Helper):
 
