@@ -128,7 +128,6 @@ def setup_request_profiler(app):
         if request.args.get('profileit') == '1':
             yappi.set_clock_type('wall')
             yappi.start()
-            g.yappiing = True
 
     @app.after_request
     def stop_yappi(res):
@@ -139,7 +138,7 @@ def setup_request_profiler(app):
             stats.print_all(stream)
             stream.seek(0)
             return send_file(stream, as_attachment=True,\
-                attachment_filename = '{}.txt'.format(request.path))
+                attachment_filename='profiler{}-stats.txt'.format(request.path.replace('/', '_')))
         return res
 
 
