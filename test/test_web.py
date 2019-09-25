@@ -9040,7 +9040,7 @@ class TestWeb(web.Helper):
         url = u'/?profileit=1'
         res = self.app_get_json(url)
         assert res.headers['Content-Disposition'].startswith('attachment')
-        assert 'Clock type: WALL' in res.data
+        assert 'events: Ticks' in res.data
 
 
 class TestWebUserMetadataUpdate(web.Helper):
