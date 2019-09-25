@@ -18,6 +18,7 @@
 """Core module for PYBOSSA."""
 import os
 import logging
+import tempfile
 from StringIO import StringIO
 import humanize
 import yappi
@@ -132,13 +133,17 @@ def setup_request_profiler(app):
     @app.after_request
     def stop_yappi(res):
         if request.args.get('profileit') == '1':
+            yappi.stop()
             stats = yappi.get_func_stats()
             yappi.clear_stats()
-            stream = StringIO()
-            stats.print_all(stream)
-            stream.seek(0)
-            return send_file(stream, as_attachment=True,\
-                attachment_filename='profiler{}-stats.txt'.format(request.path.replace('/', '_')))
+            with tempfile.NamedTemporaryFile(delete=False) as fp:
+                stats.save(fp.name, type='callgrind')
+                fp.seek(0)
+                stream = StringIO()
+                stream.write(fp.read())
+                stream.seek(0)
+                return send_file(stream, as_attachment=True,\
+                attachment_filename='callgrind.profiler{}-stats'.format(request.path.replace('/', '_')))
         return res
 
 
