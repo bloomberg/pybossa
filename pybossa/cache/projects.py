@@ -250,6 +250,7 @@ def n_task_runs(project_id):
 @memoize(timeout=timeouts.get('APP_TIMEOUT'))
 def n_remaining_task_runs(project_id):
     """Return total number of tasks runs currently remaining for a project."""
+    print('******** HITTING DB')
     sql = text('''SELECT SUM(task.n_answers - COALESCE(t.actual_answers, 0))
                   FROM task
                   LEFT JOIN (SELECT task_id, COUNT(id) AS actual_answers
@@ -262,6 +263,7 @@ def n_remaining_task_runs(project_id):
 
 def n_expected_task_runs(project_id):
     """Return total number of expected task_runs of a project."""
+    print('======== computing expected task runs')
     return n_task_runs(project_id) + n_remaining_task_runs(project_id)
 
 
