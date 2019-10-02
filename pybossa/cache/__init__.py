@@ -148,14 +148,19 @@ def memoize(timeout=300, cache_group_keys=None):
             key = "%s:%s_args:" % (settings.REDIS_KEYPREFIX, f.__name__)
             key_to_hash = get_key_to_hash(*args, **kwargs)
             key = get_hash_key(key, key_to_hash)
+            print('hash key: {}'.format(key))
             if os.environ.get('PYBOSSA_REDIS_CACHE_DISABLED') is None:
                 output = sentinel.slave.get(key)
                 if output:
+                    print('got output from cache')
+                    print(pickle.loads(output))
                     return pickle.loads(output)
+                print('recomputing')
                 output = f(*args, **kwargs)
                 sentinel.master.setex(key, timeout, pickle.dumps(output))
                 add_key_to_cache_groups(key, cache_group_keys, *args, **kwargs)
                 return output
+            print('cache is disabled')
             output = f(*args, **kwargs)
             sentinel.master.setex(key, timeout, pickle.dumps(output))
             add_key_to_cache_groups(key, cache_group_keys, *args, **kwargs)
