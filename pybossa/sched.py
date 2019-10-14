@@ -488,7 +488,10 @@ def get_task_id_and_duration_for_project_user(project_id, user_id):
     max_seconds_remaining = float('-inf')
     for task_id, task_project_id in zip(user_task_ids, results):
         if not task_project_id:
-            task_project_id = task_repo.get_task(task_id).project_id
+            task = task_repo.get_task(task_id)
+            if not task:
+                continue
+            task_project_id = task.project_id
             save_task_id_project_id(task_id, task_project_id, 2 * TIMEOUT)
         if int(task_project_id) == project_id:
             seconds_remaining = LockManager.seconds_remaining(user_tasks[task_id])
