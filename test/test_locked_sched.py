@@ -17,7 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 from helper import sched
-from pybossa.core import project_repo
+from pybossa.core import project_repo, task_repo
 from factories import TaskFactory, ProjectFactory, UserFactory
 from pybossa.sched import (
     Schedulers,
@@ -138,6 +138,21 @@ class TestLockedSched(sched.Helper):
 
         t6 = get_locked_task(project.id, 4)
         assert not t6
+
+    @with_context
+    def test_get_locked_task_delete(self):
+        owner = UserFactory.create(id=500)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.locked
+        project_repo.save(project)
+
+        TaskFactory.create(project=project, info='task 1', n_answers=2)
+        task2 = TaskFactory.create(project=project, info='task 2', n_answers=2)
+
+        t1 = get_locked_task(project.id, 11)
+        task_repo.delete(t1)
+        t2 = get_locked_task(project.id, 11)
+        assert t2.id == task2.id
 
     @with_context
     def test_get_locked_task_offset(self):
