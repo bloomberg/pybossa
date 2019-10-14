@@ -149,9 +149,9 @@ class TestLockedSched(sched.Helper):
         TaskFactory.create(project=project, info='task 1', n_answers=2)
         task2 = TaskFactory.create(project=project, info='task 2', n_answers=2)
 
-        t1 = get_locked_task(project.id, 11)
+        (t1, ) = get_locked_task(project.id, 11)
         task_repo.delete(t1)
-        t2 = get_locked_task(project.id, 11)
+        (t2, ) = get_locked_task(project.id, 11)
         assert t2.id == task2.id
 
     @with_context
