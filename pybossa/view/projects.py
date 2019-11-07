@@ -429,6 +429,79 @@ def new():
                                          short_name=project.short_name))
 
 
+def clone_project(project, form):
+    is_admin_or_owner = (current_user.admin or
+                (current_user.subadmin and
+                    current_user.id in project.owners_ids))
+
+    proj_dict = project.dictize()
+    proj_dict.pop('secret_key', None)
+    proj_dict.pop('id', None)
+
+    proj_dict['info'].pop('passwd_hash', None)
+
+    if  bool(data_access_levels) and not form['copyUsers']:
+        proj_dict['info'].pop('project_users', None)
+
+    if not is_admin_or_owner:
+        proj_dict['info'].pop('ext_config', None)
+
+    proj_dict['owners_ids'] = project.owners_ids if is_admin_or_owner else [current_user.id]
+    proj_dict['short_name'] = form['short_name']
+    proj_dict['name'] = form['name']
+
+    new_project = Project(**proj_dict)
+    new_project.set_password(form['password'])
+
+    return new_project
+
+
+@blueprint.route('/<short_name>/clone',  methods=['GET', 'POST'])
+@login_required
+@admin_or_subadmin_required
+def clone(short_name):
+
+    project, owner, ps = project_by_shortname(short_name)
+    project_sanitized, owner_sanitized = sanitize_project_owner(project,
+                                                                owner,
+                                                                current_user,
+                                                                ps)
+    ensure_authorized_to('read', project)
+    hidden_inputs = [] if bool(data_access_levels) else ['copy_users']
+    form = dict(name = project.short_name,
+                short_name = project.short_name,
+                password = '',
+                copy_users= False)
+
+    if request.method == 'POST':
+        ensure_authorized_to('create', Project)
+        cloned = False
+
+        form = ProjectCommonForm(request.body)
+        if not form.validate():
+            flash(gettext('Please correct the errors'), 'error')
+        else:
+            new_project = clone_project(project, form.data)
+            project_repo.save(new_project)
+            cloned = True
+
+        return handle_content_type(dict(
+            form=form,
+            cloned=cloned,
+            project=project_sanitized,
+            hidden_inputs=hidden_inputs,
+            csrf=generate_csrf()
+        ))
+
+    else:
+        return handle_content_type(dict(
+            template='/projects/clone.html',
+            form=form,
+            project=project_sanitized,
+            hidden_inputs=hidden_inputs,
+            csrf=generate_csrf()
+        ))
+
 @blueprint.route('/<short_name>/tasks/taskpresentereditor', methods=['GET', 'POST'])
 @login_required
 @admin_or_subadmin_required
