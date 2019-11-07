@@ -94,34 +94,17 @@ class ProjectCommonForm(Form):
 
     password = TextField(
                     lazy_gettext('Password'),
-                    [validators.Optional(),
-                        pb_validator.CheckPasswordStrength(
-                                        min_len=PROJECT_PWD_MIN_LEN,
-                                        special=False)])
-
-class ProjectForm(ProjectCommonForm):
-    name = TextField(lazy_gettext('Name'),
-                     [validators.Required(),
-                      pb_validator.Unique(project_repo.get_by, 'name',
-                                          message=lazy_gettext("Name is already taken."))])
-    short_name = TextField(lazy_gettext('Short Name'),
-                           [validators.Required(),
-                            pb_validator.NotAllowedChars(),
-                            pb_validator.Unique(project_repo.get_by, 'short_name',
-                                message=lazy_gettext(
-                                    "Short Name is already taken.")),
-                            pb_validator.ReservedName('project', current_app)])
-    long_description = TextAreaField(lazy_gettext('Long Description'),
-                                     [validators.Required()])
-    description = TextAreaField(lazy_gettext('Description'),
-                                [validators.Length(max=255)])
-    password = TextField(
-                    lazy_gettext('Password'),
                     [validators.Required(),
                         pb_validator.CheckPasswordStrength(
                                         min_len=PROJECT_PWD_MIN_LEN,
                                         special=False)])
 
+class ProjectForm(ProjectCommonForm):
+
+    long_description = TextAreaField(lazy_gettext('Long Description'),
+                                     [validators.Required()])
+    description = TextAreaField(lazy_gettext('Description'),
+                                [validators.Length(max=255)])
     product = SelectField(lazy_gettext('Product'),
                           [validators.Required()], choices=[("", "")], default="")
     subproduct = SelectField(lazy_gettext('Subproduct'),

@@ -475,7 +475,6 @@ def clone(short_name):
 
     if request.method == 'POST':
         ensure_authorized_to('create', Project)
-        cloned = False
 
         form = ProjectCommonForm(request.body)
         if not form.validate():
@@ -483,11 +482,9 @@ def clone(short_name):
         else:
             new_project = clone_project(project, form.data)
             project_repo.save(new_project)
-            cloned = True
 
         return handle_content_type(dict(
             form=form,
-            cloned=cloned,
             project=project_sanitized,
             hidden_inputs=hidden_inputs,
             csrf=generate_csrf()
