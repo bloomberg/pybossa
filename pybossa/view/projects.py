@@ -703,7 +703,6 @@ def update(short_name):
         project.subproduct = project.info.get('subproduct')
         project.kpi = project.info.get('kpi')
         ensure_amp_config_applied_to_project(project, project.info.get('annotation_config', {}))
-
         form = dynamic_project_form(ProjectUpdateForm, None, data_access_levels, obj=project,
                                     products=prodsubprods)
         ensure_data_access_assignment_to_form(project.info, form)
