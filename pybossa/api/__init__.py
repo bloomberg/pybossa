@@ -402,20 +402,19 @@ def chat_notify(short_name):
             '    User requesting assistance: {user}\n'
             '    Message: {message}\n\n'
             'Slack Url\n'
-            'https://gigwork-dev.slack.com\n'
+            '{url}\n'
             )
 
         body = success_body.format(
             short_name=project.short_name,
             user=current_user.email_addr,
-            message=data.get('message'))
+            message=data.get('message'),
+            url=current_app.config.get('CHAT_URL', None))
 
         # Get email addresses for all owners of the project.
-        recipients = []
-        for user in user_repo.get_users(project.owners_ids):
-            recipients.append(user.email_addr)
-        import pdb
-        pdb.set_trace()
+        recipients = [user.email_addr for user in user_repo.get_users(project.owners_ids)]
+
+        # Send email.
         email = dict(recipients=recipients,
                      subject=subject,
                      body=body)
