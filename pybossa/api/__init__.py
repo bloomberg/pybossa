@@ -392,40 +392,33 @@ def chat_notify(short_name):
     if not project:
         return abort(400)
 
-    try:
-        data = request.json
-        subject = u'Chat session started for project {} by {}'.format(short_name, current_user.email_addr)
-        success_body = (
-            u'A user has started a chat session on a project that you an owner/co-owner for.\n\n'
-            '    Project Short Name: {short_name}\n'
-            '    User requesting assistance: {user}\n'
-            '    Message: {message}\n\n'
-            'Slack Url\n'
-            '{url}\n'
-            )
+    data = request.json
+    subject = u'Chat session started for project {} by {}'.format(short_name, current_user.email_addr)
+    success_body = (
+        u'A user has started a chat session on a project that you an owner/co-owner for.\n\n'
+        '    Project Short Name: {short_name}\n'
+        '    User requesting assistance: {user}\n'
+        '    Message: {message}\n\n'
+        'Slack Url\n'
+        '{url}\n'
+        )
 
-        body = success_body.format(
-            short_name=project.short_name,
-            user=current_user.email_addr,
-            message=data.get('message'),
-            url=current_app.config.get('CHAT_URL', None))
+    body = success_body.format(
+        short_name=project.short_name,
+        user=current_user.email_addr,
+        message=data.get('message'),
+        url=current_app.config.get('CHAT_URL', None))
 
-        # Get email addresses for all owners of the project.
-        recipients = [user.email_addr for user in user_repo.get_users(project.owners_ids)]
+    # Get email addresses for all owners of the project.
+    recipients = [user.email_addr for user in user_repo.get_users(project.owners_ids)]
 
-        # Send email.
-        email = dict(recipients=recipients,
-                     subject=subject,
-                     body=body)
-        mail_queue.enqueue(send_mail, email)
+    # Send email.
+    email = dict(recipients=recipients,
+                 subject=subject,
+                 body=body)
+    mail_queue.enqueue(send_mail, email)
 
-        return Response(json.dumps({'success': True}), 200, mimetype="application/json")
-    except Exception:
-        current_app.logger.exception(
-            'An error occurred while sending chat notification for project {}'
-            .format(project.short_name))
-
-        return Response(json.dumps({'success': False}), 500, mimetype="application/json")
+    return Response(json.dumps({'success': True}), 200, mimetype="application/json")
 
 
 @jsonpify
