@@ -380,7 +380,6 @@ def get_disqus_sso_api():
 
 
 @jsonpify
-@csrf.exempt
 @blueprint.route('/project/<short_name>/chat', methods=['POST'])
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def chat_notify(short_name):
