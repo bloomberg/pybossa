@@ -1568,3 +1568,16 @@ class TestProjectAPI(TestAPI):
 
         # Verify status code from response.
         assert res.status_code == 400
+
+    @with_context
+    def test_chat_notify_no_auth(self):
+        """Test API Project chat_notify_no_auth."""
+        # Obtain a CSRF key.
+        csrf = self.get_csrf('/account/signin')
+
+        # Make a request to the api.
+        url = '/api/project/invalid/chat'
+        res = self.app.post(url, headers={'X-CSRFToken': csrf}, content_type='application/json', data=None)
+
+        # Verify status code from response.
+        assert res.status_code == 401
