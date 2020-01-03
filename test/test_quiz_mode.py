@@ -79,8 +79,6 @@ class TestScheduler(QuizTest):
         quiz["enabled"] = True
         project.set_quiz(quiz)
 
-        project.info["quiz"]["enabled"] = True
-
         # Enable quiz mode on the user.
         user.set_quiz_status(project, 'in_progress')
 
