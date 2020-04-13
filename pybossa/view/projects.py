@@ -3583,10 +3583,13 @@ def contact(short_name):
 
     subject = u'GIGwork message for project {} by {}'.format(short_name, current_user.email_addr)
     success_body = (
-        u'A GIGwork support request has been sent on a project that you are an owner/co-owner for.\n\n'
+        u'A GIGwork support request has been sent for the project: {project_name}.\n\n'
+        u'    User: {fullname} ({user_name}, {user_id})\n'
+        u'    Email: {email}\n'
+        u'    Message: {message}\n\n'
         u'    Project Name: {project_name}\n'
         u'    Project Short Name: {project_short_name} ({project_id})\n'
-        u'    User Name: {user_name} ({user_id})\n'
+        u'    Referring Url: {referrer}\n'
         u'    Is Admin: {user_admin}\n'
         u'    Is Subadmin: {user_subadmin}\n'
         u'    Is Project Owner: {owner}\n'
@@ -3595,16 +3598,18 @@ def contact(short_name):
         u'    Available Task Runs: {remaining_task_runs}\n'
         u'    Tasks Available to User: {tasks_available_user}\n'
         u'    Tasks Completed by User: {tasks_completed_user}\n'
-        u'    Alternate Email: {email}\n'
-        u'    Message: {message}\n\n'
     )
 
     body = success_body.format(
+        fullname=current_user.fullname,
+        user_name=current_user.name,
+        user_id=current_user.id,
+        email=request.body.get("email", None),
+        message=request.body.get("message", None),
         project_name=project.name,
         project_short_name=project.short_name,
         project_id=project.id,
-        user_name=current_user.name,
-        user_id=current_user.id,
+        referrer=request.headers.get("Referer"),
         user_admin=current_user.admin,
         user_subadmin=current_user.subadmin,
         owner=request.body.get("projectOwner", False),
@@ -3612,9 +3617,7 @@ def contact(short_name):
         total_task_runs=request.body.get("totalTaskRuns", 0),
         remaining_task_runs=request.body.get("remainingTasksRuns", 0),
         tasks_available_user=request.body.get("tasksAvailableUser", 0),
-        tasks_completed_user=request.body.get("tasksCompletedUser", 0),
-        email=request.body.get("email", None),
-        message=request.body.get("message", None)
+        tasks_completed_user=request.body.get("tasksCompletedUser", 0)
     )
 
     # Get email addresses for all owners of the project.
