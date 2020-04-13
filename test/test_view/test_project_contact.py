@@ -15,15 +15,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from bs4 import BeautifulSoup
-
 import json
-from default import Test, db, with_context
+from default import Test, with_context
 from helper.web import Helper
 from factories import ProjectFactory, UserFactory
 from mock import patch
-from rq import Queue
-from pybossa.core import project_repo
 
 class TestProjectContact(Helper):
 
@@ -35,8 +31,6 @@ class TestProjectContact(Helper):
 
         admin, owner, user = UserFactory.create_batch(3)
         project = ProjectFactory.create(owner=owner, short_name='test-app', name='My New Project')
-
-        #from pybossa.view.projects import mail_queue
 
         # Obtain a CSRF key.
         csrf = self.get_csrf('/account/signin')
