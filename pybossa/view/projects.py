@@ -3575,7 +3575,7 @@ def annotation_config(short_name):
     flash(gettext('Project annotation configurations updated'), 'success')
     return redirect_content_type(url_for('.settings', short_name=project.short_name))
 
-@blueprint.route('/<short_name>/contact', methods=['GET', 'POST'])
+@blueprint.route('/<short_name>/contact', methods=['POST'])
 @login_required
 def contact(short_name):
     result = project_by_shortname(short_name)
