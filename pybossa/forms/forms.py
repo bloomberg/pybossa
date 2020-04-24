@@ -61,14 +61,16 @@ USER_NAME_MAX_LENGTH = 35
 USER_FULLNAME_MAX_LENGTH = 35
 PROJECT_PWD_MIN_LEN = 5
 
+
 def create_nullable_select(label, items):
     return SelectField(
         label=lazy_gettext(label),
-        choices=[(None, "NONE")] + [(x,x) for x in items],
+        choices=[(None, "NONE")] + [(x, x) for x in items],
         coerce=lambda x: None if x == "None" else x
     )
 
-### Custom Validators
+# Custom Validators
+
 
 def is_json(json_type):
     def v(form, field):
@@ -77,6 +79,7 @@ def is_json(json_type):
         except Exception:
             raise validators.ValidationError('Field must be JSON object.')
     return v
+
 
 BooleanField.false_values = {False, 'false', '', 'off', 'n', 'no'}
 
@@ -91,20 +94,21 @@ class ProjectCommonForm(Form):
                            [validators.Required(),
                             pb_validator.NotAllowedChars(),
                             pb_validator.Unique(project_repo.get_by, 'short_name',
-                                message=lazy_gettext(
-                                    "Short Name is already taken.")),
+                                                message=lazy_gettext(
+                                                    "Short Name is already taken.")),
                             pb_validator.ReservedName('project', current_app)])
 
     password = TextField(
-                    lazy_gettext('Password'),
-                    [validators.Required(),
-                        pb_validator.CheckPasswordStrength(
-                                        min_len=PROJECT_PWD_MIN_LEN,
-                                        special=False)],
-                    render_kw={'placeholder': 'Minimum length {} characters, 1 uppercase, 1 lowercase and 1 numeric.'.format(PROJECT_PWD_MIN_LEN)})
+        lazy_gettext('Password'),
+        [validators.Required(),
+         pb_validator.CheckPasswordStrength(
+            min_len=PROJECT_PWD_MIN_LEN,
+            special=False)],
+        render_kw={'placeholder': 'Minimum length {} characters, 1 uppercase, 1 lowercase and 1 numeric.'.format(PROJECT_PWD_MIN_LEN)})
 
     def __init__(self, *args, **kwargs):
         Form.__init__(self, *args, **kwargs)
+
 
 class ProjectForm(ProjectCommonForm):
 
@@ -118,51 +122,58 @@ class ProjectForm(ProjectCommonForm):
                              [validators.Required()], choices=[("", "")], default="")
 
     kpi = DecimalField(lazy_gettext('KPI - Estimate of amount of minutes to complete one task (0.1-120)'), places=2,
-        validators=[validators.Required(), NumberRange(Decimal('0.1'), 120)])
+                       validators=[validators.Required(), NumberRange(Decimal('0.1'), 120)])
+
 
 class ProjectUpdateForm(ProjectForm):
     id = IntegerField(label=None, widget=HiddenInput())
     description = TextAreaField(lazy_gettext('Description'),
-                            [validators.Required(
-                                message=lazy_gettext(
-                                    "You must provide a description.")),
-                             validators.Length(max=255)])
+                                [validators.Required(
+                                    message=lazy_gettext(
+                                        "You must provide a description.")),
+                                 validators.Length(max=255)])
     short_name = TextField(label=None, widget=HiddenInput())
     long_description = TextAreaField(lazy_gettext('Long Description'))
-    allow_anonymous_contributors = BooleanField(lazy_gettext('Allow Anonymous Contributors'))
+    allow_anonymous_contributors = BooleanField(
+        lazy_gettext('Allow Anonymous Contributors'))
     zip_download = BooleanField(lazy_gettext('Allow ZIP data download'))
     category_id = SelectField(lazy_gettext('Category'), coerce=int)
     hidden = BooleanField(lazy_gettext('Hide?'))
     email_notif = BooleanField(lazy_gettext('Email Notifications'))
     password = TextField(
-                    lazy_gettext('Password'),
-                    [validators.Optional(),
-                        pb_validator.CheckPasswordStrength(
-                                        min_len=PROJECT_PWD_MIN_LEN,
-                                        special=False)],
-                    render_kw={'placeholder': 'Minimum length {} characters, 1 uppercase, 1 lowercase and 1 numeric.'.format(PROJECT_PWD_MIN_LEN)})
+        lazy_gettext('Password'),
+        [validators.Optional(),
+         pb_validator.CheckPasswordStrength(
+            min_len=PROJECT_PWD_MIN_LEN,
+            special=False)],
+        render_kw={'placeholder': 'Minimum length {} characters, 1 uppercase, 1 lowercase and 1 numeric.'.format(PROJECT_PWD_MIN_LEN)})
+    #import pdb;pdb.set_trace()
     webhook = TextField(lazy_gettext('Webhook'),
                         [pb_validator.Webhook()])
     sync_enabled = BooleanField(lazy_gettext('Enable Project Syncing'))
+
 
 class AnnotationForm(Form):
     dataset_description = TextAreaField(lazy_gettext('Dataset Description'))
     provider = create_nullable_select(
         'Annotation Provider',
-        ["PERSONNEL","VENDOR","CONTINGENT_WORKER","FREELANCER","CROWDSOURCING_WORKER"]
+        ["PERSONNEL", "VENDOR", "CONTINGENT_WORKER",
+            "FREELANCER", "CROWDSOURCING_WORKER"]
     )
-    restrictions_and_permissioning = TextAreaField(lazy_gettext('Restrictions & Permissioning'))
+    restrictions_and_permissioning = TextAreaField(
+        lazy_gettext('Restrictions & Permissioning'))
     sampling_method = create_nullable_select(
         'Sampling Method',
-        ["RANDOM","SYSTEMATIC","STRATIFIED","CLUSTERED"]
+        ["RANDOM", "SYSTEMATIC", "STRATIFIED", "CLUSTERED"]
     )
     sampling_script = TextField(lazy_gettext('Sampling Script Link'))
     label_aggregation_strategy = create_nullable_select(
         'Label Aggregation Strategy',
-        ["MAJORITY","WORKER_TRUST"]
+        ["MAJORITY", "WORKER_TRUST"]
     )
     task_input_schema = TextAreaField(lazy_gettext('Task Input Schema'))
     task_output_schema = TextAreaField(lazy_gettext('Task Output Schema'))
+
 
 class ProjectSyncForm(Form):
     target_key = TextField(lazy_gettext('API Key'))
@@ -173,15 +184,18 @@ class ProjectQuizForm(Form):
     questions = IntegerField(
         lazy_gettext('Number of questions per quiz'),
         [
-            validators.InputRequired(lazy_gettext('This field must be a positive integer.')),
+            validators.InputRequired(lazy_gettext(
+                'This field must be a positive integer.')),
             validators.NumberRange(min=1)
         ]
     )
     passing = IntegerField(
         lazy_gettext('Number of correct answers to pass quiz'),
         [
-            validators.InputRequired(lazy_gettext('This field must be a non-negative integer.')),
-            validators.NumberRange(min=0) # Making this 0 to allow quizzes with free-form answers.
+            validators.InputRequired(lazy_gettext(
+                'This field must be a non-negative integer.')),
+            # Making this 0 to allow quizzes with free-form answers.
+            validators.NumberRange(min=0)
         ]
     )
     completion_mode = SelectField(
@@ -205,23 +219,25 @@ class ProjectQuizForm(Form):
                 )
             )
 
+
 class TaskPresenterForm(Form):
     id = IntegerField(label=None, widget=HiddenInput())
     editor = TextAreaField('')
     guidelines = TextAreaField('')
 
+
 class TaskDefaultRedundancyForm(Form):
     default_n_answers = IntegerField(lazy_gettext('Default Redundancy'),
-                           [validators.Required(),
-                            validators.NumberRange(
-                                min=task_repo.MIN_REDUNDANCY,
-                                max=task_repo.MAX_REDUNDANCY,
-                                message=lazy_gettext(
-                                    'Number of answers should be a \
+                                     [validators.Required(),
+                                      validators.NumberRange(
+                                         min=task_repo.MIN_REDUNDANCY,
+                                         max=task_repo.MAX_REDUNDANCY,
+                                         message=lazy_gettext(
+                                             'Number of answers should be a \
                                      value between {} and {:,}'.format(
-                                        task_repo.MIN_REDUNDANCY,
-                                        task_repo.MAX_REDUNDANCY
-                                    )))])
+                                                 task_repo.MIN_REDUNDANCY,
+                                                 task_repo.MAX_REDUNDANCY
+                                             )))])
 
 
 class TaskRedundancyForm(Form):
@@ -255,9 +271,9 @@ class TaskTimeoutForm(Form):
     max_minutes = 120
     minutes = IntegerField(lazy_gettext('Minutes (default 60)'),
                            [validators.NumberRange(
-                                min=0,
-                                max=max_minutes
-                            )])
+                               min=0,
+                               max=max_minutes
+                           )])
     seconds = IntegerField(lazy_gettext('Seconds (0 to 59)'),
                            [validators.NumberRange(min=0, max=59)])
 
@@ -268,18 +284,22 @@ class TaskTimeoutForm(Form):
 
 
 class TaskNotificationForm(Form):
-    remaining = IntegerField(lazy_gettext('Notify when the number of remaining tasks is less than or equal to'))
+    remaining = IntegerField(lazy_gettext(
+        'Notify when the number of remaining tasks is less than or equal to'))
 
 
 class TaskSchedulerForm(Form):
-    _translate_names = lambda variant: (variant[0], lazy_gettext(variant[1]))
+    def _translate_names(variant): return (
+        variant[0], lazy_gettext(variant[1]))
     _choices = map(_translate_names, sched_variants())
     sched = SelectField(lazy_gettext('Task Scheduler'), choices=_choices)
-    rand_within_priority = BooleanField(lazy_gettext('Randomize Within Priority'))
+    rand_within_priority = BooleanField(
+        lazy_gettext('Randomize Within Priority'))
     gold_task_probability_validator = validators.NumberRange(
         min=0,
         max=1,
-        message=lazy_gettext('Gold task probability must be a value between 0.0 and 1.0')
+        message=lazy_gettext(
+            'Gold task probability must be a value between 0.0 and 1.0')
     )
     gold_task_probability = DecimalField(
         label=lazy_gettext('Gold Probability'),
@@ -289,7 +309,8 @@ class TaskSchedulerForm(Form):
 
     @classmethod
     def update_sched_options(cls, new_options):
-        _translate_names = lambda variant: (variant[0], lazy_gettext(variant[1]))
+        def _translate_names(variant): return (
+            variant[0], lazy_gettext(variant[1]))
         _choices = map(_translate_names, new_options)
         cls.sched.kwargs['choices'] = _choices
 
@@ -297,15 +318,15 @@ class TaskSchedulerForm(Form):
 class AnnouncementForm(Form):
     id = IntegerField(label=None, widget=HiddenInput())
     title = TextField(lazy_gettext('Title'),
-                     [validators.Required(message=lazy_gettext(
-                                    "You must enter a title for the post."))])
+                      [validators.Required(message=lazy_gettext(
+                          "You must enter a title for the post."))])
     body = TextAreaField(lazy_gettext('Body'),
-                           [validators.Required(message=lazy_gettext(
-                                    "You must enter some text for the post."))])
+                         [validators.Required(message=lazy_gettext(
+                             "You must enter some text for the post."))])
     info = TextField(lazy_gettext('Info'),
-                       [validators.Required(message=lazy_gettext(
-                                "You must enter a level for the post.")),
-                       is_json(dict)])
+                     [validators.Required(message=lazy_gettext(
+                         "You must enter a level for the post.")),
+                      is_json(dict)])
     media_url = TextField(lazy_gettext('URL'))
     published = BooleanField(lazy_gettext('Publish'))
 
@@ -313,18 +334,18 @@ class AnnouncementForm(Form):
 class BlogpostForm(Form):
     id = IntegerField(label=None, widget=HiddenInput())
     title = TextField(lazy_gettext('Title'),
-                     [validators.Required(message=lazy_gettext(
-                                    "You must enter a title for the post."))])
+                      [validators.Required(message=lazy_gettext(
+                          "You must enter a title for the post."))])
     body = TextAreaField(lazy_gettext('Body'),
-                           [validators.Required(message=lazy_gettext(
-                                    "You must enter some text for the post."))])
+                         [validators.Required(message=lazy_gettext(
+                             "You must enter some text for the post."))])
     published = BooleanField(lazy_gettext('Publish'))
 
 
 class PasswordForm(Form):
     password = PasswordField(lazy_gettext('Password'),
-                        [validators.Required(message=lazy_gettext(
-                                    "You must enter a password"))])
+                             [validators.Required(message=lazy_gettext(
+                                 "You must enter a password"))])
 
 
 class BulkTaskCSVImportForm(Form):
@@ -356,11 +377,13 @@ class BulkTaskGDImportForm(Form):
 class BulkTaskLocalCSVImportForm(Form):
     form_name = TextField(label=None, widget=HiddenInput(), default='localCSV')
     do_not_validate_tp = BooleanField(
-        label=lazy_gettext("Do not require all fields used in task presenter code to be present in the csv file"),
+        label=lazy_gettext(
+            "Do not require all fields used in task presenter code to be present in the csv file"),
         default=False
     )
 
     _allowed_extensions = set(['csv'])
+
     def _allowed_file(self, filename):
         return '.' in filename and \
             filename.rsplit('.', 1)[1] in self._allowed_extensions
@@ -377,7 +400,8 @@ class BulkTaskLocalCSVImportForm(Form):
                 os.makedirs(filepath)
             return filepath
 
-        current_app.logger.error('Failed to generate upload path {0}'.format(filepath))
+        current_app.logger.error(
+            'Failed to generate upload path {0}'.format(filepath))
         raise IOError('Local Upload folder is missing: {0}'.format(filepath))
 
     def get_import_data(self):
@@ -400,7 +424,8 @@ class BulkTaskLocalCSVImportForm(Form):
 
 
 class BulkTaskEpiCollectPlusImportForm(Form):
-    form_name = TextField(label=None, widget=HiddenInput(), default='epicollect')
+    form_name = TextField(
+        label=None, widget=HiddenInput(), default='epicollect')
     msg_required = lazy_gettext("You must provide an EpiCollect Plus "
                                 "project name")
     msg_form_required = lazy_gettext("You must provide a Form name "
@@ -421,6 +446,7 @@ class BulkTaskFlickrImportForm(Form):
     msg_required = lazy_gettext("You must provide a valid Flickr album ID")
     album_id = TextField(lazy_gettext('Album ID'),
                          [validators.Required(message=msg_required)])
+
     def get_import_data(self):
         return {'type': 'flickr', 'album_id': self.album_id.data}
 
@@ -428,6 +454,7 @@ class BulkTaskFlickrImportForm(Form):
 class BulkTaskDropboxImportForm(Form):
     form_name = TextField(label=None, widget=HiddenInput(), default='dropbox')
     files = FieldList(TextField(label=None, widget=HiddenInput()))
+
     def get_import_data(self):
         return {'type': 'dropbox', 'files': self.files.data}
 
@@ -439,6 +466,7 @@ class BulkTaskTwitterImportForm(Form):
                        [validators.Required(message=msg_required)])
     max_tweets = IntegerField(lazy_gettext('Number of tweets'))
     user_credentials = TextField(label=None)
+
     def get_import_data(self):
         return {
             'type': 'twitter',
@@ -452,12 +480,14 @@ class BulkTaskYoutubeImportForm(Form):
     form_name = TextField(label=None, widget=HiddenInput(), default='youtube')
     msg_required = lazy_gettext("You must provide a valid playlist")
     playlist_url = URLField(lazy_gettext('Playlist'),
-                             [validators.Required(message=msg_required)])
+                            [validators.Required(message=msg_required)])
+
     def get_import_data(self):
         return {
-          'type': 'youtube',
-          'playlist_url': self.playlist_url.data
+            'type': 'youtube',
+            'playlist_url': self.playlist_url.data
         }
+
 
 class BulkTaskS3ImportForm(Form):
     form_name = TextField(label=None, widget=HiddenInput(), default='s3')
@@ -465,12 +495,14 @@ class BulkTaskS3ImportForm(Form):
     msg_required = lazy_gettext("You must provide a valid bucket")
     bucket = TextField(lazy_gettext('Bucket'),
                        [validators.Required(message=msg_required)])
+
     def get_import_data(self):
         return {
             'type': 's3',
             'files': self.files.data,
             'bucket': self.bucket.data
         }
+
 
 class BulkTaskIIIFImportForm(Form):
     form_name = TextField(label=None, widget=HiddenInput(), default='iiif')
@@ -479,7 +511,7 @@ class BulkTaskIIIFImportForm(Form):
                            "You must provide a valid URL")
     manifest_uri = TextField(lazy_gettext('URL'),
                              [validators.Required(message=msg_required),
-                             validators.URL(message=msg_url)])
+                              validators.URL(message=msg_url)])
     version = SelectField(lazy_gettext('Presentation API version'), choices=[
         (ctx, ctx) for ctx in ManifestReader.contexts
     ], default='2.1')
@@ -514,7 +546,7 @@ class GenericBulkTaskImportForm(object):
         return self._forms[form_name](*form_args, **form_kwargs)
 
 
-### Forms for account view
+# Forms for account view
 
 class LoginForm(Form):
 
@@ -543,21 +575,21 @@ class RegisterForm(Form):
                            "characters long", username_length=USER_NAME_MAX_LENGTH)
     err_msg_2 = lazy_gettext("The user name is already taken")
     name = TextField(lazy_gettext('User name'),
-                         [
-                          validators.Length(min=3, max=USER_NAME_MAX_LENGTH, message=err_msg),
-                          pb_validator.NotAllowedChars(),
-                          pb_validator.Unique(user_repo.get_by, 'name', err_msg_2),
-                          pb_validator.ReservedName('account', current_app)])
+                     [
+        validators.Length(min=3, max=USER_NAME_MAX_LENGTH, message=err_msg),
+        pb_validator.NotAllowedChars(),
+        pb_validator.Unique(user_repo.get_by, 'name', err_msg_2),
+        pb_validator.ReservedName('account', current_app)])
 
     err_msg = lazy_gettext("Email must be between 3 and %(email_length)s "
                            "characters long", email_length=EMAIL_MAX_LENGTH)
     err_msg_2 = lazy_gettext("Email is already taken")
     email_addr = EmailField(lazy_gettext('Email Address'),
-                           [validators.Length(min=3,
-                                              max=EMAIL_MAX_LENGTH,
-                                              message=err_msg),
-                            validators.Email(),
-                            pb_validator.UniqueCaseInsensitive(
+                            [validators.Length(min=3,
+                                               max=EMAIL_MAX_LENGTH,
+                                               message=err_msg),
+                             validators.Email(),
+                             pb_validator.UniqueCaseInsensitive(
                                 user_repo.search_by_email,
                                 'email_addr',
                                 err_msg_2)])
@@ -566,19 +598,20 @@ class RegisterForm(Form):
     err_msg_2 = lazy_gettext("Passwords must match")
     if enable_strong_password:
         password = PasswordField(
-                        lazy_gettext('New Password'),
-                        [validators.Required(err_msg),
-                         validators.EqualTo('confirm', err_msg_2),
-                         pb_validator.CheckPasswordStrength()])
+            lazy_gettext('New Password'),
+            [validators.Required(err_msg),
+             validators.EqualTo('confirm', err_msg_2),
+             pb_validator.CheckPasswordStrength()])
     else:
         password = PasswordField(
-                        lazy_gettext('New Password'),
-                        [validators.Required(err_msg),
-                            validators.EqualTo('confirm', err_msg_2)])
+            lazy_gettext('New Password'),
+            [validators.Required(err_msg),
+             validators.EqualTo('confirm', err_msg_2)])
 
     confirm = PasswordField(lazy_gettext('Repeat Password'))
     project_slug = SelectMultipleField(lazy_gettext('Project'), choices=[])
-    consent = BooleanField(default='checked', false_values=("False", "false", '', '0', 0))
+    consent = BooleanField(default='checked', false_values=(
+        "False", "false", '', '0', 0))
 
     def generate_password(self):
         if self.data['password']:
@@ -595,7 +628,7 @@ class UpdateProfileForm(Form):
     id = IntegerField(label=None, widget=HiddenInput())
 
     err_msg = lazy_gettext("Full name must be between 3 and %(fullname)s "
-                           "characters long" , fullname=USER_FULLNAME_MAX_LENGTH)
+                           "characters long", fullname=USER_FULLNAME_MAX_LENGTH)
     fullname = TextField(lazy_gettext('Full name'),
                          [validators.Length(min=3, max=USER_FULLNAME_MAX_LENGTH, message=err_msg)])
 
@@ -612,11 +645,11 @@ class UpdateProfileForm(Form):
                            "characters long", email_length=EMAIL_MAX_LENGTH)
     err_msg_2 = lazy_gettext("Email is already taken")
     email_addr = EmailField(lazy_gettext('Email Address'),
-                           [validators.Length(min=3,
-                                              max=EMAIL_MAX_LENGTH,
-                                              message=err_msg),
-                            validators.Email(),
-                            pb_validator.Unique(user_repo.get_by, 'email_addr', err_msg_2)])
+                            [validators.Length(min=3,
+                                               max=EMAIL_MAX_LENGTH,
+                                               message=err_msg),
+                             validators.Email(),
+                             pb_validator.Unique(user_repo.get_by, 'email_addr', err_msg_2)])
     subscribed = BooleanField(lazy_gettext('Get email notifications'))
 
     locale = SelectField(lazy_gettext('Language'))
@@ -642,15 +675,15 @@ class ChangePasswordForm(Form):
     err_msg_2 = lazy_gettext("Passwords must match")
     if enable_strong_password:
         new_password = PasswordField(
-                        lazy_gettext('New Password'),
-                        [validators.Required(err_msg),
-                            pb_validator.CheckPasswordStrength(),
-                            validators.EqualTo('confirm', err_msg_2)])
+            lazy_gettext('New Password'),
+            [validators.Required(err_msg),
+             pb_validator.CheckPasswordStrength(),
+             validators.EqualTo('confirm', err_msg_2)])
     else:
         new_password = PasswordField(
-                        lazy_gettext('New password'),
-                        [validators.Required(err_msg),
-                            validators.EqualTo('confirm', err_msg_2)])
+            lazy_gettext('New password'),
+            [validators.Required(err_msg),
+             validators.EqualTo('confirm', err_msg_2)])
     confirm = PasswordField(lazy_gettext('Repeat password'))
 
 
@@ -662,15 +695,15 @@ class ResetPasswordForm(Form):
     err_msg_2 = lazy_gettext("Passwords must match")
     if enable_strong_password:
         new_password = PasswordField(
-                        lazy_gettext('New Password'),
-                        [validators.Required(err_msg),
-                            pb_validator.CheckPasswordStrength(),
-                            validators.EqualTo('confirm', err_msg_2)])
+            lazy_gettext('New Password'),
+            [validators.Required(err_msg),
+             pb_validator.CheckPasswordStrength(),
+             validators.EqualTo('confirm', err_msg_2)])
     else:
         new_password = PasswordField(
-                        lazy_gettext('New Password'),
-                        [validators.Required(err_msg),
-                            validators.EqualTo('confirm', err_msg_2)])
+            lazy_gettext('New Password'),
+            [validators.Required(err_msg),
+             validators.EqualTo('confirm', err_msg_2)])
     confirm = PasswordField(lazy_gettext('Repeat Password'))
 
 
@@ -681,10 +714,10 @@ class ForgotPasswordForm(Form):
     err_msg = lazy_gettext("Email must be between 3 and %(email_length)s "
                            "characters long", email_length=EMAIL_MAX_LENGTH)
     email_addr = EmailField(lazy_gettext('Email Address'),
-                           [validators.Length(min=3,
-                                              max=EMAIL_MAX_LENGTH,
-                                              message=err_msg),
-                            validators.Email()])
+                            [validators.Length(min=3,
+                                               max=EMAIL_MAX_LENGTH,
+                                               message=err_msg),
+                             validators.Email()])
 
 
 class PasswordResetKeyForm(Form):
@@ -699,7 +732,7 @@ class OTPForm(Form):
                         'You must provide a valid OTP code'))])
 
 
-### Forms for admin view
+# Forms for admin view
 
 class SearchForm(Form):
     user = TextField(lazy_gettext('User'))
@@ -715,7 +748,7 @@ class CategoryForm(Form):
                             [validators.Required()])
 
 
-### Common forms
+# Common forms
 class AvatarUploadForm(Form):
     id = IntegerField(label=None, widget=HiddenInput())
     avatar = FileField(lazy_gettext('Avatar'),
@@ -728,8 +761,10 @@ class AvatarUploadForm(Form):
 
 
 class BulkUserCSVImportForm(Form):
-    form_name = TextField(label=None, widget=HiddenInput(), default='usercsvimport')
+    form_name = TextField(label=None, widget=HiddenInput(),
+                          default='usercsvimport')
     _allowed_extensions = set(['csv'])
+
     def _allowed_file(self, filename):
         return '.' in filename and \
             filename.rsplit('.', 1)[1] in self._allowed_extensions
@@ -765,29 +800,29 @@ class UserPrefMetadataForm(Form):
     """Form for admins to add metadata for users or for users to update their
     own metadata"""
     languages = Select2Field(
-        lazy_gettext('Language(s)'), choices=[],default="")
+        lazy_gettext('Language(s)'), choices=[], default="")
     locations = Select2Field(
         lazy_gettext('Location(s)'), choices=[], default="")
     work_hours_from = TimeField(
         lazy_gettext('Work Hours From'),
         [TimeFieldsValidator(["work_hours_to", "timezone"],
-        message="Work Hours From, Work Hours To, and Timezone must be filled out for submission")],
+                             message="Work Hours From, Work Hours To, and Timezone must be filled out for submission")],
         default='')
     work_hours_to = TimeField(
         lazy_gettext('Work Hours To'),
         [TimeFieldsValidator(["work_hours_from", "timezone"],
-        message="Work Hours From, Work Hours To, and Timezone must be filled out for submission")],
+                             message="Work Hours From, Work Hours To, and Timezone must be filled out for submission")],
         default='')
     timezone = SelectField(lazy_gettext('Timezone'),
-        [TimeFieldsValidator(["work_hours_from", "work_hours_to"],
-        message="Work Hours From, Work Hours To, and Timezone must be filled out for submission")],
-        choices=[], default="")
+                           [TimeFieldsValidator(["work_hours_from", "work_hours_to"],
+                                                message="Work Hours From, Work Hours To, and Timezone must be filled out for submission")],
+                           choices=[], default="")
     user_type = SelectField(
         lazy_gettext('Type of user'), [validators.Required()], choices=[], default="")
     if data_access.data_access_levels:
         data_access = Select2Field(
             lazy_gettext('Data Access(s)'), [validators.Required(),
-                pb_validator.UserTypeValiadator()],
+                                             pb_validator.UserTypeValiadator()],
             choices=data_access.data_access_levels['valid_access_levels'], default="")
     review = TextAreaField(
         lazy_gettext('Additional comments'), default="")
@@ -814,19 +849,22 @@ class UserPrefMetadataForm(Form):
     def is_disabled(self, field):
         return self._disabled.get(field, False)
 
+
 class TransferOwnershipForm(Form):
     email_addr = EmailField(lazy_gettext('Email of the new owner'))
 
 
 class RegisterFormWithUserPrefMetadata(RegisterForm, UserPrefMetadataForm):
     """Create User Form that has ability to set user preferences and metadata"""
-    consent = BooleanField(default='checked', false_values=("False", "false", '', '0', 0))
+    consent = BooleanField(default='checked', false_values=(
+        "False", "false", '', '0', 0))
 
 
 class DataAccessForm(Form):
     """Form to configure data access levels"""
 
-    #for future extensions
+    # for future extensions
+
 
 class ProjectReportForm(Form):
     """Register Form Class for generating project report."""
