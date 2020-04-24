@@ -32,6 +32,7 @@ from pybossa.model.category import Category
 from pybossa.model.blogpost import Blogpost
 import re
 
+
 class Project(db.Model, DomainObject):
     '''A microtasking Project to which Tasks are associated.
     '''
@@ -77,12 +78,14 @@ class Project(db.Model, DomainObject):
     #: If emails are sent to users about new tasks
     email_notif = Column(Boolean, default=False)
 
-    tasks = relationship(Task, cascade='all, delete, delete-orphan', backref='project')
+    tasks = relationship(
+        Task, cascade='all, delete, delete-orphan', backref='project')
     task_runs = relationship(TaskRun, backref='project',
                              cascade='all, delete-orphan',
                              order_by='TaskRun.finish_time.desc()')
     category = relationship(Category)
-    blogposts = relationship(Blogpost, cascade='all, delete-orphan', backref='project')
+    blogposts = relationship(
+        Blogpost, cascade='all, delete-orphan', backref='project')
     owners_ids = Column(MutableList.as_mutable(ARRAY(Integer)), default=list())
 
     def needs_password(self):
@@ -222,5 +225,6 @@ class Project(db.Model, DomainObject):
 
     def set_gold_task_probability(self, value):
         self.info['sched_gold_task_probability'] = float(value)
+
 
 Index('project_owner_id_idx', Project.owner_id)

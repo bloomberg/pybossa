@@ -1,0 +1,19 @@
+{
+  "folders": [
+    {
+      "path": "../.."
+    },
+    {
+      "path": "../../../gigwork-docker-dev"
+    },
+    {
+      "path": "../../../annotation-management-platform-ui"
+    },
+    {
+      "path": "../../../../class-demos"
+    }
+  ],
+  "settings": {
+    "git.ignoreLimitWarning": true
+  }
+}

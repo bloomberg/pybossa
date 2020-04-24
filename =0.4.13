@@ -1,0 +1,6 @@
+Defaulting to user installation because normal site-packages is not writeable
+Looking in indexes: https://artprod.dev.bloomberg.com/artifactory/api/pypi/bloomberg-pypi/simple
+Collecting python-magic
+  Downloading https://artprod.dev.bloomberg.com/artifactory/api/pypi/bloomberg-pypi/packages/packages/42/a1/76d30c79992e3750dac6790ce16f056f870d368ba142f83f75f694d93001/python_magic-0.4.15-py2.py3-none-any.whl (5.5 kB)
+Installing collected packages: python-magic
+Successfully installed python-magic-0.4.15
