@@ -11,6 +11,9 @@
     },
     {
       "path": "../../../../class-demos"
+    },
+    {
+      "path": "../../../pybossa-default-theme"
     }
   ],
   "settings": {
