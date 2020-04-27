@@ -1,8 +1,0 @@
-Defaulting to user installation because normal site-packages is not writeable
-Looking in indexes: https://artprod.dev.bloomberg.com/artifactory/api/pypi/bloomberg-pypi/simple
-Collecting cffi
-  Using cached https://artprod.dev.bloomberg.com/artifactory/api/pypi/bloomberg-pypi/packages/packages/14/ef/8fb81a8ebde3eb113a412a7548afb0b19c7d1793992039f4be26b2074e81/cffi-1.14.0-cp27-cp27m-macosx_10_9_x86_64.whl (173 kB)
-Collecting pycparser
-  Using cached https://artprod.dev.bloomberg.com/artifactory/api/pypi/bloomberg-pypi/packages/packages/ae/e7/d9c3a176ca4b02024debf82342dab36efadfc5776f9c8db077e8f6e71821/pycparser-2.20-py2.py3-none-any.whl (112 kB)
-Installing collected packages: pycparser, cffi
-Successfully installed cffi-1.14.0 pycparser-2.20
