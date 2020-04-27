@@ -51,3 +51,5 @@ env3/
 *.bak
 *.orig
 tags
+node_modules/
+node_modules/
