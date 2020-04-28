@@ -562,6 +562,81 @@ class TestPybossaUtil(Test):
                 for item in row:
                     assert item in fake_csv[0], err_msg
 
+    @with_context
+    def test_csv_validate_required_fields_accept_string(self):
+        """Test validate_required_fields against csv data
+        with data_access, data_source_id (string), data_owner (string).
+        Ignore numeric validation."""
+        patch_dict = {'TASK_REQUIRED_FIELDS': {
+            'data_owner': {'val': None, 'check_val': False},
+            'data_source_id': {'val': None, 'check_val': False}}}
+        with patch.dict(self.flask_app.config, patch_dict):
+            fake_csv = 'line,data_access,data_source_id,data_owner\ntest,"[""L4""]",123,abc'
+            csvreader = csv.reader(fake_csv.splitlines())
+            csviterator = iter(csvreader)
+
+            index = 0
+            for row in csviterator:
+                if index == 0:
+                    # Read csv header.
+                    headers = row
+                else:
+                    # Read csv data and check required fields.
+                    fvals = {headers[idx]: cell for idx, cell in enumerate(row)}
+                    invalid_fields = util.validate_required_fields(fvals)
+                    assert len(invalid_fields) == 0
+                index = index + 1
+
+    @with_context
+    def test_csv_validate_required_fields_accept_numeric(self):
+        """Test validate_required_fields against csv data
+        with data_access, data_source_id (integer), data_owner (integer).
+        Include numeric validation."""
+        patch_dict = {'TASK_REQUIRED_FIELDS': {
+            'data_access': {'val': None, 'check_val': False},
+            'data_owner': {'val': None, 'check_val': False, 'require_int': True},
+            'data_source_id': {'val': None, 'check_val': False, 'require_int': True}}}
+        with patch.dict(self.flask_app.config, patch_dict):
+            fake_csv = ('line,data_access,data_source_id,data_owner\n'
+                'test,"[""L4""]",123.0,456\n'
+                'test,"[""L4""]",123.6,456\n'
+                'test,"[""L4""]",abc,456\n'
+                'test,"[""L4""]",,456\n'
+                'test,"[""L4""]",123,456.0\n'
+                'test,"[""L4""]",123,456.6\n'
+                'test,"[""L4""]",123,abc\n'
+                'test,"[""L4""]",123,\n'
+                'test,,123,456\n'
+                'test,"[""L4""]",123,456')
+            csvreader = csv.reader(fake_csv.splitlines())
+            csviterator = iter(csvreader)
+
+            index = 0
+            for row in csviterator:
+                if index == 0:
+                    # Read csv header.
+                    headers = row
+                else:
+                    # Read csv data and check required fields.
+                    fvals = {headers[idx]: cell for idx, cell in enumerate(row)}
+                    invalid_fields = util.validate_required_fields(fvals)
+                    if index < 5:
+                        # data_source_id must be an integer.
+                        assert len(invalid_fields) == 1
+                        assert 'data_source_id' in invalid_fields
+                    elif index < 9:
+                        # data_owner must be an integer.
+                        assert len(invalid_fields) == 1
+                        assert 'data_owner' in invalid_fields
+                    elif index == 9:
+                        # data_access must have a value.
+                        assert len(invalid_fields) == 1
+                        assert 'data_access' in invalid_fields
+                    else:
+                        # data_source_id, data_owner, data_access are valid.
+                        assert len(invalid_fields) == 0
+                index = index + 1
+
     def test_publish_channel_private(self):
         """Test publish_channel private method works."""
         sentinel = MagicMock()
