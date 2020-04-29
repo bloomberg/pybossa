@@ -649,6 +649,18 @@ class TestPybossaUtil(Test):
         # Validate csv data.
         self.csv_validate_required_fields(config, validate)
 
+    def test_is_int(self):
+        """Test is_int method."""
+        assert util.is_int(1) is True
+        assert util.is_int('1') is True
+        assert util.is_int(1.0) is True
+        assert util.is_int('1.0') is True
+        assert util.is_int(1.1) is False
+        assert util.is_int('1.1') is False
+        assert util.is_int('a') is False
+        assert util.is_int(None) is False
+        assert util.is_int(True) is False
+
     def test_publish_channel_private(self):
         """Test publish_channel private method works."""
         sentinel = MagicMock()
