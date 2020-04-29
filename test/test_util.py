@@ -589,10 +589,9 @@ class TestPybossaUtil(Test):
                 else:
                     # Read csv data and check required fields.
                     fvals = {headers[idx]: cell for idx, cell in enumerate(row)}
-                    invalid_fields = util.validate_required_fields(fvals)
 
                     # Allow client to assert on result.
-                    callback(index, invalid_fields)
+                    callback(index, fvals)
     @with_context
     def test_csv_validate_required_fields_accept_string(self):
         """Test validate_required_fields ignore integer validation."""
@@ -601,7 +600,8 @@ class TestPybossaUtil(Test):
             'data_owner': {'val': None, 'check_val': False},
             'data_source_id': {'val': None, 'check_val': False}}}
 
-        def validate(index, invalid_fields):
+        def validate(index, fvals):
+            invalid_fields = util.validate_required_fields(fvals)
             if index == 4:
                 # data_source_id must have a value.
                 assert len(invalid_fields) == 1
@@ -629,7 +629,8 @@ class TestPybossaUtil(Test):
             'data_owner': {'val': None, 'check_val': False, 'require_int': True},
             'data_source_id': {'val': None, 'check_val': False, 'require_int': True}}}
 
-        def validate(index, invalid_fields):
+        def validate(index, fvals):
+            invalid_fields = util.validate_required_fields(fvals)
             if index < 5:
                 # data_source_id must be an integer.
                 assert len(invalid_fields) == 1
