@@ -341,7 +341,7 @@ def user_progress(project_id=None, short_name=None):
                 total=n_tasks(project.id),
                 completed=n_completed_tasks(project.id),
                 remaining=num_available_tasks,
-                locked=n_locked_tasks(project.id)
+                locked=n_locked_tasks(project.id),
                 remaining_for_user=num_available_tasks_for_user,
                 quiz=current_user.get_quiz_for_project(project),
                 guidelines_updated=guidelines_updated
