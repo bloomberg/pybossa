@@ -4584,8 +4584,8 @@ class TestWeb(web.Helper):
         res = self.app.get("/", follow_redirects=True)
         error_msg = "There should not be a message for subadmin"
         print(res.data)
-        assert announcement.title in res.data, error_msg
-        assert announcement.body in res.data, error_msg
+        assert announcement.title.encode('utf-8') in res.data, error_msg
+        assert announcement.body.encode('utf-8') in res.data, error_msg
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
