@@ -4575,8 +4575,8 @@ class TestWeb(web.Helper):
         res = self.app.get("/", follow_redirects=True)
         error_msg = "There should be a message for admin"
         print(res.data)
-        assert announcement.title in res.data, error_msg
-        assert announcement.body in res.data, error_msg
+        assert announcement.title.encode('utf-8') in res.data, error_msg
+        assert announcement.body.encode('utf-8') in res.data, error_msg
         self.signout()
 
         self.register(subadmin=True)
@@ -4595,8 +4595,8 @@ class TestWeb(web.Helper):
         res = self.app.get("/", follow_redirects=True)
         error_msg = "There should not be a message for anonymous user"
         print(res.data)
-        assert announcement.title not in res.data, error_msg
-        assert announcement.body not in res.data, error_msg
+        assert announcement.title.encode('utf-8') not in res.data, error_msg
+        assert announcement.body.encode('utf-8') not in res.data, error_msg
 
     @with_context
     def test_export_user_json(self):
