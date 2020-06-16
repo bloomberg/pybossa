@@ -27,7 +27,6 @@ from onelogin.saml2.auth import OneLogin_Saml2_Auth
 
 blueprint = Blueprint('bloomberg', __name__)
 
-
 @blueprint.route('/login', methods=['GET', 'POST'])
 @csrf.exempt
 def login():  # pragma: no cover

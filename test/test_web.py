@@ -4574,7 +4574,6 @@ class TestWeb(web.Helper):
         self.signin()
         res = self.app.get("/", follow_redirects=True)
         error_msg = "There should be a message for admin"
-        print(res.data)
         assert announcement.title.encode('utf-8') in res.data, error_msg
         assert announcement.body.encode('utf-8') in res.data, error_msg
         self.signout()
@@ -4583,7 +4582,6 @@ class TestWeb(web.Helper):
         self.signin()
         res = self.app.get("/", follow_redirects=True)
         error_msg = "There should not be a message for subadmin"
-        print(res.data)
         assert announcement.title.encode('utf-8') in res.data, error_msg
         assert announcement.body.encode('utf-8') in res.data, error_msg
 
@@ -4594,7 +4592,6 @@ class TestWeb(web.Helper):
         announcement = AnnouncementFactory.create(published=True, info={'level': 30})
         res = self.app.get("/", follow_redirects=True)
         error_msg = "There should not be a message for anonymous user"
-        print(res.data)
         assert announcement.title.encode('utf-8') not in res.data, error_msg
         assert announcement.body.encode('utf-8') not in res.data, error_msg
 
