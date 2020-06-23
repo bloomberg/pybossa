@@ -71,7 +71,7 @@ class TaskAPI(APIBase):
             if not gold_task and (n_taskruns >= new.n_answers):
                 new.state = 'completed'
         new.calibration = int(gold_task)
-        new.exported = new.disabled or gold_task
+        new.exported = new.disabled if 'disabled' in new or gold_task
 
     def _preprocess_post_data(self, data):
         project_id = data["project_id"]
