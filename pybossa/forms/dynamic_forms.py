@@ -38,7 +38,7 @@ def dynamic_project_form(class_type, form_data, data_access_levels, products=Non
             [validators.Regexp('^([A-Z]{3,4}\s\d+)?$')]) #[validators.Regexp('^$|[A-Z]\s\d')])
 
     generate_form = ProjectFormExtraInputs(form_data, obj=obj)
-    if not form_data:
+    if data_access_levels and not form_data:
         generate_form.amp_store.data = bool(not obj or obj.amp_store)
     return generate_form
 
