@@ -1106,7 +1106,7 @@ def get_user_pref_db_clause(user_pref, user_email=None):
 def is_int(s):
     try:
         value = float(str(s))
-        return value.is_integer() and value >= -2147483648 and value <= 2147483647
+        return value.is_integer() and -2147483648 <= value <= 2147483647
     except:
         return False
 
