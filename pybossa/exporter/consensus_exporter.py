@@ -208,7 +208,7 @@ def format_consensus(rows):
     # }
     rv = []
     local_user_cache = {}
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     for row in rows:
         data = OrderedDict(row)
         task_info = flatten(data.get('task_info', {}), prefix='task_info')
@@ -218,12 +218,10 @@ def format_consensus(rows):
         answer_fields = {k: v.get('answser_field_config', {}) for k, v in consensus['consensus'].items()}
         consensus = flatten(consensus, level=2,
                             ignore=['contributorsMetConsensus', 'answser_field_config'])
-        print(consensus)
         task_runs = data['task_run__info']
         for k, v in consensus.items():
             match = re.match(__KEY_RE, k)
             if match:
-                import pdb; pdb.set_trace()
                 ans_key = match.group('ans_key')
                 for user_pct in v:
                     user_id = user_pct.pop('user_id')
