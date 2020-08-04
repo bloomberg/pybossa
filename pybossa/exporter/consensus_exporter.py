@@ -95,8 +95,10 @@ def get_contributor_answer(data, path, answer_field_config):
         field_data = data.get(field_name, [])
         target_field_data = [d for d in field_data if match_nested_value(d)]
         return target_field_data[0][key] if target_field_data else None
-    else:
+    elif answer_field_config.get('type') in ['categorical', 'freetext']:
         return get_value_by_path(data, paths)
+    else:
+        return None
 
 def get_value_by_path(data, path):
     if not path or not data:
