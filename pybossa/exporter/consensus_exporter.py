@@ -98,15 +98,15 @@ def get_contributor_answer(data, path, answer_field_config):
     else:
         return get_value_by_path(data, paths)
 
-def get_value_by_path(data, path, consensus_type):
+def get_value_by_path(data, path):
     if not path or not data:
         return data
     key = path[0]
     try:
         index = int(key)
-        return get_value_by_path(data[index], path[1:], consensus_type)
+        return get_value_by_path(data[index], path[1:])
     except ValueError:
-        return get_value_by_path(data.get(key), path[1:], consensus_type)
+        return get_value_by_path(data.get(key), path[1:])
 
 
 def format_consensus(rows):

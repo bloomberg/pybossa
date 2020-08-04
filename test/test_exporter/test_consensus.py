@@ -84,12 +84,12 @@ class TestConsensusExporter(Test):
             },
         }
         task_run = {"joe": {'context': {'name': 'hello'}}}
-        rows = dict(task_id=1,
+        rows = [dict(task_id=1,
                     project_id=1,
                     task_run__id=10,
                     task_run__user_id=2,
-                    task_run_info=task_run,
-                    consensus=consensus)
+                    task_run__info=task_run,
+                    consensus={'consensus':consensus} )]
 
         expect = [{
             "contributor_name": "joe",
