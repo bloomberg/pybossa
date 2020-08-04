@@ -117,7 +117,8 @@ def format_consensus(rows):
         task_info = flatten(data.get('task_info', {}), prefix='task_info')
         data.update(task_info)
         consensus = data.pop('consensus') or OrderedDict()
-        answer_fields = {k: v.get('answser_field_config', {}) for k, v in consensus['consensus'].items()}
+        if consensus.get('consensus'):
+            answer_fields = {k: v.get('answser_field_config', {}) for k, v in consensus['consensus'].items()}
         consensus = flatten(consensus, level=2,
                             ignore=['contributorsMetConsensus', 'answser_field_config'])
         task_runs = data['task_run__info']
