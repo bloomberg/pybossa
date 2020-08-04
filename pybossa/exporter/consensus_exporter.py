@@ -78,8 +78,8 @@ def flatten(obj, level=1, prefix=None, sep='__', ignore=tuple()):
 def get_contributor_answer(data, path, answer_field_config):
 
     def match_nested_value(record):
-        match = [record[k] == v for k, v in key_value_pair.items()]
-        return all(patch)
+        match = [str(record[k]) == str(v) for k, v in key_value_pair.items()]
+        return all(match)
 
     if not answer_field_config or not path:
         return None
@@ -89,8 +89,8 @@ def get_contributor_answer(data, path, answer_field_config):
 
         field_name = paths[0]
         key = paths[-1]
-        values = paths[1 : -2]
-        key_value_pair = {key_value[i]: values[i] for i in range(len(key_values))}
+        values = paths[1 : -1]
+        key_value_pair = {key_values[i]: values[i] for i in range(len(key_values))}
 
         field_data = data.get(field_name, [])
         target_field_data = [d for d in field_data if match_nested_value(d)]
@@ -110,111 +110,13 @@ def get_value_by_path(data, path):
 
 
 def format_consensus(rows):
-    # cons = {
-    # "context.0.name": {
-    #     "answser_field_config": {
-    #         "config": {
-    #             "keys": [
-    #             "contract_size",
-    #             "last_delivery_date",
-    #             "last_trade_date",
-    #             "full_exchange_symbol",
-    #             "first_trade_date",
-    #             "first_notice_date",
-    #             "first_delivery_date",
-    #             "tick_size"
-    #             ],
-    #             "keyValues": [
-    #             "month",
-    #             "year"
-    #             ]
-    #         },
-    #         "type": "categorical_nested",
-    #         "retry_for_consensus": False
-    #     },
-    #     "contributorsMetConsensus": [
-    #     894
-    #     ],
-    #     "percentage": 100.0,
-    #     "contributorsConsensusPercentage": [
-    #     {
-    #         "percentage": 100.0,
-    #         "user_id": 894
-    #     }
-    #     ],
-    #     "value": "ywr"
-    # },
-    # "context.1.name": {
-    #     "contributorsMetConsensus": [
-    #     894
-    #     ],
-    #     "percentage": 100.0,
-    #     "contributorsConsensusPercentage": [
-    #     {
-    #         "percentage": 100.0,
-    #         "user_id": 894
-    #     }
-    #     ],
-    #     "value": "ljh"
-    # },
-    # "context.1.addr": {
-    #     "contributorsMetConsensus": [
-    #     894
-    #     ],
-    #     "percentage": 100.0,
-    #     "contributorsConsensusPercentage": [
-    #     {
-    #         "percentage": 100.0,
-    #         "user_id": 894
-    #     }
-    #     ],
-    #     "value": "ny"
-    # },
-    # "context.0.addr": {
-    #     "contributorsMetConsensus": [
-    #     894
-    #     ],
-    #     "percentage": 100.0,
-    #     "contributorsConsensusPercentage": [
-    #     {
-    #         "percentage": 100.0,
-    #         "user_id": 894
-    #     }
-    #     ],
-    #     "value": "nj"
-    # },
-    # "context": {
-    #     "contributorsMetConsensus": [
-    #     894
-    #     ],
-    #     "percentage": 100.0,
-    #     "contributorsConsensusPercentage": [
-    #     {
-    #         "percentage": 100.0,
-    #         "user_id": 894
-    #     }
-    #     ],
-    #     "value": [
-    #     {
-    #         "addr": "nj",
-    #         "name": "ywr"
-    #     },
-    #     {
-    #         "addr": "ny",
-    #         "name": "ljh"
-    #     }
-    #     ]
-    # }
-    # }
     rv = []
     local_user_cache = {}
-    # import pdb; pdb.set_trace()
     for row in rows:
         data = OrderedDict(row)
         task_info = flatten(data.get('task_info', {}), prefix='task_info')
         data.update(task_info)
         consensus = data.pop('consensus') or OrderedDict()
-        # consensus = dict(consensus=cons)
         answer_fields = {k: v.get('answser_field_config', {}) for k, v in consensus['consensus'].items()}
         consensus = flatten(consensus, level=2,
                             ignore=['contributorsMetConsensus', 'answser_field_config'])
