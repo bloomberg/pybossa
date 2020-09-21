@@ -244,11 +244,10 @@ def n_priority_x_tasks(project_id, priority=1.0, include_gold_task=False):
     if include_gold_task:
         query = text('''SELECT COUNT(*) AS n_tasks FROM task
                         WHERE project_id=:project_id AND state = 'ongoing'
-                        AND state !='enrich' AND priority_0=:priority;''')
+                        AND priority_0=:priority;''')
     else:
         query = text('''SELECT COUNT(*) AS n_tasks FROM task
                         WHERE project_id=:project_id AND state = 'ongoing'
-                        AND state !='enrich'
                         AND calibration = 0 AND priority_0=:priority;''')
     result = session.execute(query, dict(project_id=project_id, priority=priority))
     n_tasks = 0
