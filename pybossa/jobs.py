@@ -1202,7 +1202,7 @@ def push_notification(project_id, **kwargs):
 def mail_project_report(info, email_addr):
     from pybossa.core import project_csv_exporter
 
-    recipients = email_addr if isinstance(email_addr, list) else [email_addr],
+    recipients = email_addr if isinstance(email_addr, list) else [email_addr]
     try:
         zipfile = None
         filename = project_csv_exporter.zip_name(info)

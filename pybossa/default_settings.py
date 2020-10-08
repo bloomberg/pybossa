@@ -110,7 +110,6 @@ WEEKLY_UPDATE_STATS = 'Sunday'
 
 # Send emails weekly to admin
 WEEKLY_ADMIN_REPORTS = 'Monday'
-WEEKLY_ADMIN_REPORTS_EMAIL = ['tbarrett@bloomberg.net','aross107@bloomberg.net']
 
 # Enable Server Sent Events
 SSE = False
