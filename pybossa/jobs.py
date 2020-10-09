@@ -1476,7 +1476,7 @@ def export_all_users(fmt, email_addr):
         recipients = email_addr
         current_app.logger.info(u'Scheduling export_all_users job send to admins')
     else:
-        recipients [email_addr]
+        recipients = [email_addr]
 
     try:
         data = {"json": respond_json, "csv": respond_csv}[fmt]()
