@@ -1021,8 +1021,9 @@ def get_weekly_admin_report_jobs():
                     kwargs={},
                     timeout=timeout,
                     queue='low')
+        fmt = 'csv'
         user_report = dict(name=export_all_users,
-                    args=[recipients],
+                    args=[fmt, recipients],
                     kwargs={},
                     timeout=timeout,
                     queue='low')
