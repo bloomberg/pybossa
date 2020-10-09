@@ -190,7 +190,7 @@ class TestWeeklyReport(Test):
         jobs = [job for job in get_weekly_admin_report_jobs()]
         assert len(jobs) == 2
         assert jobs[0]['name'] == mail_project_report
-        assert jobs[0]['args']['info']['user_id'] == 'admin'
+        assert jobs[0]['args'][0]['user_id'] == 'admin'
         assert jobs[0]['timeout'] == self.flask_app.config.get('TIMEOUT')
         assert jobs[0]['queue'] == 'low'
 
