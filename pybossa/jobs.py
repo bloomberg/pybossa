@@ -1204,6 +1204,7 @@ def mail_project_report(info, email_addr):
     from pybossa.core import project_csv_exporter
 
     recipients = email_addr if isinstance(email_addr, list) else [email_addr]
+    current_app.logger.info(u'Scheduling mail_project_report job send to {}'.format(info['user_id']))
     try:
         zipfile = None
         filename = project_csv_exporter.zip_name(info)
@@ -1471,6 +1472,12 @@ def export_all_users(fmt, email_addr):
     def add_headers(writer):
         writer.writerow(exportable_attributes)
 
+    if isinstance(email_addr, list):
+        recipients = email_addr
+        current_app.logger.info(u'Scheduling export_all_users job send to admins')
+    else:
+        recipients [email_addr]
+
     try:
         data = {"json": respond_json, "csv": respond_csv}[fmt]()
         attachment = Attachment(
@@ -1479,7 +1486,7 @@ def export_all_users(fmt, email_addr):
             data
         )
         mail_dict = {
-            'recipients': email_addr if isinstance(email_addr, list) else [email_addr],
+            'recipients': recipients,
             'subject': 'User Export',
             'body': 'Your exported data is attached.',
             'attachments': [attachment]
