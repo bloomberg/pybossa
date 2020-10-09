@@ -1472,10 +1472,9 @@ def export_all_users(fmt, email_addr):
     def add_headers(writer):
         writer.writerow(exportable_attributes)
 
-    recipients = [email_addr]
-    if isinstance(email_addr, list):
-        recipients = email_addr
-        current_app.logger.info(u'Scheduling export_all_users job send to admins')
+    recipients = email_addr if isinstance(email_addr, list) else [email_addr]
+    current_app.logger.info(u'Scheduling export_all_users job send to {} admins/users'
+                            .format(len(recipients)))
 
     try:
         data = {"json": respond_json, "csv": respond_csv}[fmt]()
