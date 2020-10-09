@@ -1008,11 +1008,11 @@ def notify_task_progress(info, email_addr, queue='high'):
 
 def get_weekly_admin_report_jobs():
     """Return email jobs with weekly report to admins"""
-    send_emails_date = current_app.config.get('WEEKLY_ADMIN_REPORTS')
+    send_emails_date = current_app.config.get('WEEKLY_ADMIN_REPORTS').lower()
     recipients = current_app.config.get('WEEKLY_ADMIN_REPORTS_EMAIL')
     today = datetime.today().strftime('%A').lower()
     timeout = current_app.config.get('TIMEOUT')
-    if recipients and today.lower() == send_emails_date.lower():
+    if recipients and today == send_emails_date:
         info = dict(timestamp=datetime.datetime.now().isoformat(),
             user_id="admin",
             base_url=current_app.config.get('SERVER_URL') or '' + '/project/')
