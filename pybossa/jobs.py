@@ -1012,7 +1012,7 @@ def get_weekly_admin_report_jobs():
     recipients = current_app.config.get('WEEKLY_ADMIN_REPORTS_EMAIL')
     today = datetime.today().strftime('%A').lower()
     timeout = current_app.config.get('TIMEOUT')
-    if today.lower() == send_emails_date.lower():
+    if recipients and today.lower() == send_emails_date.lower():
         info = dict(timestamp=datetime.datetime.now().isoformat(),
             user_id="admin",
             base_url=current_app.config.get('SERVER_URL') or '' + '/project/')
@@ -1472,11 +1472,10 @@ def export_all_users(fmt, email_addr):
     def add_headers(writer):
         writer.writerow(exportable_attributes)
 
+    recipients = [email_addr]
     if isinstance(email_addr, list):
         recipients = email_addr
         current_app.logger.info(u'Scheduling export_all_users job send to admins')
-    else:
-        recipients = [email_addr]
 
     try:
         data = {"json": respond_json, "csv": respond_csv}[fmt]()
