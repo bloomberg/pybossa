@@ -1028,7 +1028,7 @@ def get_weekly_admin_report_jobs():
                     timeout=timeout,
                     queue='low')
         job = [project_report, user_report]
-        yield job
+        return iter(job)
 
 def get_weekly_stats_update_projects():
     """Return email jobs with weekly stats update for project owner."""
