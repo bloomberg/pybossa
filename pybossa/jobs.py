@@ -1012,6 +1012,8 @@ def get_weekly_admin_report_jobs():
     recipients = current_app.config.get('WEEKLY_ADMIN_REPORTS_EMAIL')
     today = datetime.today().strftime('%A').lower()
     timeout = current_app.config.get('TIMEOUT')
+    current_app.logger.info(u'Checking weekly report for admins, scheduled date: {}, today: {}'
+                            .format(send_emails_date, today))
     if recipients and today == send_emails_date:
         info = dict(timestamp=datetime.now().isoformat(),
             user_id="admin",
