@@ -1013,7 +1013,7 @@ def get_weekly_admin_report_jobs():
     today = datetime.today().strftime('%A').lower()
     timeout = current_app.config.get('TIMEOUT')
     if recipients and today == send_emails_date:
-        info = dict(timestamp=datetime.datetime.now().isoformat(),
+        info = dict(timestamp=datetime.now().isoformat(),
             user_id="admin",
             base_url=current_app.config.get('SERVER_URL') or '' + '/project/')
         project_report = dict(name=mail_project_report,
