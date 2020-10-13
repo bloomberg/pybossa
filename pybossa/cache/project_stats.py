@@ -315,49 +315,10 @@ def stats_hours(project_id, period='2 week'):
     for row in results:
         max_hours = row.max
 
-    # Get hour stats for Auth users
-    sql = text('''
-               WITH myquery AS
-                (SELECT to_char(
-                    DATE_TRUNC('hour',
-                        TO_TIMESTAMP(finish_time, 'YYYY-MM-DD"T"HH24:MI:SS.US')
-                    ),
-                    'HH24') AS h, COUNT(id)
-                    FROM task_run WHERE project_id=:project_id
-                    AND user_ip IS NULL AND
-                    TO_DATE(task_run.finish_time, 'YYYY-MM-DD\THH24:MI:SS.US')
-                    >= NOW() - :period :: INTERVAL
-                    GROUP BY h)
-               SELECT h, count from myquery;
-               ''').execution_options(stream=True)
-
-    results = session.execute(sql, params)
-
-    for row in results:
-        hours_auth[row.h] = row.count
-
-    # Get maximum stats for Auth users
-    sql = text('''
-               WITH myquery AS
-                (SELECT to_char(
-                    DATE_TRUNC('hour',
-                        TO_TIMESTAMP(finish_time, 'YYYY-MM-DD"T"HH24:MI:SS.US')
-                    ),
-                    'HH24') AS h, COUNT(id)
-                    FROM task_run WHERE project_id=:project_id
-                    AND user_ip IS NULL AND
-                    TO_DATE(task_run.finish_time, 'YYYY-MM-DD\THH24:MI:SS.US')
-                    >= NOW() - :period :: INTERVAL
-                    GROUP BY h)
-               SELECT max(count) from myquery;
-               ''').execution_options(stream=True)
-
-    results = session.execute(sql, params)
-    for row in results:
-        max_hours_auth = row.max
-
-    # Skip Anonymous users' hour stats and maximum stats if DISABLE_ANONYMOUS_ACCESS is True
+    # with anonymous access disabled, auth users and aggr users counts would be same.
+    # reuse aggr user counts for auth users.  
     if app_settings.config.get('DISABLE_ANONYMOUS_ACCESS'):
+        hours_auth, max_hours_auth = hours.copy(), max_hours
         return hours, hours_anon, hours_auth, max_hours, max_hours_anon, \
             max_hours_auth
 
@@ -401,6 +362,47 @@ def stats_hours(project_id, period='2 week'):
     results = session.execute(sql, params)
     for row in results:
         max_hours_anon = row.max
+
+    # Get hour stats for Auth users
+    sql = text('''
+               WITH myquery AS
+                (SELECT to_char(
+                    DATE_TRUNC('hour',
+                        TO_TIMESTAMP(finish_time, 'YYYY-MM-DD"T"HH24:MI:SS.US')
+                    ),
+                    'HH24') AS h, COUNT(id)
+                    FROM task_run WHERE project_id=:project_id
+                    AND user_ip IS NULL AND
+                    TO_DATE(task_run.finish_time, 'YYYY-MM-DD\THH24:MI:SS.US')
+                    >= NOW() - :period :: INTERVAL
+                    GROUP BY h)
+               SELECT h, count from myquery;
+               ''').execution_options(stream=True)
+
+    results = session.execute(sql, params)
+
+    for row in results:
+        hours_auth[row.h] = row.count
+
+    # Get maximum stats for Auth users
+    sql = text('''
+               WITH myquery AS
+                (SELECT to_char(
+                    DATE_TRUNC('hour',
+                        TO_TIMESTAMP(finish_time, 'YYYY-MM-DD"T"HH24:MI:SS.US')
+                    ),
+                    'HH24') AS h, COUNT(id)
+                    FROM task_run WHERE project_id=:project_id
+                    AND user_ip IS NULL AND
+                    TO_DATE(task_run.finish_time, 'YYYY-MM-DD\THH24:MI:SS.US')
+                    >= NOW() - :period :: INTERVAL
+                    GROUP BY h)
+               SELECT max(count) from myquery;
+               ''').execution_options(stream=True)
+
+    results = session.execute(sql, params)
+    for row in results:
+        max_hours_auth = row.max
 
     return hours, hours_anon, hours_auth, max_hours, max_hours_anon, \
         max_hours_auth
