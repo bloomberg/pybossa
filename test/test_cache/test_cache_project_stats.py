@@ -155,7 +155,6 @@ class TestProjectsStatsCache(Test):
         today = datetime.now(pytz.utc)
         TaskFactory.create()
         TaskRunFactory.create(project=pr, task=task)
-        AnonymousTaskRunFactory.create(project=pr)
         hours, hours_anon, hours_auth, max_hours, \
             max_hours_anon, max_hours_auth = stats_hours(pr.id, disable_anonymous_access=True)
         assert len(hours) == 24, len(hours)
