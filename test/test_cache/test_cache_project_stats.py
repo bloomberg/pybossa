@@ -23,6 +23,7 @@ from factories import UserFactory, ProjectFactory, TaskFactory, \
 import pytz
 from datetime import date, datetime, timedelta
 from mock import patch
+import app_settings
 
 
 class TestProjectsStatsCache(Test):
@@ -151,14 +152,15 @@ class TestProjectsStatsCache(Test):
     @with_context
     def test_stats_hours_with_disable_anonymous_access(self):
         """Test CACHE PROJECT STATS hours with disable_anonymous_access works."""
-        patch.dict(self.flask_app.config, {'DISABLE_ANONYMOUS_ACCESS': True})
         pr = ProjectFactory.create()
         task = TaskFactory.create(n_answers=1)
         today = datetime.now(pytz.utc)
         TaskFactory.create()
         TaskRunFactory.create(project=pr, task=task)
-        hours, hours_anon, hours_auth, max_hours, \
-            max_hours_anon, max_hours_auth = stats_hours(pr.id)
+        with patch.dict(app_settings.config, {'DISABLE_ANONYMOUS_ACCESS': 'True'}):
+            hours, hours_anon, hours_auth, max_hours, \
+                max_hours_anon, max_hours_auth = stats_hours(pr.id)
+
         assert len(hours) == 24, len(hours)
         assert hours[today.strftime('%H')] == 1, hours[today.strftime('%H')]
         assert hours_anon[today.strftime('%H')] == 0, hours_anon[today.strftime('%H')]
