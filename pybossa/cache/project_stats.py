@@ -260,7 +260,7 @@ def stats_dates(project_id, period='15 day'):
 
 
 @memoize(timeout=ONE_HOUR)
-def stats_hours(project_id, period='2 week'):
+def stats_hours(project_id, period='2 week', disable_anonymous_access=None):
     """Return statistics of a project per hours."""
     hours = {}
     hours_anon = {}
@@ -317,7 +317,7 @@ def stats_hours(project_id, period='2 week'):
 
     # with anonymous access disabled, auth users and aggr users counts would be same.
     # reuse aggr user counts for auth users.  
-    if app_settings.config.get('DISABLE_ANONYMOUS_ACCESS'):
+    if disable_anonymous_access:
         hours_auth, max_hours_auth = hours.copy(), max_hours
         return hours, hours_anon, hours_auth, max_hours, max_hours_anon, \
             max_hours_auth
@@ -537,7 +537,7 @@ def stats_format_users(project_id, users, anon_users, auth_users):
 def update_stats(project_id, period='2 week'):
     """Update the stats of a given project."""
     hours, hours_anon, hours_auth, max_hours, \
-        max_hours_anon, max_hours_auth = stats_hours(project_id, period)
+        max_hours_anon, max_hours_auth = stats_hours(project_id, period, disable_anonymous_access=app_settings.config.get('DISABLE_ANONYMOUS_ACCESS'))
     users, anon_users, auth_users = stats_users(project_id)
     dates, dates_anon, dates_auth = stats_dates(project_id, period)
 

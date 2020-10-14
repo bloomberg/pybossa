@@ -3508,7 +3508,7 @@ def show_performance_stats(short_name):
                                                                 owner,
                                                                 current_user,
                                                                 ps)
-    _, _, user_ids = stats.stats_users(project.id)
+    _, _, user_ids = stats.stats_users(project.id, disable_anonymous_access=app_settings.config.get('DISABLE_ANONYMOUS_ACCESS'))
 
     can_update = current_user.admin or \
         (current_user.subadmin and current_user.id in project.owners_ids)
