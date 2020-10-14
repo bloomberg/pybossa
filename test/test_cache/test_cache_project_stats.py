@@ -146,3 +146,22 @@ class TestProjectsStatsCache(Test):
         assert max_hours == 1
         assert max_hours_anon is None
         assert max_hours_auth == 1
+
+    @with_context
+    def test_stats_hours_with_disable_anonymous_access(self):
+        """Test CACHE PROJECT STATS hours with disable_anonymous_access works."""
+        pr = ProjectFactory.create()
+        task = TaskFactory.create(n_answers=1)
+        today = datetime.now(pytz.utc)
+        TaskFactory.create()
+        TaskRunFactory.create(project=pr, task=task)
+        AnonymousTaskRunFactory.create(project=pr)
+        hours, hours_anon, hours_auth, max_hours, \
+            max_hours_anon, max_hours_auth = stats_hours(pr.id, disable_anonymous_access=True)
+        assert len(hours) == 24, len(hours)
+        assert hours[today.strftime('%H')] == 1, hours[today.strftime('%H')]
+        assert hours_anon[today.strftime('%H')] == 0, hours_anon[today.strftime('%H')]
+        assert hours_auth[today.strftime('%H')] == 1, hours_auth[today.strftime('%H')]
+        assert max_hours == 1
+        assert max_hours_anon == 0
+        assert max_hours_auth == 1
