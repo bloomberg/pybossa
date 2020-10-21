@@ -109,7 +109,7 @@ ACCOUNT_CONFIRMATION_DISABLED = True
 WEEKLY_UPDATE_STATS = 'Sunday'
 
 # Send emails weekly to admin
-WEEKLY_ADMIN_REPORTS = 'Thursday'
+WEEKLY_ADMIN_REPORTS = 'Monday'
 
 # Enable Server Sent Events
 SSE = False
