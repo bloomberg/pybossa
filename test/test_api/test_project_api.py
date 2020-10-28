@@ -1319,7 +1319,8 @@ class TestProjectAPI(TestAPI):
             owner_id=user.id,
             long_description=u'Long Description\n================',
             info={'task_presenter': '<div>'},
-            published=True)
+            published=True,
+            password='hello_world')
         data = json.dumps(data)
 
         res = self.app.post('/api/project?api_key=' + user.api_key, data=data)
