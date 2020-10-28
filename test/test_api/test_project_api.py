@@ -1310,23 +1310,6 @@ class TestProjectAPI(TestAPI):
         assert error['exception_msg'] == "Reserved keys in payload", error
 
     @with_context
-    def test_project_post_with_published_attribute_is_not_forbidden(self):
-        user = UserFactory.create()
-        data = dict(
-            name='name',
-            short_name='name',
-            description='description',
-            owner_id=user.id,
-            long_description=u'Long Description\n================',
-            info={'task_presenter': '<div>'},
-            published=True,
-            password='hello_world')
-        data = json.dumps(data)
-
-        res = self.app.post('/api/project?api_key=' + user.api_key, data=data)
-        assert res.status_code == 200, res.status_code
-
-    @with_context
     def test_project_update_with_published_attribute_is_not_forbidden(self):
         user = UserFactory.create()
         project = ProjectFactory.create(owner=user)
