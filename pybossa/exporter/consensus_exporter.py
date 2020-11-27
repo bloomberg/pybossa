@@ -133,6 +133,7 @@ def format_consensus(rows):
                     if user_id not in local_user_cache:
                         user_info = get_user_info(user_id) or {'user_id': user_id}
                         local_user_cache[user_id] = user_info
+                    user_info = local_user_cache[user_id]
                     user_name = user_info.get('name')
                     tr = task_runs.get(user_name, {})
                     user_pct['contributor_name'] = user_name
