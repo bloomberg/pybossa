@@ -23,6 +23,7 @@ from flask_login import current_user, login_required
 
 import six
 import requests
+import json
 from werkzeug.exceptions import Forbidden, BadRequest, InternalServerError, NotFound
 
 from pybossa.cache.projects import get_project_data
@@ -158,6 +159,20 @@ def get_encryption_key(project):
         return get_secret_from_vault(project_encryption)
 
 
+def encrypt_task_response_data(task_id, project_id, data):
+    content = None
+    task = task_repo.get_task(task_id)
+    if not (task and isinstance(task.info, dict) and 'private_json__encrypted_payload' in task.info):
+        return content
+
+    project = get_project_data(project_id)
+    secret = get_encryption_key(project)
+    cipher = AESWithGCM(secret)
+    content = json.dumps(data)
+    content = cipher.encrypt(content.encode('utf8')).decode('utf8')
+    return content
+
+
 @blueprint.route('/hdfs/<string:cluster>/<int:project_id>/<path:path>')
 @no_cache
 @login_required
@@ -200,3 +215,64 @@ def hdfs_file(project_id, cluster, path):
         raise InternalServerError('An Error Occurred')
 
     return Response(content)
+
+
+def validate_task(project, task_id, user_id):
+    """Confirm task payload is valid and user is authorized to access task."""
+    task = task_repo.get_task(task_id)
+
+    if not task or task.project_id != project['id']:
+        raise BadRequest('Task does not exist')
+
+    if current_user.admin:
+        return True
+
+    if has_lock(task_id, user_id,
+                project['info'].get('timeout', ContributionsGuard.STAMP_TTL)):
+        return True
+
+    if user_id in project['owners_ids']:
+        return True
+
+    raise Forbidden('FORBIDDEN')
+
+
+@blueprint.route('/encrypted/taskpayload/<int:project_id>/<int:task_id>')
+@no_cache
+@login_required
+def encrypted_task_payload(project_id, task_id):
+    """Proxy to decrypt encrypted task payload"""
+    current_app.logger.info('Project id {}, task id {}, decrypt task payload.'.format(project_id, task_id))
+    signature = request.args.get('task-signature')
+    if not signature:
+        current_app.logger.exception('Project id {}, task id {} has no signature.'.format(project_id, task_id))
+        raise Forbidden('No signature')
+
+    project = get_project_data(project_id)
+    if not project:
+        current_app.logger.exception('Invalid project id {}.'.format(project_id, task_id))
+        raise BadRequest('Invalid Project')
+
+    timeout = project['info'].get('timeout', ContributionsGuard.STAMP_TTL)
+
+    payload = signer.loads(signature, max_age=timeout)
+    task_id = payload.get('task_id', 0)
+
+    validate_task(project, task_id, current_user.id)
+
+    ## decrypt encrypted task data under private_json__encrypted_payload
+    try:
+        secret = get_encryption_key(project)
+        task = task_repo.get_task(task_id)
+        content = task.info.get('private_json__encrypted_payload')
+        if content:
+            cipher = AESWithGCM(secret)
+            content = cipher.decrypt(content)
+        else:
+            content = ''
+    except Exception as e:
+        current_app.logger.exception('Project id {} task {} decrypt encrypted data {}'.format(project_id, task_id, e))
+        raise InternalServerError('An Error Occurred')
+
+    response = Response(content, content_type='application/json')
+    return response
