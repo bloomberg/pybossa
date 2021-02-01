@@ -3026,7 +3026,6 @@ def sync_project(short_name):
     default_sync_target = current_app.config.get('DEFAULT_SYNC_TARGET')
 
     try:
-        raise Exception
         # Validate the ability to sync
         able_to_sync = source_url != default_sync_target
         auth_to_sync = (current_user.admin or
@@ -3122,7 +3121,7 @@ def sync_project(short_name):
         current_app.logger.info(
             'exception type is {}'
             .format(str(exception_type)))
-        msg = gettext('Error: Ensure your production API key is used, your production account is sub-admin and enabled, and the target project is enabled for project syncing')
+        msg = gettext('Error: Ensure your production API key is used, your production account is sub-admin and enabled, and the target project is enabled for project syncing.')
         flash(msg, 'error')
     return redirect_content_type(
         url_for('.publish', short_name=short_name))
