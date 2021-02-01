@@ -8488,7 +8488,7 @@ class TestWeb(web.Helper):
         data = json.loads(res.data)
         next_url = '/project/{}/publish'.format(project.short_name)
 
-        assert data['flash'] == 'Error: Ensure PROD API key is used, your PROD account is Subadmin & enabled, & target project is enabled for project syncing', data
+        assert data['flash'] == 'Error: Ensure PROD API key is used, your PROD account is Subadmin and enabled, and target project is enabled for project syncing', data
         assert data['next'] == next_url, data
         assert data['status'] == 'error', data
 

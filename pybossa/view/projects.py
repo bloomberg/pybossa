@@ -3121,7 +3121,7 @@ def sync_project(short_name):
         current_app.logger.info(
             'exception type is {}'
             .format(str(exception_type)))
-        msg = gettext('Error: Ensure PROD API key is used, your PROD account is Subadmin & enabled, & target project is enabled for project syncing')
+        msg = gettext('Error: Ensure PROD API key is used, your PROD account is Subadmin and enabled, and target project is enabled for project syncing')
         flash(msg, 'error')
     return redirect_content_type(
         url_for('.publish', short_name=short_name))
