@@ -3094,9 +3094,12 @@ def sync_project(short_name):
                 'A request error occurred while syncing {}: {}'
                 .format(project.short_name, str(res.__dict__)))
             msg = gettext(
-                'The production server returned an unexpected error.')
+                'Error: Ensure your production API key is used, your production account is sub-admin and enabled, and the target project is enabled for project syncing.')
             flash(msg, 'error')
     except SyncUnauthorized as err:
+        current_app.logger.info(
+            'Exception SyncUnauthorized: An error occurred while syncing {}'
+            .format(project.short_name))
         if err.sync_type == 'ProjectSyncer':
             msg = gettext('The API key entered is not authorized to '
                           'perform this action. Please ensure you '
@@ -3109,6 +3112,9 @@ def sync_project(short_name):
                           'or contact an admin.')
             flash(msg, 'error')
     except NotEnabled:
+        current_app.logger.info(
+            'Exception NotEnabled: An error occurred while syncing {}'
+            .format(project.short_name))
         msg = 'The current project is not enabled for syncing. '
         enable_msg = Markup('{} <strong><a href="{}/update" '
                             'target="_blank">{}</a></strong>')
@@ -3116,12 +3122,12 @@ def sync_project(short_name):
               'error')
     except Exception as exception_type:
         current_app.logger.exception(
-            'An error occurred while syncing {}'
+            'Final Exception: An error occurred while syncing {}'
             .format(project.short_name))
         current_app.logger.info(
             'exception type is {}'
             .format(str(exception_type)))
-        msg = gettext('Error: Ensure your production API key is used, your production account is sub-admin and enabled, and the target project is enabled for project syncing.')
+        msg = gettext('An unexpected error occurred while trying to sync your project.')
         flash(msg, 'error')
     return redirect_content_type(
         url_for('.publish', short_name=short_name))
