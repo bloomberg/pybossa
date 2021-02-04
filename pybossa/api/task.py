@@ -22,7 +22,7 @@ This package adds GET, POST, PUT and DELETE methods for:
     * tasks
 
 """
-from flask import abort
+from flask import abort, current_app
 from flask_login import current_user
 from werkzeug.exceptions import BadRequest, Conflict
 from pybossa.model.task import Task
@@ -72,6 +72,8 @@ class TaskAPI(APIBase):
                 new.state = 'completed'
         new.calibration = int(gold_task)
         new.exported = gold_task
+        current_app.logger.info("Task %d updated, new state: %s, new exported: %s",
+                                new.id, new.state, str(new.exported))
 
     def _preprocess_post_data(self, data):
         project_id = data["project_id"]
