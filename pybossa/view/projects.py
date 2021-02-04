@@ -3082,7 +3082,7 @@ def sync_project(short_name):
                          body=body)
             mail_queue.enqueue(send_mail, email)
         elif res.status_code == 415:
-            current_app.logger.info('response code: {}'.format(str(res.status_code))
+            current_app.logger.info('response code: {}'.format(str(res.status_code)))
             current_app.logger.error(
                 'A request error occurred while syncing {}: {}'
                 .format(project.short_name, str(res.__dict__)))
@@ -3091,7 +3091,7 @@ def sync_project(short_name):
                 'but you are not an owner.')
             flash(msg, 'error')
         else:
-            current_app.logger.info('response code: {}'.format(str(res.status_code))
+            current_app.logger.info('response code: {}'.format(str(res.status_code)))
             current_app.logger.error(
                 'A request error occurred while syncing {}: {}'
                 .format(project.short_name, str(res.__dict__)))
