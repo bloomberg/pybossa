@@ -196,7 +196,6 @@ class TestProjectSyncer(Test):
         assert res.status_code == 200, 'build_payload output should result in valid api query'
         assert res.json["info"]["sync"] == payload["info"]["sync"]
 
-
     @with_context
     @patch('pybossa.syncer.project_syncer.ProjectSyncer.get_target')
     @patch('pybossa.syncer.category_syncer.CategorySyncer.get_target', return_value={'id': 1})
