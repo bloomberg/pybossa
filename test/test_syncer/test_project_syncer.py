@@ -210,8 +210,7 @@ class TestProjectSyncer(Test):
         res = Response()
         res.ok=False
         res.status_code=403
-        res.content=“”
-
+        res.content = ""
         mock_get.return_value = create_target()
         mock_update.return_value = res
         project = ProjectFactory.create()
