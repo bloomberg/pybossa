@@ -206,9 +206,8 @@ class TestProjectSyncer(Test):
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
         user = UserFactory.create(admin=True, email_addr=u'user@test.com')
         project_syncer.syncer = user
-
         res = Response()
-        res.ok=False
+        # res.ok=False
         res.status_code=403
         res.content = ""
         mock_get.return_value = create_target()
