@@ -207,13 +207,13 @@ class TestProjectSyncer(Test):
         user = UserFactory.create(admin=True, email_addr=u'user@test.com')
         project_syncer.syncer = user
 
-	      res = Response()
+        res = Response()
         res.ok=False
         res.status_code=403
-	      res.content=“”
+        res.content=“”
 
         mock_get.return_value = create_target()
-	      mock_update.return_value = res
+        mock_update.return_value = res
         project = ProjectFactory.create()
         project_syncer.sync(project)
         project_syncer.get_target.assert_called_once()
