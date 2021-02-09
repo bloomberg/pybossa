@@ -3103,9 +3103,7 @@ def sync_project(short_name):
             'Exception SyncUnauthorized: An error occurred while syncing {}'
             .format(project.short_name))
         if err.sync_type == 'ProjectSyncer':
-            msg = gettext('The API key entered is not authorized to '
-                          'perform this action. Please ensure you '
-                          'have entered the appropriate API key.')
+            msg = gettext('Project sync failed. Ensure your production account is sub-admin.')
             flash(msg, 'error')
         elif err.sync_type == 'CategorySyncer':
             msg = gettext('You are not authorized to create a new '
