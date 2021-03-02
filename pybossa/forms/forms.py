@@ -792,6 +792,10 @@ class UserPrefMetadataForm(Form):
     skill_level = SelectField(
         lazy_gettext('Skill Level of user'), [validators.Optional()], choices=[],
         default="")
+    degree_level = SelectField(
+        lazy_gettext('College Degree Level of user'), [validators.Optional()],
+        choices=[],
+        default="")
     if data_access.data_access_levels:
         data_access = Select2Field(
             lazy_gettext('Data Access(s)'), [validators.Required(),
@@ -799,6 +803,8 @@ class UserPrefMetadataForm(Form):
             choices=data_access.data_access_levels['valid_user_access_levels'], default="")
     review = TextAreaField(
         lazy_gettext('Additional comments'), default="")
+    other_profile = TextAreaField(
+        lazy_gettext('Other Profiles(json format)'), default="")
 
     def __init__(self, *args, **kwargs):
         Form.__init__(self, *args, **kwargs)
@@ -811,6 +817,7 @@ class UserPrefMetadataForm(Form):
         self.timezone.choices = upref_mdata_choices['timezones']
         self.user_type.choices = upref_mdata_choices['user_types']
         self.skill_level.choices = upref_mdata_choices['skill_levels']
+        self.degree_level.choices = upref_mdata_choices['degree_levels']
 
     def set_can_update(self, can_update_info):
         self._disabled = self._get_disabled_fields(can_update_info)

@@ -26,6 +26,8 @@ This module exports the following endpoints:
     * Profile: method to manage user's profile (update data, reset password...)
 
 """
+import json
+
 from itsdangerous import BadData
 from markdown import markdown
 
@@ -1171,7 +1173,10 @@ def get_user_data_as_form(user):
         'work_hours_to': metadata.get('work_hours_to'),
         'review': metadata.get('review'),
         'timezone': metadata.get('timezone'),
-        'data_access': user.info.get('data_access')
+        'data_access': user.info.get('data_access'),
+        'skill_level': metadata.get('skill_level'),
+        'degree_level': metadata.get('degree_level'),
+        'other_profile': metadata.get('other_profile')
     }
 
 
@@ -1182,11 +1187,19 @@ def get_user_pref_and_metadata(user_name, form):
         return user_pref, metadata
 
     if form.validate():
+        # if form.other_profile.data:
+        #     try:
+        #         json.load(form.other_profile.data)
+        #     except:
+        #         raise Exception("Other profile must be JSON format")
+
         metadata = dict(admin=current_user.name, time_stamp=time.ctime(),
                         user_type=form.user_type.data, work_hours_from=form.work_hours_from.data,
                         work_hours_to=form.work_hours_to.data, review=form.review.data,
                         timezone=form.timezone.data, profile_name=user_name,
-                        skill_level=form.skill_level.data)
+                        skill_level=form.skill_level.data,
+                        degree_level=form.degree_level.data,
+                        other_profile=form.other_profile.data)
         if form.languages.data:
             user_pref['languages'] = form.languages.data
         if form.locations.data:
