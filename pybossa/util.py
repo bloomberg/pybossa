@@ -964,7 +964,8 @@ def can_update_user_info(current_user, user_to_update):
             not (user_to_update.admin or user_to_update.subadmin)), None
     # normal user can update self except for 'user_type' field
     if current_user.id == user_to_update.id:
-        return True, {'user_type': 'You must be an admin or subadmin to edit this.'}
+        return True, {'user_type': 'You must be an admin or subadmin to edit this.',
+                      'skill_level': 'You must be an admin or subadmin to edit this.'}
     return False, None
 
 

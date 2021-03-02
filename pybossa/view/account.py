@@ -1185,7 +1185,8 @@ def get_user_pref_and_metadata(user_name, form):
         metadata = dict(admin=current_user.name, time_stamp=time.ctime(),
                         user_type=form.user_type.data, work_hours_from=form.work_hours_from.data,
                         work_hours_to=form.work_hours_to.data, review=form.review.data,
-                        timezone=form.timezone.data, profile_name=user_name)
+                        timezone=form.timezone.data, profile_name=user_name,
+                        skill_level=form.skill_level.data)
         if form.languages.data:
             user_pref['languages'] = form.languages.data
         if form.locations.data:

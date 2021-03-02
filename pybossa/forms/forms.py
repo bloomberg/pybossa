@@ -789,6 +789,9 @@ class UserPrefMetadataForm(Form):
         choices=[], default="")
     user_type = SelectField(
         lazy_gettext('Type of user'), [validators.Required()], choices=[], default="")
+    skill_level = SelectField(
+        lazy_gettext('Skill Level of user'), [validators.Optional()], choices=[],
+        default="")
     if data_access.data_access_levels:
         data_access = Select2Field(
             lazy_gettext('Data Access(s)'), [validators.Required(),
@@ -807,6 +810,7 @@ class UserPrefMetadataForm(Form):
         self.locations.choices = upref_mdata_choices['locations']
         self.timezone.choices = upref_mdata_choices['timezones']
         self.user_type.choices = upref_mdata_choices['user_types']
+        self.skill_level.choices = upref_mdata_choices['skill_levels']
 
     def set_can_update(self, can_update_info):
         self._disabled = self._get_disabled_fields(can_update_info)
