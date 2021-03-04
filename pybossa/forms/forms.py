@@ -796,6 +796,8 @@ class UserPrefMetadataForm(Form):
             choices=data_access.data_access_levels['valid_user_access_levels'], default="")
     review = TextAreaField(
         lazy_gettext('Additional comments'), default="")
+    profile = TextAreaField(
+        lazy_gettext('Profiles(json format)'), default="")
 
     def __init__(self, *args, **kwargs):
         Form.__init__(self, *args, **kwargs)
