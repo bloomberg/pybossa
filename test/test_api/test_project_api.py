@@ -1155,6 +1155,31 @@ class TestProjectAPI(TestAPI):
 
 
     @with_context
+    def test_task_progress(self):
+        """Test API taskprogress as anonymous works"""
+        from pybossa import data_access
+        user = UserFactory.create(admin=True)
+        project = ProjectFactory.create(owner=user)
+        tasks = TaskFactory.create_batch(2, project=project)
+        headers = [('Authorization', user.api_key)]
+        category = CategoryFactory.create()
+
+        taskruns = []
+        for task in tasks:
+            taskruns.extend(AnonymousTaskRunFactory.create_batch(2, task=task))
+
+        # check basic query without constraints to filter tasks  
+        res = self.app.get('/api/project?all=1&category_id=%s' % category.id, headers=headers, follow_redirects=True)
+        assert res.status_code == 200
+
+        # check 404 response when the project doesn't exist   
+        res = self.app.get('/api/project//taskprogress', follow_redirects=True, headers=headers)
+        error_msg = "A valid project must be used"
+        assert res.status_code == 404, error_msg
+
+
+
+    @with_context
     def test_delete_project_cascade(self):
         """Test API delete project deletes associated tasks and taskruns"""
         project = ProjectFactory.create()
