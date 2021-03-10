@@ -1155,5 +1155,5 @@ class TestAccessControl(Test):
         assert util.can_update_user_info(normal_user, subadmin) == (False, None)
         (can_update, disabled) = util.can_update_user_info(normal_user, normal_user)
         assert can_update
-        assert disabled.keys() == ['user_type']
+        assert set(disabled.keys()) == {'user_type', 'profile'}
         assert util.can_update_user_info(normal_user, normal_user2) == (False, None)
