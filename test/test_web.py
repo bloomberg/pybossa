@@ -7158,7 +7158,7 @@ class TestWeb(web.Helper):
 
         res = self.app.get(url, follow_redirects=True)
         dom = BeautifulSoup(res.data)
-        divs = ['task_scheduler', 'task_delete', 'task_redundancy']
+        divs = ['task_scheduler', 'task_redundancy']
         for div in divs:
             err_msg = "There should be a %s section" % div
             assert dom.find(id=div) is not None, err_msg
@@ -7182,12 +7182,12 @@ class TestWeb(web.Helper):
         self.signin()
         res = self.app.get(url, follow_redirects=True)
         dom = BeautifulSoup(res.data)
-        divs = ['task_scheduler', 'task_delete', 'task_redundancy']
+        divs = ['task_scheduler', 'task_redundancy']
         for div in divs:
             err_msg = "There should be a %s section" % div
             assert dom.find(id=div) is not None, err_msg
 
- @with_context
+    @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
     def test_task_delete(self, mock):
         """Test WEB TASK Delete works"""
