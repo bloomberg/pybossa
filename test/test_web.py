@@ -7202,7 +7202,7 @@ class TestWeb(web.Helper):
 
         res = self.app.get(url, follow_redirects=True)
         dom = BeautifulSoup(res.data)
-        div = 'task_delete'
+        div = 'delete_tasks'
         err_msg = "There should be a %s section" % div
         assert dom.find(id=div) is not None, err_msg
 
@@ -7210,7 +7210,7 @@ class TestWeb(web.Helper):
         self.signin()
         res = self.app.get(url, follow_redirects=True)
         dom = BeautifulSoup(res.data)
-        div = 'task_delete'
+        div = 'delete_tasks'
         err_msg = "There should be a %s section" % div
         assert dom.find(id=div) is not None, err_msg
 
