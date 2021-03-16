@@ -282,7 +282,6 @@ def locked_scheduler(query_factory):
             for task_id, taskcount, n_answers, calibration, meta, timeout in rows:
                 score = 0
                 if meta:
-                    import pdb;pdb.set_trace()
                     pref = json.loads(meta).get('preference', {})
                     for key, value in pref.iteritems():
                         if not user_profile.get(key):

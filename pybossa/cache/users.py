@@ -365,7 +365,6 @@ def get_user_by_id(user_id):
 
 
 def get_user_profile_metadata(user_id):
-    import pdb; pdb.set_trace()
     user = get_user_by_id(user_id)
     info = user.info or {} if user else {}
     return info.get("metadata", {}).get('profile') or {}
