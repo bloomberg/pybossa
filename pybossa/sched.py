@@ -248,7 +248,8 @@ def locked_scheduler(query_factory):
     def template_get_locked_task(project_id, user_id=None, user_ip=None,
                                  external_uid=None, limit=1, offset=0,
                                  orderby='priority_0', desc=True,
-                                 rand_within_priority=False, task_type='gold_last'):
+                                 rand_within_priority=False, task_type='gold_last',
+                                 filter_user_prefs=True):
         if offset > 2:
             raise BadRequest('')
         if offset > 0:
@@ -267,16 +268,43 @@ def locked_scheduler(query_factory):
         sql = query_factory(project_id, user_id=user_id, limit=limit,
                             rand_within_priority=rand_within_priority,
                             task_type=task_type)
+        db_max_records = 100000
+        limit = db_max_records if filter_user_prefs else user_count + 5
         rows = session.execute(sql, dict(project_id=project_id,
                                          user_id=user_id,
                                          assign_user=assign_user,
-                                         limit=user_count + 5))
+                                         limit=limit))
 
-        for task_id, taskcount, n_answers, calibration, timeout in rows:
+        if filter_user_prefs:
+            # calculate task preference score
+            user_profile = json.loads(cached_users.get_user_profile_metadata(user_id))
+            task_rank_info = []
+            for task_id, taskcount, n_answers, calibration, meta, timeout in rows:
+                score = 0
+                if meta:
+                    import pdb;pdb.set_trace()
+                    pref = json.loads(meta).get('preference', {})
+                    for key, value in pref.iteritems():
+                        if not user_profile.get(key):
+                            continue
+                        user_data = user_profile.get(key) or 0
+                        try:
+                            user_data = float(user_data)
+                            score += value * user_data
+                        except ValueError as e:
+                            # TODO: when user profile is not number, we need another method to calculate score
+                            pass
+                task_rank_info.append((task_id, taskcount, n_answers, calibration, score, timeout))
+            rows = sorted(task_rank_info, key=lambda tup: tup[4], reverse=True)
+            print(rows)
+        else:
+            rows = [r for r in rows]
+
+        for task_id, taskcount, n_answers, calibration, _, timeout in rows:
+            print(task_id)
             timeout = timeout or TIMEOUT
             remaining = float('inf') if calibration else n_answers - taskcount
             if acquire_lock(task_id, user_id, remaining, timeout):
-                rows.close()
                 save_task_id_project_id(task_id, project_id, 2 * timeout)
                 register_active_user(project_id, user_id, sentinel.master, ttl=timeout)
 
@@ -323,7 +351,7 @@ def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=Fals
         order_by.append('id ASC')
 
     sql = '''
-           SELECT task.id, COUNT(task_run.task_id) AS taskcount, n_answers, task.calibration,
+           SELECT task.id, COUNT(task_run.task_id) AS taskcount, n_answers, task.calibration, task.info->>'meta_pref',
               (SELECT info->'timeout'
                FROM project
                WHERE id=:project_id) as timeout
@@ -376,7 +404,7 @@ def get_locked_task(project_id, user_id=None, limit=1, rand_within_priority=Fals
 
 @locked_scheduler
 def get_user_pref_task(project_id, user_id=None, limit=1, rand_within_priority=False,
-                       task_type='gold_last'):
+                       task_type='gold_last', filter_user_prefs=True):
     """ Select a new task based on user preference set under user profile.
 
     For each incomplete task, check if the number of users working on the task
