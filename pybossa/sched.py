@@ -249,7 +249,7 @@ def locked_scheduler(query_factory):
                                  external_uid=None, limit=1, offset=0,
                                  orderby='priority_0', desc=True,
                                  rand_within_priority=False, task_type='gold_last',
-                                 filter_user_prefs=True):
+                                 filter_user_prefs=False):
         if offset > 2:
             raise BadRequest('')
         if offset > 0:
