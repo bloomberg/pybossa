@@ -84,6 +84,7 @@ def new_task(project_id, sched, user_id=None, user_ip=None,
                      orderby=orderby,
                      desc=desc,
                      rand_within_priority=rand_within_priority,
+                     filter_user_prefs=(sched==Schedulers.user_pref),
                      task_type=task_type)
 
 
@@ -295,12 +296,10 @@ def locked_scheduler(query_factory):
                             pass
                 task_rank_info.append((task_id, taskcount, n_answers, calibration, score, timeout))
             rows = sorted(task_rank_info, key=lambda tup: tup[4], reverse=True)
-            print(rows)
         else:
             rows = [r for r in rows]
 
         for task_id, taskcount, n_answers, calibration, _, timeout in rows:
-            print(task_id)
             timeout = timeout or TIMEOUT
             remaining = float('inf') if calibration else n_answers - taskcount
             if acquire_lock(task_id, user_id, remaining, timeout):
