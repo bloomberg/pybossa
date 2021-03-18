@@ -201,7 +201,7 @@ class TestNewtaskPasswd(TestAPI):
     @with_context
     def test_newtask_with_task_preference_scores(self):
         """Test newtask returns task with best matching score"""
-        user_info = dict(metadata={"profile": json.dumps({"english": 0.9})})
+        user_info = dict(metadata={"profile": json.dumps({"english": 0.9, "country": "canada"})})
         owner = UserFactory.create(id=500, info=user_info)
         user_repo.save(owner)
         project = ProjectFactory.create(owner=owner)
