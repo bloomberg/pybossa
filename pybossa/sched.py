@@ -275,10 +275,10 @@ def locked_scheduler(query_factory):
                                          user_id=user_id,
                                          assign_user=assign_user,
                                          limit=limit))
-
-        if filter_user_prefs:
+        user_profile = cached_users.get_user_profile_metadata(user_id)
+        if user_profile and filter_user_prefs:
             # calculate task preference score
-            user_profile = json.loads(cached_users.get_user_profile_metadata(user_id))
+            user_profile = json.loads(user_profile)
             task_rank_info = []
             for task_id, taskcount, n_answers, calibration, meta, timeout in rows:
                 score = 0
