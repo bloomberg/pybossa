@@ -17,6 +17,8 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
 
+from pybossa.core import task_repo, user_repo
+from pybossa.sched import get_user_pref_task, Schedulers
 from itsdangerous import SignatureExpired
 from default import db, with_context
 from test_api import TestAPI, get_pwd_cookie
@@ -194,3 +196,50 @@ class TestNewtaskPasswd(TestAPI):
         assert res.status_code == 200, (res, res.data)
         task = json.loads(res.data)
         assert task.get('gold_answers') is None
+
+    # For task routing POC
+    @with_context
+    def test_newtask_with_task_preference_scores(self):
+        """Test newtask returns task with best matching score"""
+        user_info = dict(metadata={"profile": json.dumps({"english": 0.9})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+
+        task_1_info = {'question': 'answer_1', 'meta_pref': json.dumps({'preference': {'english': 1.0}})}
+        task_2_info = {'question': 'answer_2', 'meta_pref': json.dumps({'preference': {'spanish': 1.0}})}
+        TaskFactory.create(project=project, info=task_1_info, priority_0=0)
+        TaskFactory.create(project=project, info=task_2_info, priority_0=1.0)
+        api_key = project.owner.api_key
+
+        # as a real user, no password
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, api_key)
+        res = self.app.get(url)
+        assert res.status_code == 200, (res, res.data)
+        task = json.loads(res.data)
+        assert task.get('info', {}).get('question') == 'answer_1'
+
+    @with_context
+    def test_newtask_with_task_preference_scores_invalid_value(self):
+        """Test newtask returns task with best matching score"""
+        user_info = dict(metadata={"profile": json.dumps({"english": "A"})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+
+        task_1_info = {'question': 'answer_1', 'meta_pref': json.dumps({'preference': {'english': 1.0}})}
+        task_2_info = {'question': 'answer_2', 'meta_pref': json.dumps({'preference': {'spanish': 1.0}})}
+        TaskFactory.create(project=project, info=task_1_info, priority_0=0)
+        TaskFactory.create(project=project, info=task_2_info, priority_0=1.0)
+        api_key = project.owner.api_key
+
+        # as a real user, no password
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, api_key)
+        res = self.app.get(url)
+        assert res.status_code == 200, (res, res.data)
+        task = json.loads(res.data)
+        assert task.get('info', {}).get('question') == 'answer_2'
