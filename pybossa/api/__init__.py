@@ -384,9 +384,7 @@ def task_progress(project_id=None, short_name=None):
         project = project_repo.get_by_shortname(short_name)
     elif project_id:
         project = project_repo.get(project_id)
-
     filter_fields = request.args
-
     if not project:
         return abort(404)
 
@@ -397,14 +395,12 @@ def task_progress(project_id=None, short_name=None):
     for key in filter_fields.keys():
         if key in task_fields:
             sql_text += " AND {0}=:{1}".format(key, key)
+        elif key in task_info_fields and filter_fields[key] == "null".lower():
+            sql_text +=  " AND info ->> '{0}' is Null".format(key)    
         elif key in task_info_fields:
-            if filter_fields[key] == "null".lower():
-                sql_text +=  " AND info ->> '{0}' is Null".format(key)    
-            else:
-                sql_text += " AND info ->> '{0}'=:{1}".format(key, key)
+            sql_text += " AND info ->> '{0}'=:{1}".format(key, key)
         else:
             raise Exception("invalid key: the field that you are filtering by does not exist")
-
     sql_text += ';'
     sql_query = text(sql_text)
     results = db.slave_session.execute(sql_query, filter_fields)
@@ -413,7 +409,6 @@ def task_progress(project_id=None, short_name=None):
     # results are stored as a sqlalchemy resultProxy
     num_tasks = results.first()[0]
     task_count_dict = dict(task_count=num_tasks)
-
     return Response(json.dumps(task_count_dict), mimetype="application/json")
     
 
