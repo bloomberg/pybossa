@@ -392,25 +392,20 @@ def task_progress(project_id=None, short_name=None):
 
     sql_text = "SELECT COUNT(*) FROM task WHERE project_id=" + str(project.id)
     task_info_fields = get_searchable_columns(project.id)
-    
+
     # create sql query from filter fields received on request.args
     for key in filter_fields.keys():
         if key in task_fields:
             sql_text += " AND {0}=:{1}".format(key, key)
-            # can there be empty fields / Null for fields which are parents of task.info ? i think so
-            # ??
         elif key in task_info_fields:
             if filter_fields[key] == "null":
                 sql_text +=  " AND info ->> '{0}' is Null".format(key)    
             else:
                 sql_text += " AND info ->> '{0}'=:{1}".format(key, key)
         else:
-            print(task_info_fields)
-            print(str(key) + "not found in above list")
             raise Exception("invalid key: the field that you are filtering by does not exist")
 
     sql_text += ';'
-    print(sql_text)
     sql_query = text(sql_text)
     results = db.slave_session.execute(sql_query, filter_fields)
     timeout = current_app.config.get('TIMEOUT')
