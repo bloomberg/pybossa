@@ -395,10 +395,11 @@ def task_progress(project_id=None, short_name=None):
     for key in filter_fields.keys():
         if key in task_fields:
             sql_text += " AND {0}=:{1}".format(key, key)
-        elif key in task_info_fields and filter_fields[key] == "null".lower():
-            sql_text +=  " AND info ->> '{0}' is Null".format(key)    
         elif key in task_info_fields:
-            sql_text += " AND info ->> '{0}'=:{1}".format(key, key)
+            if filter_fields[key].lower() == "null":
+                sql_text +=  " AND info ->> '{0}' is Null".format(key)    
+            else:
+                sql_text += " AND info ->> '{0}'=:{1}".format(key, key)
         else:
             raise Exception("invalid key: the field that you are filtering by does not exist")
     sql_text += ';'
