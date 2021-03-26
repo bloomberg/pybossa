@@ -1190,6 +1190,14 @@ class TestProjectAPI(TestAPI):
         res = self.app.get('/api/project/1/taskprogress?Fruit=null', follow_redirects=True, headers=headers)
         assert res.status_code == 200
 
+        # query for the count of all task count using null keyword
+        res = self.app.get('/api/project/1/taskprogress?Fruit=Null', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+
+        # query for the count of all task count using null keyword
+        res = self.app.get('/api/project/1/taskprogress?Fruit=NULL', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+
 
     @with_context
     def test_delete_project_cascade(self):
