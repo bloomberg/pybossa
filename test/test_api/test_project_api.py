@@ -1160,14 +1160,17 @@ class TestProjectAPI(TestAPI):
         from pybossa import data_access
         user = UserFactory.create(admin=True)
         project = ProjectFactory.create(owner=user)
-        tasks = TaskFactory.create_batch(2, project=project)
+        tasks = TaskFactory.create_batch(3, project=project)
         headers = [('Authorization', user.api_key)]
         category = CategoryFactory.create()
-
+    
         taskruns = []
         for task in tasks:
             taskruns.extend(AnonymousTaskRunFactory.create_batch(2, task=task))
+            task.info = {"Fruit": "apple"}
 
+        # leave one task null for testing
+        tasks[0].info = {}
         # check basic query without constraints to filter tasks  
         res = self.app.get('/api/project?all=1&category_id=%s' % category.id, headers=headers, follow_redirects=True)
         assert res.status_code == 200
@@ -1177,7 +1180,34 @@ class TestProjectAPI(TestAPI):
         error_msg = "A valid project must be used"
         assert res.status_code == 404, error_msg
 
+        # query for the count of all tasks in the propject
+        res = self.app.get('/api/project/1/taskprogress', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
 
+        # query for the count of all task count using a specific filter
+        res = self.app.get('/api/project/1/taskprogress?Fruit=apple', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+
+        # query for the count of all task count using null keyword
+        res = self.app.get('/api/project/1/taskprogress?Fruit=null', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+
+        # query for the count of all task count using null keyword
+        res = self.app.get('/api/project/1/taskprogress?Fruit=Null', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+
+        # query for the count of all task count using null keyword
+        res = self.app.get('/api/project/1/taskprogress?Fruit=NULL', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+        assert res.data == '''{"task_count": 1}'''
+
+        # assert the result count is 0
+        res = self.app.get('/api/project/1/taskprogress?Fruit=INVALID', follow_redirects=True, headers=headers)
+        assert res.data == '''{"task_count": 0}'''
+
+        # query with filter
+        res = self.app.get('/api/project/1/taskprogress?Fruit=apple', follow_redirects=True, headers=headers)
+        assert res.data == '''{"task_count": 2}'''
 
     @with_context
     def test_delete_project_cascade(self):
