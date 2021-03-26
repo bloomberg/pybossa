@@ -1163,10 +1163,11 @@ class TestProjectAPI(TestAPI):
         tasks = TaskFactory.create_batch(2, project=project)
         headers = [('Authorization', user.api_key)]
         category = CategoryFactory.create()
-
+    
         taskruns = []
         for task in tasks:
             taskruns.extend(AnonymousTaskRunFactory.create_batch(2, task=task))
+            task.info = {"Fruit": "apple"}
 
         # check basic query without constraints to filter tasks  
         res = self.app.get('/api/project?all=1&category_id=%s' % category.id, headers=headers, follow_redirects=True)
@@ -1177,6 +1178,17 @@ class TestProjectAPI(TestAPI):
         error_msg = "A valid project must be used"
         assert res.status_code == 404, error_msg
 
+        # query for the count of all tasks in the propject
+        res = self.app.get('/api/project/1/taskprogress', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+
+        # query for the count of all task count using a specific filter
+        res = self.app.get('/api/project/1/taskprogress?Fruit=apple', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+
+        # query for the count of all task count using null keyword
+        res = self.app.get('/api/project/1/taskprogress?Fruit=null', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
 
 
     @with_context
