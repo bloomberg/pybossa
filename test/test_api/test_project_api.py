@@ -1198,6 +1198,13 @@ class TestProjectAPI(TestAPI):
         res = self.app.get('/api/project/1/taskprogress?Fruit=NULL', follow_redirects=True, headers=headers)
         assert res.status_code == 200
 
+        # assert the result count is 0
+        res = self.app.get('/api/project/1/taskprogress?Fruit=INVALID', follow_redirects=True, headers=headers)
+        assert res.data == '''{"task_count": 0}'''
+
+        # assert the result count is 0 or appropriate error returned
+        res = self.app.get('/api/project/1/taskprogress?Fruit=apple', follow_redirects=True, headers=headers)
+        assert res.data == '''{"task_count": 2}'''
 
     @with_context
     def test_delete_project_cascade(self):
