@@ -39,7 +39,8 @@ import hashlib
 from flask import url_for
 from pybossa.cloud_store_api.s3 import upload_json_data
 from pybossa.auth.task import TaskAuth
-
+from pybossa.cache import delete_memoized
+from pybossa.cache.task_browse_helpers import get_searchable_columns
 import json
 import copy
 
@@ -119,3 +120,9 @@ class TaskAPI(APIBase):
 
     def _select_attributes(self, data):
         return TaskAuth.apply_access_control(data, user=current_user, project_data=get_project_data(data['project_id']))
+
+    def put(self, oid):
+        # reset cache / memoized
+        delete_memoized(get_searchable_columns)
+        print('you have reached the super put and cleared the memo cache')
+        return super(TaskAPI, self).put(oid)
