@@ -124,5 +124,4 @@ class TaskAPI(APIBase):
     def put(self, oid):
         # reset cache / memoized
         delete_memoized(get_searchable_columns)
-        print('you have reached the super put and cleared the memo cache')
         return super(TaskAPI, self).put(oid)
