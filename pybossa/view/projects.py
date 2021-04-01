@@ -96,6 +96,8 @@ from pybossa.data_access import (data_access_levels, subadmins_are_privileged,
     ensure_annotation_config_from_form, ensure_amp_config_applied_to_project)
 import app_settings
 from copy import deepcopy
+from pybossa.cache import delete_memoized
+from pybossa.cache.task_browse_helpers import get_searchable_columns
 
 
 cors_headers = ['Content-Type', 'Authorization']
@@ -1041,6 +1043,9 @@ def import_task(short_name):
 
 
 def _import_tasks(project, **form_data):
+    # reset cache / memoized
+    delete_memoized(get_searchable_columns)
+
     report = None
     number_of_tasks = importer.count_tasks_to_import(**form_data)
     if number_of_tasks <= MAX_NUM_SYNCHRONOUS_TASKS_IMPORT:
@@ -1716,6 +1721,9 @@ def _update_task_redundancy(project_id, task_ids, n_answers):
 @admin_or_subadmin_required
 def delete_selected_tasks(short_name):
     try:
+        # reset cache / memoized
+        delete_memoized(get_searchable_columns)
+
         project, owner, ps = project_by_shortname(short_name)
         ensure_authorized_to('read', project)
         ensure_authorized_to('update', project)
@@ -1787,6 +1795,9 @@ def delete_tasks(short_name):
                         csrf=generate_csrf())
         return handle_content_type(response)
     else:
+        # reset cache / memoized
+        delete_memoized(get_searchable_columns)
+
         force_reset = request.form.get("force_reset") == 'true'
         if ps.n_tasks <= MAX_NUM_SYNCHRONOUS_TASKS_DELETE:
             task_repo.delete_valid_from_project(project, force_reset=force_reset)
