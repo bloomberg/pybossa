@@ -396,7 +396,8 @@ def task_progress(project_id=None, short_name=None):
         if key in task_fields:
             sql_text += " AND {0}=:{1}".format(key, key)
         elif key in task_info_fields:
-            if filter_fields[key].lower() == "null":
+            # include support for empty string and null in URL 
+            if filter_fields[key].lower() in ["null", ""]:
                 sql_text +=  " AND info ->> '{0}' is Null".format(key)    
             else:
                 sql_text += " AND info ->> '{0}'=:{1}".format(key, key)
