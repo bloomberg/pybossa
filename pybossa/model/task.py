@@ -57,6 +57,10 @@ class Task(db.Model, DomainObject):
     exported = Column(Boolean, default=False)
     #: Task.user_pref field in JSONB with user preference data for the task.
     user_pref = Column(JSONB)
+    #: Task.worker_pref field in JSONB with user preference data for the task.
+    worker_pref = Column(JSONB)
+    #: Task.worker_filter field in JSONB with user preference data for the task.
+    worker_filter = Column(JSONB)
     #: Task.gold_answers field in JSONB to record golden answers for fields under Task.info.
     gold_answers = Column(JSONB)
     #: Task.expiration field to determine when a task should no longer be scheduled. As UTC timestamp without timezone
