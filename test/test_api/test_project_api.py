@@ -1155,7 +1155,6 @@ class TestProjectAPI(TestAPI):
 
 
     @with_context
-<<<<<<< HEAD
     def test_task_progress(self):
         """Test API taskprogress as anonymous works"""
         from pybossa import data_access
@@ -1211,8 +1210,6 @@ class TestProjectAPI(TestAPI):
         assert res.data == '''{"task_count": 2}'''
 
     @with_context
-=======
->>>>>>> 56c1c573... Revert "added task_progress method (#568)"
     def test_delete_project_cascade(self):
         """Test API delete project deletes associated tasks and taskruns"""
         project = ProjectFactory.create()
