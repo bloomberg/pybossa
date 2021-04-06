@@ -1185,8 +1185,6 @@ def get_user_pref_and_metadata(user_name, form):
         return user_pref, metadata
 
     if form.validate():
-        # TODO profile data validation
-
         metadata = dict(admin=current_user.name, time_stamp=time.ctime(),
                         user_type=form.user_type.data, work_hours_from=form.work_hours_from.data,
                         work_hours_to=form.work_hours_to.data, review=form.review.data,
