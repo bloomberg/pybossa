@@ -80,10 +80,6 @@ from pybossa.task_creator_helper import set_gold_answers
 from pybossa.auth.task import TaskAuth
 from pybossa.service_validators import ServiceValidators
 import requests
-from sqlalchemy.sql import text
-from pybossa.model.user import User
-from pybossa.core import db
-from pybossa.cache.task_browse_helpers import is_valid_searchable_column, get_searchable_columns
 
 
 blueprint = Blueprint('api', __name__)
@@ -397,9 +393,9 @@ def task_progress(project_id=None, short_name=None):
         if key in task_fields:
             sql_text += " AND {0}=:{1}".format(key, key)
         elif key in task_info_fields:
-            # include support for empty string and null in URL 
+            # include support for empty string and null in URL
             if filter_fields[key].lower() in ["null", ""]:
-                sql_text +=  " AND info ->> '{0}' is Null".format(key)    
+                sql_text +=  " AND info ->> '{0}' is Null".format(key)
             else:
                 sql_text += " AND info ->> '{0}'=:{1}".format(key, key)
         else:
@@ -413,7 +409,7 @@ def task_progress(project_id=None, short_name=None):
     num_tasks = results.first()[0]
     task_count_dict = dict(task_count=num_tasks)
     return Response(json.dumps(task_count_dict), mimetype="application/json")
-    
+
 
 @jsonpify
 @blueprint.route('/auth/project/<short_name>/token')
