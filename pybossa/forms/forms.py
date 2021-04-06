@@ -74,7 +74,8 @@ def create_nullable_select(label, items):
 def is_json(json_type):
     def v(form, field):
         try:
-            assert isinstance(json.loads(field.data), json_type)
+            if field.data:
+                assert isinstance(json.loads(field.data), json_type)
         except Exception:
             raise validators.ValidationError('Field must be JSON object.')
     return v
