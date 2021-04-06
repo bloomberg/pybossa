@@ -82,7 +82,6 @@ class ReservedFieldProcessor(object):
 
     def process(self, task_data, cell, *args):
         if self.header in ['user_pref', 'worker_filter', 'worker_pref']:
-            print(self.header)
             if cell:
                 task_data[self.header] = json.loads(cell.lower())
             else:

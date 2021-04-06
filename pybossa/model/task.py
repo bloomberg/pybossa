@@ -57,9 +57,9 @@ class Task(db.Model, DomainObject):
     exported = Column(Boolean, default=False)
     #: Task.user_pref field in JSONB with user preference data for the task.
     user_pref = Column(JSONB)
-    #: Task.worker_pref field in JSONB with user preference data for the task.
+    #: Task.worker_pref field in JSONB with worker preference data for the task.
     worker_pref = Column(JSONB)
-    #: Task.worker_filter field in JSONB with user preference data for the task.
+    #: Task.worker_filter field in JSONB with worker filter data for the task.
     worker_filter = Column(JSONB)
     #: Task.gold_answers field in JSONB to record golden answers for fields under Task.info.
     gold_answers = Column(JSONB)
@@ -78,5 +78,8 @@ class Task(db.Model, DomainObject):
     __table_args__ = (
         Index('task_info_idx', sqlalchemy.text('md5(info::text)')),
     )
+    __mapper_args__ = {
+        "order_by": id
+    }
 
 Index('task_project_id_idx', Task.project_id)
