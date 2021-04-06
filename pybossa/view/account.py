@@ -484,7 +484,7 @@ def create_account(user_data, project_slugs=None, ldap_disabled=True, auto_creat
        "admin":user_data.get('admin', None)})
     else:
         new_user.info = dict(metadata={})
-        new_user.info['metadata'].update({"user_type": user_data.get('user_type', None), 
+        new_user.info['metadata'].update({"user_type": user_data.get('user_type', None),
         "admin":user_data.get('admin', None)})
 
     if ldap_disabled:
@@ -552,10 +552,10 @@ def profile(name):
         raise abort(404)
 
     form = None
-    (can_update, disabled_fields) = can_update_user_info(current_user, user)
+    (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
     if app_settings.upref_mdata:
         form_data = cached_users.get_user_pref_metadata(user.name)
-        form = UserPrefMetadataForm(can_update=(can_update, disabled_fields), **form_data)
+        form = UserPrefMetadataForm(can_update=(can_update, disabled_fields, hidden_fields), **form_data)
         form.set_upref_mdata_choices()
     if user.id != current_user.id:
         return _show_public_profile(user, form, can_update)
@@ -1103,11 +1103,11 @@ def add_metadata(name):
 
     """
     user = user_repo.get_by_name(name=name)
-    (can_update, disabled_fields) = can_update_user_info(current_user, user)
+    (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
     if not can_update:
         abort(403)
     form_data = get_form_data(request, user, disabled_fields)
-    form = UserPrefMetadataForm(form_data, can_update=(can_update, disabled_fields))
+    form = UserPrefMetadataForm(form_data, can_update=(can_update, disabled_fields, hidden_fields))
     form.set_upref_mdata_choices()
 
     if not form.validate():

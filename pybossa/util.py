@@ -811,7 +811,7 @@ def generate_notification_email_for_admins(user, admins_emails, access_type):
                                   server_url=server_url,
                                   is_qa=is_qa)
     return msg
-    
+
 
 def generate_manage_user_email(user, operation):
     assert user
@@ -955,18 +955,19 @@ def valid_or_no_s3_bucket(task_data):
 
 
 def can_update_user_info(current_user, user_to_update):
+    disable_fields = {'user_type': 'You must be an admin or subadmin to edit this.'}
+    hidden_fields = {'profile': 'You must be an admin or subadmin to view and edit this.'}
     # admin can update anyone
     if current_user.admin:
-        return True, None
+        return True, None, None
     # subadmin can update self and normal users
     if current_user.subadmin:
         return (current_user.id == user_to_update.id or
-            not (user_to_update.admin or user_to_update.subadmin)), None
-    # normal user can update self except for 'user_type' field
+            not (user_to_update.admin or user_to_update.subadmin)), None, None
+    # normal user cannot view/update 'profile' field, cannot update 'user_type' field
     if current_user.id == user_to_update.id:
-        return True, {'user_type': 'You must be an admin or subadmin to edit this.',
-                      'profile': 'You must be an admin or subadmin to edit this.'}
-    return False, None
+        return True, disable_fields, hidden_fields
+    return False, None, None
 
 
 def get_enabled_users(user_emails):
