@@ -208,10 +208,12 @@ class TestNewtaskPasswd(TestAPI):
         project.info['sched'] = Schedulers.user_pref
         project_repo.save(project)
 
-        task_1_info = {'question': 'answer_1', 'meta_pref': json.dumps({'preference': {'english': 1.0}})}
-        task_2_info = {'question': 'answer_2', 'meta_pref': json.dumps({'preference': {'spanish': 1.0}})}
-        TaskFactory.create(project=project, info=task_1_info, priority_0=0)
-        TaskFactory.create(project=project, info=task_2_info, priority_0=1.0)
+        task_1_info = {'question': 'answer_1'}
+        task_1_pref = {'english': 1.0}
+        task_2_info = {'question': 'answer_2'}
+        task_2_pref = {'spanish': 1.0}
+        TaskFactory.create(project=project, info=task_1_info, priority_0=0, worker_pref=task_1_pref)
+        TaskFactory.create(project=project, info=task_2_info, priority_0=1.0, worker_pref=task_2_pref)
         api_key = project.owner.api_key
 
         # as a real user, no password
@@ -231,10 +233,13 @@ class TestNewtaskPasswd(TestAPI):
         project.info['sched'] = Schedulers.user_pref
         project_repo.save(project)
 
-        task_1_info = {'question': 'answer_1', 'meta_pref': json.dumps({'preference': {'english': 1.0}})}
-        task_2_info = {'question': 'answer_2', 'meta_pref': json.dumps({'preference': {'spanish': 1.0}})}
-        TaskFactory.create(project=project, info=task_1_info, priority_0=0)
-        TaskFactory.create(project=project, info=task_2_info, priority_0=1.0)
+        task_1_info = {'question': 'answer_1'}
+        task_1_pref = {'english': 1.0}
+        task_2_info = {'question': 'answer_2'}
+        task_2_pref = {'spanish': 1.0}
+        TaskFactory.create(project=project, info=task_1_info, priority_0=0, worker_pref=task_1_pref)
+        TaskFactory.create(project=project, info=task_2_info, priority_0=1.0, worker_pref=task_2_pref)
+
         api_key = project.owner.api_key
 
         # as a real user, no password
