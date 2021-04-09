@@ -280,26 +280,25 @@ def locked_scheduler(query_factory):
             # calculate task preference score
             user_profile = json.loads(user_profile)
             task_rank_info = []
-            for task_id, taskcount, n_answers, calibration, meta, timeout in rows:
+            for task_id, taskcount, n_answers, calibration, w_filter, w_pref, timeout in rows:
                 score = 0
-                if meta:
-                    pref = json.loads(meta).get('preference', {})
-                    for key, value in pref.iteritems():
-                        if not user_profile.get(key):
-                            continue
-                        user_data = user_profile.get(key) or 0
-                        try:
-                            user_data = float(user_data)
-                            score += value * user_data
-                        except ValueError as e:
-                            # TODO: when user profile is not number, we need another method to calculate score
-                            pass
-                task_rank_info.append((task_id, taskcount, n_answers, calibration, score, timeout))
+                w_pref = w_pref or {}
+                for key, value in w_pref.iteritems():
+                    if not user_profile.get(key):
+                        continue
+                    user_data = user_profile.get(key) or 0
+                    try:
+                        user_data = float(user_data)
+                        score += value * user_data
+                    except ValueError as e:
+                        # TODO: when user profile is not number, we need another method to calculate score
+                        pass
+                task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
             rows = sorted(task_rank_info, key=lambda tup: tup[4], reverse=True)
         else:
             rows = [r for r in rows]
 
-        for task_id, taskcount, n_answers, calibration, _, timeout in rows:
+        for task_id, taskcount, n_answers, calibration, _, _, timeout in rows:
             timeout = timeout or TIMEOUT
             remaining = float('inf') if calibration else n_answers - taskcount
             if acquire_lock(task_id, user_id, remaining, timeout):
@@ -349,7 +348,8 @@ def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=Fals
         order_by.append('id ASC')
 
     sql = '''
-           SELECT task.id, COUNT(task_run.task_id) AS taskcount, n_answers, task.calibration, task.info->>'meta_pref',
+           SELECT task.id, COUNT(task_run.task_id) AS taskcount, n_answers, task.calibration,
+           worker_filter, worker_pref,
               (SELECT info->'timeout'
                FROM project
                WHERE id=:project_id) as timeout
