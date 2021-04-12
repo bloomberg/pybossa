@@ -23,7 +23,7 @@ matrix:
     - sudo cat /etc/apt/sources.list
     - lsb_release -r
     - sudo apt clean
-    - apt-get remove cassandra
+    - sudo apt-get remove cassandra
     - sudo rm -rf /var/lib/cassandra
     - sudo rm -rf /var/log/cassandra
     - sudo rm -rf /etc/cassandra
