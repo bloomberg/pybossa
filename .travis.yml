@@ -27,7 +27,7 @@ matrix:
     - sudo rm -rf /var/lib/cassandra
     - sudo rm -rf /var/log/cassandra
     - sudo rm -rf /etc/cassandra
-    - sudo find / -name '*cassandra*'
+    - sudo rm -rf `sudo find / -name '*cassandra*'`
     - sudo apt-get clean
     
     - sudo apt-get update -y
