@@ -135,8 +135,8 @@ class TestSched(sched.Helper):
 
         tasks = get_depth_first_all_task(project.id, user.id, limit=2)
         assert len(tasks) == 2, len(tasks)
-        assert tasks[0].id == orig_tasks[0].id, tasks
-        assert tasks[1].id == orig_tasks[1].id, tasks
+        assert tasks[0].id == orig_tasks[0].id
+        assert tasks[1].id == orig_tasks[1].id
 
         for i in range(5):
             tr = TaskRun(project_id=project.id,
