@@ -20,8 +20,9 @@ matrix:
     before_install:
     - sudo mount -o remount,size=50% /var/ramfs # https://github.com/travis-ci/travis-ci/issues/9036
     - sudo rm -f /etc/boto.cfg # https://github.com/travis-ci/travis-ci/issues/7940
+    - sudo cat /etc/apt/sources.list
+    - lsb_release -r
     - sudo apt clean
-    - sudo RUN sed -i '/jessie-updates/d' /etc/apt/sources.list  # Now archived
     - sudo apt-get update -y 
     - sudo apt-get install -y libxml2-dev libxmlsec1-dev # python-saml deps
     - git submodule update --init --recursive
