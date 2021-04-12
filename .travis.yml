@@ -23,12 +23,14 @@ matrix:
     - sudo cat /etc/apt/sources.list
     - lsb_release -r
     
-    - sudo cp /etc/apt/sources.list ~/ 
-    - sudo wget "http://pastebin.com/raw.php?i=uzhrtg5M" -O /etc/apt/sources.list 
-    - sudo apt-get update
-    - sudo rm /etc/apt/sources.list.d/ubuntu-extras.list
-    - sudo apt-get update
+    - sudo apt-get remove cassandra
+    - sudo rm -rf /var/lib/cassandra
+    - sudo rm -rf /var/log/cassandra
+    - sudo rm -rf /etc/cassandra
+    - sudo find / -name '*cassandra*'
+    - sudo apt-get clean
     
+    - sudo apt-get update -y
     - sudo apt-get install -y libxml2-dev libxmlsec1-dev # python-saml deps
     - git submodule update --init --recursive
     - redis-server --version
