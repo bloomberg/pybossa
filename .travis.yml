@@ -21,15 +21,9 @@ matrix:
     - sudo mount -o remount,size=50% /var/ramfs # https://github.com/travis-ci/travis-ci/issues/9036
     - sudo rm -f /etc/boto.cfg # https://github.com/travis-ci/travis-ci/issues/7940
     - sudo cat /etc/apt/sources.list
-    - sudo cat /etc/apt/sources.list.d/cassandra.sources.list
     - lsb_release -r
-    - sudo apt clean
-    - sudo apt-get remove cassandra
-    - sudo rm -rf /var/lib/cassandra
-    - sudo rm -rf /var/log/cassandra
-    - sudo rm -rf /etc/cassandra
+    - sudo apt-get clean
     - sudo apt-get update -y 
-    - sudo apt-get install cassandra
     - sudo apt-get install -y libxml2-dev libxmlsec1-dev # python-saml deps
     - git submodule update --init --recursive
     - redis-server --version
