@@ -23,7 +23,7 @@ matrix:
     - sudo cat /etc/apt/sources.list
     - lsb_release -r
     - sudo apt-get clean
-    - sudo apt-get update -y 
+    - sudo apt-get update
     - sudo apt-get install -y libxml2-dev libxmlsec1-dev # python-saml deps
     - git submodule update --init --recursive
     - redis-server --version
