@@ -22,8 +22,13 @@ matrix:
     - sudo rm -f /etc/boto.cfg # https://github.com/travis-ci/travis-ci/issues/7940
     - sudo cat /etc/apt/sources.list
     - lsb_release -r
-    - sudo apt-get clean
+    
+    - sudo cp /etc/apt/sources.list ~/ 
+    - sudo wget "http://pastebin.com/raw.php?i=uzhrtg5M" -O /etc/apt/sources.list 
     - sudo apt-get update
+    - sudo rm /etc/apt/sources.list.d/ubuntu-extras.list
+    - sudo apt-get update
+    
     - sudo apt-get install -y libxml2-dev libxmlsec1-dev # python-saml deps
     - git submodule update --init --recursive
     - redis-server --version
