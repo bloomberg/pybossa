@@ -386,7 +386,7 @@ def register():
                            email_addr=form.email_addr.data,
                            password=form.password.data,
                            consent=form.consent.data)
-        # guarentee that the full name is well defined wiht no spaces at the beginning or end
+        # guarentee that the full name is well defined with no spaces at the beginning or end
         account['fullname'] = account['fullname'].strip()
 
         ensure_user_data_access_assignment_from_form(account, form)
