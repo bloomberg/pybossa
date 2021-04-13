@@ -69,9 +69,7 @@ class ReservedFieldProcessor(object):
         'priority_0',
         'n_answers',
         'user_pref',
-        'expiration',
-        'worker_filter',
-        'worker_pref'
+        'expiration'
     ])
     is_input = False
 
@@ -81,7 +79,7 @@ class ReservedFieldProcessor(object):
             return ReservedFieldProcessor(header)
 
     def process(self, task_data, cell, *args):
-        if self.header in ['user_pref', 'worker_filter', 'worker_pref']:
+        if self.header == 'user_pref':
             if cell:
                 task_data[self.header] = json.loads(cell.lower())
             else:
@@ -178,7 +176,7 @@ class BulkTaskCSVImportBase(BulkTaskImport):
         BulkTaskImport.__init__(self)
         self._field_processors = None
         self._input_fields = None
-
+    
     def tasks(self):
         """Get tasks from a given URL."""
         return self._get_csv_data()
@@ -228,7 +226,7 @@ class BulkTaskCSVImportBase(BulkTaskImport):
     def _import_csv_tasks(self, csvreader):
         """Import CSV tasks."""
         # These two lines execute immediately when the function is called.
-        # The rest is deferred inside the generator function until the
+        # The rest is deferred inside the generator function until the 
         # first task is iterated.
         csviterator = iter(csvreader)
         self.fields(csvreader=csviterator)

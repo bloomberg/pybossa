@@ -88,7 +88,7 @@ class TestTaskCsvExporter(Test):
         assert french_value == u'fran\u00E7ais am\u00E9ricaine \u00E9pais'
         assert chinese_value == u'\u4E2D\u570B\u7684 \u82F1\u8A9E \u7F8E\u570B\u4EBA'
         assert smart_quotes_value == u'\u201CHello\u201D'
-
+    
     @with_context
     def test_task_csv_exporter_flatten(self):
         """Test that TaskCsvExporter flatten method works."""
@@ -99,7 +99,7 @@ class TestTaskCsvExporter(Test):
                'c': {
                    'nested_y': {'double_nested': 'www.example.com'},
                    'nested_z': True},
-               'd': [{'nested_z': 'X'}]}
+               'd': [{'nested_z': 'X'}]} 
 
         keys = sorted(dict(exporter.flatten(row.iteritems(), key_prefix='', return_value=None)).keys())
 
@@ -155,7 +155,7 @@ class TestExporters(Test):
 
         expected_headers = ['info', 'fav_user_ids', 'user_pref', 'n_answers', 'quorum', 'calibration',
             'created', 'state', 'gold_answers_best_job', 'gold_answers_best_boss', 'exported',
-            'project_id', 'id', 'priority_0', 'expiration', 'worker_pref', 'worker_filter']
+            'project_id', 'id', 'priority_0', 'expiration']
         obj_keys = task1_data.keys()
 
         self._compare_object_keys(obj_keys, expected_headers)
@@ -163,8 +163,7 @@ class TestExporters(Test):
         assert task1_data['gold_answers_best_boss'] == expected_gold_answer['best_boss']
 
         expected_headers = ['info', 'fav_user_ids', 'user_pref', 'n_answers', 'quorum', 'calibration',
-            'created', 'state', 'gold_answers', 'exported', 'project_id', 'id', 'priority_0', 'expiration',
-            'worker_pref', 'worker_filter']
+            'created', 'state', 'gold_answers', 'exported', 'project_id', 'id', 'priority_0', 'expiration']
         obj_keys = task2_data.keys()
 
         self._compare_object_keys(obj_keys, expected_headers)
