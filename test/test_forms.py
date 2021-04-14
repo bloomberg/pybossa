@@ -431,7 +431,7 @@ class TestRegisterFormWithUserPrefMetadata(Test):
             'review'
         ]
         #Disable some fields
-        form.set_can_update((True, disabled, {}))
+        form.set_can_update((True, disabled, None))
         for field_name, disable_reason in six.iteritems(disabled):
             assert form.is_disabled(getattr(form, field_name)) == disable_reason
         for field_name in enabled:

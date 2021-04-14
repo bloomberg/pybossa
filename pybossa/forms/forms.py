@@ -824,7 +824,7 @@ class UserPrefMetadataForm(Form):
     def _hide_fields(self, (can_update, disabled_fields, hidden_fields)):
         if not can_update:
             return {field: 'Form is not updatable.' for field in self}
-        for name, reason in six.iteritems(hidden_fields or {}):
+        for name, _ in six.iteritems(hidden_fields or {}):
             f = getattr(self, name)
             f.widget = HiddenInput()
             f.label=""

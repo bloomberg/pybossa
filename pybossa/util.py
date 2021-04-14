@@ -956,7 +956,7 @@ def valid_or_no_s3_bucket(task_data):
 
 def can_update_user_info(current_user, user_to_update):
     disable_fields = {'user_type': 'You must be an admin or subadmin to edit this.'}
-    hidden_fields = {'profile': 'You must be an admin or subadmin to view and edit this.'}
+    hidden_fields = {'profile': 'You must be admin or subadmin to view this'}
     # admin can update anyone
     if current_user.admin:
         return True, None, None
@@ -964,7 +964,7 @@ def can_update_user_info(current_user, user_to_update):
     if current_user.subadmin:
         return (current_user.id == user_to_update.id or
             not (user_to_update.admin or user_to_update.subadmin)), None, None
-    # normal user cannot view/update 'profile' field, cannot update 'user_type' field
+    # users without admin or subadmin priviledge cannot view 'profile' field or update 'user_type' field
     if current_user.id == user_to_update.id:
         return True, disable_fields, hidden_fields
     return False, None, None
