@@ -20,6 +20,12 @@ matrix:
     before_install:
     - sudo mount -o remount,size=50% /var/ramfs # https://github.com/travis-ci/travis-ci/issues/9036
     - sudo rm -f /etc/boto.cfg # https://github.com/travis-ci/travis-ci/issues/7940
+    - sudo apt-get remove cassandra
+    - sudo rm -rf /var/lib/cassandra
+    - sudo rm -rf /var/log/cassandra
+    - sudo rm -rf /etc/cassandra
+    - sudo rm -rf `sudo find / -name '*cassandra*'`
+    - sudo apt-get clean
     - sudo apt-get update -y && sudo apt-get install -y libxml2-dev libxmlsec1-dev # python-saml deps
     - git submodule update --init --recursive
     - redis-server --version
