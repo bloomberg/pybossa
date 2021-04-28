@@ -106,7 +106,7 @@ def get_value_by_path(data, path):
     key = path[0]
     try:
         index = int(key)
-        return get_value_by_path(data[index], path[1:])
+        return  get_value_by_path(data[index], path[1:]) if index < len(data) else None
     except ValueError:
         return get_value_by_path(data.get(key), path[1:])
 
