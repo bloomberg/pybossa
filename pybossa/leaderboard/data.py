@@ -22,7 +22,6 @@ from pybossa.model.user import User
 
 u = User()
 
-
 def get_leaderboard(top_users=20, user_id=None, window=0, info=None):
     """Return a list of top_users and if user_id return its position."""
     materialized_view = "users_rank_%s" % info
