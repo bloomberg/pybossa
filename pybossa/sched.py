@@ -284,7 +284,7 @@ def locked_scheduler(query_factory):
             for task_id, taskcount, n_answers, calibration, w_filter, w_pref, timeout in rows:
                 w_pref = w_pref or {}
                 w_filter = w_filter or {}
-                meet_requirement = cached_helpers.user_meet_task_requirement(w_filter, user_profile)
+                meet_requirement = cached_helpers.user_meet_task_requirement(task_id, w_filter, user_profile)
                 if meet_requirement:
                     score = get_task_preference(w_pref, user_profile)
                     task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
