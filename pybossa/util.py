@@ -1087,8 +1087,10 @@ def get_user_pref_db_clause(user_pref, user_email=None):
 def get_user_filter_db_clause(user_profile):
     # expand task filter as per sql format and (partially) match user profiles
     # still need further validation to filter good tasks out
-    user_profile_keys = [str(key) for key in user_profile.keys()]
-    sql = """task.worker_filter IS NULL OR task.worker_filter = '{}' OR task.worker_filter ?| ARRAY{}""".format("{}", user_profile_keys)
+    sql = """task.worker_filter IS NULL OR task.worker_filter = '{}'""".format("{}")
+    if user_profile:
+        user_profile_keys = [str(key) for key in user_profile.keys()]
+        sql += """ OR task.worker_filter ?| ARRAY{}::text[]""".format(user_profile_keys)
     return sql
 
 

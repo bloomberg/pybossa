@@ -279,20 +279,16 @@ def locked_scheduler(query_factory):
         user_profile = cached_users.get_user_profile_metadata(user_id)
         if filter_user_prefs:
             # validate user qualification and calculate task preference score
-            user_profile = json.loads(user_profile)
-            print(user_profile)
+            user_profile = json.loads(user_profile) if user_profile else {}
             task_rank_info = []
             for task_id, taskcount, n_answers, calibration, w_filter, w_pref, timeout in rows:
                 w_pref = w_pref or {}
                 w_filter = w_filter or {}
-
                 meet_requirement = cached_helpers.user_meet_task_requirement(w_filter, user_profile)
-                print("{} meet requirement: {}".format(task_id, meet_requirement))
                 if meet_requirement:
                     score = get_task_preference(w_pref, user_profile)
                     task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
             rows = sorted(task_rank_info, key=lambda tup: tup[4], reverse=True)
-            print(rows)
         else:
             rows = [r for r in rows]
 
