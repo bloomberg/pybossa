@@ -182,6 +182,7 @@ def _has_no_tasks(project_id):
         n_tasks = row.n_tasks
     return n_tasks == 0
 
+
 def user_meet_task_requirement(task_id, user_filter, user_profile):
     for field, filters in user_filter.iteritems():
         if not user_profile.get(field):
@@ -201,6 +202,7 @@ def user_meet_task_requirement(task_id, user_filter, user_profile):
                                 reason {}""".format(task_id, field, str(e)))
             return False
     return True
+
 
 def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     """Return the number of tasks for a given project a user can contribute to.
