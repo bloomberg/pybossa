@@ -1084,6 +1084,14 @@ def get_user_pref_db_clause(user_pref, user_email=None):
     return user_pref_sql + email_sql if user_email else user_pref_sql
 
 
+def get_user_filter_db_clause(user_profile):
+    # expand task filter as per sql format and (partially) match user profiles
+    # still need further validation to filter good tasks out
+    user_profile_keys = [str(key) for key in user_profile.keys()]
+    sql = """task.worker_filter IS NULL OR task.worker_filter = '{}' OR task.worker_filter ?| ARRAY{}""".format("{}", user_profile_keys)
+    return sql
+
+
 def is_int(s):
     try:
         value = float(str(s))
