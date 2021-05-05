@@ -182,7 +182,7 @@ def _has_no_tasks(project_id):
         n_tasks = row.n_tasks
     return n_tasks == 0
 
-def user_meet_task_requirement(user_filter, user_profile):
+def user_meet_task_requirement(task_id, user_filter, user_profile):
     for field, filters in user_filter.iteritems():
         if not user_profile.get(field):
             # if user profile does not have attribute, user does not qualify for the task
@@ -195,9 +195,10 @@ def user_meet_task_requirement(user_filter, user_profile):
             if op not in comparator_func:
                 raise Exception("invalid operator %s", op)
             if not comparator_func[op](user_data, require):
-                raise Exception("task requires %s %s, user data %s", op, require, user_data)
+                return False
         except Exception as e:
-            current_app.logger.info("user disqualify for {} on field {}, reason {}".format(task_id, field, str(e)))
+            current_app.logger.info("""An error occured when validate constraints for task {} on field {},
+                                reason {}""".format(task_id, field, str(e)))
             return False
     return True
 
@@ -249,7 +250,7 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
             user_profile = json.loads(user_profile) if user_profile else {}
             for task_id, w_filter in result:
                 w_filter = w_filter or {}
-                num_available_tasks += int(user_meet_task_requirement(w_filter, user_profile))
+                num_available_tasks += int(user_meet_task_requirement(task_id, w_filter, user_profile))
             return num_available_tasks
 
     except Exception as e:
