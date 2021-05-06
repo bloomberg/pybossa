@@ -431,17 +431,17 @@ class TestRegisterFormWithUserPrefMetadata(Test):
             'review'
         ]
         #Disable some fields
-        form.set_can_update((True, disabled))
+        form.set_can_update((True, disabled, None))
         for field_name, disable_reason in six.iteritems(disabled):
             assert form.is_disabled(getattr(form, field_name)) == disable_reason
         for field_name in enabled:
             assert not form.is_disabled(getattr(form, field_name))
         #Disable all fields
-        form.set_can_update((False, None))
+        form.set_can_update((False, None, None))
         for field in form:
             assert form.is_disabled(field)
         #Enable all fields
-        form.set_can_update((True, None))
+        form.set_can_update((True, None, None))
         for field in form:
             assert not form.is_disabled(field)
 
