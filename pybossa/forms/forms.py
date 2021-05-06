@@ -74,7 +74,8 @@ def create_nullable_select(label, items):
 def is_json(json_type):
     def v(form, field):
         try:
-            assert isinstance(json.loads(field.data), json_type)
+            if field.data:
+                assert isinstance(json.loads(field.data), json_type)
         except Exception:
             raise validators.ValidationError('Field must be JSON object.')
     return v
@@ -797,11 +798,12 @@ class UserPrefMetadataForm(Form):
     review = TextAreaField(
         lazy_gettext('Additional comments'), default="")
     profile = TextAreaField(
-        lazy_gettext('Profiles(json format)'), default="")
+        lazy_gettext('Profiles(json format)'), [is_json(dict)], default="",
+        render_kw={"placeholder": "{'finance': 0.5, 'art': 0.8}"})
 
     def __init__(self, *args, **kwargs):
         Form.__init__(self, *args, **kwargs)
-        self.set_can_update(kwargs.get('can_update', (True, None)))
+        self.set_can_update(kwargs.get('can_update', (True, None, None)))
 
     def set_upref_mdata_choices(self):
         upref_mdata_choices = app_settings.upref_mdata.get_upref_mdata_choices()
@@ -812,11 +814,20 @@ class UserPrefMetadataForm(Form):
 
     def set_can_update(self, can_update_info):
         self._disabled = self._get_disabled_fields(can_update_info)
+        self._hide_fields(can_update_info)
 
-    def _get_disabled_fields(self, (can_update, disabled_fields)):
+    def _get_disabled_fields(self, (can_update, disabled_fields, hidden_fields)):
         if not can_update:
             return {field: 'Form is not updatable.' for field in self}
         return {getattr(self, name): reason for name, reason in six.iteritems(disabled_fields or {})}
+
+    def _hide_fields(self, (can_update, disabled_fields, hidden_fields)):
+        if not can_update:
+            return {field: 'Form is not updatable.' for field in self}
+        for name, _ in six.iteritems(hidden_fields or {}):
+            f = getattr(self, name)
+            f.widget = HiddenInput()
+            f.label=""
 
     def is_disabled(self, field):
         return self._disabled.get(field, False)
