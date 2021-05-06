@@ -597,7 +597,7 @@ def _set_orderby_desc(query, orderby, descending):
             query = query.order_by(getattr(Task, orderby).desc())
         else:
             query = query.order_by(getattr(Task, orderby).asc())
-    #query = query.order_by(Task.id.asc())
+    query = query.order_by(Task.id.asc())
     return query
 
 

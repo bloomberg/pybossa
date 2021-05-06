@@ -49,9 +49,3 @@ class TestModelTask(Test):
         db.session.add(task)
         assert_raises(IntegrityError, db.session.commit)
         db.session.rollback()
-    
-    @with_context
-    def test_task_pct_status(self):
-        task = Task(project_id=None, n_answers=2)
-        assert task.pct_status() == 0, task.pct_status()
-        
