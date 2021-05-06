@@ -1140,20 +1140,21 @@ class TestAccessControl(Test):
         assert normal_user.id != normal_user2.id
 
         # Admin can update anyone
-        assert util.can_update_user_info(admin, admin) == (True, None)
-        assert util.can_update_user_info(admin, subadmin) == (True, None)
-        assert util.can_update_user_info(admin, normal_user) == (True, None)
+        assert util.can_update_user_info(admin, admin) == (True, None, None)
+        assert util.can_update_user_info(admin, subadmin) == (True, None, None)
+        assert util.can_update_user_info(admin, normal_user) == (True, None, None)
 
         # Subadmin can update self and normal users
-        assert util.can_update_user_info(subadmin, admin) == (False, None)
-        assert util.can_update_user_info(subadmin, subadmin2) == (False, None)
-        assert util.can_update_user_info(subadmin, subadmin) == (True, None)
-        assert util.can_update_user_info(subadmin, normal_user) == (True, None)
+        assert util.can_update_user_info(subadmin, admin) == (False, None, None)
+        assert util.can_update_user_info(subadmin, subadmin2) == (False, None, None)
+        assert util.can_update_user_info(subadmin, subadmin) == (True, None, None)
+        assert util.can_update_user_info(subadmin, normal_user) == (True, None, None)
 
         # Normal user can update self except for 'user_type' field
-        assert util.can_update_user_info(normal_user, admin) == (False, None)
-        assert util.can_update_user_info(normal_user, subadmin) == (False, None)
-        (can_update, disabled) = util.can_update_user_info(normal_user, normal_user)
+        assert util.can_update_user_info(normal_user, admin) == (False, None, None)
+        assert util.can_update_user_info(normal_user, subadmin) == (False, None, None)
+        (can_update, disabled, hidden) = util.can_update_user_info(normal_user, normal_user)
         assert can_update
-        assert set(disabled.keys()) == {'user_type', 'profile'}
-        assert util.can_update_user_info(normal_user, normal_user2) == (False, None)
+        assert set(disabled.keys()) == {'user_type'}
+        assert set(hidden.keys()) == {'profile'}
+        assert util.can_update_user_info(normal_user, normal_user2) == (False, None, None)
