@@ -799,7 +799,7 @@ class UserPrefMetadataForm(Form):
         lazy_gettext('Additional comments'), default="")
     profile = TextAreaField(
         lazy_gettext('Profiles(json format)'), [is_json(dict)], default="",
-        render_kw={"placeholder": '{"finance": 0.5, "art": 0.8}'})
+        render_kw={"placeholder": '{"finance": 0.5, "english": 0.8}'})
 
     def __init__(self, *args, **kwargs):
         Form.__init__(self, *args, **kwargs)
