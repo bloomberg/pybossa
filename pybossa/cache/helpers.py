@@ -20,6 +20,7 @@
 import json
 from flask import current_app
 from sqlalchemy.sql import text
+import operator
 from pybossa.core import db
 from pybossa.cache import memoize, ONE_HOUR
 from pybossa.cache.projects import n_results, overall_progress
@@ -28,6 +29,20 @@ from pybossa.cache import users as cached_users
 
 session = db.slave_session
 
+comparator_func = {
+    "less_than": operator.lt,
+    "<": operator.lt,
+    "less_than_equal": operator.le,
+    "<=": operator.le,
+    "greater_than": operator.gt,
+    ">": operator.gt,
+    "greater_than_equal": operator.ge,
+    ">=": operator.ge,
+    "equal": operator.eq,
+    "==": operator.eq,
+    "not_equal": operator.ne,
+    "!=": operator.ne,
+}
 
 def n_gold_tasks(project_id):
     """Return the number of gold tasks for a given project"""
@@ -168,6 +183,27 @@ def _has_no_tasks(project_id):
     return n_tasks == 0
 
 
+def user_meet_task_requirement(task_id, user_filter, user_profile):
+    for field, filters in user_filter.iteritems():
+        if not user_profile.get(field):
+            # if user profile does not have attribute, user does not qualify for the task
+            return False
+        user_data = user_profile.get(field) or 0
+        try:
+            user_data = float(user_data)
+            require = filters[0]
+            op = filters[1]
+            if op not in comparator_func:
+                raise Exception("invalid operator %s", op)
+            if not comparator_func[op](user_data, require):
+                return False
+        except Exception as e:
+            current_app.logger.info("""An error occured when validate constraints for task {} on field {},
+                                reason {}""".format(task_id, field, str(e)))
+            return False
+    return True
+
+
 def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     """Return the number of tasks for a given project a user can contribute to.
     based on the completion of the project tasks, previous task_runs
@@ -192,25 +228,36 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
                ; '''
     else:
         user_pref_list = cached_users.get_user_preferences(user_id)
+        user_filter_list = cached_users.get_user_filters(user_id)
         sql = '''
-               SELECT COUNT(*) AS n_tasks FROM task
+               SELECT task.id, worker_filter FROM task
                WHERE project_id=:project_id AND state !='completed'
                AND state !='enrich'
                AND id NOT IN
                (SELECT task_id FROM task_run WHERE
                project_id=:project_id AND user_id=:user_id)
                AND ({})
-               ;'''.format(user_pref_list)
+               AND ({})
+               ;'''.format(user_pref_list, user_filter_list)
     sqltext = text(sql)
     try:
         result = session.execute(sqltext, dict(project_id=project_id, user_id=user_id, assign_user=assign_user))
+        if scheduler != Schedulers.user_pref:
+            for row in result:
+                n_tasks = row.n_tasks
+                return n_tasks
+        else:
+            num_available_tasks = 0
+            user_profile = cached_users.get_user_profile_metadata(user_id)
+            user_profile = json.loads(user_profile) if user_profile else {}
+            for task_id, w_filter in result:
+                w_filter = w_filter or {}
+                num_available_tasks += int(user_meet_task_requirement(task_id, w_filter, user_profile))
+            return num_available_tasks
+
     except Exception as e:
         current_app.logger.exception('Exception in get_user_pref_task {0}, sql: {1}'.format(str(e), str(sqltext)))
         return None
-
-    for row in result:
-        n_tasks = row.n_tasks
-    return n_tasks
 
 
 def latest_submission_task_date(project_id):
