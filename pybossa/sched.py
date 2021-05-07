@@ -30,6 +30,7 @@ from werkzeug.exceptions import BadRequest, Forbidden
 import random
 import json
 from pybossa.cache import users as cached_users
+from pybossa.cache import helpers as cached_helpers
 from flask import current_app
 from pybossa import data_access
 from datetime import datetime
@@ -276,24 +277,17 @@ def locked_scheduler(query_factory):
                                          assign_user=assign_user,
                                          limit=limit))
         user_profile = cached_users.get_user_profile_metadata(user_id)
-        if user_profile and filter_user_prefs:
-            # calculate task preference score
-            user_profile = json.loads(user_profile)
+        if filter_user_prefs:
+            # validate user qualification and calculate task preference score
+            user_profile = json.loads(user_profile) if user_profile else {}
             task_rank_info = []
             for task_id, taskcount, n_answers, calibration, w_filter, w_pref, timeout in rows:
-                score = 0
                 w_pref = w_pref or {}
-                for key, value in w_pref.iteritems():
-                    if not user_profile.get(key):
-                        continue
-                    user_data = user_profile.get(key) or 0
-                    try:
-                        user_data = float(user_data)
-                        score += value * user_data
-                    except ValueError as e:
-                        # TODO: when user profile is not number, we need another method to calculate score
-                        pass
-                task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
+                w_filter = w_filter or {}
+                meet_requirement = cached_helpers.user_meet_task_requirement(task_id, w_filter, user_profile)
+                if meet_requirement:
+                    score = get_task_preference(w_pref, user_profile)
+                    task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
             rows = sorted(task_rank_info, key=lambda tup: tup[4], reverse=True)
         else:
             rows = [r for r in rows]
@@ -329,7 +323,7 @@ def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=Fals
     '''
     filters = []
     if filter_user_prefs:
-        filters.append('AND ({})'.format(cached_users.get_user_preferences(user_id)))
+        filters.append('AND ({}) AND ({})'.format(cached_users.get_user_preferences(user_id), cached_users.get_user_filters(user_id)))
     if task_type == 'gold':
         filters.append('AND task.calibration = 1')
     elif task_type == 'no_gold':
@@ -370,6 +364,17 @@ def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=Fals
                       ','.join(order_by))
     return text(sql)
 
+def get_task_preference(task_pref, user_profile):
+    score = 0
+    for key, value in task_pref.iteritems():
+        user_data = user_profile.get(key) or 0
+        try:
+            user_data = float(user_data)
+            score += value * user_data
+        except ValueError as e:
+            # TODO: when user profile is not number, we need another method to calculate score
+            pass
+    return score
 
 def select_contributable_task(project, user_id, **kwargs):
     sched, _ = get_scheduler_and_timeout(project)
