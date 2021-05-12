@@ -40,6 +40,7 @@ class TestConsensusExporter(Test):
             zipfile = ZipFile(fp)
             filename = zipfile.namelist()[0]
             df = DataFrame.from_csv(StringIO(zipfile.read(filename)))
+            df = df.sort_values(by=['task_id'])
         rows = df.reset_index().to_dict(orient='records')
         assert len(rows) == 2
         row = rows[0]
@@ -58,6 +59,7 @@ class TestConsensusExporter(Test):
             zipfile = ZipFile(fp)
             filename = zipfile.namelist()[0]
             df = DataFrame.from_csv(StringIO(zipfile.read(filename)))
+            df = df.sort_values(by=['task_id'])
         rows = df.reset_index().to_dict(orient='records')
         assert len(rows) == 2
         assert json.loads(rows[0]['task_run__info'])[task_run.user.name] == {'hello': u'你好'}
