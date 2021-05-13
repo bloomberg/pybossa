@@ -44,6 +44,10 @@ class ProjectSyncer(Syncer):
         target = self.get_target(short_name=project.short_name)
         payload = self._build_payload(project, target)
         is_new_project = not target
+        print("in project syncer")
+        print(target)
+        print(is_new_project)
+        print(payload)
 
         if is_new_project:
             return is_new_project, self._create(payload, self.target_key)
@@ -85,6 +89,10 @@ class ProjectSyncer(Syncer):
             payload = self._merge_pass_through_keys(
                     project_dict, target)
 
+        input_data = project['info'].get('data_classification', {}).get('input_data') or ''
+        output_data = project['info'].get('data_classification', {}).get('output_data') or ''
+        data_class = str(input_data) + str(output_data)
+        payload['info']['annotation_config']['amp_store'] = False if ('L1' in data_class or 'L2' in data_class) else True
         payload = self._add_sync_info(payload)
         payload = self._sync_category(project.category_id, payload)
         payload = self._merge_github_keys(project_dict, payload)
