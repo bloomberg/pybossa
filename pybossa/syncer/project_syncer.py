@@ -44,10 +44,6 @@ class ProjectSyncer(Syncer):
         target = self.get_target(short_name=project.short_name)
         payload = self._build_payload(project, target)
         is_new_project = not target
-        print("in project syncer")
-        print(target)
-        print(is_new_project)
-        print(payload)
 
         if is_new_project:
             return is_new_project, self._create(payload, self.target_key)
