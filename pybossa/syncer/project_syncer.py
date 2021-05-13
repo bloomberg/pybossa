@@ -88,7 +88,10 @@ class ProjectSyncer(Syncer):
         input_data = project['info'].get('data_classification', {}).get('input_data') or ''
         output_data = project['info'].get('data_classification', {}).get('output_data') or ''
         data_class = str(input_data) + str(output_data)
-        payload['info']['annotation_config']['amp_store'] = False if ('L1' in data_class or 'L2' in data_class) else True
+        # using .get in case annotation_config doesn't exist 
+        annotation_config = payload['info'].get('annotation_config', {})
+        if ('L1' in data_class or 'L2' in data_class):
+            annotation_config['amp_store'] = False
         payload = self._add_sync_info(payload)
         payload = self._sync_category(project.category_id, payload)
         payload = self._merge_github_keys(project_dict, payload)
