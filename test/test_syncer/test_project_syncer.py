@@ -24,7 +24,7 @@ from pybossa.syncer import NotEnabled
 from pybossa.syncer.project_syncer import ProjectSyncer
 from default import db, Test, with_context
 from factories import ProjectFactory, UserFactory
-
+from pybossa.core import project_repo
 from pybossa.model.project import Project
 
 
@@ -205,9 +205,10 @@ class TestProjectSyncer(Test):
         project_syncer.syncer = user
         
         project = ProjectFactory.create()
-        project.info['data_classification'] = dict(input_data="L2 - public", output_data="L2 - public")
+        project.info['data_classification'] = dict(input_data="L2 - propriertary valid", output_data="L2 - propriertary valid")
+        project_repo.save(project)
+
         # no sync info by default
-        
         assert not project.info.get("sync")
 
         payload = project_syncer._build_payload(project)
@@ -224,11 +225,12 @@ class TestProjectSyncer(Test):
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
         user = UserFactory.create(admin=True, email_addr=u'user@test.com')
         project_syncer.syncer = user
-        
+
         project = ProjectFactory.create()
-        project.info['data_classification'] = dict(input_data="L3 - public", output_data="L3 - public")
+        project.info['data_classification'] = dict(input_data="L3 - community", output_data="L3 - community")
+        project_repo.save(project)
+
         # no sync info by default
-        
         assert not project.info.get("sync")
 
         payload = project_syncer._build_payload(project)
