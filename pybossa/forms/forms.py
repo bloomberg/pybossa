@@ -798,8 +798,11 @@ class UserPrefMetadataForm(Form):
     review = TextAreaField(
         lazy_gettext('Additional comments'), default="")
     profile = TextAreaField(
-        lazy_gettext('Profiles(json format)'), [is_json(dict)], default="",
-        render_kw={"placeholder": '{"finance": 0.5, "english": 0.8}'})
+        lazy_gettext("<div>Task Preferences</div>"
+                     "<div style='color:red; font-weight:normal; font-size:12px;'>"
+                     "Must not include sensitive nor personally identifiable information.</div>"),
+            [is_json(dict)], default="",
+            render_kw={"placeholder": '{"finance": 0.5, "english": 0.8}'})
 
     def __init__(self, *args, **kwargs):
         Form.__init__(self, *args, **kwargs)
