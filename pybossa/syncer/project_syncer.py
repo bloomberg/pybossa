@@ -81,11 +81,8 @@ class ProjectSyncer(Syncer):
 
         if not target:
             payload = self._remove_reserved_keys(project_dict)
-            input_data = output_data = ""
-            if "data_classification" in project.info and "input_data" in project.info["data_classification"]:
-                input_data = project.info["data_classification"]["input_data"]
-            if "data_classification" in project.info and "output_data" in project.info["data_classification"]:
-                output_data = project.info["data_classification"]["output_data"]
+            input_data = project.info.get("data_classification", {}).get("input_data", "")
+            output_data = project.info.get("data_classification", {}).get("output_data", "")
             data_class = str(input_data) + str(output_data)
             # using .get in case annotation_config doesn't exist 
             annotation_config = payload['info'].get('annotation_config', {})
