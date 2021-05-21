@@ -24,7 +24,7 @@ from pybossa.syncer import NotEnabled
 from pybossa.syncer.project_syncer import ProjectSyncer
 from default import db, Test, with_context
 from factories import ProjectFactory, UserFactory
-
+from pybossa.core import project_repo
 from pybossa.model.project import Project
 
 
@@ -195,6 +195,53 @@ class TestProjectSyncer(Test):
         res = self.app.put("/api/project/{}".format(project.id), headers=headers, data=json.dumps(payload))
         assert res.status_code == 200, 'build_payload output should result in valid api query'
         assert res.json["info"]["sync"] == payload["info"]["sync"]
+
+
+    @with_context
+    @patch('pybossa.syncer.category_syncer.CategorySyncer.get_target', return_value={'id': 1})
+    def test_sync_L2_without_target(self, mock_cat):
+        project_syncer = ProjectSyncer(self.target_url, self.target_key)
+        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        project_syncer.syncer = user
+        
+        project = ProjectFactory.create()
+        project.info['data_classification'] = dict(input_data="L2 - propriertary valid", output_data="L2 - propriertary valid")
+        project_repo.save(project)
+
+        # no sync info by default
+        assert not project.info.get("sync")
+
+        payload = project_syncer._build_payload(project)
+
+        # sync existing does put request
+        headers = [('Authorization', user.api_key)]
+        res = self.app.put("/api/project/{}".format(project.id), headers=headers, data=json.dumps(payload))
+        assert res.status_code == 200, 'build_payload output should result in valid api query'
+        assert res.json["info"]["sync"] == payload["info"]["sync"]
+
+    @with_context
+    @patch('pybossa.syncer.category_syncer.CategorySyncer.get_target', return_value={'id': 1})
+    def test_sync_L3_without_target(self, mock_cat):
+        project_syncer = ProjectSyncer(self.target_url, self.target_key)
+        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        project_syncer.syncer = user
+
+        project = ProjectFactory.create()
+        project.info['data_classification'] = dict(input_data="L3 - community", output_data="L3 - community")
+        project_repo.save(project)
+
+        # no sync info by default
+        assert not project.info.get("sync")
+
+        payload = project_syncer._build_payload(project)
+
+        # sync existing does put request
+        headers = [('Authorization', user.api_key)]
+        res = self.app.put("/api/project/{}".format(project.id), headers=headers, data=json.dumps(payload))
+        assert res.status_code == 200, 'build_payload output should result in valid api query'
+        assert res.json["info"]["sync"] == payload["info"]["sync"]
+
+
 
     @with_context
     @patch('pybossa.syncer.project_syncer.ProjectSyncer.get_target')
