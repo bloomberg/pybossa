@@ -215,7 +215,7 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     if user_id is None or user_id <= 0:
         return n_tasks
     assign_user = json.dumps({'assign_user': [cached_users.get_user_email(user_id)]}) if user_id else None
-    scheduler = project.get('sched', 'default') if type(project) == dict else project.info.get('sched', 'default')
+    scheduler = project["info"].get('sched', 'default') if type(project) == dict else project.info.get('sched', 'default')
     project_id = project['id'] if type(project) == dict else project.id
     if scheduler != Schedulers.user_pref:
         sql = '''
