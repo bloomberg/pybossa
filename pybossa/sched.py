@@ -270,8 +270,7 @@ def locked_scheduler(query_factory):
         sql = query_factory(project_id, user_id=user_id, limit=limit,
                             rand_within_priority=rand_within_priority,
                             task_type=task_type)
-        db_max_records = 100000
-        limit = db_max_records if filter_user_prefs else user_count + 5
+        limit = current_app.config.get('DB_MAXIMUM_BATCH_SIZE') if filter_user_prefs else user_count + 5
         rows = session.execute(sql, dict(project_id=project_id,
                                          user_id=user_id,
                                          assign_user=assign_user,
