@@ -595,7 +595,7 @@ class TestNTaskAvailable(sched.Helper):
     @with_context
     def test_task_routing_1(self):
         '''
-        task[0]: needs finance skill at least 0.4, should be anble to assign to the user
+        task[0]: needs finance skill at least 0.4, should be able to assign to the user
         task[1]: needs marketing skill at least 0.3, should be able to assign to the user
         task[3]: doesnt have filters, should be able to assign to the user
         '''
@@ -614,7 +614,7 @@ class TestNTaskAvailable(sched.Helper):
     @with_context
     def test_task_routing_2(self):
         '''
-        task[0]: needs finance skill at least 0.8, should not be anble to assign to the user
+        task[0]: needs finance skill at least 0.8, should not be able to assign to the user
         task[1]: needs geography skill at least 0.5, should not be able to assign to the user
         task[3]: doesnt have filters, should be able to assign to the user
         '''
@@ -646,8 +646,6 @@ class TestNTaskAvailable(sched.Helper):
         tasks[1].worker_filter = {'geography': [0.5, '>=']}
         task_repo.save(tasks[1])
         assert n_available_tasks_for_user(project, 500) == 1
-
-
 
     @with_context
     def test_upref_sched_gold_task(self):

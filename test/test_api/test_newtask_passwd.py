@@ -272,7 +272,7 @@ class TestNewtaskPasswd(TestAPI):
         res = self.app.get(url)
         assert res.status_code == 200, (res, res.data)
         task = json.loads(res.data)
-        assert task.get('info', {}).get('question') == 'answer_2'
+        assert task.get('info', {}).get('question') == 'answer_2', "task_1 requires english skill >= 1"
 
     @with_context
     def test_newtask_with_task_filter_2(self):
@@ -297,7 +297,7 @@ class TestNewtaskPasswd(TestAPI):
         res = self.app.get(url)
         assert res.status_code == 200, (res, res.data)
         task = json.loads(res.data)
-        assert task.get('info', {}).get('question') == 'answer_2'
+        assert task.get('info', {}).get('question') == 'answer_2', "task_1 requires english skill >= 0.9"
 
     @with_context
     def test_newtask_with_task_filter_3(self):
@@ -316,6 +316,12 @@ class TestNewtaskPasswd(TestAPI):
         TaskFactory.create(project=project, info=task_1_info, priority_0=1.0, worker_filter=task_1_filter)
         TaskFactory.create(project=project, info=task_2_info, priority_0=0, worker_filter=task_2_filter)
         api_key = project.owner.api_key
+
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, api_key)
+        res = self.app.get(url)
+        assert res.status_code == 200, (res, res.data)
+        task = json.loads(res.data)
+        assert task.get('info', {}).get('question') == 'answer_2', "task_1 requires english skill"
 
     @with_context
     def test_newtask_with_task_filter_4(self):
@@ -340,7 +346,7 @@ class TestNewtaskPasswd(TestAPI):
         res = self.app.get(url)
         assert res.status_code == 200, (res, res.data)
         task = json.loads(res.data)
-        assert task.get('info', {}).get('question') == 'answer_2'
+        assert task.get('info', {}).get('question') == 'answer_2', "task_1 requires spanish skill > 0.6"
 
     @with_context
     def test_newtask_with_task_filter_invalid_ooperator(self):
@@ -364,4 +370,4 @@ class TestNewtaskPasswd(TestAPI):
         res = self.app.get(url)
         assert res.status_code == 200, (res, res.data)
         task = json.loads(res.data)
-        assert task.get('info', {}).get('question') == 'answer_2'
+        assert task.get('info', {}).get('question') == 'answer_2', "task_1 has invalid filter"
