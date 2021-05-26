@@ -811,7 +811,7 @@ def generate_notification_email_for_admins(user, admins_emails, access_type):
                                   server_url=server_url,
                                   is_qa=is_qa)
     return msg
-    
+
 
 def generate_manage_user_email(user, operation):
     assert user
@@ -955,17 +955,19 @@ def valid_or_no_s3_bucket(task_data):
 
 
 def can_update_user_info(current_user, user_to_update):
+    disable_fields = {'user_type': 'You must be an admin or subadmin to edit this.'}
+    hidden_fields = {'profile': 'You must be admin or subadmin to view this'}
     # admin can update anyone
     if current_user.admin:
-        return True, None
+        return True, None, None
     # subadmin can update self and normal users
     if current_user.subadmin:
         return (current_user.id == user_to_update.id or
-            not (user_to_update.admin or user_to_update.subadmin)), None
-    # normal user can update self except for 'user_type' field
+            not (user_to_update.admin or user_to_update.subadmin)), None, None
+    # users without admin or subadmin priviledge cannot view 'profile' field or update 'user_type' field
     if current_user.id == user_to_update.id:
-        return True, {'user_type': 'You must be an admin or subadmin to edit this.'}
-    return False, None
+        return True, disable_fields, hidden_fields
+    return False, None, None
 
 
 def get_enabled_users(user_emails):
@@ -1080,6 +1082,16 @@ def get_user_pref_db_clause(user_pref, user_email=None):
                     '''.format(assign_key)
 
     return user_pref_sql + email_sql if user_email else user_pref_sql
+
+
+def get_user_filter_db_clause(user_profile):
+    # expand task filter as per sql format and (partially) match user profiles
+    # still need further validation to filter good tasks out
+    sql = """task.worker_filter IS NULL OR task.worker_filter = '{}'""".format("{}")
+    if user_profile:
+        user_profile_keys = [str(key) for key in user_profile.keys()]
+        sql += """ OR task.worker_filter ?| ARRAY{}::text[]""".format(user_profile_keys)
+    return sql
 
 
 def is_int(s):

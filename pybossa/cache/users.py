@@ -28,7 +28,7 @@ from pybossa.model.project import Project
 from pybossa.leaderboard.data import get_leaderboard as gl
 from pybossa.leaderboard.jobs import leaderboard as lb
 import json
-from pybossa.util import get_user_pref_db_clause
+from pybossa.util import get_user_pref_db_clause, get_user_filter_db_clause
 from pybossa.data_access import data_access_levels
 from pybossa.util import get_taskrun_date_range_sql_clause_params
 
@@ -358,11 +358,23 @@ def get_user_preferences(user_id):
 
 
 @memoize(timeout=ONE_DAY)
+def get_user_filters(user_id):
+    user_profile = get_user_profile_metadata(user_id)
+    user_profile = json.loads(user_profile) if user_profile else {}
+    return get_user_filter_db_clause(user_profile)
+
+
+@memoize(timeout=ONE_DAY)
 def get_user_by_id(user_id):
     assert user_id is not None or user_id > 0
     user = User.query.get(user_id)
     return user
 
+
+def get_user_profile_metadata(user_id):
+    user = get_user_by_id(user_id)
+    info = user.info or {} if user else {}
+    return info.get("metadata", {}).get('profile')
 
 def get_user_email(user_id):
     user= get_user_by_id(user_id)

@@ -162,3 +162,6 @@ AVATAR_ABSOLUTE = True
 # Spam accounts to avoid
 SPAM = []
 REQUEST_FILE_VALIDITY_IN_DAYS = 60
+
+# Task routing batch size
+DB_MAXIMUM_BATCH_SIZE = 10000

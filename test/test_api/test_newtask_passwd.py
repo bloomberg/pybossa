@@ -17,6 +17,8 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
 
+from pybossa.core import task_repo, user_repo
+from pybossa.sched import get_user_pref_task, Schedulers
 from itsdangerous import SignatureExpired
 from default import db, with_context
 from test_api import TestAPI, get_pwd_cookie
@@ -194,3 +196,178 @@ class TestNewtaskPasswd(TestAPI):
         assert res.status_code == 200, (res, res.data)
         task = json.loads(res.data)
         assert task.get('gold_answers') is None
+
+    # For task routing
+    @with_context
+    def test_newtask_with_task_preference_scores(self):
+        """Test newtask returns task with best matching score"""
+        user_info = dict(metadata={"profile": json.dumps({"english": 0.9})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+
+        task_1_info = {'question': 'answer_1'}
+        task_1_pref = {'english': 1.0}
+        task_2_info = {'question': 'answer_2'}
+        task_2_pref = {'spanish': 1.0}
+        TaskFactory.create(project=project, info=task_1_info, priority_0=0, worker_pref=task_1_pref)
+        TaskFactory.create(project=project, info=task_2_info, priority_0=1.0, worker_pref=task_2_pref)
+        api_key = project.owner.api_key
+
+        # as a real user, no password
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, api_key)
+        res = self.app.get(url)
+        assert res.status_code == 200, (res, res.data)
+        task = json.loads(res.data)
+        assert task.get('info', {}).get('question') == 'answer_1'
+
+    @with_context
+    def test_newtask_with_task_preference_scores_invalid_value(self):
+        """Test newtask returns task with best matching score"""
+        user_info = dict(metadata={"profile": json.dumps({"english": "A"})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+
+        task_1_info = {'question': 'answer_1'}
+        task_1_pref = {'english': 1.0}
+        task_2_info = {'question': 'answer_2'}
+        task_2_pref = {'spanish': 1.0}
+        TaskFactory.create(project=project, info=task_1_info, priority_0=0, worker_pref=task_1_pref)
+        TaskFactory.create(project=project, info=task_2_info, priority_0=1.0, worker_pref=task_2_pref)
+
+        api_key = project.owner.api_key
+
+        # as a real user, no password
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, api_key)
+        res = self.app.get(url)
+        assert res.status_code == 200, (res, res.data)
+        task = json.loads(res.data)
+        assert task.get('info', {}).get('question') == 'answer_2'
+
+    @with_context
+    def test_newtask_with_task_filter_1(self):
+        """Test newtask returns task that matches filter"""
+        user_info = dict(metadata={"profile": json.dumps({"english": 0.8})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+
+        task_1_info = {'question': 'answer_1'}
+        task_1_filter = {'english': [1.0, ">="]}
+        task_2_info = {'question': 'answer_2'}
+        task_2_filter = {'english': [0.8, ">="]}
+        TaskFactory.create(project=project, info=task_1_info, priority_0=1.0, worker_filter=task_1_filter)
+        TaskFactory.create(project=project, info=task_2_info, priority_0=0, worker_filter=task_2_filter)
+        api_key = project.owner.api_key
+
+        # as a real user, no password
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, api_key)
+        res = self.app.get(url)
+        assert res.status_code == 200, (res, res.data)
+        task = json.loads(res.data)
+        assert task.get('info', {}).get('question') == 'answer_2', "task_1 requires english skill >= 1"
+
+    @with_context
+    def test_newtask_with_task_filter_2(self):
+        """Test newtask returns task that matches filter"""
+        user_info = dict(metadata={"profile": json.dumps({"english": 0.8})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+
+        task_1_info = {'question': 'answer_1'}
+        task_1_filter = {'english': [0.9, ">="]}
+        task_2_info = {'question': 'answer_2'}
+        task_2_filter = {}
+        TaskFactory.create(project=project, info=task_1_info, priority_0=1.0, worker_filter=task_1_filter)
+        TaskFactory.create(project=project, info=task_2_info, priority_0=0, worker_filter=task_2_filter)
+        api_key = project.owner.api_key
+
+        # as a real user, no password
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, api_key)
+        res = self.app.get(url)
+        assert res.status_code == 200, (res, res.data)
+        task = json.loads(res.data)
+        assert task.get('info', {}).get('question') == 'answer_2', "task_1 requires english skill >= 0.9"
+
+    @with_context
+    def test_newtask_with_task_filter_3(self):
+        """Test newtask returns task that matches filter"""
+        user_info = dict(metadata={"profile": json.dumps({})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+
+        task_1_info = {'question': 'answer_1'}
+        task_1_filter = {'english': [0.9, ">="]}
+        task_2_info = {'question': 'answer_2'}
+        task_2_filter = {}
+        TaskFactory.create(project=project, info=task_1_info, priority_0=1.0, worker_filter=task_1_filter)
+        TaskFactory.create(project=project, info=task_2_info, priority_0=0, worker_filter=task_2_filter)
+        api_key = project.owner.api_key
+
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, api_key)
+        res = self.app.get(url)
+        assert res.status_code == 200, (res, res.data)
+        task = json.loads(res.data)
+        assert task.get('info', {}).get('question') == 'answer_2', "task_1 requires english skill"
+
+    @with_context
+    def test_newtask_with_task_filter_4(self):
+        """Test newtask returns task that matches filter"""
+        user_info = dict(metadata={"profile": json.dumps({"english": 0.8})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+
+        task_1_info = {'question': 'answer_1'}
+        task_1_filter = {'english': [0.5, ">="], 'spanish': [0.6, ">"]}
+        task_2_info = {'question': 'answer_2'}
+        task_2_filter = {}
+        TaskFactory.create(project=project, info=task_1_info, priority_0=1.0, worker_filter=task_1_filter)
+        TaskFactory.create(project=project, info=task_2_info, priority_0=0, worker_filter=task_2_filter)
+        api_key = project.owner.api_key
+
+        # as a real user, no password
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, api_key)
+        res = self.app.get(url)
+        assert res.status_code == 200, (res, res.data)
+        task = json.loads(res.data)
+        assert task.get('info', {}).get('question') == 'answer_2', "task_1 requires spanish skill > 0.6"
+
+    @with_context
+    def test_newtask_with_task_filter_invalid_ooperator(self):
+        """Test newtask returns task that matches filter and raise exception for error"""
+        user_info = dict(metadata={"profile": json.dumps({"english": 0.8})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+
+        task_1_info = {'question': 'answer_1'}
+        task_1_filter = {'english': [0.4, "%"]}
+        task_2_info = {'question': 'answer_2'}
+        task_2_filter = {}
+        TaskFactory.create(project=project, info=task_1_info, priority_0=1.0, worker_filter=task_1_filter)
+        TaskFactory.create(project=project, info=task_2_info, priority_0=0, worker_filter=task_2_filter)
+        api_key = project.owner.api_key
+
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, api_key)
+        res = self.app.get(url)
+        assert res.status_code == 200, (res, res.data)
+        task = json.loads(res.data)
+        assert task.get('info', {}).get('question') == 'answer_2', "task_1 has invalid filter"

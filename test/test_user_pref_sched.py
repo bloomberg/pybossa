@@ -593,6 +593,61 @@ class TestNTaskAvailable(sched.Helper):
         assert n_available_tasks_for_user(project, 500) == 2
 
     @with_context
+    def test_task_routing_1(self):
+        '''
+        task[0]: needs finance skill at least 0.4, should be able to assign to the user
+        task[1]: needs marketing skill at least 0.3, should be able to assign to the user
+        task[3]: doesnt have filters, should be able to assign to the user
+        '''
+        user_info = dict(metadata={"profile": json.dumps({"finance": 0.6, "marketing": 0.4})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        tasks = TaskFactory.create_batch(3, project=project, n_answers=10)
+        tasks[0].worker_filter = {'finance': [0.4, '>=']}
+        task_repo.save(tasks[0])
+        tasks[1].worker_filter = {'marketing': [0.3, '>=']}
+        task_repo.save(tasks[1])
+        assert n_available_tasks_for_user(project, 500) == 3
+
+    @with_context
+    def test_task_routing_2(self):
+        '''
+        task[0]: needs finance skill at least 0.8, should not be able to assign to the user
+        task[1]: needs geography skill at least 0.5, should not be able to assign to the user
+        task[3]: doesnt have filters, should be able to assign to the user
+        '''
+        user_info = dict(metadata={"profile": json.dumps({"finance": 0.6, "marketing": 0.4})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        tasks = TaskFactory.create_batch(3, project=project, n_answers=10)
+        tasks[0].worker_filter = {'finance': [0.8, '>=']}
+        task_repo.save(tasks[0])
+        tasks[1].worker_filter = {'geography': [0.5, '>=']}
+        task_repo.save(tasks[1])
+        assert n_available_tasks_for_user(project, 500) == 1
+
+    @with_context
+    def test_task_routing_3(self):
+        '''
+        User has empty profile set, only tasks that have empty filter can be assigned to user
+        '''
+        user_info = dict(metadata={"profile": json.dumps({})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        tasks = TaskFactory.create_batch(3, project=project, n_answers=10)
+        tasks[0].worker_filter = {'finance': [0.8, '>=']}
+        task_repo.save(tasks[0])
+        tasks[1].worker_filter = {'geography': [0.5, '>=']}
+        task_repo.save(tasks[1])
+        assert n_available_tasks_for_user(project, 500) == 1
+
+    @with_context
     def test_upref_sched_gold_task(self):
         """ Test gold tasks presented with user pref scheduler """
 

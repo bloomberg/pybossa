@@ -30,6 +30,7 @@ from werkzeug.exceptions import BadRequest, Forbidden
 import random
 import json
 from pybossa.cache import users as cached_users
+from pybossa.cache import helpers as cached_helpers
 from flask import current_app
 from pybossa import data_access
 from datetime import datetime
@@ -84,6 +85,7 @@ def new_task(project_id, sched, user_id=None, user_ip=None,
                      orderby=orderby,
                      desc=desc,
                      rand_within_priority=rand_within_priority,
+                     filter_user_prefs=(sched==Schedulers.user_pref),
                      task_type=task_type)
 
 
@@ -248,7 +250,8 @@ def locked_scheduler(query_factory):
     def template_get_locked_task(project_id, user_id=None, user_ip=None,
                                  external_uid=None, limit=1, offset=0,
                                  orderby='priority_0', desc=True,
-                                 rand_within_priority=False, task_type='gold_last'):
+                                 rand_within_priority=False, task_type='gold_last',
+                                 filter_user_prefs=False):
         if offset > 2:
             raise BadRequest('')
         if offset > 0:
@@ -267,16 +270,31 @@ def locked_scheduler(query_factory):
         sql = query_factory(project_id, user_id=user_id, limit=limit,
                             rand_within_priority=rand_within_priority,
                             task_type=task_type)
+        limit = current_app.config.get('DB_MAXIMUM_BATCH_SIZE') if filter_user_prefs else user_count + 5
         rows = session.execute(sql, dict(project_id=project_id,
                                          user_id=user_id,
                                          assign_user=assign_user,
-                                         limit=user_count + 5))
+                                         limit=limit))
+        user_profile = cached_users.get_user_profile_metadata(user_id)
+        if filter_user_prefs:
+            # validate user qualification and calculate task preference score
+            user_profile = json.loads(user_profile) if user_profile else {}
+            task_rank_info = []
+            for task_id, taskcount, n_answers, calibration, w_filter, w_pref, timeout in rows:
+                w_pref = w_pref or {}
+                w_filter = w_filter or {}
+                meet_requirement = cached_helpers.user_meet_task_requirement(task_id, w_filter, user_profile)
+                if meet_requirement:
+                    score = get_task_preference(w_pref, user_profile)
+                    task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
+            rows = sorted(task_rank_info, key=lambda tup: tup[4], reverse=True)
+        else:
+            rows = [r for r in rows]
 
-        for task_id, taskcount, n_answers, calibration, timeout in rows:
+        for task_id, taskcount, n_answers, calibration, _, _, timeout in rows:
             timeout = timeout or TIMEOUT
             remaining = float('inf') if calibration else n_answers - taskcount
             if acquire_lock(task_id, user_id, remaining, timeout):
-                rows.close()
                 save_task_id_project_id(task_id, project_id, 2 * timeout)
                 register_active_user(project_id, user_id, sentinel.master, ttl=timeout)
 
@@ -304,7 +322,7 @@ def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=Fals
     '''
     filters = []
     if filter_user_prefs:
-        filters.append('AND ({})'.format(cached_users.get_user_preferences(user_id)))
+        filters.append('AND ({}) AND ({})'.format(cached_users.get_user_preferences(user_id), cached_users.get_user_filters(user_id)))
     if task_type == 'gold':
         filters.append('AND task.calibration = 1')
     elif task_type == 'no_gold':
@@ -324,6 +342,7 @@ def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=Fals
 
     sql = '''
            SELECT task.id, COUNT(task_run.task_id) AS taskcount, n_answers, task.calibration,
+           worker_filter, worker_pref,
               (SELECT info->'timeout'
                FROM project
                WHERE id=:project_id) as timeout
@@ -344,6 +363,17 @@ def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=Fals
                       ','.join(order_by))
     return text(sql)
 
+def get_task_preference(task_pref, user_profile):
+    score = 0
+    for key, value in task_pref.iteritems():
+        user_data = user_profile.get(key) or 0
+        try:
+            user_data = float(user_data)
+            score += value * user_data
+        except ValueError as e:
+            # TODO: when user profile is not number, we need another method to calculate score
+            pass
+    return score
 
 def select_contributable_task(project, user_id, **kwargs):
     sched, _ = get_scheduler_and_timeout(project)
@@ -376,7 +406,7 @@ def get_locked_task(project_id, user_id=None, limit=1, rand_within_priority=Fals
 
 @locked_scheduler
 def get_user_pref_task(project_id, user_id=None, limit=1, rand_within_priority=False,
-                       task_type='gold_last'):
+                       task_type='gold_last', filter_user_prefs=True):
     """ Select a new task based on user preference set under user profile.
 
     For each incomplete task, check if the number of users working on the task
