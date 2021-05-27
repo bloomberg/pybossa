@@ -357,7 +357,6 @@ def get_user_preferences(user_id):
     return get_user_pref_db_clause(user_pref, user_email)
 
 
-@memoize(timeout=ONE_DAY)
 def get_user_filters(user_id):
     user_profile = get_user_profile_metadata(user_id)
     user_profile = json.loads(user_profile) if user_profile else {}
