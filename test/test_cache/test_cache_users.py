@@ -553,6 +553,9 @@ class TestUsersCache(Test):
 
     @with_context
     def test_draft_projects_cached(self):
+        """Test CACHE USERS draft_projects_cached returns an empty list if the user has no
+                draft projects"""
         user = UserFactory.create()
-        result = cached_users.draft_projects(user.id)
-        assert result
+        ProjectFactory.create(owner=user, published=True)
+        draft_projects = cached_users.draft_projects_cached(user.id)
+        assert len(draft_projects) == 0
