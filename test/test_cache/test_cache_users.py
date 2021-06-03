@@ -550,3 +550,12 @@ class TestUsersCache(Test):
         end = None
         task_runs = cached_users.get_tasks_completed_between(user.id, beginning_time_utc=beg, end_time_utc=end)
         assert len(task_runs) == 0
+
+    @with_context
+    def test_draft_projects_cached(self):
+        """Test CACHE USERS draft_projects_cached returns an empty list if the user has no
+                draft projects"""
+        user = UserFactory.create()
+        ProjectFactory.create(owner=user, published=True)
+        draft_projects = cached_users.draft_projects_cached(user.id)
+        assert len(draft_projects) == 0
