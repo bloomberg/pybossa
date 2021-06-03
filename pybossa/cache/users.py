@@ -345,11 +345,9 @@ def get_user_pref_metadata(name):
 
 def delete_user_pref_metadata(user):
     delete_memoized(get_user_pref_metadata, user.name)
-    delete_memoized(get_user_preferences, user.id)
     delete_memoized(get_user_by_id, user.id)
 
 
-@memoize(timeout=ONE_DAY)
 def get_user_preferences(user_id):
     user = get_user_by_id(user_id)
     user_pref = user.user_pref or {} if user else {}
