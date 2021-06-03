@@ -550,3 +550,9 @@ class TestUsersCache(Test):
         end = None
         task_runs = cached_users.get_tasks_completed_between(user.id, beginning_time_utc=beg, end_time_utc=end)
         assert len(task_runs) == 0
+
+    @with_context
+    def test_draft_projects_cached(self):
+        user = UserFactory.create()
+        result = cached_users.draft_projects(user.id)
+        assert result
