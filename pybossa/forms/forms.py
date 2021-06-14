@@ -800,7 +800,7 @@ class UserPrefMetadataForm(Form):
     profile = TextAreaField(
         lazy_gettext("<div>Task Preferences</div>"
                      "<div style='color:red; font-weight:normal; font-size:12px;'>"
-                     "Must not include sensitive or personally identifiable information.</div>"),
+                     "Must not include sensitive or personally identifiable information, e.g., name, email address, phone number, UUID, race, gender, health or financial information.</div>"),
             [is_json(dict)], default="",
             render_kw={"placeholder": '{"finance": 0.5, "english": 0.8}'})
 
