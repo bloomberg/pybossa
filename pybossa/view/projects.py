@@ -2360,7 +2360,7 @@ def task_timeout(short_name):
         return redirect_content_type(url_for('.tasks', short_name=project.short_name))
     else:
         if not form.in_range():
-            flash(gettext('Timeout should be between {} seconds and {} minuntes')
+            flash(gettext('Timeout should be between {} seconds and {} minutes')
                           .format(form.min_seconds, form.max_minutes), 'error')
         else:
             flash(gettext('Please correct the errors'), 'error')
