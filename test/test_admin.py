@@ -515,6 +515,14 @@ class TestAdmin(web.Helper):
         assert "Current Users with Admin privileges" not in res.data
         err_msg = "User.id=2 should be listed as an admin"
         assert "Juan Jose" not in res.data, err_msg
+
+         # Add user.id=2 disabled user to admin group
+        user = user_repo.get_by(name='juan')
+        user.enabled = False
+        user_repo.update(user)
+        res = self.app.get("/admin/users/add/2", follow_redirects=True)
+        assert "<strong>User account </strong> Juan Jose <strong> is disabled</strong>" in res.data
+
         # Delete a non existant user should return an error
         res = self.app.get("/admin/users/del/5000", follow_redirects=True)
         err = json.loads(res.data)
