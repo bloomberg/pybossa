@@ -258,7 +258,7 @@ class TaskPriorityForm(Form):
 
 class TaskTimeoutForm(Form):
     min_seconds = 30
-    max_minutes = 120
+    max_minutes = 210
     minutes = IntegerField(lazy_gettext('Minutes (default 60)'),
                            [validators.NumberRange(
                                 min=0,

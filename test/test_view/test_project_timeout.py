@@ -67,23 +67,23 @@ class TestProjectTimeout(Helper):
         data = {'minutes': 0, 'seconds': 20}
         url = '/project/%s/tasks/timeout?api_key=%s' % (project.short_name, project.owner.api_key)
         res = self.app.post(url, data=data)
-        assert 'Timeout should be between 30 seconds and 120 minuntes' in res.data
+        assert 'Timeout should be between 30 seconds and 210 minutes' in res.data
 
     @with_context
     def test_set_timeout_too_high_seconds(self):
         project = ProjectFactory.create()
-        data = {'minutes': 0, 'seconds': 200 * 60}
+        data = {'minutes': 0, 'seconds': 211 * 60}
         url = '/project/%s/tasks/timeout?api_key=%s' % (project.short_name, project.owner.api_key)
         res = self.app.post(url, data=data)
-        assert 'Timeout should be between 30 seconds and 120 minuntes' in res.data
+        assert 'Timeout should be between 30 seconds and 210 minutes' in res.data
 
     @with_context
     def test_set_timeout_too_high_minutes(self):
         project = ProjectFactory.create()
-        data = {'minutes': 200, 'seconds': 0}
+        data = {'minutes': 211, 'seconds': 0}
         url = '/project/%s/tasks/timeout?api_key=%s' % (project.short_name, project.owner.api_key)
         res = self.app.post(url, data=data)
-        assert 'Timeout should be between 30 seconds and 120 minuntes' in res.data
+        assert 'Timeout should be between 30 seconds and 210 minutes' in res.data
 
     @with_context
     def test_set_timeout_invalid(self):
