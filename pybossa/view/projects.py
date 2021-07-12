@@ -97,7 +97,6 @@ from pybossa.data_access import (data_access_levels, subadmins_are_privileged,
 import app_settings
 from copy import deepcopy
 from pybossa.cache import delete_memoized
-from pybossa.cache.task_browse_helpers import get_searchable_columns
 
 
 cors_headers = ['Content-Type', 'Authorization']
