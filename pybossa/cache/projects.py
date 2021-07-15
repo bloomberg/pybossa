@@ -22,10 +22,11 @@ from pybossa.model.project import Project
 from pybossa.util import pretty_date, static_vars, convert_utc_to_est
 from pybossa.cache import memoize, cache, delete_memoized, delete_cached, \
     memoize_essentials, delete_memoized_essential, delete_cache_group
-from pybossa.cache.task_browse_helpers import get_task_filters, allowed_fields
+from pybossa.cache.task_browse_helpers import get_task_filters, allowed_fields, user_meet_task_requirement, get_task_preference_score
 import app_settings
 from pybossa.util import get_taskrun_date_range_sql_clause_params
 
+import heapq
 session = db.slave_session
 
 
@@ -58,37 +59,58 @@ def get_top(n=4):
 @memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
                     cache_group_keys=[[0]])
 @static_vars(allowed_fields=allowed_fields)
-def browse_tasks(project_id, args):
+def browse_tasks(project_id, args, filter_user_prefs=False):
     """Cache browse tasks view for a project."""
+    import pdb; pdb.set_trace()
+    print(args)
+
     tasks = []
     total_count = task_count(project_id, args)
     if not total_count:
         return total_count, tasks
 
     filters, filter_params = get_task_filters(args)
-    sql = text('''
-               SELECT task.id,
-               coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
-               priority_0, task.created, task.calibration
-               FROM task LEFT OUTER JOIN
-               (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
-               MAX(finish_time) as ft FROM task_run
-               WHERE project_id=:project_id GROUP BY task_id) AS log_counts
-               ON task.id=log_counts.task_id
-               WHERE task.project_id=:project_id''' + filters +
-               " ORDER BY %s" % (args.get('order_by') or 'id ASC') +
-               " LIMIT :limit OFFSET :offset"
-               )
 
+    sql = """
+            SELECT task.id,
+            coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
+            priority_0, task.created, task.calibration,
+            task.worker_filter, task.worker_pref
+            FROM task LEFT OUTER JOIN
+            (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
+            MAX(finish_time) as ft FROM task_run
+            WHERE project_id=:project_id GROUP BY task_id) AS log_counts
+            ON task.id=log_counts.task_id
+            WHERE task.project_id=:project_id""" + filters + \
+            " ORDER BY %s" % (args.get('order_by') or 'id ASC')
+    params = dict(project_id=project_id, **filter_params)
     limit = args.get('records_per_page') or 10
     offset = args.get('offset') or 0
 
-    results = session.execute(sql, dict(project_id=project_id,
-                                        limit=limit,
-                                        offset=offset,
-                                        **filter_params))
+    if filter_user_prefs:
+        params["assign_user"] = args["sql_params"]["assign_user"]
+    else:
+        sql += " LIMIT :limit OFFSET :offset"
+        params["limit"] = limit
+        params["offset"] = offset
+
+
+    results = session.execute(text(sql), params)
+    task_rank_info = []
 
     for row in results:
+        import pdb; pdb.set_trace()
+        score = 0
+        # check preference if necessary
+        if filter_user_prefs:
+            user_profile = args["filter_by_wfilter_upref"]["current_user_profile"]
+            user_profile = json.loads(user_profile) if user_profile else {}
+            w_pref = row.worker_pref or {}
+            w_filter = row.worker_filter or {}
+            if not user_meet_task_requirement(row.id, w_filter, user_profile):
+                continue
+            score = get_task_preference_score(w_pref, user_profile)
+
         # TODO: use Jinja filters to format date
         def format_date(date):
             if date is not None:
@@ -100,8 +122,17 @@ def browse_tasks(project_id, args):
                     finish_time=finish_time, created=created,
                     calibration=row.calibration)
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
-        tasks.append(task)
-    return total_count, tasks
+        task_rank_info.append((task,score))
+
+    import pdb; pdb.set_trace()
+    if filter_user_prefs:
+        total_count = len(task_rank_info)
+        tasks = heapq.nlargest(offset+limit, task_rank_info, key=lambda tup: tup[1])
+        tasks = tasks[offset: offset+limit]
+    else:
+        tasks = task_rank_info
+
+    return total_count, [t[0] for t in tasks]
 
 
 def task_count(project_id, args):
@@ -290,7 +321,7 @@ def n_expected_task_runs(project_id):
 def overall_progress(project_id):
     """Return the percentage of completed tasks out of non gold tasks for a project."""
     total_tasks = n_tasks_not_gold(project_id)
-    return ((n_completed_tasks(project_id) * 100) / total_tasks) if total_tasks != 0 else 0 
+    return ((n_completed_tasks(project_id) * 100) / total_tasks) if total_tasks != 0 else 0
 
 
 @memoize(timeout=timeouts.get('APP_TIMEOUT'), cache_group_keys=[[0]])

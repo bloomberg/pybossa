@@ -23,7 +23,6 @@ from sqlalchemy.sql import text
 import operator
 from pybossa.core import db
 from pybossa.cache import memoize, ONE_HOUR
-from pybossa.cache.projects import n_results, overall_progress
 from pybossa.model.project_stats import ProjectStats
 from pybossa.cache import users as cached_users
 
@@ -146,6 +145,12 @@ def add_custom_contrib_button_to(project, user_id_or_ip, ps=None):
     project['contrib_button'] = check_contributing_state(project,
                                                          ps=ps,
                                                          **user_id_or_ip)
+    print(project['info'])
+    project['enable_task_queue'] = (project['info']['sched'] == "task_queue_schenduler")
+    print(project['info']['sched'])
+    print(project['enable_task_queue'])
+    project['enable_task_queue'] = True
+    print(project['enable_task_queue'])
     if ps is None:
         ps = session.query(ProjectStats)\
                     .filter_by(project_id=project['id']).first()
