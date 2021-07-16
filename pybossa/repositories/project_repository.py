@@ -35,8 +35,6 @@ import re
 
 class ProjectRepository(Repository):
 
-    pvf_format = re.compile('^([A-Z]{3,4}\s\d+)?$')
-
     # Methods for Project objects
     def get(self, id):
         return self.db.session.query(Project).get(id)
@@ -199,7 +197,8 @@ class ProjectRepository(Repository):
 
         # L1, L2 projects with opted in for amp storage to have pvf set
         amp_pvf = project.info.get('annotation_config', {}).get('amp_pvf')
-        if amp_store and not(amp_pvf and ProjectRepository.pvf_format.match(amp_pvf)):
+        pvf_format = re.compile(current_app.config.get("PVF_FORMAT"))
+        if amp_store and not(amp_pvf and pvf_format.match(amp_pvf)):
             raise BadRequest('Invalid PVF format. Must contain <PVF name> <PVF val>.')
 
     def _verify_product_subproduct(self, project):
@@ -212,7 +211,7 @@ class ProjectRepository(Repository):
             raise BadRequest("Invalid product")
         if subproduct not in products_subproducts[product]:
             raise BadRequest("Invalid subproduct")
-        
+
     def _verify_required_fields(self, project):
         if not project.name:
             raise BadRequest("Name required")
