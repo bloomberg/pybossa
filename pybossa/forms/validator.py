@@ -17,6 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import date
+from flask import current_app
 from flask_babel import lazy_gettext
 from wtforms.validators import ValidationError
 import re
@@ -243,7 +244,7 @@ class AmpPvfValidator(object):
         if not message:
             message = lazy_gettext("Invalid PVF.")
         self.message = message
-        self.pvf_format = re.compile('^([A-Z]{3,4}\s\d+)?$')
+        self.pvf_format = re.compile(current_app.config.get("PVF_FORMAT"))
 
     def __call__(self, form, field):
         amp_pvf = form.amp_pvf.data
