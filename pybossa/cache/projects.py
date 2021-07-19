@@ -17,6 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Cache module for projects."""
 from sqlalchemy.sql import text
+from pybossa.contributions_guard import ContributionsGuard
 from pybossa.core import db, timeouts
 from pybossa.model.project import Project
 from pybossa.util import pretty_date, static_vars, convert_utc_to_est
@@ -59,7 +60,7 @@ def get_top(n=4):
 @memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
                     cache_group_keys=[[0]])
 @static_vars(allowed_fields=allowed_fields)
-def browse_tasks(project_id, args, filter_user_prefs=False):
+def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
     """Cache browse tasks view for a project."""
     import pdb; pdb.set_trace()
     print(args)
@@ -75,7 +76,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False):
             SELECT task.id,
             coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
             priority_0, task.created, task.calibration,
-            task.worker_filter, task.worker_pref
+            task.user_pref, task.worker_filter, task.worker_pref
             FROM task LEFT OUTER JOIN
             (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
             MAX(finish_time) as ft FROM task_run
@@ -94,19 +95,26 @@ def browse_tasks(project_id, args, filter_user_prefs=False):
         params["limit"] = limit
         params["offset"] = offset
 
+    print(sql)
+    print(params)
+
 
     results = session.execute(text(sql), params)
     task_rank_info = []
 
+    user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", "")
+    user_profile = json.loads(user_profile) if user_profile else {}
+    print("user_profile: ", user_profile)
+
     for row in results:
-        import pdb; pdb.set_trace()
         score = 0
         # check preference if necessary
         if filter_user_prefs:
-            user_profile = args["filter_by_wfilter_upref"]["current_user_profile"]
-            user_profile = json.loads(user_profile) if user_profile else {}
             w_pref = row.worker_pref or {}
             w_filter = row.worker_filter or {}
+            print("user preference: ", row.user_pref)
+            print("worker filter: ", w_filter)
+            print("worker preference", w_pref)
             if not user_meet_task_requirement(row.id, w_filter, user_profile):
                 continue
             score = get_task_preference_score(w_pref, user_profile)
@@ -126,13 +134,43 @@ def browse_tasks(project_id, args, filter_user_prefs=False):
 
     import pdb; pdb.set_trace()
     if filter_user_prefs:
+        # get to total available tasks
         total_count = len(task_rank_info)
-        tasks = heapq.nlargest(offset+limit, task_rank_info, key=lambda tup: tup[1])
-        tasks = tasks[offset: offset+limit]
+
+        # tasks = heapq.nlargest(offset+limit, task_rank_info, key=lambda tup: tup[1])
+        tasks = select_available_tasks(task_rank_info, project_id, user_id, offset+limit)
+        print(tasks)
+        # tasks = tasks[offset: offset+limit]
     else:
         tasks = task_rank_info
 
     return total_count, [t[0] for t in tasks]
+
+
+def select_available_tasks(task_rank_info, project_id, user_id, num_tasks_needed):
+    """execude tasks that had been locked and sort tasks based on preference score"""
+    project = db.session.query(Project).get(project_id)
+    timeout = project.info["timeout"] or ContributionsGuard.STAMP_TTL
+
+    from pybossa.core import sentinel
+    from pybossa.redis_lock import get_active_user_count
+
+    users = get_active_user_count(project_id, sentinel.master)
+
+    hq = heapq.heapify([])
+    if not user_id:
+        return []
+
+    largest_score = None
+    for t, score in task_rank_info:
+        remaining = float('inf') if t["calibration"] else t["n_answers"]-t["n_task_runs"]
+        # if (not largest_score or score*(-1) < largest_score) and acquire_lock(t["id"], user_id, remaining, timeout, execute=False):
+        #     if len(hp) < maxnum_tasks_needed_length:
+        #         heapq.heappush(hq, t)
+        #     else:
+        #         heapq.heappushpop(hq, t)
+    return hq or []
+
 
 
 def task_count(project_id, args):

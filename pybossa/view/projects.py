@@ -1199,7 +1199,9 @@ def task_presenter(short_name, task_id):
     else:
         ensure_authorized_to('read', project)
 
-    if not sched.can_read_task(task, current_user) and not current_user.id in project.owners_ids:
+    scheduler = project.info.get('sched', "default")
+    scheduler = "task_queue_scheduler"
+    if scheduler != "task_queue_scheduler" and not sched.can_read_task(task, current_user) and not current_user.id in project.owners_ids:
         raise abort(403)
 
     if current_user.is_anonymous:
@@ -1447,7 +1449,9 @@ def tasks(short_name):
 @blueprint.route('/<short_name>/tasks/browse/<int:page>/<int:records_per_page>')
 @login_required
 def tasks_browse(short_name, page=1, records_per_page=10):
-    project, owner, ps = allow_deny_project_info(short_name)
+    # project, owner, ps = allow_deny_project_info(short_name)
+    print(request.args)
+    project, owner, ps = project_by_shortname(short_name)
     ensure_authorized_to('read', project)
 
     title = project_title(project, "Tasks")
@@ -1460,8 +1464,27 @@ def tasks_browse(short_name, page=1, records_per_page=10):
         current_app.logger.exception('Error getting columns')
         columns = []
 
+    scheduler = project.info.get('sched', "default")
+    scheduler = "task_queue_scheduler"
+
     try:
         args = parse_tasks_browse_args(request.args)
+        # some schedulers require worker filter and worker preference in filters
+        if scheduler == "task_queue_scheduler" and not (current_user.subadmin or current_user.admin or current_user.id in project.owners_ids):
+            user = cached_users.get_user_by_id(current_user.id)
+            user_pref = user.user_pref or {} if user else {}
+            user_email = user.email_addr if user else None
+            user_profile = cached_users.get_user_profile_metadata(current_user.id)
+            user_profile = json.loads(user_profile) if user_profile else {}
+            args["filter_by_wfilter_upref"] = dict(current_user_pref=user_pref,
+                                                current_user_email=user_email,
+                                                current_user_profile=user_profile)
+            args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
+            args["display_columns"] = ['task_id', 'priority', 'created']
+
+            # TODO: read pre-defined customized columns from project settings, now use hard-code setting for POC
+            args["display_info_columns"] = ["col_1", "col_3"]
+
     except (ValueError, TypeError) as err:
         current_app.logger.exception(err)
         flash(gettext('Invalid filtering criteria'), 'error')
@@ -1482,7 +1505,7 @@ def tasks_browse(short_name, page=1, records_per_page=10):
         args["records_per_page"] = per_page
         args["offset"] = offset
         start_time = time.time()
-        total_count, page_tasks = cached_projects.browse_tasks(project.get('id'), args)
+        total_count, page_tasks = cached_projects.browse_tasks(project.get('id'), args, bool(args.get("filter_by_wfilter_upref")), current_user.id)
         current_app.logger.debug("Browse Tasks data loading took %s seconds"
                                  % (time.time()-start_time))
         first_task_id = cached_projects.first_task_id(project.get('id'))

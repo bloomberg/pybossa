@@ -35,6 +35,12 @@ def get_active_user_count(project_id, conn):
                  if float(expiration) < now]
     if to_delete:
         conn.hdel(key, *to_delete)
+    print("loooool")
+    print(to_delete)
+
+    all_ = [user for user, expiration in conn.hgetall(key).iteritems()]
+    print("all")
+    print(all_)
     return conn.hlen(key)
 
 
