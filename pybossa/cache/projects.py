@@ -132,7 +132,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
         task_rank_info.append((task, score))
 
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     if filter_user_prefs:
         # get to total available tasks
         total_count = len(task_rank_info)

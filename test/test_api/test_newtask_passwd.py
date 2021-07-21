@@ -346,7 +346,7 @@ class TestNewtaskPasswd(TestAPI):
         res = self.app.get(url)
         assert res.status_code == 200, (res, res.data)
         task = json.loads(res.data)
-        assert task.get('info', {}).get('question') == 'answer_2', "task_1 requires spanish skill > 0.6"
+        assert task.get('info', {}).get('question') == 'answer_2', "task_1 requires spanish skill >= 0.5"
 
     @with_context
     def test_newtask_with_task_filter_invalid_ooperator(self):

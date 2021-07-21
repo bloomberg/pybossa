@@ -1,5 +1,6 @@
 from collections import defaultdict
 import json
+import operator
 import re
 from sqlalchemy.sql import text
 from werkzeug.exceptions import BadRequest
@@ -9,6 +10,21 @@ from pybossa.util import (convert_est_to_utc,
     get_user_pref_db_clause, get_user_filter_db_clause)
 from flask import current_app
 import app_settings
+
+comparator_func = {
+    "less_than": operator.lt,
+    "<": operator.lt,
+    "less_than_equal": operator.le,
+    "<=": operator.le,
+    "greater_than": operator.gt,
+    ">": operator.gt,
+    "greater_than_equal": operator.ge,
+    ">=": operator.ge,
+    "equal": operator.eq,
+    "==": operator.eq,
+    "not_equal": operator.ne,
+    "!=": operator.ne,
+}
 
 def get_task_filters(args):
     """

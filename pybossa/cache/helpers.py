@@ -20,7 +20,6 @@
 import json
 from flask import current_app
 from sqlalchemy.sql import text
-import operator
 from pybossa.core import db
 from pybossa.cache import memoize, ONE_HOUR
 from pybossa.model.project_stats import ProjectStats
@@ -28,21 +27,6 @@ from pybossa.cache import users as cached_users
 from pybossa.cache import task_browse_helpers as cached_task_browse_helpers
 
 session = db.slave_session
-
-comparator_func = {
-    "less_than": operator.lt,
-    "<": operator.lt,
-    "less_than_equal": operator.le,
-    "<=": operator.le,
-    "greater_than": operator.gt,
-    ">": operator.gt,
-    "greater_than_equal": operator.ge,
-    ">=": operator.ge,
-    "equal": operator.eq,
-    "==": operator.eq,
-    "not_equal": operator.ne,
-    "!=": operator.ne,
-}
 
 def n_gold_tasks(project_id):
     """Return the number of gold tasks for a given project"""
