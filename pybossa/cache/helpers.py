@@ -25,6 +25,7 @@ from pybossa.core import db
 from pybossa.cache import memoize, ONE_HOUR
 from pybossa.model.project_stats import ProjectStats
 from pybossa.cache import users as cached_users
+from pybossa.cache import task_browse_helpers as cached_task_browse_helpers
 
 session = db.slave_session
 
@@ -186,27 +187,6 @@ def _has_no_tasks(project_id):
     return n_tasks == 0
 
 
-def user_meet_task_requirement(task_id, user_filter, user_profile):
-    for field, filters in user_filter.iteritems():
-        if not user_profile.get(field):
-            # if user profile does not have attribute, user does not qualify for the task
-            return False
-        user_data = user_profile.get(field) or 0
-        try:
-            user_data = float(user_data)
-            require = filters[0]
-            op = filters[1]
-            if op not in comparator_func:
-                raise Exception("invalid operator %s", op)
-            if not comparator_func[op](user_data, require):
-                return False
-        except Exception as e:
-            current_app.logger.info("""An error occured when validate constraints for task {} on field {},
-                                reason {}""".format(task_id, field, str(e)))
-            return False
-    return True
-
-
 def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     """Return the number of tasks for a given project a user can contribute to.
     based on the completion of the project tasks, previous task_runs
@@ -255,7 +235,9 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
             user_profile = json.loads(user_profile) if user_profile else {}
             for task_id, w_filter in result:
                 w_filter = w_filter or {}
-                num_available_tasks += int(user_meet_task_requirement(task_id, w_filter, user_profile))
+                num_available_tasks += int(
+                    cached_task_browse_helpers.user_meet_task_requirement(task_id, w_filter, user_profile)
+                )
             return num_available_tasks
 
     except Exception as e:
