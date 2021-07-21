@@ -157,9 +157,10 @@ def select_available_tasks(task_rank_info, project_id, user_id, num_tasks_needed
     lock_manager = LockManager(sentinel.master, timeout)
     now = now = time.time()
 
-    # if user doest
+    # if there is no sort parameter, use preference score to sort tasks
     if not sort_by:
-        task_rank_info = heapq.nlargest(num_tasks_needed+users+1, task_rank_info, key=lambda tup: tup[1])
+        task_rank_info = heapq.nlargest(num_tasks_needed+users+1, task_rank_info,
+                                        key=lambda tup: tup[1])
 
     # remove tasks if task is unavailable to contribute
     tasks = []
@@ -177,44 +178,6 @@ def select_available_tasks(task_rank_info, project_id, user_id, num_tasks_needed
 
     print(tasks)
     return tasks
-
-
-# def select_available_tasks(task_rank_info, project_id, user_id, num_tasks_needed):
-#     """execude tasks that had been locked and sort tasks based on preference score"""
-
-#     from pybossa.redis_lock import LockManager
-
-#     TASK_USERS_KEY_PREFIX = 'pybossa:project:task_requested:timestamps:{0}'
-#     project = db.session.query(Project).get(project_id)
-#     timeout = project.info["timeout"] or ContributionsGuard.STAMP_TTL
-#     lock_manager = LockManager(sentinel.master, timeout)
-
-#     task_users_key = TASK_USERS_KEY_PREFIX.format(5166)
-#     locks = lock_manager.get_locks(task_users_key)
-#     print(locks)
-#     now = now = time.time()
-
-#     hq = heapq.heapify([])
-#     if not user_id:
-#         return []
-
-#     largest_score = None
-#     for t, score in task_rank_info:
-#         remaining = float('inf') if t["calibration"] else t["n_answers"]-t["n_task_runs"]
-#         if (not largest_score or score*(-1) < largest_score):
-#             task_users_key = TASK_USERS_KEY_PREFIX.format(5166)
-#             locks = lock_manager.get_locks(task_users_key)
-#             unexpired_locks = [user for user, v in locks.iteritems() if float(v)-now > 0]
-#             if len(unexpired_locks) < remaining:
-#                 if not hq:
-#                     hq = heapq.heapify([(t, score)])
-#                 elif len(hq) < maxnum_tasks_needed_length:
-#                     heapq.heappush(hq, t)
-#                 else:
-#                     heapq.heappushpop(hq, t)
-#                 largest_score = hq[-1]
-#     return hq or []
-
 
 
 def task_count(project_id, args):
