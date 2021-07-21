@@ -2914,7 +2914,7 @@ class TestWeb(web.Helper):
         # For a non existing page
         res = self.app.get('project/%s/tasks/browse/5000' % (project.short_name),
                            follow_redirects=True)
-        assert 'Displaying tasks' in res.data, res.data
+        assert re.search('Displaying tasks\s+\d+-\d+\s+of\s+1', res.data), res.data
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
