@@ -27,8 +27,9 @@ from pybossa.cache.task_browse_helpers import get_task_filters, allowed_fields, 
 import app_settings
 from pybossa.util import get_taskrun_date_range_sql_clause_params
 
-import time
 import heapq
+import time
+
 session = db.slave_session
 
 
@@ -98,13 +99,18 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
     results = session.execute(text(sql), params)
     task_rank_info = []
 
-    user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", "")
-    user_profile = json.loads(user_profile) if user_profile else {}
+    user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
     print("user_profile: ", user_profile)
 
     for row in results:
         score = 0
         # check preference if necessary
+        w_pref = row.worker_pref or {}
+        w_filter = row.worker_filter or {}
+        print(row.id)
+        print("user preference: ", row.user_pref)
+        print("worker filter: ", w_filter)
+        print("worker preference", w_pref)
         if filter_user_prefs:
             w_pref = row.worker_pref or {}
             w_filter = row.worker_filter or {}
@@ -137,9 +143,9 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
         # get to total available tasks
         total_count = len(task_rank_info)
         tasks = select_available_tasks(task_rank_info, project_id, user_id, offset+limit, args.get("order_by"))
-        print(tasks)
     else:
         tasks = task_rank_info
+    print(tasks)
 
     return total_count, [t[0] for t in tasks]
 

@@ -1450,8 +1450,7 @@ def tasks(short_name):
 @blueprint.route('/<short_name>/tasks/browse/<int:page>')
 @blueprint.route('/<short_name>/tasks/browse/<int:page>/<int:records_per_page>')
 @login_required
-def tasks_browse(short_name, page=1, records_per_page=10):
-    # project, owner, ps = allow_deny_project_info(short_name)
+def tasks_browse(short_name, page=1, records_per_page=None):
     print(request.args)
     project, owner, ps = project_by_shortname(short_name)
     ensure_authorized_to('read', project)
@@ -1486,7 +1485,9 @@ def tasks_browse(short_name, page=1, records_per_page=10):
             # args["display_info_columns"] = project.info.get('available_columns_in_tasklist', [])
             args["display_info_columns"] = ["col_1", "col_2"]
             columns = args["display_info_columns"]
-            records_per_page = 100
+            records_per_page = records_per_page or 100
+        else:
+            records_per_page = records_per_page or 10
 
     except (ValueError, TypeError) as err:
         current_app.logger.exception(err)
