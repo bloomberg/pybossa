@@ -1493,7 +1493,6 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         current_app.logger.exception(err)
         flash(gettext('Invalid filtering criteria'), 'error')
         abort(404)
-
     can_know_task_is_gold = current_user.subadmin or current_user.admin
     if not can_know_task_is_gold:
         # This has to be a list and not a set because it is JSON stringified in the template
