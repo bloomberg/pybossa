@@ -2239,6 +2239,7 @@ def task_scheduler(short_name):
                 if project.info['sched'] == sched_name:
                     form.sched.data = sched_name
                     break
+        form.customized_columns.choices = [("col_24", "col_24"), ("col_3", "col_3")]
         form.rand_within_priority.data = project.info.get('sched_rand_within_priority', False)
         form.gold_task_probability.data = project.get_gold_task_probability()
         return respond()

@@ -281,6 +281,8 @@ class TaskSchedulerForm(Form):
     _translate_names = lambda variant: (variant[0], lazy_gettext(variant[1]))
     _choices = map(_translate_names, sched_variants())
     sched = SelectField(lazy_gettext('Task Scheduler'), choices=_choices)
+    available_columns = [("col_1", "col_1"), ("col_2", "col_2"), ("col_3", "col_3")]
+    customized_columns = Select2Field(lazy_gettext('Customized columns'), choices=available_columns, default=[])
     rand_within_priority = BooleanField(lazy_gettext('Randomize Within Priority'))
     gold_task_probability_validator = validators.NumberRange(
         min=0,
