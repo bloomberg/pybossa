@@ -43,6 +43,7 @@ class Schedulers(object):
 
     locked = 'locked_scheduler'
     user_pref = 'user_pref_scheduler'
+    task_queue = 'task_queue_scheduler'
 
 
 DEFAULT_SCHEDULER = Schedulers.locked
@@ -61,7 +62,8 @@ def new_task(project_id, sched, user_id=None, user_ip=None,
         Schedulers.locked: get_locked_task,
         'incremental': get_incremental_task,
         Schedulers.user_pref: get_user_pref_task,
-        'depth_first_all': get_depth_first_all_task
+        'depth_first_all': get_depth_first_all_task,
+        Schedulers.task_queue: get_locked_task
     }
     scheduler = sched_map.get(sched, sched_map['default'])
     project = project_repo.get(project_id)
@@ -576,7 +578,8 @@ def sched_variants():
             ('depth_first', 'Depth First'),
             (Schedulers.locked, 'Locked'),
             (Schedulers.user_pref, 'User Preference Scheduler'),
-            ('depth_first_all', 'Depth First All')
+            ('depth_first_all', 'Depth First All'),
+            (Schedulers.task_queue, 'Task Queues')
             ]
 
 
