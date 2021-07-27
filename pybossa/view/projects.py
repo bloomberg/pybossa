@@ -2213,6 +2213,10 @@ def task_scheduler(short_name):
 
     title = project_title(project, gettext('Task Scheduler'))
     form = TaskSchedulerForm(request.body)
+    columns = get_searchable_columns(project.id)
+    configurable_columns = [(c, c) for c in columns]
+    configurable_columns.extend([("userPrefLang", "user_pref_languages"), ("userPrefLoc", "user_pref_locations")])
+    form.set_customized_columns_options(configurable_columns)
     pro = pro_features()
 
     def respond():
@@ -2239,7 +2243,7 @@ def task_scheduler(short_name):
                 if project.info['sched'] == sched_name:
                     form.sched.data = sched_name
                     break
-        form.customized_columns.choices = [("col_24", "col_24"), ("col_3", "col_3")]
+        form.customized_columns.data = project.info.get('available_columns_in_tasklist', [])
         form.rand_within_priority.data = project.info.get('sched_rand_within_priority', False)
         form.gold_task_probability.data = project.get_gold_task_probability()
         return respond()
@@ -2252,6 +2256,8 @@ def task_scheduler(short_name):
             old_sched = 'default'
         if form.sched.data:
             project.info['sched'] = form.sched.data
+
+        project.info['available_columns_in_tasklist'] = form.customized_columns.data
         project.info['sched_rand_within_priority'] = form.rand_within_priority.data
         project.set_gold_task_probability(form.gold_task_probability.data)
         project_repo.save(project)
