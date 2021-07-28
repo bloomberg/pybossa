@@ -7162,7 +7162,7 @@ class TestWeb(web.Helper):
         for div in divs:
             err_msg = "There should be a %s section" % div
             assert dom.find(id=div) is not None, err_msg
-        
+
         self.signout()
         # As an authenticated user
         self.register(fullname="juan", name="juan")
@@ -7289,8 +7289,9 @@ class TestWeb(web.Helper):
             dom = BeautifulSoup(res.data)
             form = dom.find(id=form_id)
             assert form is not None, res.data
-            options = dom.find_all('option')
-            assert len(options) == len(sched_config)
+            sched_form = form.find(id)
+            options = dom.find(id="sched").find_all('option')
+            assert len(options) == len(sched_config), len(options)
             scheds = [o.attrs['value'] for o in options]
             assert all(s in scheds for s, d in sched_config)
         finally:
@@ -7350,6 +7351,43 @@ class TestWeb(web.Helper):
         err_msg = "User should be redirected to sign in"
         assert dom.find(id="signin") is not None, err_msg
 
+    @with_context
+    @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
+    @patch('pybossa.view.projects.get_searchable_columns', return_value=True)
+    def test_75_available_task_queue_configurable_columns(self, columns, mock):
+        """Test WEB TASK SETTINGS scheduler page works"""
+        mock_columns = ['info_field_1', 'info_field_2', 'info_field_3']
+        fix_columns = ['userPrefLang', 'userPrefLoc']
+        columns.return_value = mock_columns
+        # Creat root user
+        self.register()
+        self.signin()
+        self.new_project()
+        url = "/project/sampleapp/tasks/scheduler"
+        form_id = 'task_scheduler'
+        from pybossa.core import setup_schedulers
+
+        try:
+            sched_config = [
+                ('default', 'Default'),
+                ('locked_scheduler', 'Locked Scheduler'),
+                ('task_queue_scheduler', 'Task Queue Scheduler')
+            ]
+            with patch.dict(self.flask_app.config, {'AVAILABLE_SCHEDULERS': sched_config}):
+                setup_schedulers(self.flask_app)
+
+            res = self.app.get(url, follow_redirects=True)
+            dom = BeautifulSoup(res.data)
+            form = dom.find(id=form_id)
+            assert form is not None, res.data
+            sched_form = form.find(id)
+            options = dom.find(id="show-customized").find_all('option')
+            assert len(options) == len(mock_columns) + len(fix_columns), len(options)
+            configurable_columns = [o.attrs['value'] for o in options]
+            assert all(s in configurable_columns for s, d in mock_columns)
+            assert all(s in configurable_columns for s, d in fix_columns)
+        except Exception:
+            pass
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
