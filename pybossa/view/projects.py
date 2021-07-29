@@ -925,6 +925,8 @@ def details(short_name):
         template_args['ckan_url'] = current_app.config.get('CKAN_URL')
         template_args['ckan_pkg_name'] = short_name
     response = dict(template=template, **template_args)
+
+    print("n_locked_tasks: ", num_locked_tasks)
     return handle_content_type(response)
 
 @blueprint.route('/<short_name>/summary', methods=['GET'])
@@ -1481,9 +1483,10 @@ def tasks_browse(short_name, page=1, records_per_page=10):
                                                 current_user_profile=user_profile)
             args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
             args["display_columns"] = ['task_id', 'priority', 'created']
-
-            # TODO: read pre-defined customized columns from project settings, now use hard-code setting for POC
-            args["display_info_columns"] = ["col_1", "col_3"]
+            # args["display_info_columns"] = project.info.get('available_columns_in_tasklist', [])
+            args["display_info_columns"] = ["col_1", "col_2"]
+            columns = args["display_info_columns"]
+            records_per_page = 100
 
     except (ValueError, TypeError) as err:
         current_app.logger.exception(err)

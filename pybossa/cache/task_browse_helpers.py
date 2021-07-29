@@ -7,6 +7,7 @@ from pybossa.cache import memoize, ONE_DAY
 from pybossa.core import db
 from pybossa.util import (convert_est_to_utc,
     get_user_pref_db_clause, get_user_filter_db_clause)
+from flask import current_app
 import app_settings
 
 def get_task_filters(args):
@@ -76,8 +77,12 @@ def get_task_filters(args):
         user_pref = args["filter_by_wfilter_upref"]["current_user_pref"]
         user_email = args["filter_by_wfilter_upref"]["current_user_email"]
         user_pref_db_clause = get_user_pref_db_clause(user_pref, user_email)
+        filters += " AND ( {} )".format(user_pref_db_clause)
+        params["assign_user"] = args["sql_params"]["assign_user"]
         user_profile = args["filter_by_wfilter_upref"]["current_user_profile"]
         user_filter_db_clause = get_user_filter_db_clause(user_profile)
+
+        filters += " AND ( {} )".format(user_filter_db_clause)
 
     return filters, params
 
@@ -217,7 +222,7 @@ def parse_tasks_browse_args(args):
     if args.get('display_columns'):
         parsed_args['display_columns'] = json.loads(args['display_columns'])
     if not isinstance(parsed_args.get('display_columns'), list):
-        parsed_args['display_columns'] = ['task_id', 'pcomplete',
+        parsed_args['display_columns'] = ['task_id', 'pcomplete', 'priority',
                                           'created', 'finish_time', 'gold_task',
                                           'actions']
     if 'display_info_columns' in args:
