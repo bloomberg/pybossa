@@ -108,6 +108,8 @@ MAX_NUM_SYNCHRONOUS_TASKS_IMPORT = 200
 MAX_NUM_SYNCHRONOUS_TASKS_DELETE = 100
 DEFAULT_TASK_TIMEOUT = ContributionsGuard.STAMP_TTL
 
+RESERVED_TASKLIST_COLUMNS = ['userPrefLang', 'userPrefLoc']
+
 auditlogger = AuditLogger(auditlog_repo, caller='web')
 mail_queue = Queue('email', connection=sentinel.master)
 importer_queue = Queue('medium',
@@ -926,7 +928,6 @@ def details(short_name):
         template_args['ckan_pkg_name'] = short_name
     response = dict(template=template, **template_args)
 
-    print("n_locked_tasks: ", num_locked_tasks)
     return handle_content_type(response)
 
 @blueprint.route('/<short_name>/summary', methods=['GET'])
@@ -1202,7 +1203,6 @@ def task_presenter(short_name, task_id):
         ensure_authorized_to('read', project)
 
     scheduler = project.info.get('sched', "default")
-    scheduler = "task_queue_scheduler"
     if scheduler != "task_queue_scheduler" and not sched.can_read_task(task, current_user) and not current_user.id in project.owners_ids:
         raise abort(403)
 
@@ -1451,7 +1451,6 @@ def tasks(short_name):
 @blueprint.route('/<short_name>/tasks/browse/<int:page>/<int:records_per_page>')
 @login_required
 def tasks_browse(short_name, page=1, records_per_page=None):
-    print(request.args)
     project, owner, ps = project_by_shortname(short_name)
     ensure_authorized_to('read', project)
 
@@ -1466,7 +1465,6 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         columns = []
 
     scheduler = project.info.get('sched', "default")
-    scheduler = "task_queue_scheduler"
 
     try:
         args = parse_tasks_browse_args(request.args)
@@ -1482,8 +1480,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                                                 current_user_profile=user_profile)
             args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
             args["display_columns"] = ['task_id', 'priority', 'created']
-            # args["display_info_columns"] = project.info.get('available_columns_in_tasklist', [])
-            args["display_info_columns"] = ["col_1", "col_2"]
+            args["display_info_columns"] = project.info.get('tasklist_columns', [])
             columns = args["display_info_columns"]
             records_per_page = records_per_page or 100
         else:
@@ -1559,9 +1556,10 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                     filter_data=args,
                     first_task_id=first_task_id,
                     info_columns=disp_info_columns,
-                    filter_columns=columns,
+                    filter_columns=[c for c in columns if c not in RESERVED_TASKLIST_COLUMNS],
                     language_options=language_options,
                     location_options=location_options,
+                    reserved_options=RESERVED_TASKLIST_COLUMNS,
                     rdancy_upd_exp=rdancy_upd_exp,
                     can_know_task_is_gold=can_know_task_is_gold)
 

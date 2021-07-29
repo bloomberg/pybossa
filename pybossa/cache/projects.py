@@ -64,8 +64,6 @@ def get_top(n=4):
 @static_vars(allowed_fields=allowed_fields)
 def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
     """Cache browse tasks view for a project."""
-    print(args)
-
     tasks = []
     total_count = task_count(project_id, args)
     if not total_count:
@@ -100,24 +98,14 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
     task_rank_info = []
 
     user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
-    print("user_profile: ", user_profile)
 
     for row in results:
         score = 0
         # check preference if necessary
         w_pref = row.worker_pref or {}
         w_filter = row.worker_filter or {}
-        print(row.id)
-        print("user preference: ", row.user_pref)
-        print("worker filter: ", w_filter)
-        print("worker preference", w_pref)
+        user_pref = row.user_pref or {}
         if filter_user_prefs:
-            w_pref = row.worker_pref or {}
-            w_filter = row.worker_filter or {}
-            print(row.id)
-            print("user preference: ", row.user_pref)
-            print("worker filter: ", w_filter)
-            print("worker preference", w_pref)
             if not user_meet_task_requirement(row.id, w_filter, user_profile):
                 # if the user is not qualified for the task, skip
                 continue
@@ -134,18 +122,18 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
         task = dict(id=row.id, n_task_runs=row.n_task_runs,
                     n_answers=row.n_answers, priority_0=row.priority_0,
                     finish_time=finish_time, created=created,
-                    calibration=row.calibration)
+                    calibration=row.calibration,
+                    userPrefLang=user_pref.get("languages", []),
+                    userPrefLoc=user_pref.get("locations", []))
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
         task_rank_info.append((task, score))
 
-    # import pdb; pdb.set_trace()
     if filter_user_prefs:
         # get to total available tasks
         total_count = len(task_rank_info)
         tasks = select_available_tasks(task_rank_info, project_id, user_id, offset+limit, args.get("order_by"))
     else:
         tasks = task_rank_info
-    print(tasks)
 
     return total_count, [t[0] for t in tasks]
 
@@ -171,7 +159,6 @@ def select_available_tasks(task_rank_info, project_id, user_id, num_tasks_needed
     # remove tasks if task is unavailable to contribute
     tasks = []
     for t, score in task_rank_info:
-        print(t["id"])
         remaining = float('inf') if t["calibration"] else t["n_answers"]-t["n_task_runs"]
         if remaining == 0:
             # does not show completed tasks to users
@@ -182,7 +169,6 @@ def select_available_tasks(task_rank_info, project_id, user_id, num_tasks_needed
         if str(user_id) in unexpired_locks or len(unexpired_locks) < remaining:
             tasks.append((t, score))
 
-    print(tasks)
     return tasks
 
 

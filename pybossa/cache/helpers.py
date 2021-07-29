@@ -132,7 +132,6 @@ def add_custom_contrib_button_to(project, user_id_or_ip, ps=None):
                                                          **user_id_or_ip)
 
     project['enable_task_queue'] = (project['info'].get('sched', "default") == "task_queue_scheduler")
-    project['enable_task_queue'] = True
     if ps is None:
         ps = session.query(ProjectStats)\
                     .filter_by(project_id=project['id']).first()
