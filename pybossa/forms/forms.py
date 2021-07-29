@@ -281,6 +281,7 @@ class TaskSchedulerForm(Form):
     _translate_names = lambda variant: (variant[0], lazy_gettext(variant[1]))
     _choices = map(_translate_names, sched_variants())
     sched = SelectField(lazy_gettext('Task Scheduler'), choices=_choices)
+    customized_columns = Select2Field(lazy_gettext('Customized columns'), choices=[], default="")
     rand_within_priority = BooleanField(lazy_gettext('Randomize Within Priority'))
     gold_task_probability_validator = validators.NumberRange(
         min=0,
@@ -292,6 +293,9 @@ class TaskSchedulerForm(Form):
         validators=[gold_task_probability_validator],
         description=lazy_gettext('Probability value between 0 and 1')
     )
+
+    def set_customized_columns_options(self, new_options):
+        self.customized_columns.choices = new_options
 
     @classmethod
     def update_sched_options(cls, new_options):
