@@ -1468,8 +1468,11 @@ def tasks_browse(short_name, page=1, records_per_page=None):
 
     try:
         args = parse_tasks_browse_args(request.args)
-        # some schedulers require worker filter and worker preference in filters
-        if scheduler == "task_queue_scheduler" and not (current_user.subadmin or current_user.admin or current_user.id in project.owners_ids):
+        if current_user.subadmin or current_user.admin or current_user.id in project.owners_ids:
+            # owner and admin have full access
+            records_per_page = records_per_page or 10
+        elif scheduler == "task_queue_scheduler":
+            # worker can access limited tasks only when task_queue_scheduler is selected
             user = cached_users.get_user_by_id(current_user.id)
             user_pref = user.user_pref or {} if user else {}
             user_email = user.email_addr if user else None
@@ -1484,8 +1487,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             columns = args["display_info_columns"]
             records_per_page = records_per_page or 100
         else:
-            records_per_page = records_per_page or 10
-
+            abort(403)
     except (ValueError, TypeError) as err:
         current_app.logger.exception(err)
         flash(gettext('Invalid filtering criteria'), 'error')

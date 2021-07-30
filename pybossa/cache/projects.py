@@ -59,8 +59,8 @@ def get_top(n=4):
     return top_projects
 
 
-# @memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
-#                     cache_group_keys=[[0]])
+@memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
+                    cache_group_keys=[[0]])
 @static_vars(allowed_fields=allowed_fields)
 def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
     """Cache browse tasks view for a project."""
@@ -145,7 +145,7 @@ def select_available_tasks(task_rank_info, project_id, user_id, num_tasks_needed
 
     TASK_USERS_KEY_PREFIX = 'pybossa:project:task_requested:timestamps:{0}'
     project = db.session.query(Project).get(project_id)
-    timeout = project.info["timeout"] or ContributionsGuard.STAMP_TTL
+    timeout = project.info.get("timeout") or ContributionsGuard.STAMP_TTL
     users = get_active_user_count(project_id, sentinel.master)
 
     lock_manager = LockManager(sentinel.master, timeout)

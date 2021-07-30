@@ -35,27 +35,7 @@ def get_active_user_count(project_id, conn):
                  if float(expiration) < now]
     if to_delete:
         conn.hdel(key, *to_delete)
-    print("loooool")
-    print(to_delete)
-
-    all_ = [user for user, expiration in conn.hgetall(key).iteritems()]
-    print("all")
-    print(all_)
     return conn.hlen(key)
-
-# def get_locked_tasks_users(project_id):
-#     now = time()
-#     key = get_active_user_key(project_id)
-#     to_delete = [user for user, expiration in conn.hgetall(key).iteritems()
-#                  if float(expiration) < now]
-#     if to_delete:
-#         conn.hdel(key, *to_delete)
-
-#     active_users = [user for user, expiration in conn.hgetall(key).iteritems()]
-
-#     for user_id in active_users:
-
-#     return active_users
 
 
 def register_active_user(project_id, user_id, conn, ttl=2*60*60):
