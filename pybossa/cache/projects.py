@@ -17,14 +17,18 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Cache module for projects."""
 from sqlalchemy.sql import text
-from pybossa.core import db, timeouts
+from pybossa.contributions_guard import ContributionsGuard
+from pybossa.core import db, sentinel, timeouts
 from pybossa.model.project import Project
 from pybossa.util import pretty_date, static_vars, convert_utc_to_est
 from pybossa.cache import memoize, cache, delete_memoized, delete_cached, \
     memoize_essentials, delete_memoized_essential, delete_cache_group
-from pybossa.cache.task_browse_helpers import get_task_filters, allowed_fields
+from pybossa.cache.task_browse_helpers import get_task_filters, allowed_fields, user_meet_task_requirement, get_task_preference_score
 import app_settings
 from pybossa.util import get_taskrun_date_range_sql_clause_params
+
+import heapq
+import time
 
 session = db.slave_session
 
@@ -58,7 +62,7 @@ def get_top(n=4):
 @memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
                     cache_group_keys=[[0]])
 @static_vars(allowed_fields=allowed_fields)
-def browse_tasks(project_id, args):
+def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
     """Cache browse tasks view for a project."""
     tasks = []
     total_count = task_count(project_id, args)
@@ -66,29 +70,49 @@ def browse_tasks(project_id, args):
         return total_count, tasks
 
     filters, filter_params = get_task_filters(args)
-    sql = text('''
-               SELECT task.id,
-               coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
-               priority_0, task.created, task.calibration
-               FROM task LEFT OUTER JOIN
-               (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
-               MAX(finish_time) as ft FROM task_run
-               WHERE project_id=:project_id GROUP BY task_id) AS log_counts
-               ON task.id=log_counts.task_id
-               WHERE task.project_id=:project_id''' + filters +
-               " ORDER BY %s" % (args.get('order_by') or 'id ASC') +
-               " LIMIT :limit OFFSET :offset"
-               )
 
+    sql = """
+            SELECT task.id,
+            coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
+            priority_0, task.created, task.calibration,
+            task.user_pref, task.worker_filter, task.worker_pref
+            FROM task LEFT OUTER JOIN
+            (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
+            MAX(finish_time) as ft FROM task_run
+            WHERE project_id=:project_id GROUP BY task_id) AS log_counts
+            ON task.id=log_counts.task_id
+            WHERE task.project_id=:project_id""" + filters + \
+            " ORDER BY %s" % (args.get('order_by') or 'id ASC')
+    params = dict(project_id=project_id, **filter_params)
     limit = args.get('records_per_page') or 10
     offset = args.get('offset') or 0
 
-    results = session.execute(sql, dict(project_id=project_id,
-                                        limit=limit,
-                                        offset=offset,
-                                        **filter_params))
+    if filter_user_prefs:
+        params["assign_user"] = args["sql_params"]["assign_user"]
+    else:
+        sql += " LIMIT :limit OFFSET :offset"
+        params["limit"] = limit
+        params["offset"] = offset
+
+    results = session.execute(text(sql), params)
+    task_rank_info = []
+
+    user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
 
     for row in results:
+        score = 0
+        w_pref = row.worker_pref or {}
+        w_filter = row.worker_filter or {}
+        user_pref = row.user_pref or {}
+        # for worker-view, validate worker_filter and compute preference score
+        if filter_user_prefs:
+            if not user_meet_task_requirement(row.id, w_filter, user_profile):
+                # if the user is not qualified for the task, skip
+                continue
+            if not args.get('order_by'):
+                # if there is no sort defined, sort task by preference scores
+                score = get_task_preference_score(w_pref, user_profile)
+
         # TODO: use Jinja filters to format date
         def format_date(date):
             if date is not None:
@@ -98,10 +122,55 @@ def browse_tasks(project_id, args):
         task = dict(id=row.id, n_task_runs=row.n_task_runs,
                     n_answers=row.n_answers, priority_0=row.priority_0,
                     finish_time=finish_time, created=created,
-                    calibration=row.calibration)
+                    calibration=row.calibration,
+                    userPrefLang=user_pref.get("languages", []),
+                    userPrefLoc=user_pref.get("locations", []))
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
-        tasks.append(task)
-    return total_count, tasks
+        task_rank_info.append((task, score))
+
+    if filter_user_prefs:
+        # get the available tasks for current worker
+        total_count = len(task_rank_info)
+        tasks = select_available_tasks(task_rank_info, project_id, user_id, offset+limit, args.get("order_by"))
+        tasks = tasks[offset: offset+limit]
+    else:
+        tasks = task_rank_info
+
+    return total_count, [t[0] for t in tasks]
+
+
+def select_available_tasks(task_rank_info, project_id, user_id, num_tasks_needed, sort_by=None):
+    """execude tasks that had been locked and sort tasks based on preference score"""
+
+    from pybossa.redis_lock import LockManager, get_active_user_count
+
+    TASK_USERS_KEY_PREFIX = 'pybossa:project:task_requested:timestamps:{0}'
+    project = db.session.query(Project).get(project_id)
+    timeout = project.info.get("timeout") or ContributionsGuard.STAMP_TTL
+    users = get_active_user_count(project_id, sentinel.master)
+
+    lock_manager = LockManager(sentinel.master, timeout)
+    now = time.time()
+
+    # if there is no sort parameter, use preference score to sort tasks
+    if not sort_by:
+        task_rank_info = heapq.nlargest(num_tasks_needed+users+1, task_rank_info,
+                                        key=lambda tup: tup[1])
+
+    # remove tasks if task is unavailable to contribute
+    tasks = []
+    for t, score in task_rank_info:
+        remaining = float('inf') if t["calibration"] else t["n_answers"]-t["n_task_runs"]
+        if remaining == 0:
+            # does not show completed tasks to users
+            continue
+        task_users_key = TASK_USERS_KEY_PREFIX.format(t["id"])
+        locks = lock_manager.get_locks(task_users_key)
+        unexpired_locks = [user for user, v in locks.iteritems() if float(v)-now > 0]
+        if str(user_id) in unexpired_locks or len(unexpired_locks) < remaining:
+            tasks.append((t, score))
+
+    return tasks
 
 
 def task_count(project_id, args):
@@ -290,7 +359,7 @@ def n_expected_task_runs(project_id):
 def overall_progress(project_id):
     """Return the percentage of completed tasks out of non gold tasks for a project."""
     total_tasks = n_tasks_not_gold(project_id)
-    return ((n_completed_tasks(project_id) * 100) / total_tasks) if total_tasks != 0 else 0 
+    return ((n_completed_tasks(project_id) * 100) / total_tasks) if total_tasks != 0 else 0
 
 
 @memoize(timeout=timeouts.get('APP_TIMEOUT'), cache_group_keys=[[0]])

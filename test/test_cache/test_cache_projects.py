@@ -22,7 +22,8 @@ from factories import UserFactory, ProjectFactory, TaskFactory, \
     TaskRunFactory, AnonymousTaskRunFactory
 from mock import patch
 import datetime
-from pybossa.core import result_repo
+import json
+from pybossa.core import result_repo, project_repo, task_repo, user_repo
 from pybossa.model.project import Project
 from pybossa.cache.project_stats import update_stats
 from nose.tools import nottest, assert_raises
@@ -431,6 +432,80 @@ class TestProjectsCache(Test):
         count, cached_tasks = cached_projects.browse_tasks(project.id, {})
         # And it does not go over 1 (that is 100%!!)
         assert cached_tasks[0].get('pct_status') == 1.0, cached_tasks[0].get('pct_status')
+
+
+    @with_context
+    def test_browse_tasks_returns_filtered_tasks_for_workers(self):
+        """Test CACHE PROJECTS browse_tasks returns a subset of tasks
+        from a given project"""
+
+        project = ProjectFactory.create()
+        tasks = TaskFactory.create_batch(2, project=project)
+        tasks[0].worker_filter = {'finance': [0.4, '>=']}
+        task_repo.save(tasks[0])
+        tasks[1].worker_filter = {'marketing': [0.3, '>=']}
+        task_repo.save(tasks[1])
+
+        user_profile = {"finance": 0.6}
+        user_info = dict(metadata={"profile": json.dumps(user_profile)})
+        user = UserFactory.create(id=500, info=user_info)
+
+        args = dict(filter_by_wfilter_upref={"current_user_pref": {}, "current_user_email": "user@user.com", "current_user_profile": user_profile},
+                    sql_params=dict(assign_user=json.dumps({'assign_user': ["user@user.com"]})))
+
+        count, browse_tasks = cached_projects.browse_tasks(project.id, args, True, user.id)
+
+        assert len(browse_tasks) == 1, browse_tasks
+
+
+    @with_context
+    def test_browse_tasks_returns_filtered_sorted_tasks_for_workers(self):
+        """Test CACHE PROJECTS browse_tasks returns a subset of tasks
+        from a given project and by default sort based on user profile"""
+
+        project = ProjectFactory.create()
+        tasks = TaskFactory.create_batch(2, project=project)
+        tasks[1].worker_pref = {'spanish': 0.9}
+        task_repo.save(tasks[1])
+
+        user_profile = {"spanish": 0.4}
+        user_info = dict(metadata={"profile": json.dumps(user_profile)})
+        user = UserFactory.create(id=500, info=user_info)
+
+        args = dict(filter_by_wfilter_upref={"current_user_pref": {}, "current_user_email": "user@user.com", "current_user_profile": user_profile},
+            sql_params=dict(assign_user=json.dumps({'assign_user': ["user@user.com"]})))
+
+
+        count, browse_tasks = cached_projects.browse_tasks(project.id, args, True, user.id)
+
+        assert len(browse_tasks) == 2
+        assert browse_tasks[0]["id"] == tasks[1].id, "the second task should come first as it matches user profile"
+
+
+    @with_context
+    def test_browse_tasks_returns_filtered_sorted_tasks_for_workers_2(self):
+        """Test CACHE PROJECTS browse_tasks returns a subset of tasks
+        from a given project and sort based on arguments"""
+
+        project = ProjectFactory.create()
+        tasks = TaskFactory.create_batch(3, project=project)
+        tasks[1].worker_pref = {'spanish': 0.9}
+        task_repo.save(tasks[1])
+        tasks[2].priority_0 = 1.0
+        task_repo.save(tasks[2])
+
+        user_profile = {"spanish": 0.4}
+        user_info = dict(metadata={"profile": json.dumps(user_profile)})
+        user = UserFactory.create(id=500, info=user_info)
+
+        args = dict(filter_by_wfilter_upref={"current_user_pref": {}, "current_user_email": "user@user.com", "current_user_profile": user_profile},
+            sql_params=dict(assign_user=json.dumps({'assign_user': ["user@user.com"]})))
+        args["order_by"] = "priority_0 DESC"
+
+        count, browse_tasks = cached_projects.browse_tasks(project.id, args, True, user.id)
+
+        assert len(browse_tasks) == 3
+        assert browse_tasks[0]["id"] == tasks[2].id, "the third task should come first as it sorts by priority"
 
 
     @with_context

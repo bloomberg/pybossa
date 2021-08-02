@@ -97,7 +97,6 @@ from pybossa.data_access import (data_access_levels, subadmins_are_privileged,
 import app_settings
 from copy import deepcopy
 from pybossa.cache import delete_memoized
-from pybossa.cache.task_browse_helpers import get_searchable_columns
 
 
 cors_headers = ['Content-Type', 'Authorization']
@@ -108,6 +107,8 @@ blueprint_projectid = Blueprint('projectid', __name__)
 MAX_NUM_SYNCHRONOUS_TASKS_IMPORT = 200
 MAX_NUM_SYNCHRONOUS_TASKS_DELETE = 100
 DEFAULT_TASK_TIMEOUT = ContributionsGuard.STAMP_TTL
+
+RESERVED_TASKLIST_COLUMNS = ['userPrefLang', 'userPrefLoc']
 
 auditlogger = AuditLogger(auditlog_repo, caller='web')
 mail_queue = Queue('email', connection=sentinel.master)
@@ -926,6 +927,7 @@ def details(short_name):
         template_args['ckan_url'] = current_app.config.get('CKAN_URL')
         template_args['ckan_pkg_name'] = short_name
     response = dict(template=template, **template_args)
+
     return handle_content_type(response)
 
 @blueprint.route('/<short_name>/summary', methods=['GET'])
@@ -1200,7 +1202,8 @@ def task_presenter(short_name, task_id):
     else:
         ensure_authorized_to('read', project)
 
-    if not sched.can_read_task(task, current_user) and not current_user.id in project.owners_ids:
+    scheduler = project.info.get('sched', "default")
+    if scheduler != "task_queue_scheduler" and not sched.can_read_task(task, current_user) and not current_user.id in project.owners_ids:
         raise abort(403)
 
     if current_user.is_anonymous:
@@ -1447,8 +1450,8 @@ def tasks(short_name):
 @blueprint.route('/<short_name>/tasks/browse/<int:page>')
 @blueprint.route('/<short_name>/tasks/browse/<int:page>/<int:records_per_page>')
 @login_required
-def tasks_browse(short_name, page=1, records_per_page=10):
-    project, owner, ps = allow_deny_project_info(short_name)
+def tasks_browse(short_name, page=1, records_per_page=None):
+    project, owner, ps = project_by_shortname(short_name)
     ensure_authorized_to('read', project)
 
     title = project_title(project, "Tasks")
@@ -1461,13 +1464,35 @@ def tasks_browse(short_name, page=1, records_per_page=10):
         current_app.logger.exception('Error getting columns')
         columns = []
 
+    scheduler = project.info.get('sched', "default")
+
     try:
         args = parse_tasks_browse_args(request.args)
+        if current_user.subadmin or current_user.admin or current_user.id in project.owners_ids:
+            # owner and admin have full access, default size page for owner view is 10
+            per_page = records_per_page if records_per_page in allowed_records_per_page else 10
+        elif scheduler == "task_queue_scheduler":
+            # worker can access limited tasks only when task_queue_scheduler is selected
+            user = cached_users.get_user_by_id(current_user.id)
+            user_pref = user.user_pref or {} if user else {}
+            user_email = user.email_addr if user else None
+            user_profile = cached_users.get_user_profile_metadata(current_user.id)
+            user_profile = json.loads(user_profile) if user_profile else {}
+            args["filter_by_wfilter_upref"] = dict(current_user_pref=user_pref,
+                                                current_user_email=user_email,
+                                                current_user_profile=user_profile)
+            args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
+            args["display_columns"] = ['task_id', 'priority', 'created']
+            args["display_info_columns"] = project.info.get('tasklist_columns', [])
+            columns = args["display_info_columns"]
+            # default page size for worker view is 100
+            per_page = records_per_page if records_per_page in allowed_records_per_page else 100
+        else:
+            abort(403)
     except (ValueError, TypeError) as err:
         current_app.logger.exception(err)
         flash(gettext('Invalid filtering criteria'), 'error')
         abort(404)
-
     can_know_task_is_gold = current_user.subadmin or current_user.admin
     if not can_know_task_is_gold:
         # This has to be a list and not a set because it is JSON stringified in the template
@@ -1475,15 +1500,11 @@ def tasks_browse(short_name, page=1, records_per_page=10):
         args['display_columns'] = list(set(args['display_columns']) - {'gold_task'})
 
     def respond():
-        if records_per_page in allowed_records_per_page:
-            per_page = records_per_page
-        else:
-            per_page = 10
         offset = (page - 1) * per_page
         args["records_per_page"] = per_page
         args["offset"] = offset
         start_time = time.time()
-        total_count, page_tasks = cached_projects.browse_tasks(project.get('id'), args)
+        total_count, page_tasks = cached_projects.browse_tasks(project.get('id'), args, bool(args.get("filter_by_wfilter_upref")), current_user.id)
         current_app.logger.debug("Browse Tasks data loading took %s seconds"
                                  % (time.time()-start_time))
         first_task_id = cached_projects.first_task_id(project.get('id'))
@@ -1497,6 +1518,7 @@ def tasks_browse(short_name, page=1, records_per_page=10):
         disp_info_columns = args.get('display_info_columns', [])
         disp_info_columns = [col for col in disp_info_columns if col in columns]
 
+        # clean up arguments for the url
         args["changed"] = False
         if args.get("pcomplete_from"):
             args["pcomplete_from"] = args["pcomplete_from"] * 100
@@ -1505,6 +1527,8 @@ def tasks_browse(short_name, page=1, records_per_page=10):
         args["order_by"] = args.pop("order_by_dict", dict())
         args.pop("records_per_page", None)
         args.pop("offset", None)
+        args.pop('filter_by_wfilter_upref', None)
+        args.pop('sql_params', None)
 
         if disp_info_columns:
             for task in page_tasks:
@@ -1530,13 +1554,14 @@ def tasks_browse(short_name, page=1, records_per_page=10):
                     n_completed_tasks=ps.n_completed_tasks,
                     pro_features=pro,
                     allowed_records_per_page=allowed_records_per_page,
-                    records_per_page=records_per_page,
+                    records_per_page=per_page,
                     filter_data=args,
                     first_task_id=first_task_id,
                     info_columns=disp_info_columns,
-                    filter_columns=columns,
+                    filter_columns=[c for c in columns if c not in RESERVED_TASKLIST_COLUMNS],
                     language_options=language_options,
                     location_options=location_options,
+                    reserved_options=RESERVED_TASKLIST_COLUMNS,
                     rdancy_upd_exp=rdancy_upd_exp,
                     can_know_task_is_gold=can_know_task_is_gold)
 

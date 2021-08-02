@@ -1,13 +1,30 @@
 from collections import defaultdict
 import json
+import operator
 import re
 from sqlalchemy.sql import text
 from werkzeug.exceptions import BadRequest
 from pybossa.cache import memoize, ONE_DAY
 from pybossa.core import db
 from pybossa.util import (convert_est_to_utc,
-    get_user_pref_db_clause)
+    get_user_pref_db_clause, get_user_filter_db_clause)
+from flask import current_app
 import app_settings
+
+comparator_func = {
+    "less_than": operator.lt,
+    "<": operator.lt,
+    "less_than_equal": operator.le,
+    "<=": operator.le,
+    "greater_than": operator.gt,
+    ">": operator.gt,
+    "greater_than_equal": operator.ge,
+    ">=": operator.ge,
+    "equal": operator.eq,
+    "==": operator.eq,
+    "not_equal": operator.ne,
+    "!=": operator.ne,
+}
 
 def get_task_filters(args):
     """
@@ -70,6 +87,19 @@ def get_task_filters(args):
         if user_pref['languages'] or user_pref['locations']:
             user_pref_db_clause = get_user_pref_db_clause(user_pref)
             filters += " AND ( {} )".format(user_pref_db_clause)
+
+    # for task queue
+    if args.get("filter_by_wfilter_upref"):
+        user_pref = args["filter_by_wfilter_upref"]["current_user_pref"]
+        user_email = args["filter_by_wfilter_upref"]["current_user_email"]
+        user_pref_db_clause = get_user_pref_db_clause(user_pref, user_email)
+        filters += " AND ( {} )".format(user_pref_db_clause)
+        params["assign_user"] = args["sql_params"]["assign_user"]
+        user_profile = args["filter_by_wfilter_upref"]["current_user_profile"]
+        user_filter_db_clause = get_user_filter_db_clause(user_profile)
+
+        filters += " AND ( {} )".format(user_filter_db_clause)
+
     return filters, params
 
 
@@ -281,3 +311,36 @@ def _get_field_filters(filter_string):
     return [(name, operator, value)
             for name, operator, value in filters
             if value and is_valid_searchable_column(name)]
+
+
+def user_meet_task_requirement(task_id, user_filter, user_profile):
+    for field, filters in user_filter.iteritems():
+        if not user_profile.get(field):
+            # if user profile does not have attribute, user does not qualify for the task
+            return False
+        user_data = user_profile.get(field) or 0
+        try:
+            user_data = float(user_data)
+            require = filters[0]
+            op = filters[1]
+            if op not in comparator_func:
+                raise Exception("invalid operator %s", op)
+            if not comparator_func[op](user_data, require):
+                return False
+        except Exception as e:
+            current_app.logger.info("""An error occured when validate constraints for task {} on field {},
+                                reason {}""".format(task_id, field, str(e)))
+            return False
+    return True
+
+def get_task_preference_score(task_pref, user_profile):
+    score = 0
+    for key, value in task_pref.iteritems():
+        user_data = user_profile.get(key) or 0
+        try:
+            user_data = float(user_data)
+            score += value * user_data
+        except ValueError as e:
+            # TODO: when user profile is not number, we need another method to calculate score
+            pass
+    return score

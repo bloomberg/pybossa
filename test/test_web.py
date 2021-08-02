@@ -8736,42 +8736,50 @@ class TestWeb(web.Helper):
         assert res.status_code == 200, res.status_code
 
     @with_context
-    def test_browse_task_zip_download_anon(self):
+    @patch('pybossa.view.projects._check_if_redirect_to_password')
+    def test_browse_task_zip_download_anon(self, check_password):
         """Test browse task with zip download disabled for anon."""
+        check_password.return_value = None
         project = ProjectFactory.create(zip_download=False)
         url = '/project/%s/tasks/browse' % project.short_name
         res = self.app.get(url, follow_redirects=True)
         assert 'This feature requires being logged in' in res.data
 
     @with_context
-    def test_browse_task_zip_download_not_owner(self):
+    @patch('pybossa.view.projects._check_if_redirect_to_password')
+    def test_browse_task_zip_download_not_owner(self, check_password):
         """Test browse task with zip download disabled for not owner."""
+        check_password.return_value = None
         admin, owner, user = UserFactory.create_batch(3)
         project = ProjectFactory.create(zip_download=False, owner=owner)
-        url = '/project/%s/tasks/browse?api_key=%s' % (project.short_name,
-                                                       user.api_key)
+        url = '/project/%s/tasks/browse?api_key=%s&download_type=task-csv' \
+                % (project.short_name, user.api_key)
         res = self.app.get(url, follow_redirects=True)
-        assert res.status_code == 403
+        assert res.status_code == 403, res.status_code
 
     @with_context
-    def test_browse_task_zip_download_owner(self):
-        """Test browse task with zip download disabled for owner."""
+    @patch('pybossa.view.projects._check_if_redirect_to_password')
+    def test_browse_task_zip_download_owner(self, check_password):
+        """Test browse task with zip download enabled for owner."""
+        check_password.return_value = None
         admin, owner, user = UserFactory.create_batch(3)
         project = ProjectFactory.create(zip_download=False, owner=owner)
         task = TaskFactory.create_batch(20, project=project)
-        url = '/project/%s/tasks/browse?api_key=%s' % (project.short_name,
-                                                       owner.api_key)
+        url = '/project/%s/tasks/browse?api_key=%s&download_type=task-csv' \
+                % (project.short_name, owner.api_key)
         res = self.app.get(url, follow_redirects=True)
         assert res.status_code == 200, res.status_code
 
     @with_context
-    def test_browse_task_zip_download_admin(self):
-        """Test browse task with zip download disabled for admin."""
+    @patch('pybossa.view.projects._check_if_redirect_to_password')
+    def test_browse_task_zip_download_admin(self, check_password):
+        """Test browse task with zip download enabled for admin."""
+        check_password.return_value = None
         admin, owner, user = UserFactory.create_batch(3)
         project = ProjectFactory.create(zip_download=False, owner=owner)
         task = TaskFactory.create_batch(20, project=project)
-        url = '/project/%s/tasks/browse?api_key=%s' % (project.short_name,
-                                                       admin.api_key)
+        url = '/project/%s/tasks/browse?api_key=%s&download_type=task-csv' \
+                % (project.short_name, admin.api_key)
         res = self.app.get(url, follow_redirects=True)
         assert res.status_code == 200, res.status_code
 
