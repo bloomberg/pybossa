@@ -101,10 +101,10 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
 
     for row in results:
         score = 0
-        # check preference if necessary
         w_pref = row.worker_pref or {}
         w_filter = row.worker_filter or {}
         user_pref = row.user_pref or {}
+        # for worker-view, validate worker_filter and compute preference score
         if filter_user_prefs:
             if not user_meet_task_requirement(row.id, w_filter, user_profile):
                 # if the user is not qualified for the task, skip
@@ -129,9 +129,10 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
         task_rank_info.append((task, score))
 
     if filter_user_prefs:
-        # get to total available tasks
+        # get the available tasks for current worker
         total_count = len(task_rank_info)
         tasks = select_available_tasks(task_rank_info, project_id, user_id, offset+limit, args.get("order_by"))
+        tasks = tasks[offset: offset+limit]
     else:
         tasks = task_rank_info
 
@@ -149,7 +150,7 @@ def select_available_tasks(task_rank_info, project_id, user_id, num_tasks_needed
     users = get_active_user_count(project_id, sentinel.master)
 
     lock_manager = LockManager(sentinel.master, timeout)
-    now = now = time.time()
+    now = time.time()
 
     # if there is no sort parameter, use preference score to sort tasks
     if not sort_by:

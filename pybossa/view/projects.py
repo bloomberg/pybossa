@@ -1469,8 +1469,8 @@ def tasks_browse(short_name, page=1, records_per_page=None):
     try:
         args = parse_tasks_browse_args(request.args)
         if current_user.subadmin or current_user.admin or current_user.id in project.owners_ids:
-            # owner and admin have full access
-            records_per_page = records_per_page or 10
+            # owner and admin have full access, default size page for owner view is 10
+            per_page = records_per_page if records_per_page in allowed_records_per_page else 10
         elif scheduler == "task_queue_scheduler":
             # worker can access limited tasks only when task_queue_scheduler is selected
             user = cached_users.get_user_by_id(current_user.id)
@@ -1485,7 +1485,8 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             args["display_columns"] = ['task_id', 'priority', 'created']
             args["display_info_columns"] = project.info.get('tasklist_columns', [])
             columns = args["display_info_columns"]
-            records_per_page = records_per_page or 100
+            # default page size for worker view is 100
+            per_page = records_per_page if records_per_page in allowed_records_per_page else 100
         else:
             abort(403)
     except (ValueError, TypeError) as err:
@@ -1499,10 +1500,6 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         args['display_columns'] = list(set(args['display_columns']) - {'gold_task'})
 
     def respond():
-        if records_per_page in allowed_records_per_page:
-            per_page = records_per_page
-        else:
-            per_page = 10
         offset = (page - 1) * per_page
         args["records_per_page"] = per_page
         args["offset"] = offset
@@ -1521,6 +1518,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         disp_info_columns = args.get('display_info_columns', [])
         disp_info_columns = [col for col in disp_info_columns if col in columns]
 
+        # clean up arguments for the url
         args["changed"] = False
         if args.get("pcomplete_from"):
             args["pcomplete_from"] = args["pcomplete_from"] * 100
@@ -1529,6 +1527,8 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         args["order_by"] = args.pop("order_by_dict", dict())
         args.pop("records_per_page", None)
         args.pop("offset", None)
+        args.pop('filter_by_wfilter_upref', None)
+        args.pop('sql_params', None)
 
         if disp_info_columns:
             for task in page_tasks:
@@ -1554,7 +1554,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                     n_completed_tasks=ps.n_completed_tasks,
                     pro_features=pro,
                     allowed_records_per_page=allowed_records_per_page,
-                    records_per_page=records_per_page,
+                    records_per_page=per_page,
                     filter_data=args,
                     first_task_id=first_task_id,
                     info_columns=disp_info_columns,
