@@ -435,7 +435,7 @@ class TestProjectsCache(Test):
 
 
     @with_context
-    def test_browse_tasks_returns_filtered_tasks_for_workers(self):
+    def test_browse_tasks_returns_filtered_tasks_for_workers_0(self):
         """Test CACHE PROJECTS browse_tasks returns a subset of tasks
         from a given project"""
 
@@ -456,6 +456,29 @@ class TestProjectsCache(Test):
         count, browse_tasks = cached_projects.browse_tasks(project.id, args, True, user.id)
 
         assert len(browse_tasks) == 1, browse_tasks
+        assert browse_tasks[0]["id"] == tasks[0].id, "task[1] does not match users profile"
+
+
+    @with_context
+    def test_browse_tasks_returns_filtered_tasks_for_workers_1(self):
+        """Test CACHE PROJECTS browse_tasks returns a subset of tasks
+        from a given project"""
+
+        project = ProjectFactory.create()
+        tasks = TaskFactory.create_batch(2, project=project, n_answers=1)
+        task_run = TaskRunFactory.create(task=tasks[0])
+
+        user_profile = {"finance": 0.6}
+        user_info = dict(metadata={"profile": json.dumps(user_profile)})
+        user = UserFactory.create(id=500, info=user_info)
+
+        args = dict(filter_by_wfilter_upref={"current_user_pref": {}, "current_user_email": "user@user.com", "current_user_profile": user_profile},
+                    sql_params=dict(assign_user=json.dumps({'assign_user': ["user@user.com"]})))
+
+        count, browse_tasks = cached_projects.browse_tasks(project.id, args, True, user.id)
+
+        assert len(browse_tasks) == 1, "complete tasks should not be shown"
+        assert browse_tasks[0]["id"] == tasks[1].id, "complete task tasks[0] should not be shown"
 
 
     @with_context
