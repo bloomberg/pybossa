@@ -107,7 +107,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
         # for worker-view, validate worker_filter and compute preference score
         if filter_user_prefs:
             if not user_meet_task_requirement(row.id, w_filter, user_profile):
-                # exclude unqualified tasks for the user
+                # exclude tasks for which the user is unqualified
                 continue
             if not args.get('order_by'):
                 # if there is no sort defined, sort task by preference scores
