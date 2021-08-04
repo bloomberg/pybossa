@@ -443,7 +443,7 @@ class TestProjectsCache(Test):
         tasks = TaskFactory.create_batch(2, project=project)
         tasks[0].worker_filter = {'finance': [0.4, '>=']}
         task_repo.save(tasks[0])
-        tasks[1].worker_filter = {'marketing': [0.3, '>=']}
+        tasks[1].worker_filter = {'finance': [0.9, '>=']}
         task_repo.save(tasks[1])
 
         user_profile = {"finance": 0.6}
