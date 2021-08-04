@@ -59,8 +59,8 @@ def get_top(n=4):
     return top_projects
 
 
-@memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
-                    cache_group_keys=[[0]])
+# @memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
+#                     cache_group_keys=[[0]])
 @static_vars(allowed_fields=allowed_fields)
 def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
     """Cache browse tasks view for a project."""
@@ -106,8 +106,8 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
         user_pref = row.user_pref or {}
         # for worker-view, validate worker_filter and compute preference score
         if filter_user_prefs:
-            if row.n_task_runs >= row.n_answers or not user_meet_task_requirement(row.id, w_filter, user_profile):
-                # exclude completed tasks and unqualified tasks for the user
+            if not user_meet_task_requirement(row.id, w_filter, user_profile):
+                # exclude unqualified tasks for the user
                 continue
             if not args.get('order_by'):
                 # if there is no sort defined, sort task by preference scores
