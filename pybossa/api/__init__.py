@@ -396,9 +396,9 @@ def task_progress(project_id=None, short_name=None):
         if key in task_fields:
             sql_text += " AND {0}=:{1}".format(key, key)
         elif key in task_info_fields:
-            # include support for empty string and null in URL 
+            # include support for empty string and null in URL
             if filter_fields[key].lower() in ["null", ""]:
-                sql_text +=  " AND info ->> '{0}' is Null".format(key)    
+                sql_text +=  " AND info ->> '{0}' is Null".format(key)
             else:
                 sql_text += " AND info ->> '{0}'=:{1}".format(key, key)
         else:
@@ -412,7 +412,7 @@ def task_progress(project_id=None, short_name=None):
     num_tasks = results.first()[0]
     task_count_dict = dict(task_count=num_tasks)
     return Response(json.dumps(task_count_dict), mimetype="application/json")
-    
+
 
 @jsonpify
 @blueprint.route('/auth/project/<short_name>/token')
@@ -474,7 +474,7 @@ def cancel_task(task_id=None):
 
     user_id = current_user.id
     scheduler, timeout = get_scheduler_and_timeout(project)
-    if scheduler in (Schedulers.locked, Schedulers.user_pref):
+    if scheduler in (Schedulers.locked, Schedulers.user_pref, Schedulers.task_queue):
         task_locked_by_user = has_lock(task_id, user_id, timeout)
         if task_locked_by_user:
             release_lock(task_id, user_id, timeout)
@@ -504,7 +504,7 @@ def fetch_lock(task_id):
             task.project_id)
 
     ttl = None
-    if scheduler in (Schedulers.locked, Schedulers.user_pref):
+    if scheduler in (Schedulers.locked, Schedulers.user_pref, Schedulers.task_queue):
         task_locked_by_user = has_lock(
                 task.id, current_user.id, timeout)
         if task_locked_by_user:

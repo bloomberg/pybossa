@@ -36,7 +36,6 @@ from rq import Queue
 from werkzeug.datastructures import MultiDict
 
 import pybossa.sched as sched
-
 from pybossa.core import (uploader, signer, sentinel, json_exporter,
                           csv_exporter, importer, db, task_json_exporter,
                           task_csv_exporter, anonymizer)
@@ -1288,6 +1287,9 @@ def presenter(short_name):
     user_id = user_id_or_ip['user_id'] or user_id_or_ip['external_uid'] or user_id_or_ip['user_ip']
     template_args = {"project": project, "title": title, "owner": owner,
                      "invite_new_volunteers": False, "user_id": user_id}
+
+    if request.args.get("mode"):
+        template_args["mode"] = request.args.get("mode")
 
     if not project.allow_anonymous_contributors and current_user.is_anonymous:
         msg = "Oops! You have to sign in to participate in <strong>%s</strong> \

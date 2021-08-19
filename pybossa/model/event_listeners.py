@@ -114,7 +114,7 @@ def add_project_event(mapper, conn, target):
 @event.listens_for(Task, 'before_insert')
 def before_add_task_event(mapper, conn, target):
     redis_conn = sentinel.master
-    if cached_projects.get_project_scheduler(target.project_id) == Schedulers.user_pref:
+    if cached_projects.get_project_scheduler(target.project_id) in [Schedulers.user_pref, Schedulers.task_queue]:
         if not redis_conn.hget('updated_project_ids', target.project_id):
             redis_conn.hset('updated_project_ids', target.project_id, make_timestamp())
     else:

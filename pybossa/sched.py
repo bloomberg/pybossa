@@ -63,7 +63,7 @@ def new_task(project_id, sched, user_id=None, user_ip=None,
         'incremental': get_incremental_task,
         Schedulers.user_pref: get_user_pref_task,
         'depth_first_all': get_depth_first_all_task,
-        Schedulers.task_queue: get_locked_task
+        Schedulers.task_queue: get_user_pref_task
     }
     scheduler = sched_map.get(sched, sched_map['default'])
     project = project_repo.get(project_id)
@@ -87,12 +87,12 @@ def new_task(project_id, sched, user_id=None, user_ip=None,
                      orderby=orderby,
                      desc=desc,
                      rand_within_priority=rand_within_priority,
-                     filter_user_prefs=(sched==Schedulers.user_pref),
+                     filter_user_prefs=(sched in [Schedulers.user_pref, Schedulers.task_queue]),
                      task_type=task_type)
 
 
 def is_locking_scheduler(sched):
-    return sched in [Schedulers.locked, Schedulers.user_pref, 'default']
+    return sched in [Schedulers.locked, Schedulers.user_pref, Schedulers.task_queue, 'default']
 
 
 def can_read_task(task, user):
@@ -297,14 +297,7 @@ def locked_scheduler(query_factory):
             timeout = timeout or TIMEOUT
             remaining = float('inf') if calibration else n_answers - taskcount
             if acquire_lock(task_id, user_id, remaining, timeout):
-                save_task_id_project_id(task_id, project_id, 2 * timeout)
-                register_active_user(project_id, user_id, sentinel.master, ttl=timeout)
-
-                task_type = 'gold task' if calibration else 'task'
-                current_app.logger.info(
-                    'Project {} - user {} obtained {} {}, timeout: {}'
-                    .format(project_id, user_id, task_type, task_id, timeout))
-                return [session.query(Task).get(task_id)]
+                return _lock_task_for_user(task_id, project_id, user_id, timeout, calibration)
 
         return []
 
@@ -368,7 +361,7 @@ def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=Fals
 
 def select_contributable_task(project, user_id, **kwargs):
     sched, _ = get_scheduler_and_timeout(project)
-    with_user_pref = sched == Schedulers.user_pref
+    with_user_pref = sched in [Schedulers.user_pref, Schedulers.task_queue]
     kwargs['filter_user_prefs'] = with_user_pref
 
     params = dict(project_id=project.id, user_id=user_id, limit=1)
@@ -437,6 +430,46 @@ def acquire_lock(task_id, user_id, limit, timeout, pipeline=None, execute=True):
     return False
 
 
+def lock_task_for_user(task_id, project_id, user_id):
+    sql = '''
+        SELECT task.id, COUNT(task_run.task_id) AS taskcount, n_answers, task.calibration,
+            (SELECT info->'timeout'
+            FROM project
+            WHERE id=:project_id) as timeout
+        FROM task
+        LEFT JOIN task_run ON (task.id = task_run.task_id)
+        WHERE NOT EXISTS
+        (SELECT 1 FROM task_run WHERE project_id=:project_id AND
+        user_id=:user_id AND task_id=task.id)
+        AND task.project_id=:project_id
+        AND task.id = :task_id
+        AND ((task.expiration IS NULL) OR (task.expiration > (now() at time zone 'utc')::timestamp))
+        AND task.state !='completed'
+        AND task.state !='enrich'
+        group by task.id
+        '''
+
+    rows = session.execute(sql, dict(project_id=project_id,
+                                    user_id=user_id,
+                                    task_id=task_id))
+    for task_id, taskcount, n_answers, calibration, timeout in rows:
+        timeout = timeout or TIMEOUT
+        remaining = float('inf') if calibration else n_answers - taskcount
+        if acquire_lock(task_id, user_id, remaining, timeout):
+            return _lock_task_for_user(task_id, project_id, user_id, timeout, calibration)
+
+
+def _lock_task_for_user(task_id, project_id, user_id, timeout, calibration=False):
+    save_task_id_project_id(task_id, project_id, 2 * timeout)
+    register_active_user(project_id, user_id, sentinel.master, ttl=timeout)
+
+    task_type = 'gold task' if calibration else 'task'
+    current_app.logger.info(
+        'Project {} - user {} obtained {} {}, timeout: {}'
+        .format(project_id, user_id, task_type, task_id, timeout))
+    return [session.query(Task).get(task_id)]
+
+
 def release_user_locks_for_project(user_id, project_id):
     user_tasks = get_user_tasks(user_id, TIMEOUT)
     user_task_ids = user_tasks.keys()
@@ -462,8 +495,10 @@ def release_lock(task_id, user_id, timeout, pipeline=None, execute=True):
     lock_manager.release_lock(user_tasks_key, task_id, pipeline=pipeline)
 
     project_ids = get_task_ids_project_id([task_id])
+    user_tasks = get_user_tasks(user_id, timeout)
     if project_ids:
-        unregister_active_user(project_ids[0], user_id, sentinel.master)
+        if project_ids[0] not in get_task_ids_project_id(user_tasks):
+            unregister_active_user(project_ids[0], user_id, sentinel.master)
 
     if execute:
         pipeline.execute()

@@ -723,7 +723,7 @@ def send_email_notifications():
         if not project.email_notif:
             continue
         user_emails = []
-        if cached_projects.get_project_scheduler(project_id) == Schedulers.user_pref:
+        if cached_projects.get_project_scheduler(project_id) in [Schedulers.user_pref, Schedulers.task_queue]:
             user_emails = user_repo.get_user_pref_recent_contributor_emails(project_id, timestamp)
         else:
             if cached_projects.overall_progress(project_id) != 100:
