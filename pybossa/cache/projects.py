@@ -70,8 +70,9 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
         return total_count, tasks
 
     filters, filter_params = get_task_filters(args)
-
-    sql = """
+    """only show ongoing tasks if filter_user_prefs is true"""
+    if filter_user_prefs:
+        sql = """
             SELECT task.id,
             coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
             priority_0, task.created, task.calibration,
@@ -81,8 +82,22 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
             MAX(finish_time) as ft FROM task_run
             WHERE project_id=:project_id GROUP BY task_id) AS log_counts
             ON task.id=log_counts.task_id
+            WHERE task.state='ongoing'
             WHERE task.project_id=:project_id""" + filters + \
             " ORDER BY %s" % (args.get('order_by') or 'id ASC')
+    else:
+        sql = """
+                SELECT task.id,
+                coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
+                priority_0, task.created, task.calibration,
+                task.user_pref, task.worker_filter, task.worker_pref
+                FROM task LEFT OUTER JOIN
+                (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
+                MAX(finish_time) as ft FROM task_run
+                WHERE project_id=:project_id GROUP BY task_id) AS log_counts
+                ON task.id=log_counts.task_id
+                WHERE task.project_id=:project_id""" + filters + \
+                " ORDER BY %s" % (args.get('order_by') or 'id ASC')
     params = dict(project_id=project_id, **filter_params)
     limit = args.get('records_per_page') or 10
     offset = args.get('offset') or 0
