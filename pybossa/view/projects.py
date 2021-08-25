@@ -86,7 +86,7 @@ from pybossa.cache.helpers import n_gold_tasks, n_available_tasks, oldest_availa
 from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date, n_locked_tasks
 from pybossa.util import crossdomain
 from pybossa.error import ErrorStatus
-from pybossa.sched import select_task_for_gold_mode
+from pybossa.sched import select_task_for_gold_mode, lock_task_for_user
 from pybossa.syncer import NotEnabled, SyncUnauthorized
 from pybossa.syncer.project_syncer import ProjectSyncer
 from pybossa.exporter.csv_reports_export import ProjectReportCsvExporter
@@ -1204,6 +1204,8 @@ def task_presenter(short_name, task_id):
     scheduler = project.info.get('sched', "default")
     if scheduler != "task_queue_scheduler" and not sched.can_read_task(task, current_user) and not current_user.id in project.owners_ids:
         raise abort(403)
+    elif mode == "cherry_pick":
+        lock_task_for_user(task_id, project.id, current_user.id)
 
     if current_user.is_anonymous:
         if not project.allow_anonymous_contributors:
