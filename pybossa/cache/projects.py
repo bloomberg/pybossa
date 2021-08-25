@@ -83,7 +83,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
             WHERE project_id=:project_id GROUP BY task_id) AS log_counts
             ON task.id=log_counts.task_id
             WHERE task.state='ongoing'
-            WHERE task.project_id=:project_id""" + filters + \
+            AND task.project_id=:project_id""" + filters + \
             " ORDER BY %s" % (args.get('order_by') or 'id ASC')
     else:
         sql = """
