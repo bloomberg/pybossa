@@ -86,7 +86,7 @@ from pybossa.cache.helpers import n_gold_tasks, n_available_tasks, oldest_availa
 from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date, n_locked_tasks
 from pybossa.util import crossdomain
 from pybossa.error import ErrorStatus
-from pybossa.sched import select_task_for_gold_mode, lock_task_for_user
+from pybossa.sched import Schedulers, select_task_for_gold_mode, lock_task_for_user
 from pybossa.syncer import NotEnabled, SyncUnauthorized
 from pybossa.syncer.project_syncer import ProjectSyncer
 from pybossa.exporter.csv_reports_export import ProjectReportCsvExporter
@@ -1201,12 +1201,6 @@ def task_presenter(short_name, task_id):
     else:
         ensure_authorized_to('read', project)
 
-    scheduler = project.info.get('sched', "default")
-    if scheduler != "task_queue_scheduler" and not sched.can_read_task(task, current_user) and not current_user.id in project.owners_ids:
-        raise abort(403)
-    elif mode == "cherry_pick":
-        lock_task_for_user(task_id, project.id, current_user.id)
-
     if current_user.is_anonymous:
         if not project.allow_anonymous_contributors:
             msg = ("Oops! You have to sign in to participate in "
@@ -1227,6 +1221,14 @@ def task_presenter(short_name, task_id):
             url = url_for('account.signin', next=next_url)
             markup = Markup('{{}} <a href="{}">{{}}</a>'.format(url))
             flash(markup.format(msg_1, msg_2), "warning")
+
+    scheduler = project.info.get('sched', "default")
+    if not (current_user.subadmin or current_user.admin or current_user.id in project.owners_ids):
+        # Users without admin privilege have to be on task_queue-cherry_pick or be locked to task to view
+        if scheduler == sched.Schedulers.task_queue and mode == "cherry_pick":
+            lock_task_for_user(task_id, project.id, current_user.id)
+        elif not sched.can_read_task(task, current_user):
+            raise abort(403)
 
     title = project_title(project, "Contribute")
     project_sanitized, owner_sanitized = sanitize_project_owner(project, owner,
@@ -1475,7 +1477,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         if current_user.subadmin or current_user.admin or current_user.id in project.owners_ids:
             # owner and admin have full access, default size page for owner view is 10
             per_page = records_per_page if records_per_page in allowed_records_per_page else 10
-        elif scheduler == "task_queue_scheduler":
+        elif scheduler == Schedulers.task_queue:
             # worker can access limited tasks only when task_queue_scheduler is selected
             user = cached_users.get_user_by_id(current_user.id)
             user_pref = user.user_pref or {} if user else {}
