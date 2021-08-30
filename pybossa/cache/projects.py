@@ -69,14 +69,8 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
     if not total_count:
         return total_count, tasks
 
+    args['user_id'] = user_id
     filters, filter_params = get_task_filters(args)
-
-    """exclude tasks that the current worker has worked before"""
-    if filter_user_prefs:
-        filters += ''' AND NOT EXISTS
-           (SELECT 1 FROM task_run WHERE project_id=:project_id AND
-           user_id=:user_id AND task_id=task.id)'''
-        filter_params.append(user_id)
 
     sql = """
             SELECT task.id,
