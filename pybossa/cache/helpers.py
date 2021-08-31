@@ -25,6 +25,7 @@ from pybossa.cache import memoize, ONE_HOUR
 from pybossa.model.project_stats import ProjectStats
 from pybossa.cache import users as cached_users
 from pybossa.cache import task_browse_helpers as cached_task_browse_helpers
+from pybossa.sched import Schedulers
 
 session = db.slave_session
 
@@ -131,7 +132,7 @@ def add_custom_contrib_button_to(project, user_id_or_ip, ps=None):
                                                          ps=ps,
                                                          **user_id_or_ip)
 
-    project['enable_task_queue'] = (project['info'].get('sched', "default") == "task_queue_scheduler")
+    project['enable_task_queue'] = (project['info'].get('sched', "default") == Schedulers.task_queue)
     if ps is None:
         ps = session.query(ProjectStats)\
                     .filter_by(project_id=project['id']).first()
@@ -182,7 +183,7 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     assign_user = json.dumps({'assign_user': [cached_users.get_user_email(user_id)]}) if user_id else None
     scheduler = project["info"].get('sched', 'default') if type(project) == dict else project.info.get('sched', 'default')
     project_id = project['id'] if type(project) == dict else project.id
-    if scheduler != Schedulers.user_pref:
+    if scheduler not in [Schedulers.user_pref, Schedulers.task_queue]:
         sql = '''
                SELECT COUNT(*) AS n_tasks FROM task
                WHERE project_id=:project_id AND state !='completed'
@@ -207,7 +208,7 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     sqltext = text(sql)
     try:
         result = session.execute(sqltext, dict(project_id=project_id, user_id=user_id, assign_user=assign_user))
-        if scheduler != Schedulers.user_pref:
+        if scheduler not in [Schedulers.user_pref, Schedulers.task_queue]:
             for row in result:
                 n_tasks = row.n_tasks
                 return n_tasks

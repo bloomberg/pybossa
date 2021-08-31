@@ -8784,6 +8784,32 @@ class TestWeb(web.Helper):
         assert res.status_code == 200, res.status_code
 
     @with_context
+    @patch('pybossa.view.projects._check_if_redirect_to_password')
+    def test_task_list_worker_view_0(self, check_password):
+        """Test task list worker access for task_queue_scheduler selected."""
+        check_password.return_value = None
+        admin, owner, user = UserFactory.create_batch(3)
+        project = ProjectFactory.create(zip_download=True, owner=owner, info={"sched": "task_queue_scheduler"})
+        task = TaskFactory.create_batch(20, project=project)
+        url = '/project/%s/tasks/browse?api_key=%s' \
+                % (project.short_name, user.api_key)
+        res = self.app.get(url, follow_redirects=True)
+        assert res.status_code == 200, res.status_code
+
+    @with_context
+    @patch('pybossa.view.projects._check_if_redirect_to_password')
+    def test_task_list_worker_view_1(self, check_password):
+        """Test task list worker access for other schedulers selected."""
+        check_password.return_value = None
+        admin, owner, user = UserFactory.create_batch(3)
+        project = ProjectFactory.create(zip_download=True, owner=owner, info={"sched": "default"})
+        task = TaskFactory.create_batch(20, project=project)
+        url = '/project/%s/tasks/browse?api_key=%s' \
+                % (project.short_name, user.api_key)
+        res = self.app.get(url, follow_redirects=True)
+        assert res.status_code == 403, res.status_code
+
+    @with_context
     def test_projects_account(self):
         """Test projecs on profiles are good."""
         owner, contributor = UserFactory.create_batch(2)
