@@ -69,6 +69,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
     if not total_count:
         return total_count, tasks
 
+    args['user_id'] = user_id
     filters, filter_params = get_task_filters(args)
 
     sql = """
@@ -83,6 +84,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
             ON task.id=log_counts.task_id
             WHERE task.project_id=:project_id""" + filters + \
             " ORDER BY %s" % (args.get('order_by') or 'id ASC')
+
     params = dict(project_id=project_id, **filter_params)
     limit = args.get('records_per_page') or 10
     offset = args.get('offset') or 0
