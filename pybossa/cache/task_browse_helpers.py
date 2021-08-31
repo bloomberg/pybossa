@@ -93,12 +93,13 @@ def get_task_filters(args):
         # task queue exclude completed tasks
         filters += " AND state!='completed'"
 
-        """exclude tasks that the current worker has worked before"""
+        # exclude tasks that the current worker has worked on before
         filters += ''' AND NOT EXISTS
            (SELECT 1 FROM task_run WHERE project_id=:project_id AND
            user_id=:user_id AND task_id=task.id)'''
         params["user_id"] = args.get('user_id')
 
+        # include additional filters
         user_pref = args["filter_by_wfilter_upref"]["current_user_pref"]
         user_email = args["filter_by_wfilter_upref"]["current_user_email"]
         user_pref_db_clause = get_user_pref_db_clause(user_pref, user_email)
