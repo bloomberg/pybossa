@@ -86,7 +86,7 @@ from pybossa.cache.helpers import n_gold_tasks, n_available_tasks, oldest_availa
 from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date, n_locked_tasks
 from pybossa.util import crossdomain
 from pybossa.error import ErrorStatus
-from pybossa.sched import Schedulers, select_task_for_gold_mode, lock_task_for_user
+from pybossa.sched import Schedulers, select_task_for_gold_mode, lock_task_for_user, get_locked_tasks_project
 from pybossa.syncer import NotEnabled, SyncUnauthorized
 from pybossa.syncer.project_syncer import ProjectSyncer
 from pybossa.exporter.csv_reports_export import ProjectReportCsvExporter
@@ -3745,3 +3745,53 @@ def get_last_activity(project):
     last_submission_task_date = last_submission_task_date[0:10] if last_submission_task_date else 'None'
 
     return project.last_activity if project.last_activity != '0' and project.last_activity != 'None' else last_submission_task_date
+
+def get_locked_tasks(project):
+    """
+    Returns a list of locked tasks for a project.
+    """
+    locked_tasks = []
+
+    # Get locked tasks for this project.
+    locks = get_locked_tasks_project(project.id)
+    for lock in locks:
+        # Get user details for the lock.
+        user_id = lock.get('user_id')
+        task_id = lock.get('task_id')
+        seconds_remaining = lock.get('seconds_remaining')
+        user = cached_users.get_user_by_id(user_id)
+        data = {
+            "user_id": user_id,
+            "task_id": task_id,
+            "seconds_remaining": seconds_remaining,
+            "name": user.name,
+            "fullname": user.fullname,
+            "email": user.email_addr,
+            "admin": user.admin,
+            "subadmin": user.subadmin,
+        }
+        locked_tasks.append(data)
+
+    return locked_tasks
+
+@blueprint.route('/<short_name>/locks', methods=['GET'])
+@login_required
+@admin_or_subadmin_required
+def locks(short_name):
+    """View locked tasks for a project."""
+    form = SearchForm(request.body)
+
+    # Get the project.
+    project, owner, ps = project_by_shortname(short_name)
+
+    # Security check.
+    ensure_authorized_to('read', project)
+
+    response = dict(
+        project_name=short_name,
+        project_id=project.id,
+        owner=owner,
+        locks=get_locked_tasks(project)
+    )
+
+    return jsonify(response)

@@ -24,7 +24,7 @@ from pybossa.model.task import Task
 from pybossa.model.task_run import TaskRun
 from pybossa.model.counter import Counter
 from pybossa.core import db, sentinel, project_repo, task_repo
-from redis_lock import LockManager, get_active_user_count, register_active_user, unregister_active_user
+from redis_lock import LockManager, get_active_user_count, register_active_user, unregister_active_user, get_active_user_key
 from contributions_guard import ContributionsGuard
 from werkzeug.exceptions import BadRequest, Forbidden
 import random
@@ -535,6 +535,29 @@ def get_task_users_key(task_id):
 def get_user_tasks_key(user_id):
     return USER_TASKS_KEY_PREFIX.format(user_id)
 
+def get_locked_tasks_project(project_id):
+    tasks = []
+    redis_conn = sentinel.master
+
+    # Get the active users key for this project.
+    key = get_active_user_key(project_id)
+
+    # Get the users for each locked task.
+    for user_key in redis_conn.hgetall(key).iteritems():
+        user_id = user_key[0]
+
+        # Get the tasks locked by this user.
+        task_id, seconds_remaining = get_task_id_and_duration_for_project_user(project_id, user_id)
+        if seconds_remaining > 0:
+            # This lock has not yet expired, get the details.
+            user_tasks = get_user_tasks(user_id, TIMEOUT)
+            for task in user_tasks:
+                tasks.append({
+                    "user_id": user_id,
+                    "task_id": task_id,
+                    "seconds_remaining": seconds_remaining
+                })
+    return tasks
 
 def get_task_id_project_id_key(task_id):
     return TASK_ID_PROJECT_ID_KEY_PREFIX.format(task_id)
