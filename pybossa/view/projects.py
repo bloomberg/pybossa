@@ -3790,7 +3790,7 @@ def locks(short_name):
     response = dict(
         project_name=short_name,
         project_id=project.id,
-        owner=owner,
+        owner=cached_users.get_user_by_id(owner.id).fullname,
         locks=get_locked_tasks(project)
     )
 
