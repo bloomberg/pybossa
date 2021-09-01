@@ -3747,9 +3747,7 @@ def get_last_activity(project):
     return project.last_activity if project.last_activity != '0' and project.last_activity != 'None' else last_submission_task_date
 
 def get_locked_tasks(project):
-    """
-    Returns a list of locked tasks for a project.
-    """
+    """Returns a list of locked tasks for a project."""
     locked_tasks = []
 
     # Get locked tasks for this project.
