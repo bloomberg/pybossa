@@ -3746,7 +3746,7 @@ def get_last_activity(project):
 
     return project.last_activity if project.last_activity != '0' and project.last_activity != 'None' else last_submission_task_date
 
-def get_locked_tasks(project):
+def get_locked_tasks(project, task_id=None):
     """Returns a list of locked tasks for a project."""
     locked_tasks = []
 
@@ -3755,28 +3755,31 @@ def get_locked_tasks(project):
     for lock in locks:
         # Get user details for the lock.
         user_id = lock.get('user_id')
-        task_id = lock.get('task_id')
+        lock_task_id = lock.get('task_id')
         seconds_remaining = lock.get('seconds_remaining')
-        user = cached_users.get_user_by_id(user_id)
-        data = {
-            "user_id": user_id,
-            "task_id": task_id,
-            "seconds_remaining": seconds_remaining,
-            "name": user.name,
-            "fullname": user.fullname,
-            "email": user.email_addr,
-            "admin": user.admin,
-            "subadmin": user.subadmin,
-        }
-        locked_tasks.append(data)
+
+        if not task_id or task_id == lock_task_id:
+            user = cached_users.get_user_by_id(user_id)
+            data = {
+                "user_id": user_id,
+                "task_id": lock_task_id,
+                "seconds_remaining": seconds_remaining,
+                "name": user.name,
+                "fullname": user.fullname,
+                "email": user.email_addr,
+                "admin": user.admin,
+                "subadmin": user.subadmin,
+            }
+            locked_tasks.append(data)
 
     return locked_tasks
 
-@blueprint.route('/<short_name>/locks', methods=['GET'])
+@blueprint.route('/<short_name>/locks/', methods=['GET'], defaults={'task_id': ''})
+@blueprint.route('/<short_name>/locks/<int:task_id>/', methods=['GET'])
 @login_required
 @admin_or_subadmin_required
-def locks(short_name):
-    """View locked tasks for a project."""
+def locks(short_name, task_id):
+    """View locked task(s) for a project."""
     form = SearchForm(request.body)
 
     # Get the project.
@@ -3785,11 +3788,19 @@ def locks(short_name):
     # Security check.
     ensure_authorized_to('read', project)
 
-    response = dict(
-        project_name=short_name,
-        project_id=project.id,
-        owner=cached_users.get_user_by_id(owner.id).fullname,
-        locks=get_locked_tasks(project)
-    )
+    # Retrieve locked tasks.
+    tasks = get_locked_tasks(project, task_id)
 
-    return jsonify(response)
+    status_code = 200
+    if task_id:
+        # Return a single task or an empty object.
+        if len(tasks):
+            response = tasks[0]
+        else:
+            response = {}
+            status_code = 404
+    else:
+        # Return an array of tasks.
+        response = tasks
+
+    return jsonify(response), status_code
