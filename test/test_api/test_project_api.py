@@ -2008,6 +2008,7 @@ class TestProjectAPI(TestAPI):
             short_name='test_project',
             name='Test Project',
             info={
+                'passwd_hash': None,
                 'total': 150,
                 'task_presenter': 'foo',
                 'data_classification': dict(input_data="L4 - Public Third-Party Data", output_data="L4 - Public Third-Party Data"),
@@ -2015,9 +2016,10 @@ class TestProjectAPI(TestAPI):
                 'product': 'B Test Product',
                 'subproduct': 'B Test Sub-Product',
             },
-            owner=user)
+            owner=user1)
+
         tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
-        headers = [('Authorization', user.api_key)]
+        headers = [('Authorization', user1.api_key)]
 
         # Request a new task for user 1 and lock the task.
         url = '/api/project/%s/newtask?api_key=%s' % (project.id, user1.api_key)
@@ -2043,3 +2045,90 @@ class TestProjectAPI(TestAPI):
         assert res_data[1].get('task_id') == task2.get('id'), "Successful locked task_id 2"
         assert res_data[0].get('seconds_remaining') > 0, "Successful locked task 1 seconds_remaining"
         assert res_data[1].get('seconds_remaining') > 0, "Successful locked task 2 seconds_remaining"
+
+    @with_context
+    def test_locked_tasks_api_no_tasks(self):
+        """Test API /locks when no tasks are locked"""
+        user = UserFactory.create(id=500)
+        project = ProjectFactory.create(
+            short_name='test_project',
+            name='Test Project',
+            info={
+                'total': 150,
+                'task_presenter': 'foo',
+                'data_classification': dict(input_data="L4 - Public Third-Party Data", output_data="L4 - Public Third-Party Data"),
+                'kpi': 0.5,
+                'product': 'B Test Product',
+                'subproduct': 'B Test Sub-Product',
+            },
+            owner=user)
+        tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
+        headers = [('Authorization', user.api_key)]
+
+        # Call API method to retrieve locks.
+        res = self.app.get('/project/{}/locks/'.format(project.short_name), headers=headers, follow_redirects=True)
+        res_data = json.loads(res.data)
+
+        assert res.status_code == 200, "POST project locks api should be successful"
+        assert len(res_data) == 0, "Successful count of locked tasks 0."
+
+    @with_context
+    def test_locked_tasks_api_specific(self):
+        """Test API /locks to return currently locked task for a single user and specific task id"""
+        user = UserFactory.create(id=500)
+        project = ProjectFactory.create(
+            short_name='test_project',
+            name='Test Project',
+            info={
+                'total': 150,
+                'task_presenter': 'foo',
+                'data_classification': dict(input_data="L4 - Public Third-Party Data", output_data="L4 - Public Third-Party Data"),
+                'kpi': 0.5,
+                'product': 'B Test Product',
+                'subproduct': 'B Test Sub-Product',
+            },
+            owner=user)
+        tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
+        headers = [('Authorization', user.api_key)]
+
+        # Request a new task for this user and lock the task.
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, user.api_key)
+        res = self.app.get(url, follow_redirects=True)
+        task = json.loads(res.data)
+        task_id = task.get('id')
+
+        # Call API method to retrieve locks.
+        res = self.app.get('/project/{}/locks/{}/'.format(project.short_name, task_id), headers=headers, follow_redirects=True)
+        res_data = json.loads(res.data)
+
+        assert res.status_code == 200, "POST project locks api should be successful"
+        assert res_data.get('name') == user.name, "Successful locked task user name"
+        assert int(res_data.get('user_id')) == user.id, "Successful locked task user id"
+        assert res_data.get('task_id') == task_id, "Successful locked task_id"
+        assert res_data.get('seconds_remaining') > 0, "Successful locked task seconds_remaining"
+
+
+    @with_context
+    def test_locked_tasks_api_specific_no_tasks(self):
+        """Test API /locks to return 404 for specific task with no lock"""
+        user = UserFactory.create(id=500)
+        project = ProjectFactory.create(
+            short_name='test_project',
+            name='Test Project',
+            info={
+                'total': 150,
+                'task_presenter': 'foo',
+                'data_classification': dict(input_data="L4 - Public Third-Party Data", output_data="L4 - Public Third-Party Data"),
+                'kpi': 0.5,
+                'product': 'B Test Product',
+                'subproduct': 'B Test Sub-Product',
+            },
+            owner=user)
+        tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
+        headers = [('Authorization', user.api_key)]
+
+        # Call API method to retrieve lock for a task that is not locked.
+        res = self.app.get('/project/{}/locks/{}/'.format(project.short_name, tasks[0].id), headers=headers, follow_redirects=True)
+        res_data = json.loads(res.data)
+
+        assert res.status_code == 404, "POST project locks api should return 404"
