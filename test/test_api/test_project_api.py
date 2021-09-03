@@ -1974,7 +1974,7 @@ class TestProjectAPI(TestAPI):
             info={
                 'total': 150,
                 'task_presenter': 'foo',
-                'data_classification': dict(input_data="L4 - Public Third-Party Data", output_data="L4 - Public Third-Party Data"),
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
                 'kpi': 0.5,
                 'product': 'B Test Product',
                 'subproduct': 'B Test Sub-Product',
@@ -2010,7 +2010,7 @@ class TestProjectAPI(TestAPI):
     #         info={
     #             'total': 150,
     #             'task_presenter': 'foo',
-    #             'data_classification': dict(input_data="L4 - Public Third-Party Data", output_data="L4 - Public Third-Party Data"),
+    #             'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
     #             'kpi': 0.5,
     #             'product': 'B Test Product',
     #             'subproduct': 'B Test Sub-Product',
@@ -2055,7 +2055,7 @@ class TestProjectAPI(TestAPI):
             info={
                 'total': 150,
                 'task_presenter': 'foo',
-                'data_classification': dict(input_data="L4 - Public Third-Party Data", output_data="L4 - Public Third-Party Data"),
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
                 'kpi': 0.5,
                 'product': 'B Test Product',
                 'subproduct': 'B Test Sub-Product',
@@ -2081,7 +2081,7 @@ class TestProjectAPI(TestAPI):
             info={
                 'total': 150,
                 'task_presenter': 'foo',
-                'data_classification': dict(input_data="L4 - Public Third-Party Data", output_data="L4 - Public Third-Party Data"),
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
                 'kpi': 0.5,
                 'product': 'B Test Product',
                 'subproduct': 'B Test Sub-Product',
@@ -2117,7 +2117,7 @@ class TestProjectAPI(TestAPI):
             info={
                 'total': 150,
                 'task_presenter': 'foo',
-                'data_classification': dict(input_data="L4 - Public Third-Party Data", output_data="L4 - Public Third-Party Data"),
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
                 'kpi': 0.5,
                 'product': 'B Test Product',
                 'subproduct': 'B Test Sub-Product',
