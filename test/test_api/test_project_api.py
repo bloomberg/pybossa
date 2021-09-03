@@ -1976,8 +1976,8 @@ class TestProjectAPI(TestAPI):
                 'task_presenter': 'foo',
                 'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
                 'kpi': 0.5,
-                'product': 'B Test Product',
-                'subproduct': 'B Test Sub-Product',
+                'product': 'abc',
+                'subproduct': 'def',
             },
             owner=user)
         tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
@@ -2004,16 +2004,17 @@ class TestProjectAPI(TestAPI):
     #     """Test API /locks to return currently locked tasks for multiple users"""
     #     user1 = UserFactory.create(id=500)
     #     user2 = UserFactory.create(id=501)
+    #     make_subadmin(user2)
     #     project = ProjectFactory.create(
     #         short_name='test_project',
     #         name='Test Project',
     #         info={
     #             'total': 150,
     #             'task_presenter': 'foo',
-    #             'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
+    #             'data_classification': dict(input_data="L4 - Public Third-Party Data", output_data="L4 - Public Third-Party Data"),
     #             'kpi': 0.5,
-    #             'product': 'B Test Product',
-    #             'subproduct': 'B Test Sub-Product',
+    #             'product': 'abc',
+    #             'subproduct': 'def',
     #         },
     #         owner=user1)
 
@@ -2057,8 +2058,8 @@ class TestProjectAPI(TestAPI):
                 'task_presenter': 'foo',
                 'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
                 'kpi': 0.5,
-                'product': 'B Test Product',
-                'subproduct': 'B Test Sub-Product',
+                'product': 'abc',
+                'subproduct': 'def',
             },
             owner=user)
         tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
@@ -2083,8 +2084,8 @@ class TestProjectAPI(TestAPI):
                 'task_presenter': 'foo',
                 'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
                 'kpi': 0.5,
-                'product': 'B Test Product',
-                'subproduct': 'B Test Sub-Product',
+                'product': 'abc',
+                'subproduct': 'def',
             },
             owner=user)
         tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
@@ -2119,8 +2120,8 @@ class TestProjectAPI(TestAPI):
                 'task_presenter': 'foo',
                 'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
                 'kpi': 0.5,
-                'product': 'B Test Product',
-                'subproduct': 'B Test Sub-Product',
+                'product': 'abc',
+                'subproduct': 'def',
             },
             owner=user)
         tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
