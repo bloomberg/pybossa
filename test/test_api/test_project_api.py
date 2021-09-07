@@ -1964,6 +1964,42 @@ class TestProjectAPI(TestAPI):
         assert res.status_code == 200, "POST project api should be successful"
         assert res_data["info"]["annotation_config"]["amp_pvf"] == "GIG 200", "Project PVF should be set to GIG 200 for public data."
 
+
+    @with_context
+    def test_export_statuses(self):
+        """Test export_statuses"""
+        user = UserFactory.create(id=500)
+        project = ProjectFactory.create(
+            short_name='test_project',
+            name='Test Project',
+            info={
+                'total': 150,
+                'task_presenter': 'foo',
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
+                'kpi': 0.5,
+                'product': 'abc',
+                'subproduct': 'def',
+            },
+            owner=user)
+        tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
+        headers = [('Authorization', user.api_key)]
+
+        # Request a new task for this user and lock the task.
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, user.api_key)
+        res = self.app.get(url, follow_redirects=True)
+        task = json.loads(res.data)
+
+        # Call API method to retrieve locks.
+        res = self.app.get('/project/{}/{}/result_status'.format(project.short_name, task.get('id')), headers=headers, follow_redirects=True)
+        res_data = json.loads(res.data)
+
+        assert res.status_code == 200, "GET status should be successful"
+        user_details = res_data.get('user_details')[0]
+        assert user_details.get('user_id') == user.id, "Successful user id match"
+        assert user_details.get('status') == 'Locked', "Successful status lock"
+        assert user_details.get('lock_ttl') > 0, "Successful lock TTL"
+
+
     @with_context
     def test_locked_tasks_api(self):
         """Test API /locks to return currently locked task for a single user"""
@@ -1996,7 +2032,7 @@ class TestProjectAPI(TestAPI):
         assert len(res_data) == 1, "Successful count of locked tasks 1."
         assert res_data[0].get('name') == user.name, "Successful locked task user name"
         assert int(res_data[0].get('user_id')) == user.id, "Successful locked task user id"
-        assert res_data[0].get('task_id') == task.get('id'), "Successful locked task_id"
+        assert int(res_data[0].get('task_id')) == task.get('id'), "Successful locked task_id"
         assert res_data[0].get('seconds_remaining') > 0, "Successful locked task seconds_remaining"
 
     @with_context
@@ -2041,8 +2077,8 @@ class TestProjectAPI(TestAPI):
         assert res_data[1].get('name') == user2.name, "Successful locked task user2 name"
         assert int(res_data[0].get('user_id')) == user1.id, "Successful locked task user1 id"
         assert int(res_data[1].get('user_id')) == user2.id, "Successful locked task user2 id"
-        assert res_data[0].get('task_id') == task1.get('id'), "Successful locked task_id 1"
-        assert res_data[1].get('task_id') == task2.get('id'), "Successful locked task_id 2"
+        assert int(res_data[0].get('task_id')) == task1.get('id'), "Successful locked task_id 1"
+        assert int(res_data[1].get('task_id')) == task2.get('id'), "Successful locked task_id 2"
         assert res_data[0].get('seconds_remaining') > 0, "Successful locked task 1 seconds_remaining"
         assert res_data[1].get('seconds_remaining') > 0, "Successful locked task 2 seconds_remaining"
 
@@ -2104,7 +2140,7 @@ class TestProjectAPI(TestAPI):
         assert res.status_code == 200, "POST project locks api should be successful"
         assert res_data[0].get('name') == user.name, "Successful locked task user name"
         assert int(res_data[0].get('user_id')) == user.id, "Successful locked task user id"
-        assert res_data[0].get('task_id') == task_id, "Successful locked task_id"
+        assert int(res_data[0].get('task_id')) == task_id, "Successful locked task_id"
         assert res_data[0].get('seconds_remaining') > 0, "Successful locked task seconds_remaining"
 
 
@@ -2148,11 +2184,11 @@ class TestProjectAPI(TestAPI):
         assert len(res_data) == 2, "Successful count of locked tasks 2."
         assert res_data[0].get('name') == user1.name, "Successful locked task user name"
         assert int(res_data[0].get('user_id')) == user1.id, "Successful locked task user id"
-        assert res_data[0].get('task_id') == task_id, "Successful locked task_id"
+        assert int(res_data[0].get('task_id')) == task_id, "Successful locked task_id"
         assert res_data[0].get('seconds_remaining') > 0, "Successful locked task seconds_remaining"
         assert res_data[1].get('name') == user2.name, "Successful locked task user name"
         assert int(res_data[1].get('user_id')) == user2.id, "Successful locked task user id"
-        assert res_data[1].get('task_id') == task_id2, "Successful locked task_id"
+        assert int(res_data[1].get('task_id')) == task_id2, "Successful locked task_id"
         assert res_data[1].get('seconds_remaining') > 0, "Successful locked task seconds_remaining"
         assert task_id == task_id2, "Successful same task locked by multiple users"
 

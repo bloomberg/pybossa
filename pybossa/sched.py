@@ -536,6 +536,7 @@ def get_user_tasks_key(user_id):
     return USER_TASKS_KEY_PREFIX.format(user_id)
 
 def get_locked_tasks_project(project_id):
+    """Returns a list of locked tasks for a given project."""
     tasks = []
     redis_conn = sentinel.master
 
@@ -546,17 +547,25 @@ def get_locked_tasks_project(project_id):
     for user_key in redis_conn.hgetall(key).iteritems():
         user_id = user_key[0]
 
-        # Get the tasks locked by this user.
-        task_id, seconds_remaining = get_task_id_and_duration_for_project_user(project_id, user_id)
-        if seconds_remaining > 0:
-            # This lock has not yet expired, get the details.
-            user_tasks = get_user_tasks(user_id, TIMEOUT)
-            for task in user_tasks:
-                tasks.append({
-                    "user_id": user_id,
-                    "task_id": task_id,
-                    "seconds_remaining": seconds_remaining
-                })
+        # Get locks by user.
+        user_tasks = get_user_tasks(user_id, TIMEOUT)
+        # Get task ids for the locks.
+        user_task_ids = user_tasks.keys()
+        # Get project ids for the task ids.
+        results = get_task_ids_project_id(user_task_ids)
+        # For each locked task, check if the lock is still active.
+        for task_id, task_project_id in zip(user_task_ids, results):
+            # Match the requested project id.
+            if int(task_project_id) == project_id:
+                # Calculate seconds remaining.
+                seconds_remaining = LockManager.seconds_remaining(user_tasks[task_id])
+                if seconds_remaining > 0:
+                    # This lock has not yet expired.
+                    tasks.append({
+                        "user_id": user_id,
+                        "task_id": task_id,
+                        "seconds_remaining": seconds_remaining
+                    })
     return tasks
 
 def get_task_id_project_id_key(task_id):
@@ -564,6 +573,7 @@ def get_task_id_project_id_key(task_id):
 
 
 def get_task_id_and_duration_for_project_user(project_id, user_id):
+    """Returns the max seconds remaining locked task for a user and project."""
     user_tasks = get_user_tasks(user_id, TIMEOUT)
     user_task_ids = user_tasks.keys()
     results = get_task_ids_project_id(user_task_ids)

@@ -3758,7 +3758,7 @@ def get_locked_tasks(project, task_id=None):
         lock_task_id = lock.get('task_id')
         seconds_remaining = lock.get('seconds_remaining')
 
-        if not task_id or task_id == lock_task_id:
+        if not task_id or task_id == int(lock_task_id):
             user = cached_users.get_user_by_id(user_id)
             data = {
                 "user_id": user_id,
