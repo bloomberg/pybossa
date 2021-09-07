@@ -3789,18 +3789,8 @@ def locks(short_name, task_id):
     ensure_authorized_to('read', project)
 
     # Retrieve locked tasks.
-    tasks = get_locked_tasks(project, task_id)
+    locked_tasks = get_locked_tasks(project, task_id)
 
-    status_code = 200
-    if task_id:
-        # Return a single task or an empty object.
-        if len(tasks):
-            response = tasks[0]
-        else:
-            response = {}
-            status_code = 404
-    else:
-        # Return an array of tasks.
-        response = tasks
+    status_code = 404 if task_id and not len(locked_tasks) else 200
 
-    return jsonify(response), status_code
+    return jsonify(locked_tasks), status_code
