@@ -495,9 +495,9 @@ def release_lock(task_id, user_id, timeout, pipeline=None, execute=True):
     lock_manager.release_lock(user_tasks_key, task_id, pipeline=pipeline)
 
     project_ids = get_task_ids_project_id([task_id])
-    user_tasks = get_user_tasks(user_id, timeout)
+    remaining_user_tasks_id = [t for t in get_user_tasks(user_id, timeout).keys() if t != str(task_id)]
     if project_ids:
-        if project_ids[0] not in get_task_ids_project_id(user_tasks):
+        if project_ids[0] not in get_task_ids_project_id(remaining_user_tasks_id):
             unregister_active_user(project_ids[0], user_id, sentinel.master)
 
     if execute:
