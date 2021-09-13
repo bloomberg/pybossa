@@ -188,9 +188,10 @@ def memoize_essentials(timeout=300, essentials=None, cache_group_keys=None):
             key_to_hash = get_key_to_hash(*args, **kwargs)
             key = get_hash_key(key, key_to_hash)
             if os.environ.get('PYBOSSA_REDIS_CACHE_DISABLED') is None:
-                output = sentinel.slave.get(key)
-                if output:
-                    return pickle.loads(output)
+                if not kwargs.get("force_refresh"):
+                    output = sentinel.slave.get(key)
+                    if output:
+                        return pickle.loads(output)
                 output = f(*args, **kwargs)
                 sentinel.master.setex(key, timeout, pickle.dumps(output))
                 add_key_to_cache_groups(key, cache_group_keys, *args, **kwargs)
