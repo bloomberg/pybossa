@@ -1575,8 +1575,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                     location_options=location_options,
                     reserved_options=RESERVED_TASKLIST_COLUMNS,
                     rdancy_upd_exp=rdancy_upd_exp,
-                    can_know_task_is_gold=can_know_task_is_gold,
-                    for_worker=(not current_user.admin and not current_user.id in project['owners_ids']))
+                    can_know_task_is_gold=can_know_task_is_gold)
 
         return handle_content_type(data)
 
