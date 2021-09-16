@@ -1510,12 +1510,14 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         args["records_per_page"] = per_page
         args["offset"] = offset
         start_time = time.time()
+        force_refresh = scheduler == Schedulers.task_queue and \
+                not (current_user.subadmin or current_user.admin or current_user.id in project["owners_ids"])
         total_count, page_tasks = cached_projects.browse_tasks(
             project.get('id'),
             args,
             bool(args.get("filter_by_wfilter_upref")),
             current_user.id,
-            force_refresh=bool(args.get("filter_by_wfilter_upref"))
+            force_refresh=force_refresh
         )
         current_app.logger.debug("Browse Tasks data loading took %s seconds"
                                  % (time.time()-start_time))
