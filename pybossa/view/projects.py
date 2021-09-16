@@ -1044,8 +1044,6 @@ def import_task(short_name):
 
 
 def _import_tasks(project, **form_data):
-    # reset cache / memoized
-    delete_memoized(get_searchable_columns)
 
     report = None
     number_of_tasks = importer.count_tasks_to_import(**form_data)
@@ -1053,6 +1051,8 @@ def _import_tasks(project, **form_data):
         report = importer.create_tasks(task_repo, project, **form_data)
         flash(report.message)
         if report.total > 0:
+            # reset cache / memoized
+            delete_memoized(get_searchable_columns)
             cached_projects.delete_browse_tasks(project.id)
             check_and_send_task_notifications(project.id)
     else:
@@ -1510,7 +1510,15 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         args["records_per_page"] = per_page
         args["offset"] = offset
         start_time = time.time()
-        total_count, page_tasks = cached_projects.browse_tasks(project.get('id'), args, bool(args.get("filter_by_wfilter_upref")), current_user.id)
+        force_refresh = scheduler == Schedulers.task_queue and \
+                not (current_user.subadmin or current_user.admin or current_user.id in project["owners_ids"])
+        total_count, page_tasks = cached_projects.browse_tasks(
+            project.get('id'),
+            args,
+            bool(args.get("filter_by_wfilter_upref")),
+            current_user.id,
+            force_refresh=force_refresh
+        )
         current_app.logger.debug("Browse Tasks data loading took %s seconds"
                                  % (time.time()-start_time))
         first_task_id = cached_projects.first_task_id(project.get('id'))

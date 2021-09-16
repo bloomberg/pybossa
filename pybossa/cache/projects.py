@@ -62,7 +62,7 @@ def get_top(n=4):
 @memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
                     cache_group_keys=[[0]])
 @static_vars(allowed_fields=allowed_fields)
-def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None):
+def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwargs):
     """Cache browse tasks view for a project."""
     tasks = []
     total_count = task_count(project_id, args)
