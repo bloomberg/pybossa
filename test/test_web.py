@@ -8772,6 +8772,21 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.view.projects._check_if_redirect_to_password')
+    def test_browse_task_zip_download_coowner(self, check_password):
+        """Test browse task with zip download enabled for coowner."""
+        check_password.return_value = None
+        admin, owner, user = UserFactory.create_batch(3)
+        project = ProjectFactory.create(zip_download=False, owner=owner)
+        project.owners_ids.append(user.id)
+        project_repo.save(project)
+        task = TaskFactory.create_batch(20, project=project)
+        url = '/project/%s/tasks/browse?api_key=%s&download_type=task-csv' \
+                % (project.short_name, user.api_key)
+        res = self.app.get(url, follow_redirects=True)
+        assert res.status_code == 200, res.status_code
+
+    @with_context
+    @patch('pybossa.view.projects._check_if_redirect_to_password')
     def test_browse_task_zip_download_admin(self, check_password):
         """Test browse task with zip download enabled for admin."""
         check_password.return_value = None
