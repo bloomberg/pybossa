@@ -1223,7 +1223,7 @@ def task_presenter(short_name, task_id):
             flash(markup.format(msg_1, msg_2), "warning")
 
     scheduler = project.info.get('sched', "default")
-    if not (current_user.admin or (current_user.subadmin and current_user.id in project.owners_ids)):
+    if not (current_user.admin or current_user.id in project.owners_ids):
         # Users without admin privilege have to be on task_queue-cherry_pick or be locked to task to view
         if scheduler == sched.Schedulers.task_queue and mode == "cherry_pick":
             lock_task_for_user(task_id, project.id, current_user.id)
@@ -1475,7 +1475,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
     try:
         args = parse_tasks_browse_args(request.args)
         if current_user.subadmin or current_user.admin or current_user.id in project.owners_ids:
-            # owner and admin have full access, default size page for owner view is 10
+            # owners and (sub)admin have full access, default size page for owner view is 10
             per_page = records_per_page if records_per_page in allowed_records_per_page else 10
         elif scheduler == Schedulers.task_queue:
             # worker can access limited tasks only when task_queue_scheduler is selected
