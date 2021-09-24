@@ -209,6 +209,7 @@ def hdfs_file(project_id, cluster, path):
                                                                                     str(request.args))
         raise
 
+    current_app.logger.info("Project id %s, task id %s. Accessing hdfs cluster %s, path %s", project_id, task_id, cluster, path)
     client = HDFSKerberos(**current_app.config['HDFS_CONFIG'][cluster])
     offset = request.args.get('offset')
     length = request.args.get('length')
@@ -223,8 +224,8 @@ def hdfs_file(project_id, cluster, path):
             cipher = AESWithGCM(secret)
             content = cipher.decrypt(content)
     except Exception:
-        current_app.logger.exception('Project id {} get task file {} {}'.format(project_id, path,
-                                                                                str(request.args)))
+        current_app.logger.exception("Project id %s, task id %s, cluster %s, get task file %s, %s",
+            project_id, task_id, cluster, path, str(request.args))
         raise InternalServerError('An Error Occurred')
 
     return Response(content)
