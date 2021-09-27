@@ -44,20 +44,6 @@ def redis_slave():
     sentinel.slave.ping()
 
 
-def check_hdfs():
-    clusters = current_app.config.get("HDFS_CONFIG", {}).keys()
-    for cluster in clusters:
-        urls = current_app.config['HDFS_CONFIG'][cluster]["url"].split(";")
-        user = current_app.config['HDFS_CONFIG'][cluster]["user"]
-        keytab = current_app.config['HDFS_CONFIG'][cluster]["keytab"]
-        path = "/user/{}".format(user)
-        for url in urls:
-            try:
-                client = HDFSKerberos(url, user, keytab)
-                current_app.logger.info("healthcheck hdfs, url %s, list hdfs path %s result %s", url, path, client.list(path))
-            except Exception as e:
-                current_app.logger.warning("Healtcheck hdfs error. %s, %s", url, str(e))
-
 checks = {
     'db_master': db_master,
     'db_slave': db_slave,
@@ -83,7 +69,6 @@ def perform_checks():
 @blueprint.route('/healthcheck')
 @talisman(force_https=False)
 def healthcheck():
-    check_hdfs()
     response = perform_checks()
     healthy =  all(response.itervalues())
     status = 200 if healthy else 500
