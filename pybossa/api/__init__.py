@@ -69,7 +69,7 @@ from werkzeug.exceptions import MethodNotAllowed, Forbidden
 from completed_task import CompletedTaskAPI
 from completed_task_run import CompletedTaskRunAPI
 from pybossa.cache.helpers import (n_available_tasks, n_available_tasks_for_user,
-    n_unexpired_gold_tasks, n_locked_tasks)
+    n_unexpired_gold_tasks)
 from pybossa.sched import (get_project_scheduler_and_timeout, get_scheduler_and_timeout,
                            has_lock, release_lock, Schedulers, get_locks)
 from pybossa.jobs import send_mail

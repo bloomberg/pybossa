@@ -245,15 +245,6 @@ def n_unexpired_gold_tasks(project_id):
     result = session.execute(query, dict(project_id=project_id))
     return result.scalar()
 
-
-def n_locked_tasks(project_id):
-    """Return the number of locked tasks in the project."""
-    from pybossa.core import sentinel
-    from pybossa.redis_lock import get_active_user_count
-
-    return get_active_user_count(project_id, sentinel.master)
-
-
 def n_priority_x_tasks(project_id, priority=1.0, include_gold_task=False):
     """Return the number of ongoing tasks with a given priority for a given project."""
     if include_gold_task:

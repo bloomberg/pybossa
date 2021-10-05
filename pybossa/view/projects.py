@@ -83,7 +83,7 @@ from pybossa.contributions_guard import ContributionsGuard
 from pybossa.default_settings import TIMEOUT
 from pybossa.forms.admin_view_forms import *
 from pybossa.cache.helpers import n_gold_tasks, n_available_tasks, oldest_available_task, n_completed_tasks_by_user
-from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date, n_locked_tasks
+from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date
 from pybossa.util import crossdomain
 from pybossa.error import ErrorStatus
 from pybossa.sched import Schedulers, select_task_for_gold_mode, lock_task_for_user, get_locked_tasks_project
