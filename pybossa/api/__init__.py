@@ -83,6 +83,7 @@ import requests
 from sqlalchemy.sql import text
 from pybossa.core import db
 from pybossa.cache.task_browse_helpers import get_searchable_columns
+from pybossa.view.projects import get_locked_tasks
 
 task_fields = [
     "id",
@@ -351,7 +352,7 @@ def user_progress(project_id=None, short_name=None):
                 total=n_tasks(project.id),
                 completed=n_completed_tasks(project.id),
                 remaining=num_available_tasks,
-                locked=n_locked_tasks(project.id),
+                locked=len(get_locked_tasks(project)),
                 remaining_for_user=num_available_tasks_for_user,
                 quiz=current_user.get_quiz_for_project(project),
                 guidelines_updated=guidelines_updated
