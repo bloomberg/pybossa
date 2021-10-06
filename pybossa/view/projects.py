@@ -83,7 +83,7 @@ from pybossa.contributions_guard import ContributionsGuard
 from pybossa.default_settings import TIMEOUT
 from pybossa.forms.admin_view_forms import *
 from pybossa.cache.helpers import n_gold_tasks, n_available_tasks, oldest_available_task, n_completed_tasks_by_user
-from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date, n_locked_tasks
+from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date
 from pybossa.util import crossdomain
 from pybossa.error import ErrorStatus
 from pybossa.sched import Schedulers, select_task_for_gold_mode, lock_task_for_user, get_locked_tasks_project
@@ -883,7 +883,7 @@ def details(short_name):
     num_remaining_task_runs = cached_projects.n_remaining_task_runs(project.id)
     num_expected_task_runs = cached_projects.n_expected_task_runs(project.id)
     num_gold_tasks = n_gold_tasks(project.id)
-    num_locked_tasks = n_locked_tasks(project.id)
+    num_locked_tasks = len(get_locked_tasks(project))
     num_priority_one_tasks = n_priority_x_tasks(project.id)
 
     # all projects require password check
@@ -1610,7 +1610,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                                  filetype=download_format,
                                  filters=args,
                                  disclose_gold=can_know_task_is_gold)
-            flash(gettext('You will be emailed when your export has been completed.'),
+            flash(gettext(current_app.config.get('EXPORT_MESSAGE', 'You will be emailed when your export has been completed.')),
                   'success')
         except Exception:
             current_app.logger.exception(
@@ -1909,7 +1909,7 @@ def export_to(short_name):
                                  expanded,
                                  'json',
                                  disclose_gold=disclose_gold)
-            flash(gettext('You will be emailed when your export has been completed.'),
+            flash(gettext(current_app.config.get('EXPORT_MESSAGE', 'You will be emailed when your export has been completed.')),
                   'success')
         except Exception as e:
             current_app.logger.exception(
@@ -1932,7 +1932,7 @@ def export_to(short_name):
                                  expanded,
                                  'csv',
                                  disclose_gold=disclose_gold)
-            flash(gettext('You will be emailed when your export has been completed.'),
+            flash(gettext(current_app.config.get('EXPORT_MESSAGE', 'You will be emailed when your export has been completed.')),
                   'success')
         except Exception as e:
             current_app.logger.exception(
