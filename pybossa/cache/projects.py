@@ -64,6 +64,28 @@ def get_top(n=4):
 @static_vars(allowed_fields=allowed_fields)
 def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwargs):
     """Cache browse tasks view for a project."""
+
+    # TODO: use Jinja filters to format date
+    def format_date(date):
+        if date is not None:
+            return convert_utc_to_est(date).strftime('%m-%d-%y %H:%M')
+
+    def format_task(row, locks=[]):
+        finish_time = format_date(row.ft)
+        created = format_date(row.created)
+        task = dict(id=row.id, n_task_runs=row.n_task_runs,
+                    n_answers=row.n_answers, priority_0=row.priority_0,
+                    finish_time=finish_time, created=created,
+                    calibration=row.calibration,
+                    userPrefLang=user_pref.get("languages", []),
+                    userPrefLoc=user_pref.get("locations", []),
+                    lock_user=[])
+        task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
+        if row.id in locks:
+            task['lock_user'] = lock_user_fullname
+        return task
+
+
     tasks = []
     total_count = task_count(project_id, args)
     if not total_count:
@@ -91,52 +113,96 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
     if filter_user_prefs:
         params["assign_user"] = args["sql_params"]["assign_user"]
-    else:
-        sql += " LIMIT :limit OFFSET :offset"
-        params["limit"] = limit
-        params["offset"] = offset
+        results = session.execute(text(sql), params)
+        task_rank_info = []
 
-    results = session.execute(text(sql), params)
-    task_rank_info = []
-
-    user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
-
-    for row in results:
-        score = 0
-        w_pref = row.worker_pref or {}
-        w_filter = row.worker_filter or {}
-        user_pref = row.user_pref or {}
-        # for worker-view, validate worker_filter and compute preference score
-        if filter_user_prefs:
+        user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
+        for row in results:
+            score = 0
+            w_pref = row.worker_pref or {}
+            w_filter = row.worker_filter or {}
+            user_pref = row.user_pref or {}
+            # validate worker_filter and compute preference score
             if not user_meet_task_requirement(row.id, w_filter, user_profile):
-                # exclude tasks for which the user is unqualified
                 continue
             if not args.get('order_by'):
                 # if there is no sort defined, sort task by preference scores
                 score = get_task_preference_score(w_pref, user_profile)
 
-        # TODO: use Jinja filters to format date
-        def format_date(date):
-            if date is not None:
-                return convert_utc_to_est(date).strftime('%m-%d-%y %H:%M')
-        finish_time = format_date(row.ft)
-        created = format_date(row.created)
-        task = dict(id=row.id, n_task_runs=row.n_task_runs,
-                    n_answers=row.n_answers, priority_0=row.priority_0,
-                    finish_time=finish_time, created=created,
-                    calibration=row.calibration,
-                    userPrefLang=user_pref.get("languages", []),
-                    userPrefLoc=user_pref.get("locations", []))
-        task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
-        task_rank_info.append((task, score))
+            task = format_task(row)
+            task_rank_info.append((task, score))
 
-    if filter_user_prefs:
         # get the available tasks for current worker
         total_count = len(task_rank_info)
         tasks = select_available_tasks(task_rank_info, project_id, user_id, offset+limit, args.get("order_by"))
         tasks = tasks[offset: offset+limit]
+
     else:
-        tasks = task_rank_info
+        if args.get(order_by) == "lock":
+            pass
+        else:
+            sql +=  " ORDER BY %s LIMIT :limit OFFSET :offset" % (args.get('order_by') or 'id ASC')"
+            params["limit"] = limit
+            params["offset"] = offset
+
+        results = session.execute(text(sql), params)
+        task_rank_info = []
+
+        locks = get_locked_tasks()
+
+        for row in results:
+            task = format_task(row, locks)
+            lock_score = 0
+            if row.id in locks:
+                lock_score = -1
+            else:
+                lock_score = task.pct_status
+
+            task_rank_info.append((task, lock_score))
+
+        if args.get("order_by") == "lock ASC":
+            task_rank_info = heapq.nlargest(offset+limit, task_rank_info,
+                                        key=lambda tup: tup[1])
+            tasks = task_rank_info[offset: offset+limit]
+        elif order_by = "lock DEC":
+            task_rank_info = heapq.nsmallest(offset+limit, task_rank_info,
+                                        key=lambda tup: tup[1])
+            tasks = task_rank_info[offset: offset+limit]
+        else:
+            tasks = task_rank_info
+
+
+    # results = session.execute(text(sql), params)
+    # task_rank_info = []
+
+    # user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
+
+    # for row in results:
+    #     score = 0
+    #     w_pref = row.worker_pref or {}
+    #     w_filter = row.worker_filter or {}
+    #     user_pref = row.user_pref or {}
+    #     # for worker-view, validate worker_filter and compute preference score
+    #     if filter_user_prefs:
+    #         if not user_meet_task_requirement(row.id, w_filter, user_profile):
+    #             # exclude tasks for which the user is unqualified
+    #             continue
+    #         if not args.get('order_by'):
+    #             # if there is no sort defined, sort task by preference scores
+    #             score = get_task_preference_score(w_pref, user_profile)
+
+
+    #     finish_time = format_date(row.ft)
+    #     created = format_date(row.created)
+    #     task = dict(id=row.id, n_task_runs=row.n_task_runs,
+    #                 n_answers=row.n_answers, priority_0=row.priority_0,
+    #                 finish_time=finish_time, created=created,
+    #                 calibration=row.calibration,
+    #                 userPrefLang=user_pref.get("languages", []),
+    #                 userPrefLoc=user_pref.get("locations", []))
+    #     task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
+    #     task_rank_info.append((task, score))
+
 
     return total_count, [t[0] for t in tasks]
 
