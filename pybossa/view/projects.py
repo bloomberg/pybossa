@@ -1610,7 +1610,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                                  filetype=download_format,
                                  filters=args,
                                  disclose_gold=can_know_task_is_gold)
-            flash(gettext('You will be emailed when your export has been completed.'),
+            flash(gettext(current_app.config.get('EXPORT_MESSAGE', 'You will be emailed when your export has been completed.')),
                   'success')
         except Exception:
             current_app.logger.exception(
@@ -1909,7 +1909,7 @@ def export_to(short_name):
                                  expanded,
                                  'json',
                                  disclose_gold=disclose_gold)
-            flash(gettext('You will be emailed when your export has been completed.'),
+            flash(gettext(current_app.config.get('EXPORT_MESSAGE', 'You will be emailed when your export has been completed.')),
                   'success')
         except Exception as e:
             current_app.logger.exception(
@@ -1932,7 +1932,7 @@ def export_to(short_name):
                                  expanded,
                                  'csv',
                                  disclose_gold=disclose_gold)
-            flash(gettext('You will be emailed when your export has been completed.'),
+            flash(gettext(current_app.config.get('EXPORT_MESSAGE', 'You will be emailed when your export has been completed.')),
                   'success')
         except Exception as e:
             current_app.logger.exception(

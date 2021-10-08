@@ -482,14 +482,11 @@ def create_account(user_data, project_slugs=None, ldap_disabled=True, auto_creat
     if user_data.get('user_pref'):
         new_user.user_pref = user_data['user_pref']
 
-    if user_data.get('metadata'):
-        new_user.info = dict(metadata=user_data['metadata'])
-        new_user.info['metadata'].update({"user_type": user_data.get('user_type', None),
-       "admin":user_data.get('admin', None)})
-    else:
-        new_user.info = dict(metadata={})
-        new_user.info['metadata'].update({"user_type": user_data.get('user_type', None),
-        "admin":user_data.get('admin', None)})
+    user_metadata = user_data.get('metadata', {})
+    new_user.info = dict(metadata=user_metadata)
+
+    new_user.info['metadata'].update({"user_type": user_metadata.get('user_type', None),
+        "admin": user_data.get('admin', None)})
 
     if ldap_disabled:
         new_user.set_password(user_data['password'])
