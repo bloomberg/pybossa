@@ -83,7 +83,7 @@ from pybossa.contributions_guard import ContributionsGuard
 from pybossa.default_settings import TIMEOUT
 from pybossa.forms.admin_view_forms import *
 from pybossa.cache.helpers import n_gold_tasks, n_available_tasks, oldest_available_task, n_completed_tasks_by_user
-from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date
+from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date, n_locked_tasks
 from pybossa.util import crossdomain
 from pybossa.error import ErrorStatus
 from pybossa.sched import Schedulers, select_task_for_gold_mode, lock_task_for_user, get_locked_tasks_project
@@ -883,7 +883,7 @@ def details(short_name):
     num_remaining_task_runs = cached_projects.n_remaining_task_runs(project.id)
     num_expected_task_runs = cached_projects.n_expected_task_runs(project.id)
     num_gold_tasks = n_gold_tasks(project.id)
-    num_locked_tasks = len(get_locked_tasks(project))
+    num_locked_tasks = n_locked_tasks(project.id)
     num_priority_one_tasks = n_priority_x_tasks(project.id)
 
     # all projects require password check
