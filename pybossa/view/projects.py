@@ -1543,6 +1543,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         args.pop("offset", None)
         args.pop('filter_by_wfilter_upref', None)
         args.pop('sql_params', None)
+        args.pop('user_id', None)
 
         if disp_info_columns:
             for task in page_tasks:
@@ -1551,11 +1552,23 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                 for col in disp_info_columns:
                     task['info'][col] = task_info.get(col, '')
 
+        if 'lock_status' in args['display_columns']:
+            user_info = {}
+            for task in page_tasks:
+                users = []
+                for user_id in task['lock_users']:
+                    if not user_info.get(user_id):
+                        user_info[user_id] = cached_users.get_user_by_id(user_id).fullname
+                    users.append(user_info[user_id])
+                task['lock_users'] = users
+
+        print(page_tasks)
         valid_user_preferences = app_settings.upref_mdata.get_valid_user_preferences() \
             if app_settings.upref_mdata else {}
         language_options = valid_user_preferences.get('languages')
         location_options = valid_user_preferences.get('locations')
         rdancy_upd_exp = current_app.config.get('REDUNDANCY_UPDATE_EXPIRATION', 30)
+        print(args['display_columns'])
         data = dict(template='/projects/tasks_browse.html',
                     project=project_sanitized,
                     owner=owner_sanitized,
