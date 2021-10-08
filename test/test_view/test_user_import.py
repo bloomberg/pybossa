@@ -23,6 +23,7 @@ from factories import UserFactory
 from helper import web
 from mock import patch
 from pybossa.repositories import UserRepository
+from pybossa.view import account
 
 
 user_repo = UserRepository(db)
@@ -140,3 +141,14 @@ class TestUserImport(web.Helper):
         res = self.app.post(url, follow_redirects=True, content_type='multipart/form-data',
             data={'file': (StringIO(users), 'users.csv')})
         assert 'Missing user_type in metadata' in res.data, res.data
+
+    @with_context
+    def test_get_user_pref_and_metadata_no_form(self):
+        class MockForm():
+            data = {}
+
+        form = MockForm()
+        user_pref, metadata = account.get_user_pref_and_metadata(None, form)
+
+        assert user_pref == {}
+        assert metadata == {}
