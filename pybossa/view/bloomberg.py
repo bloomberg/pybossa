@@ -97,7 +97,7 @@ def handle_bloomberg_response():
                 user_data['password']    = generate_password()
                 user_data['admin']       = 'BSSO'
                 user_data['data_access'] = data_access
-                user_data['user_type'] = user_type
+                user_data['metadata'] = {'user_type': user_type}
                 create_account(user_data, auto_create=True)
                 current_app.logger.info('Account created using BSSO info: %s', str(user_data))
                 flash('A new account has been created for you using BSSO.')
