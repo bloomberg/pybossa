@@ -1557,9 +1557,15 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             for task in page_tasks:
                 users = []
                 for user_id in task['lock_users']:
-                    if not user_info.get(user_id):
-                        user_info[user_id] = cached_users.get_user_by_id(user_id).fullname
-                    users.append(user_info[user_id])
+                    try:
+                        # show fullname for users
+                        user_id = int(user_id)
+                        if not user_info.get(user_id):
+                            user_info[user_id] = cached_users.get_user_by_id(user_id).fullname
+                        users.append(user_info[user_id])
+                    except ValueError:
+                        # show ip address for anonymous users
+                        users.append(user_id)
                 task['lock_users'] = users
 
         print(page_tasks)

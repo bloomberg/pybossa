@@ -94,7 +94,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
     locked_tasks_in_project = {}
     for lock in get_locked_tasks_project(project_id):
-        locked_tasks_in_project.setdefault(int(lock["task_id"]), []).append(int(lock["user_id"]))
+        locked_tasks_in_project.setdefault(int(lock["task_id"]), []).append(lock["user_id"])
 
     args['user_id'] = user_id
     filters, filter_params = get_task_filters(args)
@@ -151,14 +151,8 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
             params["limit"] = limit
             params["offset"] = offset
 
-        # print(sql)
-        # print(params)
         results = session.execute(text(sql), params)
         task_rank_info = []
-
-        # locked_tasks = {}
-        # for lock in get_locked_tasks_project(project_id):
-        #     locked_tasks.setdefault(int(lock["task_id"]), []).append(lock["user_id"])
 
         for row in results:
             task = format_task(row, locked_tasks_in_project.get(row.id, []))
