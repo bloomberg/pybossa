@@ -29,6 +29,8 @@ from pybossa.cache.project_stats import update_stats
 from nose.tools import nottest, assert_raises
 from pybossa.cache.task_browse_helpers import get_task_filters, parse_tasks_browse_args
 
+from mock import patch
+
 class TestProjectsCache(Test):
 
 
@@ -435,6 +437,26 @@ class TestProjectsCache(Test):
 
 
     @with_context
+    @patch('pybossa.cache.projects.get_locked_tasks_project')
+    def test_browse_tasks_sort_by_task_locks(self, locks):
+        """Test CACHE PROJECTS browse_tasks returns tasks sorted by lock_status"""
+
+        owner = UserFactory.create(id=500)
+        project = ProjectFactory.create(owner=owner, short_name="testproject")
+        tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
+
+        locks.return_value = [{"task_id": tasks[0].id, "user_id": owner.id}]
+
+        count, cached_tasks = cached_projects.browse_tasks(project.id, {"order_by": "lock_status asc"})
+        assert count == 2
+        assert cached_tasks[1]["id"] == tasks[0].id
+
+        count, cached_tasks = cached_projects.browse_tasks(project.id, {"order_by": "lock_status desc"})
+        assert count == 2
+        assert cached_tasks[0]["id"] == tasks[0].id
+
+
+    @with_context
     def test_browse_tasks_returns_filtered_tasks_for_workers_0(self):
         """Test CACHE PROJECTS browse_tasks returns a subset of tasks
         from a given project"""
@@ -482,7 +504,7 @@ class TestProjectsCache(Test):
 
 
     @with_context
-    def test_browse_tasks_returns_filtered_sorted_tasks_for_workers(self):
+    def test_browse_tasks_returns_filtered_sorted_tasks_for_workers_0(self):
         """Test CACHE PROJECTS browse_tasks returns a subset of tasks
         from a given project and by default sort based on user profile"""
 
@@ -506,7 +528,7 @@ class TestProjectsCache(Test):
 
 
     @with_context
-    def test_browse_tasks_returns_filtered_sorted_tasks_for_workers_2(self):
+    def test_browse_tasks_returns_filtered_sorted_tasks_for_workers_1(self):
         """Test CACHE PROJECTS browse_tasks returns a subset of tasks
         from a given project and sort based on arguments"""
 
