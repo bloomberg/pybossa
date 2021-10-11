@@ -1568,13 +1568,11 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                         users.append(user_id)
                 task['lock_users'] = users
 
-        print(page_tasks)
         valid_user_preferences = app_settings.upref_mdata.get_valid_user_preferences() \
             if app_settings.upref_mdata else {}
         language_options = valid_user_preferences.get('languages')
         location_options = valid_user_preferences.get('locations')
         rdancy_upd_exp = current_app.config.get('REDUNDANCY_UPDATE_EXPIRATION', 30)
-        print(args['display_columns'])
         data = dict(template='/projects/tasks_browse.html',
                     project=project_sanitized,
                     owner=owner_sanitized,

@@ -117,6 +117,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     offset = args.get('offset') or 0
 
     if filter_user_prefs:
+        # construct task list for worker view
         params["assign_user"] = args["sql_params"]["assign_user"]
         results = session.execute(text(sql), params)
         task_rank_info = []
@@ -137,7 +138,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
             task = format_task(row)
             task_rank_info.append((task, score))
 
-        # get the available tasks for current worker
+        # get a list of available tasks for current worker
         total_count = len(task_rank_info)
         tasks = select_available_tasks(task_rank_info, locked_tasks_in_project,
                                         project_id, user_id, offset+limit,
@@ -145,7 +146,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         tasks = tasks[offset: offset+limit]
 
     else:
-        print(order_by)
+        # construct task browse page for owners/admins
         if not "lock_status" in order_by:
             sql += " LIMIT :limit OFFSET :offset"
             params["limit"] = limit
@@ -186,7 +187,6 @@ def select_available_tasks(task_rank_info, locked_tasks, project_id, user_id, nu
         task_rank_info = heapq.nlargest(num_tasks_needed+len(locked_tasks)+1,
                                         task_rank_info,
                                         key=lambda tup: tup[1])
-
     # remove tasks if task is unavailable to contribute
     tasks = []
     for t, score in task_rank_info:
@@ -197,12 +197,6 @@ def select_available_tasks(task_rank_info, locked_tasks, project_id, user_id, nu
         locked_users = locked_tasks.get(t["id"], [])
         if user_id in locked_users or len(locked_users) < remaining:
             tasks.append((t, score))
-        # if t["id"] in locked_tasks and user_id not in locked_tasks[t["id"]]:
-        # task_users_key = TASK_USERS_KEY_PREFIX.format(t["id"])
-        # locks = lock_manager.get_locks(task_users_key)
-        # unexpired_locks = [user for user, v in locks.iteritems() if float(v)-now > 0]
-        # if str(user_id) in unexpired_locks or len(unexpired_locks) < remaining:
-        #     tasks.append((t, score))
 
     return tasks
 
