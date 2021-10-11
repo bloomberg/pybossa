@@ -23,6 +23,7 @@ from factories import UserFactory
 from helper import web
 from mock import patch
 from pybossa.repositories import UserRepository
+from pybossa.view import account
 
 
 user_repo = UserRepository(db)
@@ -88,7 +89,7 @@ class TestUserImport(web.Helper):
         new_user = user_repo.get_by_name('newuser')
         assert new_user.fullname == 'New User'
         assert new_user.email_addr == 'new@user.com'
-        assert new_user.info['metadata']['user_type'] == None
+        assert new_user.info['metadata']['user_type'] == 'type_a'
 
     @with_context
     @patch('pybossa.forms.forms.app_settings.upref_mdata.get_upref_mdata_choices')
@@ -140,3 +141,14 @@ class TestUserImport(web.Helper):
         res = self.app.post(url, follow_redirects=True, content_type='multipart/form-data',
             data={'file': (StringIO(users), 'users.csv')})
         assert 'Missing user_type in metadata' in res.data, res.data
+
+    @with_context
+    def test_get_user_pref_and_metadata_no_form(self):
+        class MockForm():
+            data = {}
+
+        form = MockForm()
+        user_pref, metadata = account.get_user_pref_and_metadata(None, form)
+
+        assert user_pref == {}
+        assert metadata == {}
