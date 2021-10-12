@@ -79,7 +79,6 @@ def get_locked_tasks_project(project_id):
         user_id = user_key[0]
 
         # Get locks by user.
-        # user_tasks = get_user_tasks(user_id, TIMEOUT)
         user_tasks_key = get_user_tasks_key(user_id)
         user_tasks = lock_manager.get_locks(user_tasks_key)
         # Get task ids for the locks.
@@ -104,7 +103,6 @@ def get_locked_tasks_project(project_id):
                         "task_id": task_id,
                         "seconds_remaining": seconds_remaining
                     })
-    print("tasks: ", tasks)
     return tasks
 
 

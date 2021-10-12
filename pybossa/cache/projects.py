@@ -25,7 +25,7 @@ from pybossa.cache import memoize, cache, delete_memoized, delete_cached, \
     memoize_essentials, delete_memoized_essential, delete_cache_group
 from pybossa.cache.task_browse_helpers import get_task_filters, allowed_fields, user_meet_task_requirement, get_task_preference_score
 import app_settings
-from pybossa.redis_lock import LockManager, get_active_user_count, get_locked_tasks_project
+from pybossa.redis_lock import get_locked_tasks_project
 from pybossa.util import get_taskrun_date_range_sql_clause_params
 
 import heapq
@@ -72,6 +72,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
             return convert_utc_to_est(date).strftime('%m-%d-%y %H:%M')
 
     def format_task(row, lock_users=[]):
+        """convert database record to task dictionary and format data."""
         finish_time = format_date(row.ft)
         created = format_date(row.created)
         user_pref = row.user_pref or {}

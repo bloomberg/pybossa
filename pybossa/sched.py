@@ -531,13 +531,6 @@ def get_task_ids_project_id(task_ids):
     return []
 
 
-# def get_task_users_key(task_id):
-#     return TASK_USERS_KEY_PREFIX.format(task_id)
-
-
-# def get_user_tasks_key(user_id):
-#     return USER_TASKS_KEY_PREFIX.format(user_id)
-
 def get_locked_tasks_project(project_id):
     """Returns a list of locked tasks for a given project."""
     tasks = []
@@ -570,9 +563,6 @@ def get_locked_tasks_project(project_id):
                         "seconds_remaining": seconds_remaining
                     })
     return tasks
-
-# def get_task_id_project_id_key(task_id):
-#     return TASK_ID_PROJECT_ID_KEY_PREFIX.format(task_id)
 
 
 def get_task_id_and_duration_for_project_user(project_id, user_id):
