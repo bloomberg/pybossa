@@ -883,7 +883,7 @@ def details(short_name):
     num_remaining_task_runs = cached_projects.n_remaining_task_runs(project.id)
     num_expected_task_runs = cached_projects.n_expected_task_runs(project.id)
     num_gold_tasks = n_gold_tasks(project.id)
-    num_locked_tasks = len(get_locked_tasks(project))
+    num_locked_tasks = len({task["task_id"] for task in get_locked_tasks(project)})
     num_priority_one_tasks = n_priority_x_tasks(project.id)
 
     # all projects require password check
