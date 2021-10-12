@@ -84,7 +84,6 @@ def get_locked_tasks_project(project_id):
         # Get task ids for the locks.
         user_task_ids = user_tasks.keys()
         # Get project ids for the task ids.
-        # results = get_task_ids_project_id(user_task_ids)
         results = []
         keys = [get_task_id_project_id_key(t) for t in user_task_ids]
         if keys:
