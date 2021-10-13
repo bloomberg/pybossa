@@ -25,6 +25,7 @@ from pybossa.cache import memoize, cache, delete_memoized, delete_cached, \
     memoize_essentials, delete_memoized_essential, delete_cache_group
 from pybossa.cache.task_browse_helpers import get_task_filters, allowed_fields, user_meet_task_requirement, get_task_preference_score
 import app_settings
+from pybossa.redis_lock import get_locked_tasks_project
 from pybossa.util import get_taskrun_date_range_sql_clause_params
 
 import heapq
@@ -64,10 +65,37 @@ def get_top(n=4):
 @static_vars(allowed_fields=allowed_fields)
 def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwargs):
     """Cache browse tasks view for a project."""
+
+    # TODO: use Jinja filters to format date
+    def format_date(date):
+        if date is not None:
+            return convert_utc_to_est(date).strftime('%m-%d-%y %H:%M')
+
+    def format_task(row, lock_users=[]):
+        """convert database record to task dictionary and format data."""
+        finish_time = format_date(row.ft)
+        created = format_date(row.created)
+        user_pref = row.user_pref or {}
+        task = dict(id=row.id, n_task_runs=row.n_task_runs,
+                    n_answers=row.n_answers, priority_0=row.priority_0,
+                    finish_time=finish_time, created=created,
+                    calibration=row.calibration,
+                    userPrefLang=user_pref.get("languages", []),
+                    userPrefLoc=user_pref.get("locations", []),
+                    lock_users=lock_users)
+        task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
+        return task
+
+
+    order_by = args.get('order_by') or ""
     tasks = []
     total_count = task_count(project_id, args)
     if not total_count:
         return total_count, tasks
+
+    locked_tasks_in_project = {}
+    for lock in get_locked_tasks_project(project_id):
+        locked_tasks_in_project.setdefault(int(lock["task_id"]), []).append(lock["user_id"])
 
     args['user_id'] = user_id
     filters, filter_params = get_task_filters(args)
@@ -90,75 +118,76 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     offset = args.get('offset') or 0
 
     if filter_user_prefs:
+        # construct task list for worker view
         params["assign_user"] = args["sql_params"]["assign_user"]
-    else:
-        sql += " LIMIT :limit OFFSET :offset"
-        params["limit"] = limit
-        params["offset"] = offset
+        results = session.execute(text(sql), params)
+        task_rank_info = []
 
-    results = session.execute(text(sql), params)
-    task_rank_info = []
-
-    user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
-
-    for row in results:
-        score = 0
-        w_pref = row.worker_pref or {}
-        w_filter = row.worker_filter or {}
-        user_pref = row.user_pref or {}
-        # for worker-view, validate worker_filter and compute preference score
-        if filter_user_prefs:
+        user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
+        for row in results:
+            score = 0
+            w_pref = row.worker_pref or {}
+            w_filter = row.worker_filter or {}
+            user_pref = row.user_pref or {}
+            # validate worker_filter and compute preference score
             if not user_meet_task_requirement(row.id, w_filter, user_profile):
-                # exclude tasks for which the user is unqualified
                 continue
             if not args.get('order_by'):
                 # if there is no sort defined, sort task by preference scores
                 score = get_task_preference_score(w_pref, user_profile)
 
-        # TODO: use Jinja filters to format date
-        def format_date(date):
-            if date is not None:
-                return convert_utc_to_est(date).strftime('%m-%d-%y %H:%M')
-        finish_time = format_date(row.ft)
-        created = format_date(row.created)
-        task = dict(id=row.id, n_task_runs=row.n_task_runs,
-                    n_answers=row.n_answers, priority_0=row.priority_0,
-                    finish_time=finish_time, created=created,
-                    calibration=row.calibration,
-                    userPrefLang=user_pref.get("languages", []),
-                    userPrefLoc=user_pref.get("locations", []))
-        task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
-        task_rank_info.append((task, score))
+            task = format_task(row)
+            task_rank_info.append((task, score))
 
-    if filter_user_prefs:
-        # get the available tasks for current worker
+        # get a list of available tasks for current worker
         total_count = len(task_rank_info)
-        tasks = select_available_tasks(task_rank_info, project_id, user_id, offset+limit, args.get("order_by"))
+        tasks = select_available_tasks(task_rank_info, locked_tasks_in_project,
+                                        project_id, user_id, offset+limit,
+                                        args.get("order_by"))
         tasks = tasks[offset: offset+limit]
+
     else:
-        tasks = task_rank_info
+        # construct task browse page for owners/admins
+        if not "lock_status" in order_by:
+            sql += " LIMIT :limit OFFSET :offset"
+            params["limit"] = limit
+            params["offset"] = offset
+
+        results = session.execute(text(sql), params)
+        task_rank_info = []
+
+        for row in results:
+            task = format_task(row, locked_tasks_in_project.get(row.id, []))
+            lock_score = 0
+            if row.id in locked_tasks_in_project:
+                lock_score = -1
+            else:
+                lock_score = task['pct_status']
+
+            task_rank_info.append((task, lock_score))
+
+        if order_by == "lock_status asc":
+            task_rank_info = heapq.nlargest(offset+limit, task_rank_info,
+                                        key=lambda tup: tup[1])
+            tasks = task_rank_info[offset: offset+limit]
+        elif order_by == "lock_status desc":
+            task_rank_info = heapq.nsmallest(offset+limit, task_rank_info,
+                                        key=lambda tup: tup[1])
+            tasks = task_rank_info[offset: offset+limit]
+        else:
+            tasks = task_rank_info
 
     return total_count, [t[0] for t in tasks]
 
 
-def select_available_tasks(task_rank_info, project_id, user_id, num_tasks_needed, sort_by=None):
+def select_available_tasks(task_rank_info, locked_tasks, project_id, user_id, num_tasks_needed, sort_by=None):
     """execude tasks that had been locked and sort tasks based on preference score"""
-
-    from pybossa.redis_lock import LockManager, get_active_user_count
-
-    TASK_USERS_KEY_PREFIX = 'pybossa:project:task_requested:timestamps:{0}'
-    project = db.session.query(Project).get(project_id)
-    timeout = project.info.get("timeout") or ContributionsGuard.STAMP_TTL
-    users = get_active_user_count(project_id, sentinel.master)
-
-    lock_manager = LockManager(sentinel.master, timeout)
-    now = time.time()
 
     # if there is no sort parameter, use preference score to sort tasks
     if not sort_by:
-        task_rank_info = heapq.nlargest(num_tasks_needed+users+1, task_rank_info,
+        task_rank_info = heapq.nlargest(num_tasks_needed+len(locked_tasks)+1,
+                                        task_rank_info,
                                         key=lambda tup: tup[1])
-
     # remove tasks if task is unavailable to contribute
     tasks = []
     for t, score in task_rank_info:
@@ -166,10 +195,8 @@ def select_available_tasks(task_rank_info, project_id, user_id, num_tasks_needed
         if remaining == 0:
             # does not show completed tasks to users
             continue
-        task_users_key = TASK_USERS_KEY_PREFIX.format(t["id"])
-        locks = lock_manager.get_locks(task_users_key)
-        unexpired_locks = [user for user, v in locks.iteritems() if float(v)-now > 0]
-        if str(user_id) in unexpired_locks or len(unexpired_locks) < remaining:
+        locked_users = locked_tasks.get(t["id"], [])
+        if user_id in locked_users or len(locked_users) < remaining:
             tasks.append((t, score))
 
     return tasks

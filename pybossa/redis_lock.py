@@ -16,10 +16,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from time import time
 from datetime import timedelta
+from time import time
 
+from contributions_guard import ContributionsGuard
+from pybossa.core import sentinel
 
+TASK_USERS_KEY_PREFIX = 'pybossa:project:task_requested:timestamps:{0}'
+USER_TASKS_KEY_PREFIX = 'pybossa:user:task_acquired:timestamps:{0}'
+TASK_ID_PROJECT_ID_KEY_PREFIX = 'pybossa:task_id:project_id:{0}'
 ACTIVE_USER_KEY = 'pybossa:active_users_in_project:{}'
 EXPIRE_LOCK_DELAY = 5
 
@@ -27,6 +32,14 @@ EXPIRE_LOCK_DELAY = 5
 def get_active_user_key(project_id):
     return ACTIVE_USER_KEY.format(project_id)
 
+def get_task_users_key(task_id):
+    return TASK_USERS_KEY_PREFIX.format(task_id)
+
+def get_user_tasks_key(user_id):
+    return USER_TASKS_KEY_PREFIX.format(user_id)
+
+def get_task_id_project_id_key(task_id):
+    return TASK_ID_PROJECT_ID_KEY_PREFIX.format(task_id)
 
 def get_active_user_count(project_id, conn):
     now = time()
@@ -49,6 +62,47 @@ def unregister_active_user(project_id, user_id, conn):
     now = time()
     key = get_active_user_key(project_id)
     conn.hset(key, user_id, now + EXPIRE_LOCK_DELAY)
+
+
+def get_locked_tasks_project(project_id):
+    """Returns a list of locked tasks for a given project."""
+    tasks = []
+    redis_conn = sentinel.master
+    timeout = ContributionsGuard.STAMP_TTL
+    lock_manager = LockManager(sentinel.master, timeout)
+
+    # Get the active users key for this project.
+    key = get_active_user_key(project_id)
+
+    # Get the users for each locked task.
+    for user_key in redis_conn.hgetall(key).iteritems():
+        user_id = user_key[0]
+
+        # Get locks by user.
+        user_tasks_key = get_user_tasks_key(user_id)
+        user_tasks = lock_manager.get_locks(user_tasks_key)
+        # Get task ids for the locks.
+        user_task_ids = user_tasks.keys()
+        # Get project ids for the task ids.
+        results = []
+        keys = [get_task_id_project_id_key(t) for t in user_task_ids]
+        if keys:
+            results = sentinel.master.mget(keys)
+
+        # For each locked task, check if the lock is still active.
+        for task_id, task_project_id in zip(user_task_ids, results):
+            # Match the requested project id.
+            if int(task_project_id) == project_id:
+                # Calculate seconds remaining.
+                seconds_remaining = LockManager.seconds_remaining(user_tasks[task_id])
+                if seconds_remaining > 0:
+                    # This lock has not yet expired.
+                    tasks.append({
+                        "user_id": user_id,
+                        "task_id": task_id,
+                        "seconds_remaining": seconds_remaining
+                    })
+    return tasks
 
 
 class LockManager(object):
