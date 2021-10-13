@@ -1565,7 +1565,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                         users.append(user_info[user_id])
                     except ValueError:
                         # show ip address for anonymous users
-                        users.append(user_id)
+                        logger.info("Locked user does not have valid user id: %s", user_id)
                 task['lock_users'] = users
 
         valid_user_preferences = app_settings.upref_mdata.get_valid_user_preferences() \
