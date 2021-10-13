@@ -89,12 +89,12 @@ class TaskAPI(APIBase):
         if 'n_answers' not in data:
             project = project_repo.get(project_id)
             data['n_answers'] = project.get_default_n_answers()
-        if 'languages' in data:
-            data['languages'] = data['languages'].lower()
-        if 'location' in data:
-            data['location'] = data['location'].lower()
-        if 'email' in data:
-            data['email'] = data['email'].lower()
+        if 'user_pref' in data and 'languages' in data['user_pref']:
+            data['user_pref']['languages'] = data['user_pref']['languages'].lower()
+        if 'user_pref' in data and 'location' in data['user_pref']:
+            data['user_pref']['location'] = data['user_pref']['location'].lower()
+        if 'user_pref' in data and 'email' in data['user_pref']:
+            data['user_pref']['email'] = data['user_pref']['email'].lower()
 
         invalid_fields = validate_required_fields(info)
         if invalid_fields:
