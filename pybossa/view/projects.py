@@ -1543,6 +1543,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         args.pop("offset", None)
         args.pop('filter_by_wfilter_upref', None)
         args.pop('sql_params', None)
+        args.pop('user_id', None)
 
         if disp_info_columns:
             for task in page_tasks:
@@ -1550,6 +1551,22 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                 task['info'] = {}
                 for col in disp_info_columns:
                     task['info'][col] = task_info.get(col, '')
+
+        if 'lock_status' in args['display_columns']:
+            user_info = {}
+            for task in page_tasks:
+                users = []
+                for user_id in task['lock_users']:
+                    try:
+                        # show fullname for users
+                        user_id = int(user_id)
+                        if not user_info.get(user_id):
+                            user_info[user_id] = cached_users.get_user_by_id(user_id).fullname
+                        users.append(user_info[user_id])
+                    except ValueError:
+                        # show ip address for anonymous users
+                        current_app.logger.info("Locked user does not have valid user id: %s", user_id)
+                task['lock_users'] = users
 
         valid_user_preferences = app_settings.upref_mdata.get_valid_user_preferences() \
             if app_settings.upref_mdata else {}
