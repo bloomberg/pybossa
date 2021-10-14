@@ -86,15 +86,18 @@ class TaskAPI(APIBase):
                 'task_id': duplicate
             }
             raise Conflict(json.dumps(message))
+
+
+        # include in put as well!
         if 'n_answers' not in data:
             project = project_repo.get(project_id)
             data['n_answers'] = project.get_default_n_answers()
         if 'user_pref' in data and 'languages' in data['user_pref']:
-            data['user_pref']['languages'] = data['user_pref']['languages'].lower()
+            data['user_pref']['languages'] = [val.lower() for val in data['user_pref']['languages']]
         if 'user_pref' in data and 'location' in data['user_pref']:
-            data['user_pref']['location'] = data['user_pref']['location'].lower()
+            data['user_pref']['location'] = [val.lower() for val in data['user_pref']['location']]
         if 'user_pref' in data and 'email' in data['user_pref']:
-            data['user_pref']['email'] = data['user_pref']['email'].lower()
+            data['user_pref']['email'] = [val.lower() for val in data['user_pref']['email']]
 
         invalid_fields = validate_required_fields(info)
         if invalid_fields:
