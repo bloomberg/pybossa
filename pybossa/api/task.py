@@ -87,8 +87,6 @@ class TaskAPI(APIBase):
             }
             raise Conflict(json.dumps(message))
 
-
-        # include in put as well!
         if 'n_answers' not in data:
             project = project_repo.get(project_id)
             data['n_answers'] = project.get_default_n_answers()
