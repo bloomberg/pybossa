@@ -96,7 +96,7 @@ class TaskAPI(APIBase):
         if user_pref.get('languages'):
             user_pref['languages'] = [s.lower() for s in user_pref.get('languages', [])]
         if user_pref.get('location'):
-            user_pref['location'] = [s.lower() for s in user_pref.get('location', [])]
+            user_pref['locations'] = [s.lower() for s in user_pref.get('locations', [])]
         if user_pref.get('assign_user'):
             user_pref['assign_user'] = [s.lower() for s in user_pref.get('assign_user', [])]
         invalid_fields = validate_required_fields(info)
