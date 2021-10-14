@@ -92,13 +92,13 @@ class TaskAPI(APIBase):
         if 'n_answers' not in data:
             project = project_repo.get(project_id)
             data['n_answers'] = project.get_default_n_answers()
-        if 'user_pref' in data and 'languages' in data['user_pref']:
-            data['user_pref']['languages'] = [val.lower() for val in data['user_pref']['languages']]
-        if 'user_pref' in data and 'location' in data['user_pref']:
-            data['user_pref']['location'] = [val.lower() for val in data['user_pref']['location']]
-        if 'user_pref' in data and 'email' in data['user_pref']:
-            data['user_pref']['email'] = [val.lower() for val in data['user_pref']['email']]
-
+        user_pref = data.get('user_pref', {})
+        if user_pref.get('languages'):
+            user_pref['languages'] = [s.lower() for s in user_pref.get('languages', [])]
+        if user_pref.get('location'):
+            user_pref['location'] = [s.lower() for s in user_pref.get('location', [])]
+        if user_pref.get('assign_user'):
+            user_pref['assign_user'] = [s.lower() for s in user_pref.get('assign_user', [])]
         invalid_fields = validate_required_fields(info)
         if invalid_fields:
             raise BadRequest('Missing or incorrect required fields: {}'
