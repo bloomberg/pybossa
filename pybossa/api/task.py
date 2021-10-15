@@ -88,15 +88,14 @@ class TaskAPI(APIBase):
             raise Conflict(json.dumps(message))
 
 
-        # include in put as well!
         if 'n_answers' not in data:
             project = project_repo.get(project_id)
             data['n_answers'] = project.get_default_n_answers()
         user_pref = data.get('user_pref', {})
         if user_pref.get('languages'):
             user_pref['languages'] = [s.lower() for s in user_pref.get('languages', [])]
-        if user_pref.get('location'):
-            user_pref['location'] = [s.lower() for s in user_pref.get('location', [])]
+        if user_pref.get('locations'):
+            user_pref['locations'] = [s.lower() for s in user_pref.get('locations', [])]
         if user_pref.get('assign_user'):
             user_pref['assign_user'] = [s.lower() for s in user_pref.get('assign_user', [])]
         invalid_fields = validate_required_fields(info)
