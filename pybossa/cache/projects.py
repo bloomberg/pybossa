@@ -80,8 +80,8 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     n_answers=row.n_answers, priority_0=row.priority_0,
                     finish_time=finish_time, created=created,
                     calibration=row.calibration,
-                    userPrefLang=user_pref.get("languages", []),
-                    userPrefLoc=user_pref.get("locations", []),
+                    userPrefLang=", ".join(user_pref.get("languages", [])),
+                    userPrefLoc=", ".join(user_pref.get("locations", [])),
                     lock_users=lock_users)
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
         return task
