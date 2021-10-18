@@ -680,6 +680,20 @@ class TestTaskAPI(TestAPI):
         assert_equal(out.info, 'my root task data'), out
         assert_equal(out.project_id, project.id)
 
+        # test user_pref 
+        root_data = dict(project_id=project.id, info='my root task data')
+        root_data['user_pref'] = dict(languages=["Traditional Chinese"], locations=["United States"], assign_user=["email@domain.com"])
+        res = self.app.post('/api/task?api_key=' + admin.api_key,
+                            data=json.dumps(root_data))
+        assert res.data, res
+        datajson = json.loads(res.data)
+        out = task_repo.get_task(datajson['id'])
+        assert out, out
+        assert_equal(out.info, 'my root task data'), out
+        assert_equal(out.project_id, project.id)
+
+
+
         # POST with not JSON data
         url = '/api/task?api_key=%s' % user.api_key
         res = self.app.post(url, data=data)
