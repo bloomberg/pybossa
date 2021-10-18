@@ -1,8 +1,8 @@
 import json
 
-from default import db, with_context
-from factories import ProjectFactory
-from helper import web
+from test import db, with_context
+from test.factories import ProjectFactory
+from test.helper import web
 from pybossa.repositories import ProjectRepository
 
 project_repo = ProjectRepository(db)

@@ -68,8 +68,11 @@ class TestSetupScheduledJobs(object):
         schedule_job(a_job, self.scheduler)
         schedule_job(another_job, self.scheduler)
         sched_jobs = self.scheduler.get_jobs()
+
+        # Job' object has no attribute '__name__', use func_name instead
         job_func_names = [job.func_name for job in sched_jobs]
-        module_name = 'test_jobs.test_schedule_jobs'
+
+        module_name = 'test.test_jobs.test_schedule_jobs'
 
         jobs = list(self.scheduler.get_jobs())
         assert len(jobs) == 2, len(jobs)

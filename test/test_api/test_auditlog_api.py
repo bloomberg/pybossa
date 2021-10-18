@@ -16,9 +16,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import db, with_context
-from test_api import TestAPI
-from factories import ProjectFactory, AuditlogFactory, UserFactory
+from test import db, with_context
+from test.test_api import TestAPI
+from test.factories import ProjectFactory, AuditlogFactory, UserFactory
 
 from pybossa.repositories import ProjectRepository
 from pybossa.repositories import AuditlogRepository

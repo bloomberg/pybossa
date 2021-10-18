@@ -17,9 +17,9 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from helper import web
-from default import with_context
-from mock import patch
+from test.helper import web
+from test import with_context
+from unittest.mock import patch
 
 
 class TestHealthcheckView(web.Helper):

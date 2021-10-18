@@ -211,7 +211,7 @@ class Importer(object):
                 self.upload_private_data(task_data, project.id)
 
                 task = Task(project_id=project.id, n_answers=n_answers)
-                [setattr(task, k, v) for k, v in task_data.iteritems()]
+                [setattr(task, k, v) for k, v in task_data.items()]
 
                 gold_answers = task_data.pop('gold_answers', None)
                 set_gold_answers(task, gold_answers)
@@ -261,7 +261,7 @@ class Importer(object):
 
     def get_all_importer_names(self):
         """Get all importer names."""
-        return self._importers.keys()
+        return list(self._importers.keys())
 
     def get_autoimporter_names(self):
         """Get autoimporter names."""
@@ -270,7 +270,7 @@ class Importer(object):
 
     def set_importers(self, importers):
         self._importers = \
-            {key: val for key, val in self._importers.iteritems()
+            {key: val for key, val in self._importers.items()
              if key in importers}
 
 
@@ -320,7 +320,7 @@ class UserImporter(object):
 
     def get_all_importer_names(self):
         """Get all importer names."""
-        return self._importers.keys()
+        return list(self._importers.keys())
 
     def _create_user_form(self, user_data):
         from pybossa.view.account import get_project_choices
@@ -370,9 +370,9 @@ class UserImporter(object):
                 form = self._create_user_form(user_data)
                 if not form.validate():
                     failed_users += 1
-                    current_app.logger.error(u'Failed to import user {}, {}'
+                    current_app.logger.error('Failed to import user {}, {}'
                         .format(full_name, form.errors))
-                    invalid_values.update(form.errors.keys())
+                    invalid_values.update(list(form.errors.keys()))
                     continue
                 user_data['metadata']['admin'] = current_user.name
                 user_data['password'] = form.password.data

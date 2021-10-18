@@ -24,11 +24,11 @@ from pybossa.model.task import Task
 from pybossa.model.task_run import TaskRun
 from pybossa.model.counter import Counter
 from pybossa.core import db, sentinel, project_repo, task_repo
-from redis_lock import (LockManager, get_active_user_key, get_user_tasks_key,
+from .redis_lock import (LockManager, get_active_user_key, get_user_tasks_key,
                         get_task_users_key, get_task_id_project_id_key,
                         register_active_user, unregister_active_user,
                         get_active_user_count)
-from contributions_guard import ContributionsGuard
+from .contributions_guard import ContributionsGuard
 from werkzeug.exceptions import BadRequest, Forbidden
 import random
 import json
@@ -475,7 +475,7 @@ def _lock_task_for_user(task_id, project_id, user_id, timeout, calibration=False
 
 def release_user_locks_for_project(user_id, project_id):
     user_tasks = get_user_tasks(user_id, TIMEOUT)
-    user_task_ids = user_tasks.keys()
+    user_task_ids = list(user_tasks.keys())
     results = get_task_ids_project_id(user_task_ids)
     task_ids = []
     for task_id, task_project_id in zip(user_task_ids, results):
@@ -531,6 +531,19 @@ def get_task_ids_project_id(task_ids):
     return []
 
 
+def get_task_users_key(task_id):
+    # bytes to unicode string
+    if type(task_id) == bytes:
+        task_id = task_id.decode()
+    return TASK_USERS_KEY_PREFIX.format(task_id)
+
+
+def get_user_tasks_key(user_id):
+    # bytes to unicode string
+    if type(user_id) == bytes:
+        user_id = user_id.decode()
+    return USER_TASKS_KEY_PREFIX.format(user_id)
+
 def get_locked_tasks_project(project_id):
     """Returns a list of locked tasks for a given project."""
     tasks = []
@@ -540,13 +553,16 @@ def get_locked_tasks_project(project_id):
     key = get_active_user_key(project_id)
 
     # Get the users for each locked task.
-    for user_key in redis_conn.hgetall(key).iteritems():
+    for user_key in redis_conn.hgetall(key).items():
         user_id = user_key[0]
+        # Data from Redis is bytes, thus convert it to unicode string
+        if type(user_id) == bytes:
+            user_id = user_id.decode()
 
         # Get locks by user.
         user_tasks = get_user_tasks(user_id, TIMEOUT)
         # Get task ids for the locks.
-        user_task_ids = user_tasks.keys()
+        user_task_ids = list(user_tasks.keys())
         # Get project ids for the task ids.
         results = get_task_ids_project_id(user_task_ids)
         # For each locked task, check if the lock is still active.
@@ -568,7 +584,7 @@ def get_locked_tasks_project(project_id):
 def get_task_id_and_duration_for_project_user(project_id, user_id):
     """Returns the max seconds remaining locked task for a user and project."""
     user_tasks = get_user_tasks(user_id, TIMEOUT)
-    user_task_ids = user_tasks.keys()
+    user_task_ids = list(user_tasks.keys())
     results = get_task_ids_project_id(user_task_ids)
     max_seconds_task_id = -1
     max_seconds_remaining = float('-inf')

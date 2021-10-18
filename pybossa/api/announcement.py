@@ -22,7 +22,7 @@ This package adds GET, POST, PUT and DELETE methods for:
     * announcement
 
 """
-from api_base import APIBase
+from .api_base import APIBase
 from pybossa.model.announcement import Announcement
 from pybossa.core import user_repo, project_repo
 from flask_login import current_user

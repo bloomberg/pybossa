@@ -214,7 +214,7 @@ class Exporter(object):
         if obj_generator is not None:
             with tempfile.NamedTemporaryFile() as datafile:
                 for line in obj_generator:
-                    datafile.write(str(line))
+                    datafile.write(str(line).encode())  # accepts only bytes
                 datafile.flush()
                 obj_generator.close()
 

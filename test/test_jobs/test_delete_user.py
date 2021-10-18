@@ -17,11 +17,11 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from default import Test, with_context, FakeResponse
-from factories import UserFactory
-from pybossa.jobs import delete_account, send_mail
+from test import Test, with_context, FakeResponse
+from test.factories import UserFactory
+from pybossa.jobs import delete_account
 from pybossa.core import user_repo
-from mock import patch
+from unittest.mock import patch
 from flask import current_app
 
 @patch('pybossa.jobs.mail')

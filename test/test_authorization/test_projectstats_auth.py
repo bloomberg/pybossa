@@ -16,14 +16,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, assert_not_raises, with_context
+from test import Test, assert_not_raises, with_context, with_request_context
 from pybossa.auth import ensure_authorized_to
 from nose.tools import assert_raises
 from werkzeug.exceptions import Forbidden, Unauthorized
-from mock import patch
-from test_authorization import mock_current_user
-from factories import ProjectFactory, UserFactory
-from pybossa.model.project_stats import ProjectStats
+from unittest.mock import patch
+from test.test_authorization import mock_current_user
+from test.factories import ProjectFactory
 import pybossa.cache.project_stats as stats
 
 
@@ -38,28 +37,28 @@ class TestProjectStatsAuthorization(Test):
       stats.update_stats(project.id)
       return stats.get_stats(project.id, full=True)
 
-    @with_context
+    @with_request_context
     @patch('pybossa.auth.current_user', new=mock_anonymous)
     def test_anonymous_user_can_read_projectstats(self):
         """Test anonymous users can read projectstats"""
         ps = self.prepare_stats()
         assert_not_raises(Exception, ensure_authorized_to, 'read', ps)
 
-    @with_context
+    @with_request_context
     @patch('pybossa.auth.current_user', new=mock_authenticated)
     def test_authenticated_user_can_read_projectstats(self):
         """Test authenticated users can read projectstats"""
         ps = self.prepare_stats()
         assert_not_raises(Exception, ensure_authorized_to, 'read', ps)
 
-    @with_context
+    @with_request_context
     @patch('pybossa.auth.current_user', new=mock_admin)
     def test_admin_user_can_read_projectstats(self):
         """Test admin users can read projectstats"""
         ps = self.prepare_stats()
         assert_not_raises(Exception, ensure_authorized_to, 'read', ps)
 
-    @with_context
+    @with_request_context
     @patch('pybossa.auth.current_user', new=mock_anonymous)
     def test_anonymous_user_cannot_crud_projectstats(self):
         """Test anonymous users cannot crud projectstats"""
@@ -68,7 +67,7 @@ class TestProjectStatsAuthorization(Test):
         assert_raises(Unauthorized, ensure_authorized_to, 'update', ps)
         assert_raises(Unauthorized, ensure_authorized_to, 'delete', ps)
 
-    @with_context
+    @with_request_context
     @patch('pybossa.auth.current_user', new=mock_authenticated)
     def test_authenticated_user_cannot_crud_projectstats(self):
         """Test authenticated users cannot crud project stats"""
@@ -77,7 +76,7 @@ class TestProjectStatsAuthorization(Test):
         assert_raises(Forbidden, ensure_authorized_to, 'update', ps)
         assert_raises(Forbidden, ensure_authorized_to, 'delete', ps)
 
-    @with_context
+    @with_request_context
     @patch('pybossa.auth.current_user', new=mock_admin)
     def test_admin_user_cannot_crud_projectstats(self):
         """Test admin users cannot crud project stats"""

@@ -15,17 +15,17 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from default import db, with_context
-from helper import web
-from pybossa.jobs import import_tasks
-from factories import ProjectFactory
-from pybossa.repositories import UserRepository
+from unittest.mock import patch
+
 from pybossa.repositories import ProjectRepository
-from mock import patch, MagicMock
-from mock import patch
+from pybossa.repositories import UserRepository
+from test import db, with_context
+from test.factories import ProjectFactory
+from test.helper import web
 
 project_repo = ProjectRepository(db)
 user_repo = UserRepository(db)
+
 
 class TestAutoimporterAccessAndResponses(web.Helper):
 
@@ -331,13 +331,13 @@ class TestAutoimporterBehaviour(web.Helper):
 
         res = self.app.get(url, follow_redirects=True)
 
-        assert expected_text in res.data
-        assert 'CSV' in res.data
-        #assert 'Google Drive Spreadsheet' in res.data
-        #assert 'EpiCollect Plus Project' in res.data
-        assert 'Flickr' in res.data
-        assert 'Twitter' in res.data
-        assert 'Dropbox' not in res.data
+        assert expected_text in str(res.data)
+        assert 'CSV' in str(res.data)
+        #assert 'Google Drive Spreadsheet' in str(res.data)
+        #assert 'EpiCollect Plus Project' in str(res.data)
+        assert 'Flickr' in str(res.data)
+        assert 'Twitter' in str(res.data)
+        assert 'Dropbox' not in str(res.data)
 
 
     @with_context
@@ -351,7 +351,7 @@ class TestAutoimporterBehaviour(web.Helper):
 
         res = self.app.get(url, follow_redirects=True)
 
-        assert 'Flickr' not in res.data
+        assert 'Flickr' not in str(res.data)
 
 
     @with_context
@@ -432,7 +432,7 @@ class TestAutoimporterBehaviour(web.Helper):
 
         res = self.app.get(url, follow_redirects=True)
 
-        assert "You currently have the following autoimporter" in res.data
+        assert "You currently have the following autoimporter" in str(res.data)
 
 
     @with_context
@@ -500,4 +500,4 @@ class TestAutoimporterBehaviour(web.Helper):
         res = self.app.get(url)
         login_url = '/flickr/?next=%2Fproject%2F%25E2%259C%2593project1%2Ftasks%2Fautoimporter%3Ftype%3Dflickr'
 
-        assert login_url in res.data
+        assert login_url in str(res.data)

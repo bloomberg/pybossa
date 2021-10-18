@@ -16,12 +16,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 from flask import Response
-from default import Test, assert_not_raises, with_context
+from test import Test, assert_not_raises, with_context
 from pybossa.view.twitter import manage_user, manage_user_login, \
     manage_user_no_login
 from pybossa.core import user_repo
-from mock import patch
-from factories import UserFactory
+from unittest.mock import patch
+from test.factories import UserFactory
 
 
 class TestTwitter(Test):
@@ -177,7 +177,7 @@ class TestTwitter(Test):
     @with_context
     @patch('pybossa.view.twitter.twitter.oauth')
     def test_twitter_signin_with_no_login_param(self, oauth):
-        oauth.authorize.return_value = Response(302)
+        oauth.authorize.return_value = Response(status=302)
         self.app.get('/twitter/?no_login=1')
 
         oauth.authorize.assert_called_once_with(
@@ -192,7 +192,7 @@ class TestTwitter(Test):
             'oauth_token': 'token',
             'oauth_token_secret': 'secret'
             }
-        manage_user_no_login.return_value = Response(302)
+        manage_user_no_login.return_value = Response(status=302)
         self.app.get('/twitter/oauth-authorized?no_login=1')
 
         manage_user_no_login.assert_called_once_with(
@@ -210,7 +210,7 @@ class TestTwitter(Test):
             'screen_name': 'john_doe',
             'user_id': 1
             }
-        manage_user_no_login.return_value = Response(302)
+        manage_user_no_login.return_value = Response(status=302)
 
         assert_not_raises(Exception, self.app.get, '/twitter/oauth-authorized')
 

@@ -24,7 +24,7 @@ This package adds GET, POST, PUT and DELETE methods for:
 """
 from werkzeug.exceptions import BadRequest
 from pybossa.model.result import Result
-from api_base import APIBase
+from .api_base import APIBase
 from pybossa.core import task_repo, result_repo
 from pybossa.model import make_timestamp
 from pybossa.auth import ensure_authorized_to

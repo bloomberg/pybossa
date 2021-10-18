@@ -1,20 +1,20 @@
 #!/usr/bin/env python
+import inspect
+import optparse
 import os
 import sys
-import optparse
-import inspect
 
-#import pybossa.model as model
-from pybossa.core import db, create_app
-from pybossa.model.project import Project
-from pybossa.model.user import User
-from pybossa.model.category import Category
-from pybossa.util import get_avatar_url
-
-from alembic.config import Config
 from alembic import command
+from alembic.config import Config
 from html2text import html2text
 from sqlalchemy.sql import text
+
+# import pybossa.model as model
+from pybossa.core import db, create_app
+from pybossa.model.category import Category
+from pybossa.model.project import Project
+from pybossa.model.user import User
+from pybossa.util import get_avatar_url
 
 app = create_app(run_as_server=False)
 
@@ -53,11 +53,11 @@ def fixtures():
     '''Create some fixtures!'''
     with app.app_context():
         user = User(
-            name=u'tester',
-            email_addr=u'tester@tester.org',
+            name='tester',
+            email_addr='tester@tester.org',
             api_key='tester'
             )
-        user.set_password(u'tester')
+        user.set_password('tester')
         db.session.add(user)
         db.session.commit()
 
@@ -89,7 +89,7 @@ def get_thumbnail_urls():
                 thumbnail = project.info.get('thumbnail')
                 container = project.info.get('container')
                 if (thumbnail and container):
-                    print "Updating project: %s" % project.short_name
+                    print("Updating project: %s" % project.short_name)
                     thumbnail_url = get_avatar_url(upload_method, thumbnail,
                                                    container,
                                                    app.config.get('AVATAR_ABSOLUTE',
@@ -98,7 +98,7 @@ def get_thumbnail_urls():
                     db.session.merge(project)
                     db.session.commit()
         else:
-            print "Add SERVER_NAME to your config file."
+            print("Add SERVER_NAME to your config file.")
 
 def get_avatars_url():
     """Update db records with full urls for avatar and thumbnail
@@ -113,7 +113,7 @@ def get_avatars_url():
                 avatar = user.info.get('avatar')
                 container = user.info.get('container')
                 if (avatar and container):
-                    print "Updating user: %s" % user.name
+                    print("Updating user: %s" % user.name)
                     avatar_url = get_avatar_url(upload_method, avatar,
                                                 container,
                                                 app.config.get('AVATAR_ABSOLUTE'))
@@ -121,7 +121,7 @@ def get_avatars_url():
                     db.session.merge(user)
                     db.session.commit()
         else:
-            print "Add SERVER_NAME to your config file."
+            print("Add SERVER_NAME to your config file.")
 
 
 def fix_task_date():
@@ -135,7 +135,7 @@ def fix_task_date():
         for task in tasks:
             # It's in miliseconds
             timestamp = int(re.findall(r'\d+', task.created)[0])
-            print timestamp
+            print(timestamp)
             # Postgresql expects this format 2015-05-21T13:19:06.471074
             fixed_created = datetime.fromtimestamp(timestamp/1000)\
                                     .replace(microsecond=timestamp%1000*1000)\
@@ -151,25 +151,25 @@ def delete_hard_bounces():
     with app.app_context():
         with open('email.csv', 'r') as f:
             emails = f.readlines()
-            print "Number of users: %s" % len(emails)
+            print("Number of users: %s" % len(emails))
             for email in emails:
                 usr = db.session.query(User).filter_by(email_addr=email.rstrip()).first()
                 if usr and len(usr.projects) == 0 and len(usr.task_runs) == 0:
-                    print "Deleting user: %s" % usr.email_addr
+                    print("Deleting user: %s" % usr.email_addr)
                     del_users +=1
                     db.session.delete(usr)
                     db.session.commit()
                 else:
                     if usr:
                         if len(usr.projects) > 0:
-                            print "Invalid email (user owns app): %s" % usr.email_addr
+                            print("Invalid email (user owns app): %s" % usr.email_addr)
                         if len(usr.task_runs) > 0:
-                            print "Invalid email (user has contributed): %s" % usr.email_addr
+                            print("Invalid email (user has contributed): %s" % usr.email_addr)
                         fake_emails +=1
                         usr.valid_email = False
                         db.session.commit()
-        print "%s users were deleted" % del_users
-        print "%s users have fake emails" % fake_emails
+        print("%s users were deleted" % del_users)
+        print("%s users have fake emails" % fake_emails)
 
 
 def bootstrap_avatars():
@@ -178,28 +178,31 @@ def bootstrap_avatars():
     import requests
     import os
     import time
-    from urlparse import urlparse
-    from PIL import Image
+    from urllib.parse import urlparse
 
     def get_gravatar_url(email, size):
         # import code for encoding urls and generating md5 hashes
-        import urllib, hashlib
+        import urllib.parse, urllib.error, hashlib
+
+        # Convert email to bytes string
+        if type(email) == str:
+            email = email.encode()
 
         # construct the url
         gravatar_url = "http://www.gravatar.com/avatar/" + hashlib.md5(email.lower()).hexdigest() + "?"
-        gravatar_url += urllib.urlencode({'d':404, 's':str(size)})
+        gravatar_url += urllib.parse.urlencode({'d':404, 's':str(size)})
         return gravatar_url
 
     with app.app_context():
         if app.config['UPLOAD_METHOD'] == 'local':
             users = User.query.order_by('id').all()
-            print "Downloading avatars for %s users" % len(users)
+            print("Downloading avatars for %s users" % len(users))
             for u in users:
-                print "Downloading avatar for %s ..." % u.name
+                print("Downloading avatar for %s ..." % u.name)
                 container = "user_%s" % u.id
                 path = os.path.join(app.config.get('UPLOAD_FOLDER'), container)
                 try:
-                    print get_gravatar_url(u.email_addr, 100)
+                    print(get_gravatar_url(u.email_addr, 100))
                     r = requests.get(get_gravatar_url(u.email_addr, 100), stream=True)
                     if r.status_code == 200:
                         if not os.path.isdir(path):
@@ -212,20 +215,20 @@ def bootstrap_avatars():
                         u.info['avatar'] = filename
                         u.info['container'] = container
                         db.session.commit()
-                        print "Done!"
+                        print("Done!")
                     else:
-                        print "No Gravatar, this user will use the placeholder."
+                        print("No Gravatar, this user will use the placeholder.")
                 except:
                     raise
-                    print "No gravatar, this user will use the placehoder."
+                    print("No gravatar, this user will use the placehoder.")
 
 
             apps = Project.query.all()
-            print "Downloading avatars for %s projects" % len(apps)
+            print("Downloading avatars for %s projects" % len(apps))
             for a in apps:
                 if a.info.get('thumbnail') and not a.info.get('container'):
-                    print "Working on project: %s ..." % a.short_name
-                    print "Saving avatar: %s ..." % a.info.get('thumbnail')
+                    print("Working on project: %s ..." % a.short_name)
+                    print("Saving avatar: %s ..." % a.info.get('thumbnail'))
                     url = urlparse(a.info.get('thumbnail'))
                     if url.scheme and url.netloc:
                         container = "user_%s" % a.owner_id
@@ -243,9 +246,9 @@ def bootstrap_avatars():
                                 a.info['thumbnail'] = filename
                                 a.info['container'] = container
                                 db.session.commit()
-                                print "Done!"
+                                print("Done!")
                         except:
-                            print "Something failed, this project will use the placehoder."
+                            print("Something failed, this project will use the placehoder.")
         if app.config['UPLOAD_METHOD'] == 'rackspace':
             import pyrax
             import tempfile
@@ -256,13 +259,13 @@ def bootstrap_avatars():
 
             cf = pyrax.cloudfiles
             users = User.query.all()
-            print "Downloading avatars for %s users" % len(users)
+            print("Downloading avatars for %s users" % len(users))
             dirpath = tempfile.mkdtemp()
             for u in users:
                 try:
                     r = requests.get(get_gravatar_url(u.email_addr, 100), stream=True)
                     if r.status_code == 200:
-                        print "Downloading avatar for %s ..." % u.name
+                        print("Downloading avatar for %s ..." % u.name)
                         container = "user_%s" % u.id
                         try:
                             cf.get_container(container)
@@ -283,19 +286,19 @@ def bootstrap_avatars():
                         u.info['avatar'] = filename
                         u.info['container'] = container
                         db.session.commit()
-                        print "Done!"
+                        print("Done!")
                     else:
-                        print "No Gravatar, this user will use the placeholder."
+                        print("No Gravatar, this user will use the placeholder.")
                 except:
-                    print "No gravatar, this user will use the placehoder."
+                    print("No gravatar, this user will use the placehoder.")
 
 
             apps = Project.query.all()
-            print "Downloading avatars for %s projects" % len(apps)
+            print("Downloading avatars for %s projects" % len(apps))
             for a in apps:
                 if a.info.get('thumbnail') and not a.info.get('container'):
-                    print "Working on project: %s ..." % a.short_name
-                    print "Saving avatar: %s ..." % a.info.get('thumbnail')
+                    print("Working on project: %s ..." % a.short_name)
+                    print("Saving avatar: %s ..." % a.info.get('thumbnail'))
                     url = urlparse(a.info.get('thumbnail'))
                     if url.scheme and url.netloc:
                         container = "user_%s" % a.owner_id
@@ -322,9 +325,9 @@ def bootstrap_avatars():
                                 a.info['thumbnail'] = filename
                                 a.info['container'] = container
                                 db.session.commit()
-                                print "Done!"
+                                print("Done!")
                         except:
-                            print "Something failed, this project will use the placehoder."
+                            print("Something failed, this project will use the placehoder.")
 
 
 def resize_avatars():
@@ -347,7 +350,7 @@ def resize_avatars():
             user_id_updated_avatars = t.readlines()
             t.close()
         users = User.query.filter(~User.id.in_(user_id_updated_avatars)).all()
-        print "Downloading avatars for %s users" % len(users)
+        print("Downloading avatars for %s users" % len(users))
         dirpath = tempfile.mkdtemp()
         f = open('user_id_updated_avatars.txt', 'a')
         for u in users:
@@ -361,7 +364,7 @@ def resize_avatars():
                         avatar_url = "%s/%s" % (cont.cdn_ssl_uri, u.info['avatar'])
                     r = requests.get(avatar_url, stream=True)
                     if r.status_code == 200:
-                        print "Downloading avatar for %s ..." % u.name
+                        print("Downloading avatar for %s ..." % u.name)
                         #container = "user_%s" % u.id
                         #try:
                         #    cf.get_container(container)
@@ -380,9 +383,9 @@ def resize_avatars():
                         scale_down_img = tmp.convert('P', colors=255, palette=Image.ADAPTIVE)
                         scale_down_img.save(os.path.join(dirpath, filename), format='png')
 
-                        print "New scaled down image created!"
-                        print "%s" % (os.path.join(dirpath, filename))
-                        print "---"
+                        print("New scaled down image created!")
+                        print("%s" % (os.path.join(dirpath, filename)))
+                        print("---")
 
                         chksum = pyrax.utils.get_checksum(os.path.join(dirpath,
                                                                        filename))
@@ -401,17 +404,17 @@ def resize_avatars():
                         # delete old avatar
                         obj = cont.get_object(old_avatar)
                         obj.delete()
-                        print "Done!"
+                        print("Done!")
                     else:
-                        print "No Avatar found."
+                        print("No Avatar found.")
                 else:
                     f.write("%s\n" % u.id)
-                    print "No avatar found"
+                    print("No avatar found")
             except pyrax.exceptions.NoSuchObject:
-                print "Previous avatar not found, so not deleting it."
+                print("Previous avatar not found, so not deleting it.")
             except:
                 raise
-                print "No Avatar, this user will use the placehoder."
+                print("No Avatar, this user will use the placehoder.")
         f.close()
 
 def resize_project_avatars():
@@ -441,7 +444,7 @@ def resize_project_avatars():
             f.close()
         apps = Project.query.filter(~Project.id.in_(project_id_updated_thumbnails)).all()
         #apps = [Project.query.get(2042)]
-        print "Downloading avatars for %s projects" % len(apps)
+        print("Downloading avatars for %s projects" % len(apps))
         dirpath = tempfile.mkdtemp()
         f = open(file_name, 'a')
         for a in apps:
@@ -451,7 +454,7 @@ def resize_project_avatars():
                    avatar_url = "%s/%s" % (cont.cdn_ssl_uri, a.info['thumbnail'])
                    r = requests.get(avatar_url, stream=True)
                    if r.status_code == 200:
-                       print "Downloading avatar for %s ..." % a.short_name
+                       print("Downloading avatar for %s ..." % a.short_name)
                        prefix = time.time()
                        filename = "app_%s_thumbnail_%s.png" % (a.id, prefix)
                        with open(os.path.join(dirpath, filename), 'wb') as f:
@@ -464,9 +467,9 @@ def resize_project_avatars():
                        scale_down_img = tmp.convert('P', colors=255, palette=Image.ADAPTIVE)
                        scale_down_img.save(os.path.join(dirpath, filename), format='png')
 
-                       print "New scaled down image created!"
-                       print "%s" % (os.path.join(dirpath, filename))
-                       print "---"
+                       print("New scaled down image created!")
+                       print("%s" % (os.path.join(dirpath, filename)))
+                       print("---")
 
                        chksum = pyrax.utils.get_checksum(os.path.join(dirpath,
                                                                       filename))
@@ -484,17 +487,17 @@ def resize_project_avatars():
                        # delete old avatar
                        obj = cont.get_object(old_avatar)
                        obj.delete()
-                       print "Done!"
+                       print("Done!")
                        cached_apps.get_app(a.short_name)
                    else:
-                       print "No Avatar found."
+                       print("No Avatar found.")
                 else:
-                   print "No avatar found."
+                   print("No avatar found.")
             except pyrax.exceptions.NoSuchObject:
-                print "Previous avatar not found, so not deleting it."
+                print("Previous avatar not found, so not deleting it.")
             except:
                 raise
-                print "No Avatar, this project will use the placehoder."
+                print("No Avatar, this project will use the placehoder.")
         f.close()
         #    if a.info.get('thumbnail') and not a.info.get('container'):
         #        print "Working on project: %s ..." % a.short_name
@@ -532,7 +535,7 @@ def resize_project_avatars():
 
 def password_protect_hidden_projects():
     import random
-    from pybossa.core import project_repo, user_repo, mail
+    from pybossa.core import project_repo
     from pybossa.jobs import enqueue_job, send_mail
 
 
@@ -600,10 +603,10 @@ def create_results():
     projects = project_repo.filter_by(published=True)
 
     for project in projects:
-        print "Working on project: %s" % project.short_name
+        print("Working on project: %s" % project.short_name)
         tasks = task_repo.filter_tasks_by(state='completed',
                                           project_id=project.id)
-        print "Analyzing %s tasks" % len(tasks)
+        print("Analyzing %s tasks" % len(tasks))
         for task in tasks:
             result = result_repo.get_by(project_id=project.id, task_id=task.id)
             if result is None:
@@ -613,26 +616,24 @@ def create_results():
                                 last_version=True)
                 db.session.add(result)
         db.session.commit()
-        print "Project %s completed!" % project.short_name
+        print("Project %s completed!" % project.short_name)
 
 def update_counters():
     """Populates the counters table."""
     from pybossa.core import db
-    from pybossa.core import project_repo, task_repo, result_repo
-    from pybossa.model.task import Task
-    from pybossa.model.task_run import TaskRun
+    from pybossa.core import project_repo
     from pybossa.model.counter import Counter
 
     projects = project_repo.get_all()
 
-    print len(projects)
+    print(len(projects))
 
     db.session.query(Counter).delete()
     db.session.commit()
 
 
     for project in projects:
-        print "Working on project: %s" % project.id
+        print("Working on project: %s" % project.id)
         sql = text('''select task.project_id as project_id, task.id as task_id, count(task_run.task_id) as n_task_runs from task left outer join task_run on (task_run.task_id=task.id) where task.project_id=:project_id group by task.project_id, task.id, task_run.task_id''')
         results = db.engine.execute(sql, project_id=project.id)
         for result in results:
@@ -644,16 +645,12 @@ def update_counters():
 def update_project_stats():
     """Update project stats for draft projects."""
     from pybossa.core import db
-    from pybossa.core import project_repo, task_repo, result_repo
-    from pybossa.model.task import Task
-    from pybossa.model.task_run import TaskRun
-    from pybossa.model.counter import Counter
-    import pybossa.cache.project_stats as stats
+    from pybossa.core import project_repo
 
     projects = project_repo.get_all()
 
     for project in projects:
-        print "Working on project: %s" % project.short_name
+        print("Working on project: %s" % project.short_name)
         sql_query = """INSERT INTO project_stats
                        (project_id, n_tasks, n_task_runs, n_results, n_volunteers,
                        n_completed_tasks, overall_progress, average_time,
@@ -667,8 +664,8 @@ def anonymize_ips():
 
     taskruns = task_repo.filter_task_runs_by(user_id=None)
     for tr in taskruns:
-        print "Working on taskrun %s" % tr.id
-        print "From %s to %s" % (tr.user_ip, anonymizer.ip(tr.user_ip))
+        print("Working on taskrun %s" % tr.id)
+        print("From %s to %s" % (tr.user_ip, anonymizer.ip(tr.user_ip)))
         tr.user_ip = anonymizer.ip(tr.user_ip)
         task_repo.update(tr)
 
@@ -678,7 +675,7 @@ def clean_project(project_id, skip_tasks=False):
     from pybossa.model import make_timestamp
     n_tasks = 0
     if not skip_tasks:
-        print "Deleting tasks"
+        print("Deleting tasks")
         sql = 'delete from task where project_id=%s' % project_id
         db.engine.execute(sql)
     else:
@@ -716,7 +713,7 @@ def clean_project(project_id, skip_tasks=False):
                                               last_id=last_id)
             if (len(tasks) > 0):
                 last_id = tasks[len(tasks)-1].id
-    print "Project has been cleaned"
+    print("Project has been cleaned")
 
 
 ## ==================================================
@@ -724,7 +721,7 @@ def clean_project(project_id, skip_tasks=False):
 
 def _module_functions(functions):
     local_functions = dict(functions)
-    for k,v in local_functions.items():
+    for k, v in list(local_functions.items()):  # make a copy of items view
         if not inspect.isfunction(v) or k.startswith('_'):
             del local_functions[k]
     return local_functions

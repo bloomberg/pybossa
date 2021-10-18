@@ -1,6 +1,6 @@
 #-*- coding: utf8 -*-
 from pybossa.service_validators import ServiceValidators
-from default import Test, with_context
+from test import Test, with_context
 
 
 class ServiceValidatorTestHelper(Test):
@@ -16,7 +16,7 @@ class ServiceValidatorTestHelper(Test):
         return {
             'data': {'queryTest': {
                 'context': "test_context",
-                'query': u"½.½ a zjfA Z11109",
+                'query': "½.½ a zjfA Z11109",
                 'maxresults': 10}}}
 
     def get_invalid_payload(self):
@@ -24,7 +24,7 @@ class ServiceValidatorTestHelper(Test):
             'data': {
                 'queryTest': {
                     'context': "invalid_context",
-                    'query': u"@_hhfu",
+                    'query': "@_hhfu",
                     'maxresults': 10}}}
 
 

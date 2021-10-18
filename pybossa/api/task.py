@@ -29,7 +29,7 @@ from pybossa.model.task import Task
 from pybossa.model.project import Project
 from pybossa.core import result_repo
 from pybossa.util import sign_task
-from api_base import APIBase
+from .api_base import APIBase
 from pybossa.api.pwd_manager import get_pwd_manager
 from pybossa.util import get_user_id_or_ip, validate_required_fields
 from pybossa.core import task_repo, project_repo

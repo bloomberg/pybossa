@@ -17,14 +17,14 @@
 # along with PYBOSSA.  If not,  see <http://www.gnu.org/licenses/>.
 
 import datetime
-from default import db, Test, with_context
+from test import db, Test, with_context
 from pybossa.cache import site_stats as stats
-from factories import (UserFactory, ProjectFactory, AnonymousTaskRunFactory,
+from test.factories import (UserFactory, ProjectFactory, AnonymousTaskRunFactory,
                        TaskRunFactory, TaskFactory, CategoryFactory)
 from pybossa.repositories import ResultRepository
-from mock import patch, Mock
+from unittest.mock import patch
 from pybossa.cache import management_dashboard_stats, delete_cache_group
-from pybossa.jobs import get_management_dashboard_stats, send_mail
+from pybossa.jobs import get_management_dashboard_stats
 from flask import current_app
 
 result_repo = ResultRepository(db)
@@ -421,7 +421,7 @@ class TestSiteStatsCache(Test):
         """Test management dashboard stats"""
 
         # reset cache and built just one stats, avg_time_to_complete_task
-        map(delete_cache_group, management_dashboard_stats)
+        list(map(delete_cache_group, management_dashboard_stats))
         date_15m_old = (datetime.datetime.utcnow() -  datetime.timedelta(minutes=15)).isoformat()
         date_now = datetime.datetime.utcnow()
 
@@ -440,7 +440,7 @@ class TestSiteStatsCache(Test):
             get_management_dashboard_stats(user_email)
             subject = 'Management Dashboard Statistics'
             msg = 'Management dashboard statistics is now available. It can be accessed by refreshing management dashboard page.'
-            body = (u'Hello,\n\n{}\nThe {} team.'
+            body = ('Hello,\n\n{}\nThe {} team.'
                     .format(msg, current_app.config.get('BRAND')))
             mail_dict = dict(recipients=[user_email], subject=subject, body=body)
             mail.assert_called_with(mail_dict)

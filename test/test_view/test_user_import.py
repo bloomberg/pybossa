@@ -15,13 +15,13 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from StringIO import StringIO
+from io import BytesIO
 from bs4 import BeautifulSoup
 
-from default import db, with_context
-from factories import UserFactory
-from helper import web
-from mock import patch
+from test import db, with_context
+from test.factories import UserFactory
+from test.helper import web
+from unittest.mock import patch
 from pybossa.repositories import UserRepository
 from pybossa.view import account
 
@@ -47,7 +47,7 @@ class TestUserImport(web.Helper):
     def test_not_allowed(self):
         url = '/admin/userimport'
         res = self.app.get(url, follow_redirects=True)
-        assert 'This feature requires being logged in' in res.data
+        assert 'This feature requires being logged in' in str(res.data)
 
     @with_context
     def test_allowed(self):
@@ -66,7 +66,7 @@ class TestUserImport(web.Helper):
 
         url = '/admin/userimport?api_key=%s&type=%s' % (admin.api_key, 'usercsvimport')
         res = self.app.post(url, follow_redirects=True)
-        assert 'No file' in res.data
+        assert 'No file' in str(res.data)
 
     @with_context
     @patch('pybossa.forms.forms.app_settings.upref_mdata.get_upref_mdata_choices')
@@ -79,12 +79,12 @@ class TestUserImport(web.Helper):
 
         url = '/admin/userimport?type=%s' % 'usercsvimport'
 
-        users = '''name,fullname,email_addr,password,project_slugs,user_pref,metadata
+        users = b'''name,fullname,email_addr,password,project_slugs,user_pref,metadata
             newuser,New User,new@user.com,NewU$3r!,,{},{"user_type": "type_a"}'''
         res = self.app.post(url, follow_redirects=True, content_type='multipart/form-data',
-            data={'file': (StringIO(users), 'users.csv')}) 
+            data={'file': (BytesIO(users), 'users.csv')})
 
-        assert '1 new users were imported successfully' in res.data, res.data
+        assert '1 new users were imported successfully' in str(res.data), res.data
 
         new_user = user_repo.get_by_name('newuser')
         assert new_user.fullname == 'New User'
@@ -101,11 +101,11 @@ class TestUserImport(web.Helper):
         self.signin()
         user = UserFactory.create(id=666, email_addr='new@user.com', enabled=False)
         url = '/admin/userimport?type=%s' % 'usercsvimport'
-        users = '''name,fullname,email_addr,password,project_slugs,user_pref,metadata
+        users = b'''name,fullname,email_addr,password,project_slugs,user_pref,metadata
             newuser,New User,new@user.com,NewU$3r!,,{},{"user_type": "type_a"}'''
         res = self.app.post(url, follow_redirects=True, content_type='multipart/form-data',
-            data={'file': (StringIO(users), 'users.csv')})
-        assert '1 users were re-enabled.' in res.data, res.data
+            data={'file': (BytesIO(users), 'users.csv')})
+        assert '1 users were re-enabled.' in str(res.data), res.data
 
         new_user = user_repo.get_by_name(user.name)
         assert new_user.enabled
@@ -119,11 +119,11 @@ class TestUserImport(web.Helper):
         self.register()
         self.signin()
         url = '/admin/userimport?type=%s' % 'usercsvimport'
-        users = '''name,fullname,email_addr,password,project_slugs,user_pref,metadata
+        users = b'''name,fullname,email_addr,password,project_slugs,user_pref,metadata
             newuser,New User,new@user.com,NewU$3r!,,{},{"user_type": "type_c"}'''
         res = self.app.post(url, follow_redirects=True, content_type='multipart/form-data',
-            data={'file': (StringIO(users), 'users.csv')})
-        assert 'It looks like there were no new users created' in res.data, res.data
+            data={'file': (BytesIO(users), 'users.csv')})
+        assert 'It looks like there were no new users created' in str(res.data), res.data
 
     @with_context
     @patch('pybossa.forms.forms.app_settings.upref_mdata.get_upref_mdata_choices')
@@ -136,11 +136,11 @@ class TestUserImport(web.Helper):
         from pybossa import core
 
         url = '/admin/userimport?type=%s' % 'usercsvimport'
-        users = '''name,fullname,email_addr,password,project_slugs,user_pref,metadata
+        users = b'''name,fullname,email_addr,password,project_slugs,user_pref,metadata
             newuser,New User,new@user.com,NewU$3r!,,{},{}'''
         res = self.app.post(url, follow_redirects=True, content_type='multipart/form-data',
-            data={'file': (StringIO(users), 'users.csv')})
-        assert 'Missing user_type in metadata' in res.data, res.data
+            data={'file': (BytesIO(users), 'users.csv')})
+        assert 'Missing user_type in metadata' in str(res.data), res.data
 
     @with_context
     def test_get_user_pref_and_metadata_no_form(self):

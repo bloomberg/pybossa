@@ -1,10 +1,10 @@
 # -*- coding: utf8 -*-
 import json
-from mock import patch
+from unittest.mock import patch
 
-from default import db, with_context
-from factories import ProjectFactory, UserFactory
-from helper import web
+from test import db, with_context
+from test.factories import ProjectFactory
+from test.helper import web
 from pybossa.repositories import ProjectRepository, UserRepository
 
 project_repo = ProjectRepository(db)
@@ -18,8 +18,8 @@ class TestAnswerFieldConfig(web.Helper):
         project = ProjectFactory.create(published=True)
         url = '/project/%s/answerfieldsconfig?api_key=%s' % (project.short_name, project.owner.api_key)
         res = self.app.get(url)
-        assert '<fields-config' in res.data, res.data
-        assert '<consensus-config' in res.data, res.data
+        assert '<fields-config' in str(res.data), res.data
+        assert '<consensus-config' in str(res.data), res.data
 
     @with_context
     def test_post_answer_field_config(self):

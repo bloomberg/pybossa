@@ -42,9 +42,13 @@ __all__ = ['sentinel', 'db', 'signer', 'mail', 'login_manager', 'facebook',
            'task_repo', 'announcement_repo', 'blog_repo', 'auditlog_repo', 'webhook_repo',
            'result_repo', 'performance_stats_repo', 'newsletter', 'importer', 'flickr',
            'plugin_manager', 'assets', 'JSONEncoder', 'cors', 'userimporter', 'ldap',
-           'flask_profiler', 'anonymizer']
+           'flask_profiler', 'anonymizer', 'project_stats_repo', 'helping_repo','talisman',
+           'enable_strong_password', 'task_csv_exporter', 'task_json_exporter',
+           'json_exporter', 'csv_exporter', 'project_csv_exporter', 'http_signer']
 
 # CACHE
+from decimal import Decimal
+
 from pybossa.sentinel import Sentinel
 sentinel = Sentinel()
 user_cache = None
@@ -64,6 +68,8 @@ auditlog_repo = None
 webhook_repo = None
 result_repo = None
 performance_stats_repo = None
+project_stats_repo = None
+helping_repo = None
 
 # Signer
 from pybossa.signer import Signer
@@ -120,11 +126,11 @@ timeouts = dict()
 ratelimits = dict()
 
 # Newsletter
-from newsletter import Newsletter
+from .newsletter import Newsletter
 newsletter = Newsletter()
 
 # Importer
-from importers import Importer
+from .importers import Importer
 importer = Importer()
 
 from flask_plugins import PluginManager
@@ -137,10 +143,13 @@ from flask.json import JSONEncoder as BaseEncoder
 from speaklater import _LazyString
 
 class JSONEncoder(BaseEncoder): # pragma: no cover
-    """JSON Encoder to deal with Babel lazy strings."""
+    """JSON Encoder to deal with Babel lazy strings and Decimal."""
     def default(self, o):
         if isinstance(o, _LazyString):
             return str(o)
+        # Resolves the "Object of type Decimal is not JSON serializable" error
+        if isinstance(o, Decimal):
+            return float(o)
 
         return BaseEncoder.default(self, o)
 
@@ -152,7 +161,7 @@ cors = CORS()
 enable_strong_password = None
 
 # User importer
-from importers import UserImporter
+from .importers import UserImporter
 userimporter = UserImporter()
 
 # LDAP
@@ -167,3 +176,9 @@ from pybossa.anonymizer import Anonymizer
 anonymizer = Anonymizer()
 
 talisman = None
+task_csv_exporter = None
+task_json_exporter = None
+json_exporter = None
+csv_exporter = None
+project_csv_exporter = None
+http_signer = None

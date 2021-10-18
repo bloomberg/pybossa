@@ -74,7 +74,7 @@ TASK_GOLD_FIELD_WITH_GOLD = TASK_GOLD_FIELD_WITHOUT_GOLD + [
 session = db.slave_session
 
 def _field_mapreducer(*fieldsAndPrefixTuples):
-    return ',\n'.join(chain.from_iterable(map(lambda fieldsAndPrefix: _field_mapper(*fieldsAndPrefix), fieldsAndPrefixTuples)))
+    return ',\n'.join(chain.from_iterable([_field_mapper(*fieldsAndPrefix) for fieldsAndPrefix in fieldsAndPrefixTuples]))
 
 def _field_mapper(fields, prefix=''):
   return (field.format(prefix) for field in fields)

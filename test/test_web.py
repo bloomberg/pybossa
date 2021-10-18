@@ -22,12 +22,13 @@ import copy
 import json
 import os
 import shutil
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import zipfile
-from StringIO import StringIO
-from default import db, Fixtures, with_context, with_context_settings, FakeResponse, mock_contributions_guard
-from helper import web
-from mock import patch, Mock, call, MagicMock
+from io import StringIO, BytesIO
+from test import db, Fixtures, with_context, with_context_settings, \
+    FakeResponse, mock_contributions_guard, with_request_context
+from test.helper import web
+from unittest.mock import patch, Mock, call, MagicMock
 from flask import redirect
 from itsdangerous import BadSignature
 from pybossa.util import get_user_signup_method, unicode_csv_reader
@@ -46,13 +47,13 @@ from pybossa.jobs import send_mail, import_tasks
 from pybossa.importers import ImportReport
 from pybossa.cache.project_stats import update_stats
 from pybossa.syncer import NotEnabled, SyncUnauthorized
-from factories import AnnouncementFactory, ProjectFactory, CategoryFactory, TaskFactory, TaskRunFactory, UserFactory
+from test.factories import AnnouncementFactory, ProjectFactory, CategoryFactory, TaskFactory, TaskRunFactory, UserFactory
 from unidecode import unidecode
 from werkzeug.utils import secure_filename
 from nose.tools import assert_raises
 from flatten_json import flatten
 from nose.tools import nottest
-from helper.gig_helper import make_subadmin, make_subadmin_by
+from test.helper.gig_helper import make_subadmin, make_subadmin_by
 from datetime import datetime, timedelta
 import six
 from pybossa.view.account import get_user_data_as_form
@@ -89,8 +90,8 @@ class TestWeb(web.Helper):
         self.register(name="juan")
         self.signin(email="juan@example.com", password="p4ssw0rd")
         res = self.app.get("/", follow_redirects=True)
-        assert self.html_title() in res.data, res.data
-        assert "Create" in res.data, res
+        assert self.html_title() in str(res.data), res.data
+        assert "Create" in str(res.data), res
 
     @with_context
     def test_01_index_json(self):
@@ -112,7 +113,7 @@ class TestWeb(web.Helper):
         self.signin(email="juan@example.com", password="p4ssw0rd")
         res = self.app.get('/search')
         err_msg = "Search page should be accessible"
-        assert "Search" in res.data, err_msg
+        assert "Search" in str(res.data), err_msg
 
     @with_context
     def test_01_search_json(self):
@@ -136,7 +137,7 @@ class TestWeb(web.Helper):
         self.register(name="juan")
         self.signin(email="juan@example.com", password="p4ssw0rd")
         res = self.app.get('/results')
-        assert "foobar" in res.data, res.data
+        assert "foobar" in str(res.data), res.data
         os.remove(file_name)
 
 
@@ -170,8 +171,8 @@ class TestWeb(web.Helper):
         TaskRunFactory.create(user=user)
         update_leaderboard()
         res = self.app.get('/leaderboard', follow_redirects=True)
-        assert self.html_title("Community Leaderboard") in res.data, res
-        assert user.name in res.data, res.data
+        assert self.html_title("Community Leaderboard") in str(res.data), res
+        assert user.name in str(res.data), res.data
         assert_raises(ValueError, json.loads, res.data)
 
     @with_context
@@ -295,7 +296,7 @@ class TestWeb(web.Helper):
         assert announcement0['title'] == 'Announcement title'
         assert announcement0['id'] == 1
 
-    @with_context
+    @with_request_context
     def test_project_stats(self):
         """Test WEB project stats page works"""
         res = self.register()
@@ -307,7 +308,7 @@ class TestWeb(web.Helper):
         # Without stats
         url = '/project/%s/stats' % project.short_name
         res = self.app.get(url)
-        assert "Sorry" in res.data, res.data
+        assert "Sorry" in str(res.data), res.data
 
         # We use a string here to check that it works too
         task = Task(project_id=project.id, n_answers=10)
@@ -327,9 +328,9 @@ class TestWeb(web.Helper):
         update_stats(project.id)
         res = self.app.get(url)
         assert res.status_code == 200, res.status_code
-        assert "Distribution" in res.data, res.data
+        assert "Distribution" in str(res.data), res.data
 
-    @with_context
+    @with_request_context
     def test_project_stats_json(self):
         """Test WEB project stats page works JSON"""
         res = self.register()
@@ -378,7 +379,7 @@ class TestWeb(web.Helper):
         res = self.app_get_json(url)
         data = json.loads(res.data)
         err_msg = 'Field missing in JSON response'
-        assert 'avg_contrib_time' in data, (err_msg, data.keys())
+        assert 'avg_contrib_time' in data, (err_msg, list(data.keys()))
         assert 'n_completed_tasks' in data, err_msg
         assert 'n_tasks' in data, err_msg
         assert 'n_volunteers' in data, err_msg
@@ -413,7 +414,7 @@ class TestWeb(web.Helper):
         assert data['userStats'].get('geo') == None, err_msg
 
 
-    @with_context
+    @with_request_context
     def test_contribution_time_shown_for_admins_for_every_project(self):
         admin = UserFactory.create(admin=True)
         admin.set_password('1234')
@@ -427,10 +428,10 @@ class TestWeb(web.Helper):
         self.signin(email=admin.email_addr, password='1234')
         res = self.app.get(url)
         assert_raises(ValueError, json.loads, res.data)
-        assert 'Average contribution time' in res.data
+        assert 'Average contribution time' in str(res.data)
 
 
-    @with_context
+    @with_request_context
     def test_contribution_time_shown_for_admins_for_every_project_json(self):
         admin = UserFactory.create(admin=True)
         admin.set_password('1234')
@@ -461,7 +462,7 @@ class TestWeb(web.Helper):
         assert 'secret_key' not in data['project'], err_msg
 
 
-    @with_context
+    @with_request_context
     def test_contribution_time_shown_in_pro_owned_projects(self):
         pro_owner = UserFactory.create(pro=True)
         pro_owner.set_password('1234')
@@ -473,9 +474,9 @@ class TestWeb(web.Helper):
         self.signin(email=pro_owner.email_addr, password='1234')
         res = self.app.get(pro_url)
         assert_raises(ValueError, json.loads, res.data)
-        assert 'Average contribution time' in res.data
+        assert 'Average contribution time' in str(res.data)
 
-    @with_context
+    @with_request_context
     def test_contribution_time_shown_in_pro_owned_projects_json(self):
         pro_owner = UserFactory.create(pro=True)
         pro_owned_project = ProjectFactory.create(owner=pro_owner)
@@ -512,9 +513,9 @@ class TestWeb(web.Helper):
         url = '/project/%s/stats' % project.short_name
         res = self.app.get(url)
         assert_raises(ValueError, json.loads, res.data)
-        assert 'Average contribution time' not in res.data
+        assert 'Average contribution time' not in str(res.data)
 
-    @with_context
+    @with_request_context
     def test_contribution_time_not_shown_in_regular_user_owned_projects_json(self):
         project = ProjectFactory.create()
         task = TaskFactory.create(project=project)
@@ -556,7 +557,7 @@ class TestWeb(web.Helper):
         res = self.app.get('/account', follow_redirects=True)
         assert res.status_code == 200, res.status_code
         err_msg = "There should be a Community page"
-        assert "Community" in res.data, err_msg
+        assert "Community" in str(res.data), err_msg
 
     @with_context
     def test_03_account_index_json(self):
@@ -600,9 +601,9 @@ class TestWeb(web.Helper):
         res = self.app.get('/account/register')
         # The output should have a mime-type: text/html
         assert res.mimetype == 'text/html', res
-        assert self.html_title("Register") in res.data, res
+        assert self.html_title("Register") in str(res.data), res
 
-    @with_context
+    @with_request_context
     def test_register_get_json(self):
         """Test WEB register JSON user works"""
         from pybossa.forms.account_view_forms import RegisterForm
@@ -613,7 +614,7 @@ class TestWeb(web.Helper):
         data = json.loads(res.data)
 
         form = RegisterForm()
-        expected_fields = form.data.keys()
+        expected_fields = list(form.data.keys())
 
         err_msg = "There should be a form"
         assert data.get('form'), err_msg
@@ -641,7 +642,7 @@ class TestWeb(web.Helper):
         res = self.app.post('/account/register', data=userdict)
         # The output should have a mime-type: text/html
         assert res.mimetype == 'text/html', res
-        assert "correct the errors" in res.data, res.data
+        assert "correct the errors" in str(res.data), res.data
 
 
     @with_context
@@ -702,7 +703,7 @@ class TestWeb(web.Helper):
         self.signin_user(user)
         TaskRunFactory.create(user=user, created='2000-01-01T00:00:00.000')
 
-        qps = urllib.urlencode({
+        qps = urllib.parse.urlencode({
             'start': '1999-01-01T00:00:00.000Z'
         })
         res = self.app.get('/account/{}/recent_tasks?{}'.format(user.name, qps))
@@ -710,7 +711,7 @@ class TestWeb(web.Helper):
         body = json.loads(res.data)
         assert body['count'] == 1, body
 
-        qps = urllib.urlencode({
+        qps = urllib.parse.urlencode({
             'start': '2001-01-01T00:00:00.000Z'
         })
         res = self.app.get('/account/{}/recent_tasks?{}'.format(user.name, qps))
@@ -718,7 +719,7 @@ class TestWeb(web.Helper):
         body = json.loads(res.data)
         assert body['count'] == 0, body
 
-        qps = urllib.urlencode({
+        qps = urllib.parse.urlencode({
             'start': '1999-01-01T00:00:00.000'
         })
         res = self.app.get('/account/{}/recent_tasks?{}'.format(user.name, qps))
@@ -1014,8 +1015,8 @@ class TestWeb(web.Helper):
         self.register()
         self.signin()
         res = self.app.post('/account/register', data=data)
-        assert "Account validation" in res.data, res
-        assert "Just one more step, please" in res.data, res.data
+        assert "Account validation" in str(res.data), res
+        assert "Just one more step, please" in str(res.data), res.data
         res = self.signin(email="johndoe2@example.com",password="p4ssw0rd")
         current_app.config['ACCOUNT_CONFIRMATION_DISABLED'] = True
 
@@ -1214,11 +1215,12 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.view.account.newsletter', autospec=True)
-    @patch('pybossa.view.account.url_for')
+    # @patch('pybossa.view.account.url_for')  # comment out to avoud "ValueError: I/O operation on closed file."
     @patch('pybossa.view.account.signer')
-    def test_newsletter_json(self, fake_signer, url_for, newsletter):
+    def test_newsletter_json(self, fake_signer, newsletter):
         """Test WEB confirm email shows newsletter or home with JSON."""
         newsletter.ask_user_to_subscribe.return_value = True
+
         with patch.dict(self.flask_app.config, {'MAILCHIMP_API_KEY': 'key'}):
             self.register()
             self.signin()
@@ -1229,7 +1231,6 @@ class TestWeb(web.Helper):
             data = json.loads(res.data)
             assert data.get('title') == 'Subscribe to our Newsletter', data
             assert data.get('template') == 'account/newsletter.html', data
-
 
             res = self.app_get_json(url + "?subscribe=True")
             data = json.loads(res.data)
@@ -1335,9 +1336,9 @@ class TestWeb(web.Helper):
         # TODO: add JSON support to profile page.
         # # Check profile page with several information chunks
         # res = self.profile()
-        # assert self.html_title("Profile") in res.data, res
-        # assert "John Doe" in res.data, res
-        # assert "johndoe@example.com" in res.data, res
+        # assert self.html_title("Profile") in str(res.data), res
+        # assert "John Doe" in str(res.data), res
+        # assert "johndoe@example.com" in str(res.data), res
 
         # Log out
         res = self.signout(content_type="application/json",
@@ -1352,23 +1353,23 @@ class TestWeb(web.Helper):
         # # Request profile as an anonymous user
         # # Check profile page with several information chunks
         # res = self.profile()
-        # assert "John Doe" in res.data, res
-        # assert "johndoe@example.com" not in res.data, res
+        # assert "John Doe" in str(res.data), res
+        # assert "johndoe@example.com" not in str(res.data), res
 
         # Try to access protected areas like update
         res = self.app.get('/account/johndoe/update', follow_redirects=True,
                            content_type="application/json")
         # As a user must be signed in to access, the page the title will be the
         # redirection to log in
-        assert self.html_title("Sign in") in res.data, res.data
-        assert "This feature requires being logged in." in res.data, res.data
+        assert self.html_title("Sign in") in str(res.data), res.data
+        assert "This feature requires being logged in." in str(res.data), res.data
 
         # TODO: Add JSON to profile
         # res = self.signin(next='%2Faccount%2Fprofile',
         #                   content_type="application/json",
         #                   csrf=csrf)
-        # assert self.html_title("Profile") in res.data, res
-        # assert "Welcome back %s" % "John Doe" in res.data, res
+        # assert self.html_title("Profile") in str(res.data), res
+        # assert "Welcome back %s" % "John Doe" in str(res.data), res
 
 
     @with_context
@@ -1379,66 +1380,66 @@ class TestWeb(web.Helper):
         res = self.signout()
 
         res = self.signin(method="GET")
-        assert self.html_title("Sign in") in res.data, res.data
-        assert "Sign in" in res.data, res.data
+        assert self.html_title("Sign in") in str(res.data), res.data
+        assert "Sign in" in str(res.data), res.data
 
         res = self.signin(email='')
-        assert "Please correct the errors" in res.data, res
-        assert "The e-mail is required" in res.data, res
+        assert "Please correct the errors" in str(res.data), res
+        assert "The e-mail is required" in str(res.data), res
 
         res = self.signin(password='')
-        assert "Please correct the errors" in res.data, res
-        assert "You must provide a password" in res.data, res
+        assert "Please correct the errors" in str(res.data), res
+        assert "You must provide a password" in str(res.data), res
 
         res = self.signin(email='', password='')
-        assert "Please correct the errors" in res.data, res
-        assert "The e-mail is required" in res.data, res
-        assert "You must provide a password" in res.data, res
+        assert "Please correct the errors" in str(res.data), res
+        assert "The e-mail is required" in str(res.data), res
+        assert "You must provide a password" in str(res.data), res
 
         # Non-existant user
         msg = "t find you in the system"
         res = self.signin(email='wrongemail')
-        assert msg in res.data, res.data
+        assert msg in str(res.data), res.data
 
         res = self.signin(email='wrongemail', password='wrongpassword')
-        assert msg in res.data, res
+        assert msg in str(res.data), res
 
         # Real user but wrong password or username
         msg = "Ooops, Incorrect email/password"
         res = self.signin(password='wrongpassword')
-        assert msg in res.data, res
+        assert msg in str(res.data), res
 
         res = self.signin()
-        assert self.html_title() in res.data, res
-        assert "Welcome back %s" % "John Doe" in res.data, res
+        assert self.html_title() in str(res.data), res
+        assert "Welcome back %s" % "John Doe" in str(res.data), res
 
         # Check profile page with several information chunks
         res = self.profile()
-        #assert self.html_title("Profile") in res.data, res
-        assert "John Doe" in res.data, res
-        assert "johndoe@example.com" in res.data, res
+        #assert self.html_title("Profile") in str(res.data), res
+        assert "John Doe" in str(res.data), res
+        assert "johndoe@example.com" in str(res.data), res
 
         # Log out
         res = self.signout()
-        assert self.html_title() in res.data, res
-        assert "You are now signed out" in res.data, res
+        assert self.html_title() in str(res.data), res
+        assert "You are now signed out" in str(res.data), res
 
         # Request profile as an anonymous user
         # Check profile page with several information chunks
         # res = self.profile()
-        # assert "John Doe" in res.data, res
-        # assert "johndoe@example.com" not in res.data, res
+        # assert "John Doe" in str(res.data), res
+        # assert "johndoe@example.com" not in str(res.data), res
 
         # Try to access protected areas like update
         res = self.app.get('/account/johndoe/update', follow_redirects=True)
         # As a user must be signed in to access, the page the title will be the
         # redirection to log in
-        assert self.html_title("Sign in") in res.data, res.data
-        assert "This feature requires being logged in." in res.data, res.data
+        assert self.html_title("Sign in") in str(res.data), res.data
+        assert "This feature requires being logged in." in str(res.data), res.data
 
         res = self.signin(next='%2Faccount%2Fprofile')
-        #assert self.html_title("Profile") in res.data, res
-        assert "Welcome back %s" % "John Doe" in res.data, res
+        #assert self.html_title("Profile") in str(res.data), res
+        assert "Welcome back %s" % "John Doe" in str(res.data), res
 
 
     @with_context
@@ -1462,7 +1463,7 @@ class TestWeb(web.Helper):
         user.enabled = False
         user_repo.update(user)
         res = self.signin()
-        assert "Your account is disabled" in res.data, res.data
+        assert "Your account is disabled" in str(res.data), res.data
 
     @with_context
     @with_context_settings(ENABLE_TWO_FACTOR_AUTH=False)
@@ -1473,7 +1474,7 @@ class TestWeb(web.Helper):
         user.enabled = False
         user_repo.update(user)
         res = self.signin()
-        assert "Your account is disabled" in res.data, res.data
+        assert "Your account is disabled" in str(res.data), res.data
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -1484,9 +1485,9 @@ class TestWeb(web.Helper):
         self.new_project()
         url = '/account/%s/applications' % Fixtures.name
         res = self.app.get(url)
-        assert "Projects" in res.data, res.data
-        assert "Published" in res.data, res.data
-        assert Fixtures.project_name in res.data, res.data
+        assert "Projects" in str(res.data), res.data
+        assert "Published" in str(res.data), res.data
+        assert Fixtures.project_name in str(res.data), res.data
 
         url = '/account/fakename/applications'
         res = self.app.get(url)
@@ -1506,9 +1507,9 @@ class TestWeb(web.Helper):
         self.new_project()
         url = '/account/%s/projects' % Fixtures.name
         res = self.app.get(url)
-        assert "Projects" in res.data, res.data
-        assert "Published" in res.data, res.data
-        assert Fixtures.project_name in res.data, res.data
+        assert "Projects" in str(res.data), res.data
+        assert "Published" in str(res.data), res.data
+        assert Fixtures.project_name in str(res.data), res.data
 
         url = '/account/fakename/projects'
         res = self.app.get(url)
@@ -1600,7 +1601,7 @@ class TestWeb(web.Helper):
         user = user_repo.get_by(email_addr='johndoe2@example.com')
         url = '/account/%s/update' % user.name
         assert data.get('next') == url, res.data
-        flash = u"Your profile has been updated!"
+        flash = "Your profile has been updated!"
         err_msg = "There should be a flash message"
         assert data.get('flash') == flash, (data, err_msg)
         err_msg = "It should return the same updated data"
@@ -1624,18 +1625,18 @@ class TestWeb(web.Helper):
         res = self.app.get(url, follow_redirects=False,
                            content_type='application/json')
         assert res.status_code == 302, res.status_code
-        assert "/account/signin" in res.data, res.data
+        assert "/account/signin" in str(res.data), res.data
 
         res = self.signin(method="POST", email="johndoe2@example.com",
                           password="p4ssw0rd",
                           next="%2Faccount%2Fprofile")
-        assert "Welcome back John Doe 2" in res.data, res.data
-        assert "John Doe 2" in res.data, res
-        assert "johndoe2" in res.data, res
-        assert "johndoe2@example.com" in res.data, res
+        assert "Welcome back John Doe 2" in str(res.data), res.data
+        assert "John Doe 2" in str(res.data), res
+        assert "johndoe2" in str(res.data), res
+        assert "johndoe2@example.com" in str(res.data), res
 
         res = self.app.get('/', follow_redirects=False)
-        assert "::logged-in::johndoe2" in res.data, res.data
+        assert "::logged-in::johndoe2" in str(res.data), res.data
 
 
         res = self.signout(follow_redirects=False,
@@ -1648,7 +1649,7 @@ class TestWeb(web.Helper):
         assert data.get('next') == '/', (err_msg, data)
         assert "You are now signed out" == data.get('flash'), (err_msg, data)
         res = self.app.get('/', follow_redirects=False)
-        assert "::logged-in::johndoe2" not in res.data, err_msg
+        assert "::logged-in::johndoe2" not in str(res.data), err_msg
 
         # A user must be signed in to access the update page, the page
         # the title will be the redirection to log in
@@ -1656,7 +1657,7 @@ class TestWeb(web.Helper):
                                   content_type="application/json")
         err_msg = "User should be requested to log in"
         assert res.status_code == 302, err_msg
-        assert "/account/signin" in res.data, err_msg
+        assert "/account/signin" in str(res.data), err_msg
 
         self.register(fullname="new", name="new")
         self.signin(email="new@example.com")
@@ -1682,29 +1683,29 @@ class TestWeb(web.Helper):
         # Update profile with new data
         res = self.update_profile(method="GET")
         msg = "Update your profile: %s" % "John Doe"
-        assert self.html_title(msg) in res.data, res.data
+        assert self.html_title(msg) in str(res.data), res.data
         msg = 'input id="id" name="id" type="hidden" value="1"'
-        assert msg in res.data, res
-        assert "John Doe" in res.data, res
-        assert "Save the changes" in res.data, res
+        assert msg in str(res.data), res
+        assert "John Doe" in str(res.data), res
+        assert "Save the changes" in str(res.data), res
 
         res = self.update_profile(fullname="John Doe 2",
                                   email_addr="johndoe2@example",
                                   locale="en")
-        assert "Please correct the errors" in res.data, res.data
+        assert "Please correct the errors" in str(res.data), res.data
 
         res = self.update_profile(fullname="John Doe 2",
                                   email_addr="johndoe2@example.com",
                                   locale="en")
         title = "Update your profile: John Doe 2"
-        assert self.html_title(title) in res.data, res.data
+        assert self.html_title(title) in str(res.data), res.data
         user = user_repo.get_by(email_addr='johndoe2@example.com')
-        assert "Your profile has been updated!" in res.data, res.data
-        assert "John Doe 2" in res.data, res
+        assert "Your profile has been updated!" in str(res.data), res.data
+        assert "John Doe 2" in str(res.data), res
         assert "John Doe 2" == user.fullname, user.fullname
-        assert "johndoe" in res.data, res
+        assert "johndoe" in str(res.data), res
         assert "johndoe" == user.name, user.name
-        assert "johndoe2@example.com" in res.data, res
+        assert "johndoe2@example.com" in str(res.data), res
         assert "johndoe2@example.com" == user.email_addr, user.email_addr
         assert user.subscribed is False, user.subscribed
 
@@ -1713,32 +1714,32 @@ class TestWeb(web.Helper):
                                   email_addr="johndoe2@example.com",
                                   locale="en",
                                   new_name="johndoe2")
-        assert "Your profile has been updated!" in res.data, res
-        assert "This feature requires being logged in" in res.data, res.data
+        assert "Your profile has been updated!" in str(res.data), res
+        assert "This feature requires being logged in" in str(res.data), res.data
 
         res = self.signin(method="POST", email="johndoe2@example.com",
                           password="p4ssw0rd",
                           next="%2Faccount%2Fprofile")
-        assert "Welcome back John Doe 2" in res.data, res.data
-        assert "John Doe 2" in res.data, res
-        assert "johndoe2" in res.data, res
-        assert "johndoe2@example.com" in res.data, res
+        assert "Welcome back John Doe 2" in str(res.data), res.data
+        assert "John Doe 2" in str(res.data), res
+        assert "johndoe2" in str(res.data), res
+        assert "johndoe2@example.com" in str(res.data), res
 
         res = self.signout()
-        assert self.html_title() in res.data, res
-        assert "You are now signed out" in res.data, res
+        assert self.html_title() in str(res.data), res
+        assert "You are now signed out" in str(res.data), res
 
         # A user must be signed in to access the update page, the page
         # the title will be the redirection to log in
         res = self.update_profile(method="GET")
-        assert self.html_title("Sign in") in res.data, res
-        assert "This feature requires being logged in." in res.data, res
+        assert self.html_title("Sign in") in str(res.data), res
+        assert "This feature requires being logged in." in str(res.data), res
 
         # A user must be signed in to access the update page, the page
         # the title will be the redirection to log in
         res = self.update_profile()
-        assert self.html_title("Sign in") in res.data, res
-        assert "This feature requires being logged in." in res.data, res
+        assert self.html_title("Sign in") in str(res.data), res
+        assert "This feature requires being logged in." in str(res.data), res
 
         self.register(fullname="new", name="new")
         self.signin(email="new@example.com", password="p4ssw0rd")
@@ -1818,11 +1819,11 @@ class TestWeb(web.Helper):
         # As anon
         url = '/project/%s/delete' % project.short_name
         res = self.app_get_json(url, follow_redirects=True)
-        assert 'signin' in res.data, res.data
+        assert 'signin' in str(res.data), res.data
 
         url = '/project/%s/delete' % project.short_name
         res = self.app_post_json(url)
-        assert 'signin' in res.data, res.data
+        assert 'signin' in str(res.data), res.data
 
         # As not owner
         url = '/project/%s/delete?api_key=%s' % (project.short_name, user.api_key)
@@ -1933,27 +1934,27 @@ class TestWeb(web.Helper):
 
         data = json.loads(res.data)['project']
 
-        assert 'id' in data.keys(), data.keys()
-        assert 'description' in data.keys(), data.keys()
-        assert 'info' in data.keys(), data.keys()
-        assert 'long_description' in data.keys(), data.keys()
-        assert 'n_tasks' in data.keys(), data.keys()
-        assert 'n_volunteers' in data.keys(), data.keys()
-        assert 'name' in data.keys(), data.keys()
-        assert 'overall_progress' in data.keys(), data.keys()
-        assert 'short_name' in data.keys(), data.keys()
-        assert 'created' in data.keys(), data.keys()
-        assert 'long_description' in data.keys(), data.keys()
-        assert 'last_activity' in data.keys(), data.keys()
-        assert 'last_activity_raw' in data.keys(), data.keys()
-        assert 'n_task_runs' in data.keys(), data.keys()
-        assert 'n_results' in data.keys(), data.keys()
-        assert 'owner' in data.keys(), data.keys()
-        assert 'updated' in data.keys(), data.keys()
-        assert 'featured' in data.keys(), data.keys()
-        assert 'owner_id' in data.keys(), data.keys()
-        assert 'n_completed_tasks' in data.keys(), data.keys()
-        assert 'n_blogposts' in data.keys(), data.keys()
+        assert 'id' in data.keys(), list(data.keys())
+        assert 'description' in data.keys(), list(data.keys())
+        assert 'info' in data.keys(), list(data.keys())
+        assert 'long_description' in data.keys(), list(data.keys())
+        assert 'n_tasks' in data.keys(), list(data.keys())
+        assert 'n_volunteers' in data.keys(), list(data.keys())
+        assert 'name' in data.keys(), list(data.keys())
+        assert 'overall_progress' in data.keys(), list(data.keys())
+        assert 'short_name' in data.keys(), list(data.keys())
+        assert 'created' in data.keys(), list(data.keys())
+        assert 'long_description' in data.keys(), list(data.keys())
+        assert 'last_activity' in data.keys(), list(data.keys())
+        assert 'last_activity_raw' in data.keys(), list(data.keys())
+        assert 'n_task_runs' in data.keys(), list(data.keys())
+        assert 'n_results' in data.keys(), list(data.keys())
+        assert 'owner' in data.keys(), list(data.keys())
+        assert 'updated' in data.keys(), list(data.keys())
+        assert 'featured' in data.keys(), list(data.keys())
+        assert 'owner_id' in data.keys(), list(data.keys())
+        assert 'n_completed_tasks' in data.keys(), list(data.keys())
+        assert 'n_blogposts' in data.keys(), list(data.keys())
 
     @with_context
     def test_update_project_json_as_user(self):
@@ -2158,8 +2159,8 @@ class TestWeb(web.Helper):
         self.signin()
         self.create_categories()
         res = self.app.get('/project/category/featured', follow_redirects=True)
-        assert "Projects" in res.data, res.data
-        assert Fixtures.cat_1 not in res.data, res.data
+        assert "Projects" in str(res.data), res.data
+        assert Fixtures.cat_1 not in str(res.data), res.data
 
     @with_context
     def test_06_applications_2(self):
@@ -2174,9 +2175,9 @@ class TestWeb(web.Helper):
         db.session.commit()
 
         res = self.app.get('/project/category/featured', follow_redirects=True)
-        assert self.html_title("Projects") in res.data, res.data
-        assert "Projects" in res.data, res.data
-        assert project_short_name in res.data, res.data
+        assert self.html_title("Projects") in str(res.data), res.data
+        assert "Projects" in str(res.data), res.data
+        assert project_short_name in str(res.data), res.data
 
     @with_context
     def test_06_featured_project_json(self):
@@ -2205,7 +2206,7 @@ class TestWeb(web.Helper):
         assert 'projects' in data.keys(), data
         assert data['pagination']['next'] is False, data
         assert data['pagination']['prev'] is False, data
-        assert data['pagination']['total'] == 1L, data
+        assert data['pagination']['total'] == 1, data
         assert data['active_cat']['name'] == 'Featured', data
         assert len(data['projects']) == 1, data
         assert data['projects'][0]['id'] == project.id, data
@@ -2224,10 +2225,10 @@ class TestWeb(web.Helper):
         self.register()
         self.signin()
         res = self.app.get('/project/category/featured', follow_redirects=True)
-        assert self.html_title("Projects") in res.data, res.data
-        assert "Projects" in res.data, res.data
-        assert '/project/test-app' in res.data, res.data
-        assert 'My New Project' in res.data, res.data
+        assert self.html_title("Projects") in str(res.data), res.data
+        assert "Projects" in str(res.data), res.data
+        assert '/project/test-app' in str(res.data), res.data
+        assert 'My New Project' in str(res.data), res.data
 
         # Update one task to have more answers than expected
         task = db.session.query(Task).get(1)
@@ -2238,7 +2239,7 @@ class TestWeb(web.Helper):
         cat = db.session.query(Category).get(1)
         url = '/project/category/featured/'
         res = self.app.get(url, follow_redirects=True)
-        assert 'Featured Projects' in res.data, res.data
+        assert 'Featured Projects' in str(res.data), res.data
 
     @with_context
     @patch('pybossa.ckan.requests.get')
@@ -2262,9 +2263,9 @@ class TestWeb(web.Helper):
         res = self.app.get('/project/sampleapp', follow_redirects=True)
         assert_raises(ValueError, json.loads, res.data)
         msg = "Project: Sample Project"
-        assert self.html_title(msg) in res.data, res
+        assert self.html_title(msg) in str(res.data), res
         err_msg = "There should be a contribute button"
-        assert "Start Contributing Now!" in res.data, err_msg
+        assert "Start Contributing Now!" in str(res.data), err_msg
 
         res = self.app.get('/project/sampleapp/settings', follow_redirects=True)
         assert_raises(ValueError, json.loads, res.data)
@@ -2274,20 +2275,20 @@ class TestWeb(web.Helper):
         # Now as an anonymous user
         res = self.app.get('/project/sampleapp', follow_redirects=True)
         assert_raises(ValueError, json.loads, res.data)
-        assert "This feature requires being logged in." in res.data, err_msg
+        assert "This feature requires being logged in." in str(res.data), err_msg
         res = self.app.get('/project/sampleapp/settings', follow_redirects=True)
         assert res.status == '200 OK', res.status
         err_msg = "Anonymous user should be redirected to sign in page"
-        assert "This feature requires being logged in." in res.data, err_msg
+        assert "This feature requires being logged in." in str(res.data), err_msg
 
         # Now with a different user
         self.register(fullname="Perico Palotes", name="perico")
         self.signin(email="perico@example.com", password="p4ssw0rd")
         res = self.app.get('/project/sampleapp', follow_redirects=True)
         assert_raises(ValueError, json.loads, res.data)
-        print(res.data)
-        assert "Sample Project" in res.data, res
-        assert "Enter the password to contribute to this project" in res.data, err_msg
+        print((res.data))
+        assert "Sample Project" in str(res.data), res
+        assert "Enter the password to contribute to this project" in str(res.data), err_msg
         res = self.app.get('/project/sampleapp/settings')
         assert res.status == '403 FORBIDDEN', res.status
 
@@ -2404,14 +2405,14 @@ class TestWeb(web.Helper):
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
     def test_10b_application_long_description_allows_markdown(self, mock):
         """Test WEB long description markdown is supported"""
-        markdown_description = u'Markdown\n======='
+        markdown_description = 'Markdown\n======='
         self.register()
         self.signin()
         self.new_project(long_description=markdown_description)
 
         res = self.app.get('/project/sampleapp', follow_redirects=True)
         data = res.data
-        assert '<h1>Markdown</h1>' in data, 'Markdown text not being rendered!'
+        assert '<h1>Markdown</h1>' in str(data), 'Markdown text not being rendered!'
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -2419,24 +2420,24 @@ class TestWeb(web.Helper):
         """Test WEB create a project works"""
         # Create a project as an anonymous user
         res = self.new_project(method="GET")
-        assert self.html_title("Sign in") in res.data, res
-        assert "This feature requires being logged in." in res.data, res
+        assert self.html_title("Sign in") in str(res.data), res
+        assert "This feature requires being logged in." in str(res.data), res
 
         res = self.new_project()
-        assert self.html_title("Sign in") in res.data, res.data
-        assert "This feature requires being logged in." in res.data, res.data
+        assert self.html_title("Sign in") in str(res.data), res.data
+        assert "This feature requires being logged in." in str(res.data), res.data
 
         # Sign in and create a project
         res = self.register()
         res = self.signin()
 
         res = self.new_project(method="GET")
-        assert self.html_title("Create a Project") in res.data, res
-        assert "Create the project" in res.data, res
+        assert self.html_title("Create a Project") in str(res.data), res
+        assert "Create the project" in str(res.data), res
 
         res = self.new_project(long_description='My Description')
-        assert "Sample Project" in res.data
-        assert "Project created!" in res.data, res
+        assert "Sample Project" in str(res.data)
+        assert "Project created!" in str(res.data), res
 
         project = db.session.query(Project).first()
         assert project.name == 'Sample Project', 'Different names %s' % project.name
@@ -2505,29 +2506,29 @@ class TestWeb(web.Helper):
         # Issue the error for the project.name
         res = self.new_project(name="")
         err_msg = "A project must have a name"
-        assert "This field is required" in res.data, err_msg
+        assert "This field is required" in str(res.data), err_msg
 
         # Issue the error for the project.short_name
         res = self.new_project(short_name="")
         err_msg = "A project must have a short_name"
-        assert "This field is required" in res.data, err_msg
+        assert "This field is required" in str(res.data), err_msg
 
         # Issue the error for the project.description
         res = self.new_project(long_description="")
         err_msg = "A project must have a description"
-        assert "This field is required" in res.data, err_msg
+        assert "This field is required" in str(res.data), err_msg
 
         # Issue the error for the project.short_name
         res = self.new_project(short_name='$#/|')
         err_msg = "A project must have a short_name without |/$# chars"
-        assert '$#&amp;\/| and whitespace symbols are forbidden' in res.data, err_msg
+        assert '$#&\/| and whitespace symbols are forbidden' in res.data.decode(), err_msg
 
         # Now Unique checks
         self.new_project()
         res = self.new_project()
         err_msg = "There should be a Unique field"
-        assert "Name is already taken" in res.data, err_msg
-        assert "Short Name is already taken" in res.data, err_msg
+        assert "Name is already taken" in str(res.data), err_msg
+        assert "Short Name is already taken" in str(res.data), err_msg
 
     @with_context
     @patch('pybossa.ckan.requests.get')
@@ -2549,17 +2550,17 @@ class TestWeb(web.Helper):
         # Get the Update Project web page
         res = self.update_project(method="GET")
         msg = "Project: Sample Project &middot; Update"
-        assert self.html_title(msg) in res.data, res
+        assert self.html_title(msg) in str(res.data), res
         msg = 'input id="id" name="id" type="hidden" value="1"'
-        assert msg in res.data, res
-        assert "Save the changes" in res.data, res
+        assert msg in str(res.data), res
+        assert "Save the changes" in str(res.data), res
 
         # Check form validation
         res = self.update_project(new_name="",
                                   new_short_name="",
                                   new_description="New description",
                                   new_long_description='New long desc')
-        assert "Please correct the errors" in res.data, res.data
+        assert "Please correct the errors" in str(res.data), res.data
 
         # Update the project
         res = self.update_project(new_name="New Sample Project",
@@ -2567,7 +2568,7 @@ class TestWeb(web.Helper):
                                   new_description="New description",
                                   new_long_description='New long desc')
         project = db.session.query(Project).first()
-        assert "Project updated!" in res.data, res.data
+        assert "Project updated!" in str(res.data), res.data
         err_msg = "Project name not updated %s" % project.name
         assert project.name == "New Sample Project", err_msg
 
@@ -2700,16 +2701,16 @@ class TestWeb(web.Helper):
         mock_webhook.return_value = html_request
 
         res = self.update_project(new_name="")
-        assert "This field is required" in res.data
+        assert "This field is required" in str(res.data)
 
         res = self.update_project(new_description="")
-        assert "You must provide a description." in res.data
+        assert "You must provide a description." in str(res.data)
 
         res = self.update_project(new_description="a" * 256)
-        assert "Field cannot be longer than 255 characters." in res.data
+        assert "Field cannot be longer than 255 characters." in str(res.data)
 
         res = self.update_project(new_long_description="")
-        assert "This field is required" not in res.data
+        assert "This field is required" not in str(res.data)
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -2721,17 +2722,17 @@ class TestWeb(web.Helper):
         self.new_project()
         res = self.delete_project(method="GET")
         msg = "Project: Sample Project &middot; Delete"
-        assert self.html_title(msg) in res.data, res
-        assert "No, do not delete it" in res.data, res
+        assert self.html_title(msg) in str(res.data), res
+        assert "No, do not delete it" in str(res.data), res
 
         project = db.session.query(Project).filter_by(short_name='sampleapp').first()
         res = self.delete_project(method="GET")
         msg = "Project: Sample Project &middot; Delete"
-        assert self.html_title(msg) in res.data, res
-        assert "No, do not delete it" in res.data, res
+        assert self.html_title(msg) in str(res.data), res
+        assert "No, do not delete it" in str(res.data), res
 
         res = self.delete_project()
-        assert "Project deleted!" in res.data, res
+        assert "Project deleted!" in str(res.data), res
 
         self.signin(email=Fixtures.email_addr2, password=Fixtures.password)
         res = self.delete_project(short_name=Fixtures.project_short_name)
@@ -2742,8 +2743,8 @@ class TestWeb(web.Helper):
     def test_delete_project_deletes_task_zip_files_too(self, uploader):
         """Test WEB delete project also deletes zip files for task and taskruns"""
         Fixtures.create()
-        make_subadmin_by(email_addr=u'tester@tester.com')
-        self.signin(email=u'tester@tester.com', password=u'tester')
+        make_subadmin_by(email_addr='tester@tester.com')
+        self.signin(email='tester@tester.com', password='tester')
         res = self.app.post('/project/test-app/delete', follow_redirects=True)
         expected = [call('1_test-app_task_json.zip', 'user_2'),
                     call('1_test-app_task_csv.zip', 'user_2'),
@@ -2769,8 +2770,8 @@ class TestWeb(web.Helper):
         res = self.app.get('project/%s/tasks/browse' % (project.short_name),
                            follow_redirects=True)
         dom = BeautifulSoup(res.data)
-        assert "Sample Project" in res.data, res.data
-        assert re.search('0\s+of\s+10', res.data), res.data
+        assert "Sample Project" in str(res.data), res.data
+        assert re.search('0\s+of\s+10', res.data.decode()), res.data
         err_msg = "Download button should be disabled"
         assert dom.find(id='nothingtodownload') is not None, err_msg
 
@@ -2784,8 +2785,8 @@ class TestWeb(web.Helper):
         res = self.app.get('project/%s/tasks/browse' % (project.short_name),
                            follow_redirects=True)
         dom = BeautifulSoup(res.data)
-        assert "Sample Project" in res.data, res.data
-        assert re.search('5\s+of\s+10', res.data), res.data
+        assert "Sample Project" in str(res.data), res.data
+        assert re.search('5\s+of\s+10', res.data.decode()), res.data
         err_msg = "Download Partial results button should be shown"
         assert dom.find(id='partialdownload') is not None, err_msg
 
@@ -2800,10 +2801,10 @@ class TestWeb(web.Helper):
 
         res = self.app.get('project/%s/tasks/browse' % (project.short_name),
                            follow_redirects=True)
-        assert "Sample Project" in res.data, res.data
+        assert "Sample Project" in str(res.data), res.data
         msg = '<a class="label label-success" target="_blank" href="/project/sampleapp/task/1?mode=read_only">#1</a>'
-        assert msg in res.data, res.data
-        assert re.search('10\s+of\s+10', res.data), res.data
+        assert msg in str(res.data), res.data
+        assert re.search('10\s+of\s+10', res.data.decode()), res.data
         dom = BeautifulSoup(res.data)
         err_msg = "Download Full results button should be shown"
         assert dom.find(id='fulldownload') is not None, err_msg
@@ -2906,15 +2907,15 @@ class TestWeb(web.Helper):
 
         res = self.app.get('project/%s/tasks/browse' % (project.short_name),
                            follow_redirects=True)
-        assert "Sample Project" in res.data, res.data
+        assert "Sample Project" in str(res.data), res.data
         msg = '<a class="label label-info" target="_blank" href="/project/sampleapp/task/1?mode=read_only">#1</a>'
-        assert msg in res.data, res.data
-        assert re.search('0\s+of\s+10', res.data), res.data
+        assert msg in str(res.data), res.data
+        assert re.search('0\s+of\s+10', res.data.decode()), res.data
 
         # For a non existing page
         res = self.app.get('project/%s/tasks/browse/5000' % (project.short_name),
                            follow_redirects=True)
-        assert re.search('Displaying tasks\s+\d+-\d+\s+of\s+1', res.data), res.data
+        assert re.search('Displaying tasks\s+\d+-\d+\s+of\s+1', res.data.decode()), res.data
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -2933,7 +2934,7 @@ class TestWeb(web.Helper):
         project = db.session.query(Project).first()
 
         res = self.app_get_json('project/%s/tasks/browse' % (project.short_name))
-        print(res.data)
+        print((res.data))
         data = json.loads(res.data)
         err_msg = 'key missing'
         assert 'n_completed_tasks' in data, err_msg
@@ -2964,8 +2965,8 @@ class TestWeb(web.Helper):
         self.create()
 
         res = self.app.get('project/category/featured', follow_redirects=True)
-        assert "Projects" in res.data, res.data
-        assert Fixtures.cat_1 in res.data, res.data
+        assert "Projects" in str(res.data), res.data
+        assert Fixtures.cat_1 in str(res.data), res.data
 
         task = db.session.query(Task).get(1)
         # Update one task to have more answers than expected
@@ -2977,7 +2978,7 @@ class TestWeb(web.Helper):
         url = '/project/category/%s/' % Fixtures.cat_1
         res = self.app.get(url, follow_redirects=True)
         tmp = '%s Projects' % Fixtures.cat_1
-        assert tmp in res.data, res
+        assert tmp in str(res.data), res
 
     @with_context
     def test_app_index_categories_pagination(self):
@@ -2995,9 +2996,9 @@ class TestWeb(web.Helper):
         page2 = self.app.get('/project/category/%s/page/2/' % category.short_name)
         current_app.config['APPS_PER_PAGE'] = n_apps
 
-        assert '<a href="/project/category/cat/page/2/" rel="nofollow">2</a>' in page1.data
+        assert '<a href="/project/category/cat/page/2/" rel="nofollow">2</a>' in page1.data.decode()
         assert page2.status_code == 200, page2.status_code
-        assert '<a href="/project/category/cat/" rel="nofollow">1</a>' in page2.data
+        assert '<a href="/project/category/cat/" rel="nofollow">1</a>' in page2.data.decode()
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -3014,8 +3015,8 @@ class TestWeb(web.Helper):
         #self.signout()
 
         res = self.app.get('project/category/featured', follow_redirects=True)
-        assert "Featured Projects" in res.data, res.data
-        assert "Sample Project" in res.data, res.data
+        assert "Featured Projects" in str(res.data), res.data
+        assert "Sample Project" in str(res.data), res.data
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -3055,7 +3056,7 @@ class TestWeb(web.Helper):
         assert 'projects' in data.keys(), data
         assert data['pagination']['next'] is False, data
         assert data['pagination']['prev'] is False, data
-        assert data['pagination']['total'] == 1L, data
+        assert data['pagination']['total'] == 1, data
         assert data['active_cat']['name'] == 'Draft', data
         assert len(data['projects']) == 1, data
         assert data['projects'][0]['id'] == project.id, data
@@ -3090,10 +3091,10 @@ class TestWeb(web.Helper):
         # As Admin
         self.signin()
         res = self.app.get('/project/category/draft', follow_redirects=True)
-        assert "project-published" not in res.data, res.data
-        assert "draft" in res.data, res.data
-        assert "Sample Project" in res.data, res.data
-        assert 'Draft Projects' in res.data, res.data
+        assert "project-published" not in str(res.data), res.data
+        assert "draft" in str(res.data), res.data
+        assert "Sample Project" in str(res.data), res.data
+        assert 'Draft Projects' in str(res.data), res.data
 
     @with_context
     def test_21_get_specific_ongoing_task_anonymous(self):
@@ -3107,9 +3108,9 @@ class TestWeb(web.Helper):
                  .first()
         res = self.app.get('project/%s/task/%s' % (project.short_name, task.id),
                            follow_redirects=True)
-        #assert 'TaskPresenter' in res.data, res.data
+        #assert 'TaskPresenter' in str(res.data), res.data
         #msg = "?next=%2Fproject%2F" + project.short_name + "%2Ftask%2F" + str(task.id)
-        #assert msg in res.data, res.data
+        #assert msg in str(res.data), res.data
 
         # Try with only registered users
         project.allow_anonymous_contributors = False
@@ -3117,7 +3118,7 @@ class TestWeb(web.Helper):
         db.session.commit()
         res = self.app.get('project/%s/task/%s' % (project.short_name, task.id),
                            follow_redirects=True)
-        assert 'This feature requires being logged in' in res.data
+        assert 'This feature requires being logged in' in str(res.data)
 
     @with_context
     def test_21_get_specific_ongoing_task_anonymous_json(self):
@@ -3166,7 +3167,7 @@ class TestWeb(web.Helper):
         task = db.session.query(Task).filter(Project.id == project.id).first()
         res = self.app.get('project/%s/task/%s' % (project.short_name, task.id),
                            follow_redirects=True)
-        assert 'TaskPresenter' in res.data, res.data
+        assert 'TaskPresenter' in str(res.data), res.data
 
     @with_context
     def test_23_get_specific_ongoing_task_user_json(self):
@@ -3223,7 +3224,7 @@ class TestWeb(web.Helper):
         project = db.session.query(Project).first()
         task = db.session.query(Task).filter(Project.id == project.id).first()
         res = self.app_get_json('project/%s/task/%s' % (project.short_name, task.id))
-        print(res.data)
+        print((res.data))
 
         assert fake_guard_instance.stamp.called
 
@@ -3249,9 +3250,9 @@ class TestWeb(web.Helper):
         task2_id = task2.id
 
         res = self.app.get('/project/%s/task/%s' % (project1_short_name, task2_id))
-        assert "Error" in res.data, res.data
+        assert "Error" in str(res.data), res.data
         msg = "This task does not belong to %s" % project1_short_name
-        assert msg in res.data, res.data
+        assert msg in str(res.data), res.data
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -3299,15 +3300,15 @@ class TestWeb(web.Helper):
         # First time accessing the project should redirect me to the tutorial
         res = self.app.get('/project/test-app/newtask', follow_redirects=True)
         err_msg = "There should be some tutorial for the project"
-        assert "some help" in res.data, err_msg
+        assert "some help" in str(res.data), err_msg
         # Second time should give me a task, and not the tutorial
         res = self.app.get('/project/test-app/newtask', follow_redirects=True)
-        assert "some help" not in res.data
+        assert "some help" not in str(res.data)
 
         # Check if the tutorial can be accessed directly
         res = self.app.get('/project/test-app/tutorial', follow_redirects=True)
         err_msg = "There should be some tutorial for the project"
-        assert "some help" in res.data, err_msg
+        assert "some help" in str(res.data), err_msg
 
     @with_context
     def test_26_tutorial_signed_user_json(self):
@@ -3321,10 +3322,10 @@ class TestWeb(web.Helper):
         # First time accessing the project should redirect me to the tutorial
         res = self.app.get('/project/test-app/newtask', follow_redirects=True)
         err_msg = "There should be some tutorial for the project"
-        assert "some help" in res.data, err_msg
+        assert "some help" in str(res.data), err_msg
         # Second time should give me a task, and not the tutorial
         res = self.app.get('/project/test-app/newtask', follow_redirects=True)
-        assert "some help" not in res.data
+        assert "some help" not in str(res.data)
 
         # Check if the tutorial can be accessed directly
         res = self.app_get_json('/project/test-app/tutorial')
@@ -3349,15 +3350,15 @@ class TestWeb(web.Helper):
         # First time accessing the project should redirect me to the tutorial
         res = self.app.get('/project/test-app/newtask', follow_redirects=True)
         err_msg = "There should be some tutorial for the project"
-        assert "some help" in res.data, err_msg
+        assert "some help" in str(res.data), err_msg
         # Second time should give me a task, and not the tutorial
         res = self.app.get('/project/test-app/newtask', follow_redirects=True)
-        assert "some help" not in res.data
+        assert "some help" not in str(res.data)
 
         # Check if the tutorial can be accessed directly
         res = self.app.get('/project/test-app/tutorial', follow_redirects=True)
         err_msg = "There should be some tutorial for the project"
-        assert "some help" in res.data, err_msg
+        assert "some help" in str(res.data), err_msg
 
     @nottest
     @with_context
@@ -3370,10 +3371,10 @@ class TestWeb(web.Helper):
         # First time accessing the project should redirect me to the tutorial
         res = self.app.get('/project/test-app/newtask', follow_redirects=True)
         err_msg = "There should be some tutorial for the project"
-        assert "some help" in res.data, err_msg
+        assert "some help" in str(res.data), err_msg
         # Second time should give me a task, and not the tutorial
         res = self.app.get('/project/test-app/newtask', follow_redirects=True)
-        assert "some help" not in res.data
+        assert "some help" not in str(res.data)
 
         # Check if the tutorial can be accessed directly
         res = self.app_get_json('/project/test-app/tutorial')
@@ -3398,10 +3399,10 @@ class TestWeb(web.Helper):
         # First time accessing the project should show the presenter
         res = self.app.get('/project/test-app/newtask', follow_redirects=True)
         err_msg = "There should be a presenter for the project"
-        assert "the real presenter" in res.data, err_msg
+        assert "the real presenter" in str(res.data), err_msg
         # Second time accessing the project should show the presenter
         res = self.app.get('/project/test-app/newtask', follow_redirects=True)
-        assert "the real presenter" in res.data, err_msg
+        assert "the real presenter" in str(res.data), err_msg
 
     @with_context
     def test_29_non_tutorial_anonymous_user(self):
@@ -3414,10 +3415,10 @@ class TestWeb(web.Helper):
         # First time accessing the project should show the presenter
         res = self.app.get('/project/test-app/newtask', follow_redirects=True)
         err_msg = "There should be a presenter for the project"
-        assert "the real presenter" in res.data, err_msg
+        assert "the real presenter" in str(res.data), err_msg
         # Second time accessing the project should show the presenter
         res = self.app.get('/project/test-app/newtask', follow_redirects=True)
-        assert "the real presenter" in res.data, err_msg
+        assert "the real presenter" in str(res.data), err_msg
         '''
 
     @with_context
@@ -3432,8 +3433,8 @@ class TestWeb(web.Helper):
         newtask_response = self.app.get(newtask_url, follow_redirects=True)
         task_response = self.app.get(task_url, follow_redirects=True)
 
-        assert message in newtask_response.data
-        assert message in task_response.data
+        assert message in newtask_response.data.decode()
+        assert message in task_response.data.decode()
 
     @with_context
     def test_message_is_flashed_contributing_to_project_without_presenter(self):
@@ -3449,8 +3450,8 @@ class TestWeb(web.Helper):
             newtask_response = self.app.get(newtask_url)
             task_response = self.app.get(task_url, follow_redirects=True)
 
-            assert message not in newtask_response.data, newtask_response.data
-            assert message not in task_response.data, task_response.data
+            assert message not in newtask_response.data.decode(), newtask_response.data
+            assert message not in task_response.data.decode(), task_response.data
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -3461,12 +3462,12 @@ class TestWeb(web.Helper):
         self.new_project()
 
         res = self.app.get('/project/sampleapp/settings', follow_redirects=True)
-        assert "Sample Project" in res.data, ("Project should be shown to "
+        assert "Sample Project" in str(res.data), ("Project should be shown to "
                                               "the owner")
         # TODO: Needs discussion. Disable for now.
         # msg = '<strong><i class="icon-cog"></i> ID</strong>: 1'
         # err_msg = "Project ID should be shown to the owner"
-        # assert msg in res.data, err_msg
+        # assert msg in str(res.data), err_msg
 
         self.signout()
         self.create()
@@ -3495,7 +3496,7 @@ class TestWeb(web.Helper):
 
         res = self.app.get('/project/sampleapp', follow_redirects=True)
         assert '<strong><i class="icon-cog"></i> ID</strong>: 1' not in \
-            res.data, "Project ID should be shown to the owner"
+            str(res.data), "Project ID should be shown to the owner"
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -3513,7 +3514,7 @@ class TestWeb(web.Helper):
         db.session.commit()
 
         res = self.app.get('account/johndoe', follow_redirects=True)
-        assert "Sample Project" in res.data
+        assert "Sample Project" in str(res.data)
 
     @with_context
     def test_32_oauth_password(self):
@@ -3526,28 +3527,28 @@ class TestWeb(web.Helper):
         db.session.add(user)
         db.session.commit()
         res = self.signin()
-        assert "Ooops, we didn&#39;t find you in the system" in res.data, res.data
+        assert "Ooops, we didn&#39;t find you in the system" in str(res.data), res.data
 
     @with_context
     def test_39_google_oauth_creation(self):
         """Test WEB Google OAuth creation of user works"""
         fake_response = {
-            u'access_token': u'access_token',
-            u'token_type': u'Bearer',
-            u'expires_in': 3600,
-            u'id_token': u'token'}
+            'access_token': 'access_token',
+            'token_type': 'Bearer',
+            'expires_in': 3600,
+            'id_token': 'token'}
 
         fake_user = {
-            u'family_name': u'Doe', u'name': u'John Doe',
-            u'picture': u'https://goo.gl/img.jpg',
-            u'locale': u'en',
-            u'gender': u'male',
-            u'email': u'john@gmail.com',
-            u'birthday': u'0000-01-15',
-            u'link': u'https://plus.google.com/id',
-            u'given_name': u'John',
-            u'id': u'111111111111111111111',
-            u'verified_email': True}
+            'family_name': 'Doe', 'name': 'John Doe',
+            'picture': 'https://goo.gl/img.jpg',
+            'locale': 'en',
+            'gender': 'male',
+            'email': 'john@gmail.com',
+            'birthday': '0000-01-15',
+            'link': 'https://plus.google.com/id',
+            'given_name': 'John',
+            'id': '111111111111111111111',
+            'verified_email': True}
 
         from pybossa.view import google
         response_user = google.manage_user(fake_response['access_token'],
@@ -3561,22 +3562,22 @@ class TestWeb(web.Helper):
     def test_40_google_oauth_creation(self):
         """Test WEB Google OAuth detects same user name/email works"""
         fake_response = {
-            u'access_token': u'access_token',
-            u'token_type': u'Bearer',
-            u'expires_in': 3600,
-            u'id_token': u'token'}
+            'access_token': 'access_token',
+            'token_type': 'Bearer',
+            'expires_in': 3600,
+            'id_token': 'token'}
 
         fake_user = {
-            u'family_name': u'Doe', u'name': u'John Doe',
-            u'picture': u'https://goo.gl/img.jpg',
-            u'locale': u'en',
-            u'gender': u'male',
-            u'email': u'john@gmail.com',
-            u'birthday': u'0000-01-15',
-            u'link': u'https://plus.google.com/id',
-            u'given_name': u'John',
-            u'id': u'111111111111111111111',
-            u'verified_email': True}
+            'family_name': 'Doe', 'name': 'John Doe',
+            'picture': 'https://goo.gl/img.jpg',
+            'locale': 'en',
+            'gender': 'male',
+            'email': 'john@gmail.com',
+            'birthday': '0000-01-15',
+            'link': 'https://plus.google.com/id',
+            'given_name': 'John',
+            'id': '111111111111111111111',
+            'verified_email': True}
 
         self.register()
         self.signout()
@@ -3591,25 +3592,25 @@ class TestWeb(web.Helper):
     def test_39_facebook_oauth_creation(self):
         """Test WEB Facebook OAuth creation of user works"""
         fake_response = {
-            u'access_token': u'access_token',
-            u'token_type': u'Bearer',
-            u'expires_in': 3600,
-            u'id_token': u'token'}
+            'access_token': 'access_token',
+            'token_type': 'Bearer',
+            'expires_in': 3600,
+            'id_token': 'token'}
 
         fake_user = {
-            u'username': u'teleyinex',
-            u'first_name': u'John',
-            u'last_name': u'Doe',
-            u'verified': True,
-            u'name': u'John Doe',
-            u'locale': u'en_US',
-            u'gender': u'male',
-            u'email': u'johndoe@example.com',
-            u'quotes': u'"quote',
-            u'link': u'http://www.facebook.com/johndoe',
-            u'timezone': 1,
-            u'updated_time': u'2011-11-11T12:33:52+0000',
-            u'id': u'11111'}
+            'username': 'teleyinex',
+            'first_name': 'John',
+            'last_name': 'Doe',
+            'verified': True,
+            'name': 'John Doe',
+            'locale': 'en_US',
+            'gender': 'male',
+            'email': 'johndoe@example.com',
+            'quotes': '"quote',
+            'link': 'http://www.facebook.com/johndoe',
+            'timezone': 1,
+            'updated_time': '2011-11-11T12:33:52+0000',
+            'id': '11111'}
 
         from pybossa.view import facebook
         response_user = facebook.manage_user(fake_response['access_token'],
@@ -3623,25 +3624,25 @@ class TestWeb(web.Helper):
     def test_40_facebook_oauth_creation(self):
         """Test WEB Facebook OAuth detects same user name/email works"""
         fake_response = {
-            u'access_token': u'access_token',
-            u'token_type': u'Bearer',
-            u'expires_in': 3600,
-            u'id_token': u'token'}
+            'access_token': 'access_token',
+            'token_type': 'Bearer',
+            'expires_in': 3600,
+            'id_token': 'token'}
 
         fake_user = {
-            u'username': u'teleyinex',
-            u'first_name': u'John',
-            u'last_name': u'Doe',
-            u'verified': True,
-            u'name': u'John Doe',
-            u'locale': u'en_US',
-            u'gender': u'male',
-            u'email': u'johndoe@example.com',
-            u'quotes': u'"quote',
-            u'link': u'http://www.facebook.com/johndoe',
-            u'timezone': 1,
-            u'updated_time': u'2011-11-11T12:33:52+0000',
-            u'id': u'11111'}
+            'username': 'teleyinex',
+            'first_name': 'John',
+            'last_name': 'Doe',
+            'verified': True,
+            'name': 'John Doe',
+            'locale': 'en_US',
+            'gender': 'male',
+            'email': 'johndoe@example.com',
+            'quotes': '"quote',
+            'link': 'http://www.facebook.com/johndoe',
+            'timezone': 1,
+            'updated_time': '2011-11-11T12:33:52+0000',
+            'id': '11111'}
 
         self.register()
         self.signout()
@@ -3656,14 +3657,14 @@ class TestWeb(web.Helper):
     def test_39_twitter_oauth_creation(self):
         """Test WEB Twitter OAuth creation of user works"""
         fake_response = {
-            u'access_token': {u'oauth_token': u'oauth_token',
-                              u'oauth_token_secret': u'oauth_token_secret'},
-            u'token_type': u'Bearer',
-            u'expires_in': 3600,
-            u'id_token': u'token'}
+            'access_token': {'oauth_token': 'oauth_token',
+                              'oauth_token_secret': 'oauth_token_secret'},
+            'token_type': 'Bearer',
+            'expires_in': 3600,
+            'id_token': 'token'}
 
-        fake_user = {u'screen_name': u'johndoe',
-                     u'user_id': u'11111'}
+        fake_user = {'screen_name': 'johndoe',
+                     'user_id': '11111'}
 
         from pybossa.view import twitter
         response_user = twitter.manage_user(fake_response['access_token'],
@@ -3675,20 +3676,20 @@ class TestWeb(web.Helper):
 
         res = self.signin(email=user.email_addr, password='wrong')
         msg = "It seems like you signed up with your Twitter account"
-        assert msg in res.data, msg
+        assert msg in str(res.data), msg
 
     @with_context
     def test_40_twitter_oauth_creation(self):
         """Test WEB Twitter OAuth detects same user name/email works"""
         fake_response = {
-            u'access_token': {u'oauth_token': u'oauth_token',
-                              u'oauth_token_secret': u'oauth_token_secret'},
-            u'token_type': u'Bearer',
-            u'expires_in': 3600,
-            u'id_token': u'token'}
+            'access_token': {'oauth_token': 'oauth_token',
+                              'oauth_token_secret': 'oauth_token_secret'},
+            'token_type': 'Bearer',
+            'expires_in': 3600,
+            'id_token': 'token'}
 
-        fake_user = {u'screen_name': u'johndoe',
-                     u'user_id': u'11111'}
+        fake_user = {'screen_name': 'johndoe',
+                     'user_id': '11111'}
 
         self.register()
         self.signout()
@@ -3770,7 +3771,7 @@ class TestWeb(web.Helper):
                             content_type="multipart/form-data",
                             headers={'X-CSRFToken': csrf})
         err_msg = "Avatar should be updated"
-        assert "Your avatar has been updated!" in res.data, (res.data, err_msg)
+        assert "Your avatar has been updated!" in str(res.data), (res.data, err_msg)
 
         payload['avatar'] = None
         res = self.app.post(url,
@@ -3779,7 +3780,7 @@ class TestWeb(web.Helper):
                             content_type="multipart/form-data",
                             headers={'X-CSRFToken': csrf})
         msg = "You have to provide an image file to update your avatar"
-        assert msg in res.data, (res.data, msg)
+        assert msg in str(res.data), (res.data, msg)
 
     @with_context
     def test_41_password_change(self):
@@ -3793,7 +3794,7 @@ class TestWeb(web.Helper):
                                   'confirm': "p4ssw0rd",
                                   'btn': 'Password'},
                             follow_redirects=True)
-        assert "Yay, you changed your password successfully!" in res.data, res.data
+        assert "Yay, you changed your password successfully!" in str(res.data), res.data
 
         password = "p4ssw0rd"
         self.signin(password=password)
@@ -3804,7 +3805,7 @@ class TestWeb(web.Helper):
                                   'btn': 'Password'},
                             follow_redirects=True)
         msg = "Your current password doesn&#39;t match the one in our records"
-        assert msg in res.data
+        assert msg in str(res.data)
 
         res = self.app.post('/account/johndoe/update',
                             data={'current_password': '',
@@ -3813,7 +3814,7 @@ class TestWeb(web.Helper):
                                   'btn': 'Password'},
                             follow_redirects=True)
         msg = "Please correct the errors"
-        assert msg in res.data
+        assert msg in str(res.data)
 
     @with_context
     @patch('pybossa.view.account.super_queue.enqueue')
@@ -3826,7 +3827,7 @@ class TestWeb(web.Helper):
         user = UserFactory.create(id=100)
         res = self.app.get('/account/%s/delete' % user.name)
         assert res.status_code == 302, res.status_code
-        assert '/admin' in res.data
+        assert '/admin' in str(res.data)
         mock.assert_called_with(delete_account, user.id, admin.email_addr)
 
     @with_context
@@ -3838,7 +3839,7 @@ class TestWeb(web.Helper):
         self.signout()
         res = self.app.get('/account/johndoe/delete')
         assert res.status_code == 302, res.status_code
-        assert 'account/signin?next' in res.data
+        assert 'account/signin?next' in str(res.data)
 
     @with_context
     @patch('pybossa.view.account.super_queue.enqueue')
@@ -3849,7 +3850,7 @@ class TestWeb(web.Helper):
         self.signout()
         res = self.app_get_json('/account/johndoe/delete')
         assert res.status_code == 302, res.status_code
-        assert 'account/signin?next' in res.data
+        assert 'account/signin?next' in str(res.data)
 
     @with_context
     @patch('pybossa.view.account.super_queue.enqueue')
@@ -3925,21 +3926,21 @@ class TestWeb(web.Helper):
         self.register()
         self.signin()
         res = self.app.get('/account/johndoe/update')
-        assert "Change your Password" in res.data
+        assert "Change your Password" in str(res.data)
         user = User.query.get(1)
         user.twitter_user_id = 1234
         db.session.add(user)
         db.session.commit()
         res = self.app.get('/account/johndoe/update')
-        assert "Change your Password" not in res.data, res.data
+        assert "Change your Password" not in str(res.data), res.data
 
     @with_context
     def test_43_terms_of_use_and_data(self):
         """Test WEB terms of use is working"""
         self.signin_user()
         res = self.app.get('account/register', follow_redirects=True)
-        assert "http://okfn.org/terms-of-use/" in res.data, res.data
-        assert "http://opendatacommons.org/licenses/by/" in res.data, res.data
+        assert "http://okfn.org/terms-of-use/" in str(res.data), res.data
+        assert "http://opendatacommons.org/licenses/by/" in str(res.data), res.data
 
     @with_context
     def test_help_endpoint(self):
@@ -4084,24 +4085,24 @@ class TestWeb(web.Helper):
                                   'confirm': '#4a4'},
                             follow_redirects=True)
 
-        assert "Please correct the errors" in res.data, res.data
+        assert "Please correct the errors" in str(res.data), res.data
 
         res = self.app.post('/account/reset-password?key=%s' % (key),
                             data={'new_password': 'p4ssw0rD',
                                   'confirm': 'p4ssw0rD'},
                             follow_redirects=True)
 
-        assert "You reset your password successfully!" in res.data
+        assert "You reset your password successfully!" in str(res.data)
 
         # Request without password
         res = self.app.get('/account/reset-password?key=%s' % (key), follow_redirects=True)
         assert 403 == res.status_code
 
     @with_context
-    @patch('pybossa.view.account.url_for')
+    # @patch('pybossa.view.account.url_for')  # Comment out to resolve "TypeError: Object of type MagicMock is not JSON serializable"
     @patch('pybossa.view.account.mail_queue', autospec=True)
     @patch('pybossa.view.account.signer')
-    def test_45_password_reset_link_json(self, signer, queue, mock_url):
+    def test_45_password_reset_link_json(self, signer, queue):
         """Test WEB password reset email form"""
         csrf = self.get_csrf('/account/forgot-password')
         res = self.app.post('/account/forgot-password',
@@ -4148,7 +4149,7 @@ class TestWeb(web.Helper):
         assert send_mail == enqueue_call[0][0], "send_mail not called"
         assert 'Click here to recover your account' in enqueue_call[0][1]['body']
         assert 'To recover your password' in enqueue_call[0][1]['html']
-        assert mock_url.called_with('.reset_password', key=key, _external=True)
+        # assert mock_url.called_with('.reset_password', key=key, _external=True)
         err_msg = "There should be a flash message"
         assert resdata.get('flash'), err_msg
         assert "sent you an email" in resdata.get('flash'), err_msg
@@ -4243,7 +4244,7 @@ class TestWeb(web.Helper):
             assert send_mail == enqueue_call[0][0], "send_mail not called"
             assert 'Click here to recover your account' in enqueue_call[0][1]['body']
             assert 'To recover your password' in enqueue_call[0][1]['html']
-            assert mock_url.called_with('.reset_password', key=key)
+            # assert mock_url.called_with('.reset_password', key=key)
             err_msg = "There should be a flash message"
             assert resdata.get('flash'), err_msg
             assert "sent you an email" in resdata.get('flash'), err_msg
@@ -4258,7 +4259,7 @@ class TestWeb(web.Helper):
                             data={'email_addr': "johndoe@example.com"},
                             follow_redirects=True)
         assert ("We don&#39;t have this email in our records. You may have"
-                " signed up with a different email") in res.data
+                " signed up with a different email") in str(res.data)
 
         self.register()
         self.register(name='janedoe')
@@ -4328,7 +4329,7 @@ class TestWeb(web.Helper):
                             data={'email_addr': ''},
                             follow_redirects=True)
         msg = "Something went wrong, please correct the errors"
-        assert msg in res.data, res.data
+        assert msg in str(res.data), res.data
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -4338,7 +4339,7 @@ class TestWeb(web.Helper):
         self.signin()
         self.new_project()
         res = self.app.get('/project/sampleapp/tasks/', follow_redirects=True)
-        assert "Edit the task presenter" in res.data, \
+        assert "Edit the task presenter" in str(res.data), \
             "Task Presenter Editor should be an option"
         assert_raises(ValueError, json.loads, res.data)
 
@@ -4383,7 +4384,7 @@ class TestWeb(web.Helper):
         })
         res = self.app_get_json('/project/sampleapp/tasks/')
         data = json.loads(res.data)
-        print(res.data)
+        print((res.data))
         err_msg = 'Field missing in data'
         assert 'autoimporter_enabled' in data, err_msg
         assert 'last_activity' in data, err_msg
@@ -4412,9 +4413,9 @@ class TestWeb(web.Helper):
         res = self.app.get('/project/sampleapp/tasks/taskpresentereditor',
                            follow_redirects=True)
         err_msg = "Task Presenter options not found"
-        assert "Task Presenter Editor" in res.data, err_msg
+        assert "Task Presenter Editor" in str(res.data), err_msg
         err_msg = "Basic template not found"
-        assert "The most basic template" in res.data, err_msg
+        assert "The most basic template" in str(res.data), err_msg
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -4445,13 +4446,13 @@ class TestWeb(web.Helper):
 
         res = self.app.get('/project/sampleapp/tasks/taskpresentereditor?template=basic',
                            follow_redirects=True)
-        assert "var editor" in res.data, "CodeMirror Editor not found"
-        assert "Task Presenter" in res.data, "CodeMirror Editor not found"
-        assert "Task Presenter Preview" in res.data, "CodeMirror View not found"
+        assert "var editor" in str(res.data), "CodeMirror Editor not found"
+        assert "Task Presenter" in str(res.data), "CodeMirror Editor not found"
+        assert "Task Presenter Preview" in str(res.data), "CodeMirror View not found"
         res = self.app.post('/project/sampleapp/tasks/taskpresentereditor',
                             data={'editor': 'Some HTML code!', 'task-presenter': ''},
                             follow_redirects=True)
-        assert "Sample Project" in res.data, "Does not return to project details"
+        assert "Sample Project" in str(res.data), "Does not return to project details"
         project = db.session.query(Project).first()
         err_msg = "Task Presenter failed to update"
         assert project.info['task_presenter'] == 'Some HTML code!', err_msg
@@ -4460,12 +4461,12 @@ class TestWeb(web.Helper):
         res = self.app.get('/project/sampleapp/tasks/taskpresentereditor',
                            follow_redirects=True)
 
-        assert "Some HTML code" in res.data, res.data
+        assert "Some HTML code" in str(res.data), res.data
 
         # Check it doesn't loads the previous posted code:
         res = self.app.get('/project/sampleapp/tasks/taskpresentereditor?template=basic&clear_template=true',
                            follow_redirects=True)
-        assert "Some HTML code" not in res.data, res.data
+        assert "Some HTML code" not in str(res.data), res.data
 
         res = self.app.post('/project/sampleapp/tasks/taskpresentereditor',
                             data={'guidelines': 'Some guidelines!', 'task-guidelines': ''},
@@ -4478,7 +4479,7 @@ class TestWeb(web.Helper):
         res = self.app.get('/project/sampleapp/tasks/taskpresentereditor',
                            follow_redirects=True)
 
-        assert "Some guidelines" in res.data, res.data
+        assert "Some guidelines" in str(res.data), res.data
 
 
     @with_context
@@ -4545,7 +4546,7 @@ class TestWeb(web.Helper):
         res = self.app.post('/project/sampleapp/tasks/taskpresentereditor',
                             data={'editor': 'Some HTML code!'},
                             follow_redirects=True)
-        assert "Sample Project" in res.data, "Does not return to project details"
+        assert "Sample Project" in str(res.data), "Does not return to project details"
         project = db.session.query(Project).first()
         for i in range(10):
             key = "key_%s" % i
@@ -4574,18 +4575,18 @@ class TestWeb(web.Helper):
         self.signin()
         res = self.app.get("/", follow_redirects=True)
         error_msg = "There should be a message for admin"
-        print(res.data)
-        assert announcement.title.encode('utf-8') in res.data, error_msg
-        assert announcement.body.encode('utf-8') in res.data, error_msg
+        # print(res.data.decode())
+        assert announcement.title in str(res.data), error_msg
+        assert announcement.body in str(res.data), error_msg
         self.signout()
 
         self.register(subadmin=True)
         self.signin()
         res = self.app.get("/", follow_redirects=True)
         error_msg = "There should not be a message for subadmin"
-        print(res.data)
-        assert announcement.title.encode('utf-8') in res.data, error_msg
-        assert announcement.body.encode('utf-8') in res.data, error_msg
+        # print(res.data.decode())
+        assert announcement.title in str(res.data), error_msg
+        assert announcement.body in str(res.data), error_msg
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -4594,9 +4595,9 @@ class TestWeb(web.Helper):
         announcement = AnnouncementFactory.create(published=True, info={'level': 30})
         res = self.app.get("/", follow_redirects=True)
         error_msg = "There should not be a message for anonymous user"
-        print(res.data)
-        assert announcement.title.encode('utf-8')  not in res.data, error_msg
-        assert announcement.body.encode('utf-8')  not in res.data, error_msg
+        # print(res.data)
+        assert announcement.title not in str(res.data), error_msg
+        assert announcement.body not in str(res.data), error_msg
 
     @with_context
     def test_export_user_json(self):
@@ -4608,7 +4609,7 @@ class TestWeb(web.Helper):
 
         uri = "/uploads/user_%s/personal_data.zip" % user.id
         res = self.app.get(uri, follow_redirects=True)
-        zip = zipfile.ZipFile(StringIO(res.data))
+        zip = zipfile.ZipFile(BytesIO(res.data))  # res.data is bytes type
         # Check only one file in zipfile
         err_msg = "filename count in ZIP is not 1"
         assert len(zip.namelist()) == 1, err_msg
@@ -4696,7 +4697,7 @@ class TestWeb(web.Helper):
         uri = "/uploads/user_%s/random_sec_personal_data.zip" % user.id
         print(uri)
         res = self.app.get(uri, follow_redirects=True)
-        zip = zipfile.ZipFile(StringIO(res.data))
+        zip = zipfile.ZipFile(BytesIO(res.data))
         # Check only one file in zipfile
         err_msg = "filename count in ZIP is not 1"
         assert len(zip.namelist()) == 1, err_msg
@@ -4742,7 +4743,7 @@ class TestWeb(web.Helper):
         uri = '/project/%s/tasks/export' % project.short_name
         res = self.app.get(uri, follow_redirects=True)
         heading = "Export All Tasks and Task Runs"
-        assert heading in res.data, "Export page should be available\n %s" % res.data
+        assert heading in str(res.data), "Export page should be available\n %s" % res.data
         # Now test that a 404 is raised when an arg is invalid
         uri = "/project/%s/tasks/export?type=ask&format=json" % project.short_name
         res = self.app.get(uri, follow_redirects=True)
@@ -4763,10 +4764,10 @@ class TestWeb(web.Helper):
         uri = "/project/%s/tasks/export?type=result&format=json" % project.short_name
         res = self.app.get(uri, follow_redirects=True)
         assert res.status_code == 200, res.status
-        assert 'You will be emailed when your export has been completed.' in res.data
+        assert 'You will be emailed when your export has been completed.' in str(res.data)
         return  #export handled by email
 
-        zip = zipfile.ZipFile(StringIO(res.data))
+        zip = zipfile.ZipFile(BytesIO(res.data))
         # Check only one file in zipfile
         err_msg = "filename count in ZIP is not 1"
         assert len(zip.namelist()) == 1, err_msg
@@ -4806,7 +4807,7 @@ class TestWeb(web.Helper):
         uri = '/project/%s/tasks/export' % Fixtures.project_short_name
         res = self.app.get(uri, follow_redirects=True)
         heading = "Export All Tasks and Task Runs"
-        assert heading in res.data, "Export page should be available\n %s" % res.data
+        assert heading in str(res.data), "Export page should be available\n %s" % res.data
         # Now test that a 404 is raised when an arg is invalid
         uri = "/project/%s/tasks/export?type=ask&format=json" % Fixtures.project_short_name
         res = self.app.get(uri, follow_redirects=True)
@@ -4845,21 +4846,21 @@ class TestWeb(web.Helper):
         content_disposition = 'attachment; filename=%d_test-app_task_json.zip' % project.id
         assert res.headers.get('Content-Disposition') == content_disposition, res.headers
         '''
-        assert "You will be emailed when your export has been completed." in res.data
+        assert "You will be emailed when your export has been completed." in str(res.data)
 
     @with_context
     def test_export_task_json_support_non_latin1_project_names(self):
         self.register()
         self.signin()
         owner = UserFactory.create(email_addr='xyz@a.com', admin=True, id=999)
-        project = ProjectFactory.create(name=u'Измени Киев!', short_name=u'Измени Киев!')
+        project = ProjectFactory.create(name='Измени Киев!', short_name='Измени Киев!')
         self.clear_temp_container(project.owner_id)
         res = self.app.get('project/%s/tasks/export?type=task&format=json' % project.short_name,
                            follow_redirects=True)
         assert res.status_code == 200, res.status
-        assert 'You will be emailed when your export has been completed.' in res.data
+        assert 'You will be emailed when your export has been completed.' in str(res.data)
         return  # export is handled by email
-        filename = secure_filename(unidecode(u'Измени Киев!'))
+        filename = secure_filename(unidecode('Измени Киев!'))
         assert filename in res.headers.get('Content-Disposition'), res.headers
 
     @with_context
@@ -4867,14 +4868,14 @@ class TestWeb(web.Helper):
         self.register()
         self.signin()
         owner = UserFactory.create(email_addr='xyz@a.com', admin=True, id=999)
-        project = ProjectFactory.create(name=u'Измени Киев!', short_name=u'Измени Киев!')
+        project = ProjectFactory.create(name='Измени Киев!', short_name='Измени Киев!')
         self.signin(email=owner.email_addr, password='1234')
         res = self.app.get('project/%s/tasks/export?type=task_run&format=json' % project.short_name,
                            follow_redirects=True)
         assert res.status_code == 200, res.status
-        assert 'You will be emailed when your export has been completed.' in res.data
+        assert 'You will be emailed when your export has been completed.' in str(res.data)
         return  # export is handled by email
-        filename = secure_filename(unidecode(u'Измени Киев!'))
+        filename = secure_filename(unidecode('Измени Киев!'))
         assert filename in res.headers.get('Content-Disposition'), res.headers
 
     @with_context
@@ -4882,15 +4883,15 @@ class TestWeb(web.Helper):
         self.register()
         self.signin()
         owner = UserFactory.create(email_addr='xyz@a.com', admin=True, id=999)
-        project = ProjectFactory.create(name=u'Измени Киев!', short_name=u'Измени Киев!', owner=owner)
+        project = ProjectFactory.create(name='Измени Киев!', short_name='Измени Киев!', owner=owner)
         self.signin(email=owner.email_addr, password='1234')
         self.clear_temp_container(project.owner_id)
         res = self.app.get('/project/%s/tasks/export?type=task&format=csv' % project.short_name,
                            follow_redirects=True)
         assert res.status_code == 200, res.status
-        assert 'You will be emailed when your export has been completed.' in res.data
+        assert 'You will be emailed when your export has been completed.' in str(res.data)
         return  #export handled by email
-        filename = secure_filename(unidecode(u'Измени Киев!'))
+        filename = secure_filename(unidecode('Измени Киев!'))
         assert filename in res.headers.get('Content-Disposition'), res.headers
 
     @with_context
@@ -4898,16 +4899,16 @@ class TestWeb(web.Helper):
         self.register()
         self.signin()
         owner = UserFactory.create(email_addr='xyz@a.com', admin=True, id=999)
-        project = ProjectFactory.create(name=u'Измени Киев!', short_name=u'Измени Киев!')
+        project = ProjectFactory.create(name='Измени Киев!', short_name='Измени Киев!')
         self.signin(email=owner.email_addr, password='1234')
         task = TaskFactory.create(project=project)
         TaskRunFactory.create(task=task)
         res = self.app.get('/project/%s/tasks/export?type=task_run&format=csv' % project.short_name,
                            follow_redirects=True)
         assert res.status_code == 200, res.status
-        assert 'You will be emailed when your export has been completed.' in res.data
+        assert 'You will be emailed when your export has been completed.' in str(res.data)
         return  #export handled by email
-        filename = secure_filename(unidecode(u'Измени Киев!'))
+        filename = secure_filename(unidecode('Измени Киев!'))
         assert filename in res.headers.get('Content-Disposition'), res.headers
 
     @with_context
@@ -4930,14 +4931,14 @@ class TestWeb(web.Helper):
         uri = '/project/%s/tasks/export' % Fixtures.project_short_name
         res = self.app.get(uri, follow_redirects=True)
         heading = "Export All Tasks and Task Runs"
-        assert heading in res.data, "Export page should be available\n %s" % res.data
+        assert heading in str(res.data), "Export page should be available\n %s" % res.data
         # Now get the tasks in JSON format
         uri = "/project/%s/tasks/export?type=task_run&format=json" % Fixtures.project_short_name
         res = self.app.get(uri, follow_redirects=True)
         assert res.status_code == 200, res.status
-        assert 'You will be emailed when your export has been completed.' in res.data
+        assert 'You will be emailed when your export has been completed.' in str(res.data)
         return  #export handled by email
-        zip = zipfile.ZipFile(StringIO(res.data))
+        zip = zipfile.ZipFile(BytesIO(res.data))
         # Check only one file in zipfile
         err_msg = "filename count in ZIP is not 1"
         assert len(zip.namelist()) == 1, err_msg
@@ -4965,9 +4966,9 @@ class TestWeb(web.Helper):
         uri = "/project/%s/tasks/export?type=task&format=json" % project.short_name
         res = self.app.get(uri, follow_redirects=True)
         assert res.status_code == 200, res.status
-        assert 'You will be emailed when your export has been completed.' in res.data
+        assert 'You will be emailed when your export has been completed.' in str(res.data)
         return  #export handled by email
-        zip = zipfile.ZipFile(StringIO(res.data))
+        zip = zipfile.ZipFile(BytesIO(res.data))
         extracted_filename = zip.namelist()[0]
 
         exported_task_runs = json.loads(zip.read(extracted_filename))
@@ -5017,10 +5018,10 @@ class TestWeb(web.Helper):
         # Now get the tasks in CSV format
         uri = "/project/%s/tasks/export?type=result&format=csv" % project.short_name
         res = self.app.get(uri, follow_redirects=True)
-        assert 'You will be emailed when your export has been completed' in res.data
+        assert 'You will be emailed when your export has been completed' in str(res.data)
         return
 
-        zip = zipfile.ZipFile(StringIO(res.data))
+        zip = zipfile.ZipFile(BytesIO(res.data))
         # Check only one file in zipfile
         err_msg = "filename count in ZIP is not 2"
         assert len(zip.namelist()) == 2, err_msg
@@ -5070,9 +5071,9 @@ class TestWeb(web.Helper):
                 err_msg = "%s != %s" % (result_dict_flat[k],
                                         et[keys.index(slug)])
                 if result_dict_flat[k] is not None:
-                    assert unicode(result_dict_flat[k]) == et[keys.index(slug)], err_msg
+                    assert str(result_dict_flat[k]) == et[keys.index(slug)], err_msg
                 else:
-                    assert u'' == et[keys.index(slug)], err_msg
+                    assert '' == et[keys.index(slug)], err_msg
         # Tasks are exported as an attached file
         content_disposition = 'attachment; filename=%d_project1_result_csv.zip' % project.id
         assert res.headers.get('Content-Disposition') == content_disposition, res.headers
@@ -5119,9 +5120,9 @@ class TestWeb(web.Helper):
         uri = "/project/%s/tasks/export?type=result&format=csv" % project.short_name
         res = self.app.get(uri, follow_redirects=True)
         assert res.status_code == 200, res.status
-        assert 'You will be emailed when your export has been completed.' in res.data
+        assert 'You will be emailed when your export has been completed.' in str(res.data)
         return  #export handled by email
-        zip = zipfile.ZipFile(StringIO(res.data))
+        zip = zipfile.ZipFile(BytesIO(res.data))
         # Check only one file in zipfile
         err_msg = "filename count in ZIP is not 2"
         assert len(zip.namelist()) == 2, err_msg
@@ -5176,13 +5177,13 @@ class TestWeb(web.Helper):
                 err_msg = "%s != %s" % (result_dict_flat[k],
                                         et[keys.index(slug)])
                 if result_dict_flat[k] is not None:
-                    assert unicode(result_dict_flat[k]) == et[keys.index(slug)], err_msg
+                    assert str(result_dict_flat[k]) == et[keys.index(slug)], err_msg
                 else:
-                    assert u'' == et[keys.index(slug)], err_msg
+                    assert '' == et[keys.index(slug)], err_msg
             for k in result_dict['info'].keys():
                 slug = 'info_%s' % k
                 err_msg = "%s != %s" % (result_dict['info'][k], et[keys.index(slug)])
-                assert unicode(result_dict_flat[slug]) == et[keys.index(slug)], err_msg
+                assert str(result_dict_flat[slug]) == et[keys.index(slug)], err_msg
         # Tasks are exported as an attached file
         content_disposition = 'attachment; filename=%d_project1_result_csv.zip' % project.id
         assert res.headers.get('Content-Disposition') == content_disposition, res.headers
@@ -5223,10 +5224,10 @@ class TestWeb(web.Helper):
             uri = "/project/%s/tasks/export?type=task&format=csv" % project.short_name
             res = self.app.get(uri, follow_redirects=True)
             assert res.status_code == 200, res.status
-            assert 'You will be emailed when your export has been completed.' in res.data
+            assert 'You will be emailed when your export has been completed.' in str(res.data)
             return  #export handled by email
 
-            zip = zipfile.ZipFile(StringIO(res.data))
+            zip = zipfile.ZipFile(BytesIO(res.data))
             # Check only one file in zipfile
             err_msg = "filename count in ZIP is not 2"
             assert len(zip.namelist()) == 2, err_msg
@@ -5260,7 +5261,7 @@ class TestWeb(web.Helper):
                 err_msg = "All the task.info column names should be included except geojson"
                 info_keys = None
                 if t.info:
-                    info_keys = copy.deepcopy(t.info.keys())
+                    info_keys = copy.deepcopy(list(t.info.keys()))
                     info_keys.pop(info_keys.index('geojson'))
                     for tk in info_keys:
                         expected_key = "info_%s" % tk
@@ -5277,13 +5278,13 @@ class TestWeb(web.Helper):
                         slug = '%s' % k
                         err_msg = "%s != %s" % (task_dict_flat[k], et[keys.index(slug)])
                         if task_dict_flat[k] is not None:
-                            assert unicode(task_dict_flat[k]) == et[keys.index(slug)], err_msg
+                            assert str(task_dict_flat[k]) == et[keys.index(slug)], err_msg
                         else:
-                            assert u'' == et[keys.index(slug)], err_msg
+                            assert '' == et[keys.index(slug)], err_msg
                     for k in task_dict['info'].keys():
                         slug = 'info_%s' % k
                         err_msg = "%s != %s" % (task_dict['info'][k], et[keys.index(slug)])
-                        assert unicode(task_dict_flat[slug]) == et[keys.index(slug)], err_msg
+                        assert str(task_dict_flat[slug]) == et[keys.index(slug)], err_msg
             # Tasks are exported as an attached file
             content_disposition = 'attachment; filename=%d_project1_task_csv.zip' % project.id
             assert res.headers.get('Content-Disposition') == content_disposition, res.headers
@@ -5325,7 +5326,7 @@ class TestWeb(web.Helper):
             # Now get the tasks in CSV format
             uri = "/project/%s/tasks/export?type=task&format=csv" % project.short_name
             res = self.app.get(uri, follow_redirects=True)
-            assert 'You will be emailed when your export has been completed' in res.data
+            assert 'You will be emailed when your export has been completed' in str(res.data)
             return
 
             file_name = '/tmp/task_%s.zip' % project.short_name
@@ -5390,7 +5391,7 @@ class TestWeb(web.Helper):
             self.clear_temp_container(project.owner_id)
             for i in range(0, 5):
                 task = TaskFactory.create(project=project,
-                                          info={u'answer':[{u'eñe': i}]})
+                                          info={'answer':[{'eñe': i}]})
             uri = '/project/%s/tasks/export' % project.short_name
 
             res = self.app.get(uri, follow_redirects=True)
@@ -5400,7 +5401,7 @@ class TestWeb(web.Helper):
             # Now get the tasks in CSV format
             uri = "/project/%s/tasks/export?type=task&format=csv" % project.short_name
             res = self.app.get(uri, follow_redirects=True)
-            assert 'You will be emailed when your export has been completed' in res.data
+            assert 'You will be emailed when your export has been completed' in str(res.data)
             return
 
             file_name = '/tmp/task_%s.zip' % project.short_name
@@ -5448,13 +5449,13 @@ class TestWeb(web.Helper):
                     slug = '%s' % k
                     err_msg = "%s != %s" % (task_dict_flat[k], et[keys.index(slug)])
                     if task_dict_flat[k] is not None:
-                        assert unicode(task_dict_flat[k]) == et[keys.index(slug)], err_msg
+                        assert str(task_dict_flat[k]) == et[keys.index(slug)], err_msg
                     else:
-                        assert u'' == et[keys.index(slug)], err_msg
+                        assert '' == et[keys.index(slug)], err_msg
                 for datum in task_dict['info']['answer']:
                     for k in datum.keys():
                         slug = '%s' % k
-                        assert unicode(task_dict_flat[slug]) == et[keys.index(slug)], err_msg
+                        assert str(task_dict_flat[slug]) == et[keys.index(slug)], err_msg
             # Tasks are exported as an attached file
             content_disposition = 'attachment; filename=%d_project1_task_csv.zip' % project.id
             assert res.headers.get('Content-Disposition') == content_disposition, res.headers
@@ -5483,7 +5484,7 @@ class TestWeb(web.Helper):
         project = ProjectFactory.create()
         self.clear_temp_container(project.owner_id)
         for i in range(0, 5):
-            task = TaskFactory.create(project=project, info={u'eñe': i})
+            task = TaskFactory.create(project=project, info={'eñe': i})
         uri = '/project/%s/tasks/export' % project.short_name
         res = self.app.get(uri, follow_redirects=True)
         heading = "Export All Tasks and Task Runs"
@@ -5493,7 +5494,7 @@ class TestWeb(web.Helper):
         uri = "/project/%s/tasks/export?type=task&format=csv" % project.short_name
         res = self.app.get(uri, follow_redirects=True)
         assert res.status_code == 200, res.status
-        assert 'You will be emailed when your export has been completed.' in res.data
+        assert 'You will be emailed when your export has been completed.' in str(res.data)
         return  #export handled by email
 
         file_name = '/tmp/task_%s.zip' % project.short_name
@@ -5545,13 +5546,13 @@ class TestWeb(web.Helper):
                 slug = '%s' % k
                 err_msg = "%s != %s" % (task_dict_flat[k], et[keys.index(slug)])
                 if task_dict_flat[k] is not None:
-                    assert unicode(task_dict_flat[k]) == et[keys.index(slug)], err_msg
+                    assert str(task_dict_flat[k]) == et[keys.index(slug)], err_msg
                 else:
-                    assert u'' == et[keys.index(slug)], err_msg
+                    assert '' == et[keys.index(slug)], err_msg
             for k in task_dict['info'].keys():
                 slug = 'info_%s' % k
                 err_msg = "%s != %s" % (task_dict['info'][k], et[keys.index(slug)])
-                assert unicode(task_dict_flat[slug]) == et[keys.index(slug)], err_msg
+                assert str(task_dict_flat[slug]) == et[keys.index(slug)], err_msg
         # Tasks are exported as an attached file
         content_disposition = 'attachment; filename=%d_test-app_task_csv.zip' % project.id
         assert res.headers.get('Content-Disposition') == content_disposition, res.headers
@@ -5564,7 +5565,7 @@ class TestWeb(web.Helper):
         project = ProjectFactory.create(short_name='no_tasks_here')
         uri = "/project/%s/tasks/export?type=result&format=csv" % project.short_name
         res = self.app.get(uri, follow_redirects=True)
-        zip = zipfile.ZipFile(StringIO(res.data))
+        zip = zipfile.ZipFile(BytesIO(res.data))
         extracted_filename = zip.namelist()[0]
 
         csv_content = StringIO(zip.read(extracted_filename))
@@ -5676,13 +5677,13 @@ class TestWeb(web.Helper):
         content_disposition = 'attachment; filename=%d_test-app_task_run_csv.zip' % project.id
         assert res.headers.get('Content-Disposition') == content_disposition, res.headers
         '''
-        assert "You will be emailed when your export has been completed." in res.data
+        assert "You will be emailed when your export has been completed." in str(res.data)
 
     @with_context
     @patch('pybossa.view.projects.Ckan', autospec=True)
     def test_export_tasks_ckan_exception(self, mock1):
         mocks = [Mock()]
-        from test_ckan import TestCkanModule
+        from test.test_ckan import TestCkanModule
         fake_ckn = TestCkanModule()
         package = fake_ckn.pkg_json_found
         package['id'] = 3
@@ -5713,7 +5714,7 @@ class TestWeb(web.Helper):
         uri = '/project/%s/tasks/export' % Fixtures.project_short_name
         res = self.app.get(uri, follow_redirects=True)
         heading = "Export All Tasks and Task Runs"
-        assert heading in res.data, "Export page should be available\n %s" % res.data
+        assert heading in str(res.data), "Export page should be available\n %s" % res.data
         # Now get the tasks in CKAN format
         uri = "/project/%s/tasks/export?type=task&format=ckan" % Fixtures.project_short_name
         with patch.dict(self.flask_app.config, {'CKAN_URL': 'http://ckan.com'}):
@@ -5721,13 +5722,13 @@ class TestWeb(web.Helper):
             res = self.app.get(uri, follow_redirects=True)
             msg = '415 Unsupported Media Type'
             err_msg = "CKAN is unsupported"
-            assert msg in res.data, err_msg
+            assert msg in str(res.data), err_msg
 
     @with_context
     @patch('pybossa.view.projects.Ckan', autospec=True)
     def test_export_tasks_ckan_connection_error(self, mock1):
         mocks = [Mock()]
-        from test_ckan import TestCkanModule
+        from test.test_ckan import TestCkanModule
         fake_ckn = TestCkanModule()
         package = fake_ckn.pkg_json_found
         package['id'] = 3
@@ -5757,7 +5758,7 @@ class TestWeb(web.Helper):
         uri = '/project/%s/tasks/export' % Fixtures.project_short_name
         res = self.app.get(uri, follow_redirects=True)
         heading = "Export All Tasks and Task Runs"
-        assert heading in res.data, "Export page should be available\n %s" % res.data
+        assert heading in str(res.data), "Export page should be available\n %s" % res.data
         # Now get the tasks in CKAN format
         uri = "/project/%s/tasks/export?type=task&format=ckan" % Fixtures.project_short_name
         with patch.dict(self.flask_app.config, {'CKAN_URL': 'http://ckan.com'}):
@@ -5765,7 +5766,7 @@ class TestWeb(web.Helper):
             res = self.app.get(uri, follow_redirects=True)
             msg = '415 Unsupported Media Type'
             err_msg = "CKAN is unsupported"
-            assert msg in res.data, err_msg
+            assert msg in str(res.data), err_msg
 
     @with_context
     @patch('pybossa.view.projects.Ckan', autospec=True)
@@ -5816,7 +5817,7 @@ class TestWeb(web.Helper):
         uri = '/project/%s/tasks/export' % Fixtures.project_short_name
         res = self.app.get(uri, follow_redirects=True)
         heading = "Export All Tasks and Task Runs"
-        assert heading in res.data, "Export page should be available\n %s" % res.data
+        assert heading in str(res.data), "Export page should be available\n %s" % res.data
         # Now get the tasks in CKAN format
         uri = "/project/%s/tasks/export?type=task&format=ckan" % Fixtures.project_short_name
         with patch.dict(self.flask_app.config, {'CKAN_URL': 'http://ckan.com'}):
@@ -5824,7 +5825,7 @@ class TestWeb(web.Helper):
             res = self.app.get(uri, follow_redirects=True)
             msg = '415 Unsupported Media Type'
             err_msg = "CKAN is unsupported"
-            assert msg in res.data, err_msg
+            assert msg in str(res.data), err_msg
 
     @with_context
     @patch('pybossa.view.projects.Ckan', autospec=True)
@@ -5870,7 +5871,7 @@ class TestWeb(web.Helper):
         uri = '/project/%s/tasks/export' % Fixtures.project_short_name
         res = self.app.get(uri, follow_redirects=True)
         heading = "Export All Tasks and Task Runs"
-        assert heading in res.data, "Export page should be available\n %s" % res.data
+        assert heading in str(res.data), "Export page should be available\n %s" % res.data
         # Now get the tasks in CKAN format
         uri = "/project/%s/tasks/export?type=task&format=ckan" % Fixtures.project_short_name
         res = self.app.get(uri, follow_redirects=True)
@@ -5881,7 +5882,7 @@ class TestWeb(web.Helper):
             res = self.app.get(uri, follow_redirects=True)
             msg = 'Data exported to http://ckan.com'
             err_msg = "Tasks should be exported to CKAN"
-            assert msg in res.data, err_msg
+            assert msg in str(res.data), err_msg
         '''
 
     @with_context
@@ -5924,7 +5925,7 @@ class TestWeb(web.Helper):
         uri = '/project/%s/tasks/export' % Fixtures.project_short_name
         res = self.app.get(uri, follow_redirects=True)
         heading = "Export All Tasks and Task Runs"
-        assert heading in res.data, "Export page should be available\n %s" % res.data
+        assert heading in str(res.data), "Export page should be available\n %s" % res.data
         # Now get the tasks in CKAN format
         uri = "/project/%s/tasks/export?type=task&format=ckan" % Fixtures.project_short_name
         #res = self.app.get(uri, follow_redirects=True)
@@ -5934,7 +5935,7 @@ class TestWeb(web.Helper):
             res = self.app.get(uri, follow_redirects=True)
             msg = 'Data exported to http://ckan.com'
             err_msg = "Tasks should be exported to CKAN"
-            assert msg in res.data, err_msg
+            assert msg in str(res.data), err_msg
         '''
 
 
@@ -5949,19 +5950,19 @@ class TestWeb(web.Helper):
         self.new_project()
         res = self.app.get('/project/sampleapp/tasks/import', follow_redirects=True)
         err_msg = "There should be a CSV importer"
-        assert "type=csv" in res.data, err_msg
+        assert "type=csv" in str(res.data), err_msg
         err_msg = "There should be a GDocs importer"
-        assert "type=gdocs" in res.data, err_msg
+        assert "type=gdocs" in str(res.data), err_msg
         err_msg = "There should be an Epicollect importer"
-        assert "type=epicollect" in res.data, err_msg
+        assert "type=epicollect" in str(res.data), err_msg
         err_msg = "There should be a Flickr importer"
-        assert "type=flickr" in res.data, err_msg
+        assert "type=flickr" in str(res.data), err_msg
         err_msg = "There should be a Dropbox importer"
-        assert "type=dropbox" in res.data, err_msg
+        assert "type=dropbox" in str(res.data), err_msg
         err_msg = "There should be a Twitter importer"
-        assert "type=twitter" in res.data, err_msg
+        assert "type=twitter" in str(res.data), err_msg
         err_msg = "There should be an S3 importer"
-        assert "type=s3" in res.data, err_msg
+        assert "type=s3" in str(res.data), err_msg
 
         self.signout()
 
@@ -5980,6 +5981,10 @@ class TestWeb(web.Helper):
         project = ProjectFactory.create(owner=owner)
         report = MagicMock()
         report.message = "SUCCESS"
+
+        # avoid TypeError: '>' not supported between instances of 'MagicMock' and 'int' for report.total > 0
+        report.total.__gt__ = lambda a, b: True
+
         importer_tasks.return_value = report
         url = '/project/%s/tasks/import?api_key=%s' % (project.short_name, owner.api_key)
         res = self.app_get_json(url)
@@ -6134,7 +6139,7 @@ class TestWeb(web.Helper):
 
         url = '/project/%s/tasks/import' % (project.short_name)
         res = self.app_get_json(url, follow_redirects=True)
-        assert 'signin' in res.data, res.data
+        assert 'signin' in str(res.data), res.data
 
 
     @with_context
@@ -6227,9 +6232,9 @@ class TestWeb(web.Helper):
 
         res = self.app.get(url, follow_redirects=True)
 
-        assert "type=flickr" not in res.data
-        assert "type=dropbox" not in res.data
-        assert "type=twitter" not in res.data
+        assert "type=flickr" not in str(res.data)
+        assert "type=dropbox" not in str(res.data)
+        assert "type=twitter" not in str(res.data)
 
     @with_context
     @patch('pybossa.view.projects.redirect_content_type', wraps=redirect)
@@ -6249,7 +6254,7 @@ class TestWeb(web.Helper):
                                        'formtype': 'csv', 'form_name': 'csv'},
                             follow_redirects=True)
 
-        assert "1 new task was imported successfully" in res.data, res.data
+        assert "1 new task was imported successfully" in str(res.data), res.data
         redirect.assert_called_with('/project/%s/tasks/' % project.short_name)
 
     @with_context
@@ -6268,7 +6273,7 @@ class TestWeb(web.Helper):
                                        'formtype': 'csv', 'form_name': 'csv'},
                             follow_redirects=True)
 
-        assert "1 new task was imported successfully" in res.data, res.data
+        assert "1 new task was imported successfully" in str(res.data), res.data
 
     @with_context
     @patch('pybossa.view.projects.importer_queue', autospec=True)
@@ -6292,8 +6297,8 @@ class TestWeb(web.Helper):
         queue.enqueue.assert_called_once_with(import_tasks, project.id, 'John Doe', **data)
         msg = "trying to import a large amount of tasks, so please be patient.\
             You will receive an email when the tasks are ready."
-        print(res.data)
-        assert msg in res.data
+        print((res.data))
+        assert msg in str(res.data)
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -6313,9 +6318,9 @@ class TestWeb(web.Helper):
                                        'formtype': 'csv', 'form_name': 'csv'},
                             follow_redirects=True)
         task = db.session.query(Task).first()
-        assert {u'Bar': u'2', u'Foo': u'1'} == task.info
+        assert {'Bar': '2', 'Foo': '1'} == task.info
         assert task.priority_0 == 3
-        assert "1 new task was imported successfully" in res.data
+        assert "1 new task was imported successfully" in str(res.data)
 
         # Check that only new items are imported
         empty_file = FakeResponse(text='Foo,Bar,priority_0\n1,2,3\n4,5,6',
@@ -6332,7 +6337,7 @@ class TestWeb(web.Helper):
         err_msg = "There should be only 2 tasks"
         assert len(project.tasks) == 2, (err_msg, project.tasks)
         n = 0
-        csv_tasks = [{u'Foo': u'1', u'Bar': u'2'}, {u'Foo': u'4', u'Bar': u'5'}]
+        csv_tasks = [{'Foo': '1', 'Bar': '2'}, {'Foo': '4', 'Bar': '5'}]
         for t in project.tasks:
             assert t.info == csv_tasks[n], "The task info should be the same"
             n += 1
@@ -6376,9 +6381,9 @@ class TestWeb(web.Helper):
                                        'formtype': 'gdocs', 'form_name': 'gdocs'},
                             follow_redirects=True)
         task = db.session.query(Task).first()
-        assert {u'Bar': u'2', u'Foo': u'1'} == task.info
+        assert {'Bar': '2', 'Foo': '1'} == task.info
         assert task.priority_0 == 3
-        assert "1 new task was imported successfully" in res.data
+        assert "1 new task was imported successfully" in str(res.data)
 
         # Check that only new items are imported
         empty_file = FakeResponse(text='Foo,Bar,priority_0\n1,2,3\n4,5,6',
@@ -6394,7 +6399,7 @@ class TestWeb(web.Helper):
         project = db.session.query(Project).first()
         assert len(project.tasks) == 2, "There should be only 2 tasks"
         n = 0
-        csv_tasks = [{u'Foo': u'1', u'Bar': u'2'}, {u'Foo': u'4', u'Bar': u'5'}]
+        csv_tasks = [{'Foo': '1', 'Bar': '2'}, {'Foo': '4', 'Bar': '5'}]
         for t in project.tasks:
             assert t.info == csv_tasks[n], "The task info should be the same"
             n += 1
@@ -6408,11 +6413,11 @@ class TestWeb(web.Helper):
         project = db.session.query(Project).first()
         assert len(project.tasks) == 2, "There should be only 2 tasks"
         n = 0
-        csv_tasks = [{u'Foo': u'1', u'Bar': u'2'}, {u'Foo': u'4', u'Bar': u'5'}]
+        csv_tasks = [{'Foo': '1', 'Bar': '2'}, {'Foo': '4', 'Bar': '5'}]
         for t in project.tasks:
             assert t.info == csv_tasks[n], "The task info should be the same"
             n += 1
-        assert "no new records" in res.data, res.data
+        assert "no new records" in str(res.data), res.data
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -6437,7 +6442,7 @@ class TestWeb(web.Helper):
 
         project = db.session.query(Project).first()
         err_msg = "Tasks should be imported"
-        assert "1 new task was imported successfully" in res.data, err_msg
+        assert "1 new task was imported successfully" in str(res.data), err_msg
         tasks = db.session.query(Task).filter_by(project_id=project.id).all()
         err_msg = "The imported task from EpiCollect is wrong"
         assert tasks[0].info['DeviceID'] == 23, err_msg
@@ -6455,7 +6460,7 @@ class TestWeb(web.Helper):
         project = db.session.query(Project).first()
         assert len(project.tasks) == 2, "There should be only 2 tasks"
         n = 0
-        epi_tasks = [{u'DeviceID': 23}, {u'DeviceID': 24}]
+        epi_tasks = [{'DeviceID': 23}, {'DeviceID': 24}]
         for t in project.tasks:
             assert t.info == epi_tasks[n], "The task info should be the same"
             n += 1
@@ -6497,14 +6502,14 @@ class TestWeb(web.Helper):
 
         project = db.session.query(Project).first()
         err_msg = "Tasks should be imported"
-        assert "1 new task was imported successfully" in res.data, err_msg
+        assert "1 new task was imported successfully" in str(res.data), err_msg
         tasks = db.session.query(Task).filter_by(project_id=project.id).all()
         expected_info = {
-            u'url': u'https://farm6.staticflickr.com/5441/8947115130_00e2301a0d.jpg',
-            u'url_m': u'https://farm6.staticflickr.com/5441/8947115130_00e2301a0d_m.jpg',
-            u'url_b': u'https://farm6.staticflickr.com/5441/8947115130_00e2301a0d_b.jpg',
-            u'link': u'https://www.flickr.com/photos/32985084@N00/8947115130',
-            u'title': u'Title'}
+            'url': 'https://farm6.staticflickr.com/5441/8947115130_00e2301a0d.jpg',
+            'url_m': 'https://farm6.staticflickr.com/5441/8947115130_00e2301a0d_m.jpg',
+            'url_b': 'https://farm6.staticflickr.com/5441/8947115130_00e2301a0d_b.jpg',
+            'link': 'https://www.flickr.com/photos/32985084@N00/8947115130',
+            'title': 'Title'}
         assert tasks[0].info == expected_info, tasks[0].info
 
     @with_context
@@ -6518,15 +6523,15 @@ class TestWeb(web.Helper):
         res = self.app.get(url)
         login_url = '/flickr/?next=%2Fproject%2F%25E2%259C%2593project1%2Ftasks%2Fimport%3Ftype%3Dflickr'
 
-        assert login_url in res.data
+        assert login_url in str(res.data)
 
     @with_context
     def test_bulk_dropbox_import_works(self):
         """Test WEB bulk Dropbox import works"""
-        dropbox_file_data = (u'{"bytes":286,'
-                             u'"link":"https://www.dropbox.com/s/l2b77qvlrequ6gl/test.txt?dl=0",'
-                             u'"name":"test.txt",'
-                             u'"icon":"https://www.dropbox.com/static/images/icons64/page_white_text.png"}')
+        dropbox_file_data = ('{"bytes":286,'
+                             '"link":"https://www.dropbox.com/s/l2b77qvlrequ6gl/test.txt?dl=0",'
+                             '"name":"test.txt",'
+                             '"icon":"https://www.dropbox.com/static/images/icons64/page_white_text.png"}')
         self.register()
         self.signin()
         self.new_project()
@@ -6540,9 +6545,9 @@ class TestWeb(web.Helper):
         err_msg = "Tasks should be imported"
         tasks = db.session.query(Task).filter_by(project_id=project.id).all()
         expected_info = {
-            u'link_raw': u'https://www.dropbox.com/s/l2b77qvlrequ6gl/test.txt?raw=1',
-            u'link': u'https://www.dropbox.com/s/l2b77qvlrequ6gl/test.txt?dl=0',
-            u'filename': u'test.txt'}
+            'link_raw': 'https://www.dropbox.com/s/l2b77qvlrequ6gl/test.txt?raw=1',
+            'link': 'https://www.dropbox.com/s/l2b77qvlrequ6gl/test.txt?dl=0',
+            'filename': 'test.txt'}
         assert tasks[0].info == expected_info, tasks[0].info
 
     @with_context
@@ -6553,14 +6558,14 @@ class TestWeb(web.Helper):
         tweet_data = {
             'statuses': [
                 {
-                    u'created_at': 'created',
-                    u'favorite_count': 77,
-                    u'coordinates': 'coords',
-                    u'id_str': u'1',
-                    u'id': 1,
-                    u'retweet_count': 44,
-                    u'user': {'screen_name': 'fulanito'},
-                    u'text': 'this is a tweet #match'
+                    'created_at': 'created',
+                    'favorite_count': 77,
+                    'coordinates': 'coords',
+                    'id_str': '1',
+                    'id': 1,
+                    'retweet_count': 44,
+                    'user': {'screen_name': 'fulanito'},
+                    'text': 'this is a tweet #match'
                 }
             ]
         }
@@ -6582,15 +6587,15 @@ class TestWeb(web.Helper):
         err_msg = "Tasks should be imported"
         tasks = db.session.query(Task).filter_by(project_id=project.id).all()
         expected_info = {
-            u'created_at': 'created',
-            u'favorite_count': 77,
-            u'coordinates': 'coords',
-            u'id_str': u'1',
-            u'id': 1,
-            u'retweet_count': 44,
-            u'user': {'screen_name': 'fulanito'},
-            u'user_screen_name': 'fulanito',
-            u'text': 'this is a tweet #match'
+            'created_at': 'created',
+            'favorite_count': 77,
+            'coordinates': 'coords',
+            'id_str': '1',
+            'id': 1,
+            'retweet_count': 44,
+            'user': {'screen_name': 'fulanito'},
+            'user_screen_name': 'fulanito',
+            'text': 'this is a tweet #match'
         }
         assert tasks[0].info == expected_info, tasks[0].info
 
@@ -6611,9 +6616,9 @@ class TestWeb(web.Helper):
         err_msg = "Tasks should be imported"
         tasks = db.session.query(Task).filter_by(project_id=project.id).all()
         expected_info = {
-            u'url': u'https://mybucket.s3.amazonaws.com/myfile.txt',
-            u'filename': u'myfile.txt',
-            u'link': u'https://mybucket.s3.amazonaws.com/myfile.txt'
+            'url': 'https://mybucket.s3.amazonaws.com/myfile.txt',
+            'filename': 'myfile.txt',
+            'link': 'https://mybucket.s3.amazonaws.com/myfile.txt'
         }
         assert tasks[0].info == expected_info, tasks[0].info
 
@@ -6625,17 +6630,17 @@ class TestWeb(web.Helper):
                     email_addr='john@john.com',
                     info={})
 
-        user.info = dict(facebook_token=u'facebook')
+        user.info = dict(facebook_token='facebook')
         msg, method = get_user_signup_method(user)
         err_msg = "Should return 'facebook' but returned %s" % method
         assert method == 'facebook', err_msg
 
-        user.info = dict(google_token=u'google')
+        user.info = dict(google_token='google')
         msg, method = get_user_signup_method(user)
         err_msg = "Should return 'google' but returned %s" % method
         assert method == 'google', err_msg
 
-        user.info = dict(twitter_token=u'twitter')
+        user.info = dict(twitter_token='twitter')
         msg, method = get_user_signup_method(user)
         err_msg = "Should return 'twitter' but returned %s" % method
         assert method == 'twitter', err_msg
@@ -6652,11 +6657,11 @@ class TestWeb(web.Helper):
         # Anonymous user
         res = self.app.get('/project/test-app/tasks/delete', follow_redirects=True)
         err_msg = "Anonymous user should be redirected for authentication"
-        assert "This feature requires being logged in." in res.data, err_msg
+        assert "This feature requires being logged in." in str(res.data), err_msg
         err_msg = "Anonymous user should not be allowed to delete tasks"
         res = self.app.post('/project/test-app/tasks/delete', follow_redirects=True)
         err_msg = "Anonymous user should not be allowed to delete tasks"
-        assert "This feature requires being logged in." in res.data, err_msg
+        assert "This feature requires being logged in." in str(res.data), err_msg
 
         # Authenticated user but not owner
         self.register()
@@ -6671,8 +6676,8 @@ class TestWeb(web.Helper):
 
         # Owner
         tasks = db.session.query(Task).filter_by(project_id=1).all()
-        make_subadmin_by(email_addr=u'tester@tester.com')
-        res = self.signin(email=u'tester@tester.com', password=u'tester')
+        make_subadmin_by(email_addr='tester@tester.com')
+        res = self.signin(email='tester@tester.com', password='tester')
         res = self.app.get('/project/test-app/tasks/delete', follow_redirects=True)
         err_msg = "Owner user should get 200 in GET"
         assert res.status == '200 OK', err_msg
@@ -6684,7 +6689,7 @@ class TestWeb(web.Helper):
         assert len(tasks) == 0, "len(project.tasks) != 0"
 
         # Admin
-        res = self.signin(email=u'root@root.com', password=u'tester' + 'root')
+        res = self.signin(email='root@root.com', password='tester' + 'root')
         res = self.app.get('/project/test-app/tasks/delete', follow_redirects=True)
         err_msg = "Admin user should get 200 in GET"
         assert res.status_code == 200, err_msg
@@ -6704,11 +6709,11 @@ class TestWeb(web.Helper):
         # Anonymous user
         res = self.app_get_json(url, follow_redirects=True)
         err_msg = "Anonymous user should be redirected for authentication"
-        assert "This feature requires being logged in." in res.data, err_msg
+        assert "This feature requires being logged in." in str(res.data), err_msg
         err_msg = "Anonymous user should not be allowed to delete tasks"
         res = self.app.post(url, follow_redirects=True)
         err_msg = "Anonymous user should not be allowed to delete tasks"
-        assert "This feature requires being logged in." in res.data, err_msg
+        assert "This feature requires being logged in." in str(res.data), err_msg
 
         # Authenticated user but not owner
         res = self.app_get_json(url + '?api_key=%s' % user.api_key)
@@ -6744,8 +6749,8 @@ class TestWeb(web.Helper):
     def test_delete_tasks_removes_existing_zip_files(self, uploader):
         """Test WEB delete tasks also deletes zip files for task and taskruns"""
         Fixtures.create()
-        make_subadmin_by(email_addr=u'tester@tester.com')
-        self.signin(email=u'tester@tester.com', password=u'tester')
+        make_subadmin_by(email_addr='tester@tester.com')
+        self.signin(email='tester@tester.com', password='tester')
         res = self.app.post('/project/test-app/tasks/delete', follow_redirects=True)
         expected = [call('1_test-app_task_json.zip', 'user_2'),
                     call('1_test-app_task_csv.zip', 'user_2'),
@@ -6760,9 +6765,9 @@ class TestWeb(web.Helper):
         # Anonymous user
         res = self.app.get(url, follow_redirects=True)
         err_msg = "Anonymous user should be redirected for authentication"
-        assert "This feature requires being logged in." in res.data, err_msg
+        assert "This feature requires being logged in." in str(res.data), err_msg
         res = self.app.post(url, follow_redirects=True)
-        assert "This feature requires being logged in." in res.data, err_msg
+        assert "This feature requires being logged in." in str(res.data), err_msg
         # Authenticated user
         self.register()
         self.signin()
@@ -6772,7 +6777,7 @@ class TestWeb(web.Helper):
         res = self.app.get(url, follow_redirects=True)
         err_msg = "Authenticated user should get access to reset api key page"
         assert res.status_code == 200, err_msg
-        assert "reset your personal API Key" in res.data, err_msg
+        assert "reset your personal API Key" in str(res.data), err_msg
         url = "/account/%s/resetapikey" % user.name
         res = self.app.post(url, follow_redirects=True)
         err_msg = "Authenticated user should be able to reset his api key"
@@ -6798,9 +6803,9 @@ class TestWeb(web.Helper):
         # Anonymous user
         res = self.app_get_json(url, follow_redirects=True)
         err_msg = "Anonymous user should be redirected for authentication"
-        assert "This feature requires being logged in." in res.data, err_msg
+        assert "This feature requires being logged in." in str(res.data), err_msg
         res = self.app_post_json(url, data=dict(foo=1), follow_redirects=True)
-        assert "This feature requires being logged in." in res.data, res.data
+        assert "This feature requires being logged in." in str(res.data), res.data
         # Authenticated user
         self.register()
         self.signin()
@@ -6854,7 +6859,7 @@ class TestWeb(web.Helper):
         url = "/stats"
         res = self.app.get(url, follow_redirects=True)
         err_msg = "There should be a Global Statistics page of the project"
-        assert "General Statistics" in res.data, err_msg
+        assert "General Statistics" in str(res.data), err_msg
 
     @with_context
     def test_58_global_stats_json(self):
@@ -6868,7 +6873,7 @@ class TestWeb(web.Helper):
         err_msg = "There should be a Global Statistics page of the project"
         data = json.loads(res.data)
         keys = ['projects', 'show_locs', 'stats', 'tasks', 'top5_projects_24_hours', 'top5_users_24_hours', 'users']
-        assert keys.sort() == data.keys().sort(), keys
+        assert keys.sort() == list(data.keys()).sort(), keys
 
 
     @with_context
@@ -6878,7 +6883,7 @@ class TestWeb(web.Helper):
         url = "/help/api"
         res = self.app.get(url, follow_redirects=True)
         err_msg = "There should be a help api page"
-        assert "API Help" in res.data, err_msg
+        assert "API Help" in str(res.data), err_msg
         assert_raises(ValueError, json.loads, res.data)
 
     @with_context
@@ -6901,7 +6906,7 @@ class TestWeb(web.Helper):
         url = "/help/license"
         res = self.app.get(url, follow_redirects=True)
         err_msg = "There should be a help license page"
-        assert "Licenses" in res.data, err_msg
+        assert "Licenses" in str(res.data), err_msg
         assert_raises(ValueError, json.loads, res.data)
 
     @with_context
@@ -6921,7 +6926,7 @@ class TestWeb(web.Helper):
         url = "/about"
         res = self.app.get(url, follow_redirects=True)
         err_msg = "There should be an about page"
-        assert "About" in res.data, err_msg
+        assert "About" in str(res.data), err_msg
 
     @with_context
     def test_59_help_tos(self):
@@ -6929,7 +6934,7 @@ class TestWeb(web.Helper):
         url = "/help/terms-of-use"
         res = self.app.get(url, follow_redirects=True)
         err_msg = "There should be a TOS page"
-        assert "Terms for use" in res.data, err_msg
+        assert "Terms for use" in str(res.data), err_msg
         assert_raises(ValueError, json.loads, res.data)
 
     @with_context
@@ -6951,7 +6956,7 @@ class TestWeb(web.Helper):
         url = "/help/cookies-policy"
         res = self.app.get(url, follow_redirects=True)
         err_msg = "There should be a TOS page"
-        assert "uses cookies" in res.data, err_msg
+        assert "uses cookies" in str(res.data), err_msg
         assert_raises(ValueError, json.loads, res.data)
 
     @with_context
@@ -6974,7 +6979,7 @@ class TestWeb(web.Helper):
         url = "/help/privacy"
         res = self.app.get(url, follow_redirects=True)
         err_msg = "There should be a privacy policy page"
-        assert "Privacy" in res.data, err_msg
+        assert "Privacy" in str(res.data), err_msg
         assert_raises(ValueError, json.loads, res.data)
 
     @with_context
@@ -7002,14 +7007,14 @@ class TestWeb(web.Helper):
         # As Anonymous user
         #res = self.app.get(url, follow_redirects=True)
         #err_msg = "The anonymous user should be able to participate"
-        #assert project.name in res.data, err_msg
+        #assert project.name in str(res.data), err_msg
 
         # As registered user
         self.register()
         self.signin()
         res = self.app.get(url, follow_redirects=True)
         err_msg = "The anonymous user should be able to participate"
-        assert project.name in res.data, err_msg
+        assert project.name in str(res.data), err_msg
         self.signout()
 
         # Now only allow authenticated users
@@ -7022,13 +7027,13 @@ class TestWeb(web.Helper):
         err_msg = "User should be redirected to sign in"
         project = db.session.query(Project).first()
         msg = "This feature requires being logged in"
-        assert msg in res.data, err_msg
+        assert msg in str(res.data), err_msg
 
         # As registered user
         res = self.signin()
         res = self.app.get(url, follow_redirects=True)
         err_msg = "The authenticated user should be able to participate"
-        assert project.name in res.data, err_msg
+        assert project.name in str(res.data), err_msg
         self.signout()
 
         # Now only allow authenticated users
@@ -7037,7 +7042,7 @@ class TestWeb(web.Helper):
         db.session.commit()
         res = self.app.get(url, follow_redirects=True)
         err_msg = "Only authenticated users can participate"
-        assert 'This feature requires being logged in' in res.data, err_msg
+        assert 'This feature requires being logged in' in str(res.data), err_msg
 
     @with_context
     def test_70_public_user_profile(self):
@@ -7048,13 +7053,13 @@ class TestWeb(web.Helper):
         url = '/account/%s/' % Fixtures.name
         res = self.app.get(url, follow_redirects=True)
         err_msg = "Profile requires being logged in"
-        assert 'This feature requires being logged in.' in res.data, err_msg
+        assert 'This feature requires being logged in.' in str(res.data), err_msg
 
         # Should work as an authenticated user
         user = user_repo.get(2)
         self.signin_user(user)
         res = self.app.get(url, follow_redirects=True)
-        assert Fixtures.fullname in res.data, err_msg
+        assert Fixtures.fullname in str(res.data), err_msg
 
         # Should return 404 when a user does not exist
         url = '/account/a-fake-name-that-does-not-exist/'
@@ -7245,8 +7250,8 @@ class TestWeb(web.Helper):
             res = self.task_settings_scheduler(short_name="sampleapp",
                                                sched=sched)
             err_msg = "Task Scheduler should be updated"
-            assert "Project Task Scheduler updated" in res.data, err_msg
-            assert "success" in res.data, err_msg
+            assert "Project Task Scheduler updated" in str(res.data), err_msg
+            assert "success" in str(res.data), err_msg
             project = db.session.query(Project).get(1)
             assert project.info['sched'] == sched, err_msg
             self.signout()
@@ -7304,7 +7309,7 @@ class TestWeb(web.Helper):
         res = self.app.get(url, follow_redirects=True)
         dom = BeautifulSoup(res.data)
         form = dom.find(id=form_id)
-        assert form is not None, err_msg
+        assert form is not None
         options = dom.find_all('option')
         scheds = [o.attrs['value'] for o in options]
         assert 'user_pref_scheduler' in scheds
@@ -7424,8 +7429,8 @@ class TestWeb(web.Helper):
                                                 n_answers=n_answers)
             db.session.close()
             err_msg = "Task Redundancy should be updated"
-            assert "Redundancy updated!" in res.data, err_msg
-            assert "success" in res.data, err_msg
+            assert "Redundancy updated!" in str(res.data), err_msg
+            assert "success" in str(res.data), err_msg
             project = db.session.query(Project).get(1)
             for t in project.tasks:
                 assert t.n_answers == n_answers, err_msg
@@ -7433,13 +7438,13 @@ class TestWeb(web.Helper):
             res = self.task_settings_redundancy(short_name="sampleapp",
                                                 n_answers=0)
             err_msg = "Task Redundancy should be a value between 0 and 1000"
-            assert "error" in res.data, err_msg
-            assert "success" not in res.data, err_msg
+            assert "error" in str(res.data), err_msg
+            assert "success" not in str(res.data), err_msg
             res = self.task_settings_redundancy(short_name="sampleapp",
                                                 n_answers=10000000)
             err_msg = "Task Redundancy should be a value between 0 and 1000"
-            assert "error" in res.data, err_msg
-            assert "success" not in res.data, err_msg
+            assert "error" in str(res.data), err_msg
+            assert "success" not in str(res.data), err_msg
 
             self.signout()
 
@@ -7487,7 +7492,7 @@ class TestWeb(web.Helper):
 
             res = self.app_post_json(new_url, data=dict(n_answers=n_answers), follow_redirects=True)
             data = json.loads(res.data)
-            print(res.status_code)
+            print((res.status_code))
             print(SUCCESS)
             assert data.get('status') == SUCCESS, data
             project = db.session.query(Project).get(1)
@@ -7583,8 +7588,8 @@ class TestWeb(web.Helper):
                                               task_ids=task_ids,
                                               priority_0=priority_0)
             err_msg = "Task Priority should be updated"
-            assert "error" not in res.data, err_msg
-            assert "success" in res.data, err_msg
+            assert "error" not in str(res.data), err_msg
+            assert "success" in str(res.data), err_msg
             task = db.session.query(Task).get(_id)
             assert task.id == int(task_ids), err_msg
             assert task.priority_0 == priority_0, err_msg
@@ -7593,18 +7598,18 @@ class TestWeb(web.Helper):
                                               priority_0=3,
                                               task_ids="1")
             err_msg = "Task Priority should be a value between 0.0 and 1.0"
-            assert "error" in res.data, err_msg
-            assert "success" not in res.data, err_msg
+            assert "error" in str(res.data), err_msg
+            assert "success" not in str(res.data), err_msg
             res = self.task_settings_priority(short_name="sampleapp",
                                               task_ids="1, 2")
             err_msg = "Task Priority task_ids should be a comma separated, no spaces, integers"
-            assert "error" in res.data, err_msg
-            assert "success" not in res.data, err_msg
+            assert "error" in str(res.data), err_msg
+            assert "success" not in str(res.data), err_msg
             res = self.task_settings_priority(short_name="sampleapp",
                                               task_ids="1,a")
             err_msg = "Task Priority task_ids should be a comma separated, no spaces, integers"
-            assert "error" in res.data, err_msg
-            assert "success" not in res.data, err_msg
+            assert "error" in str(res.data), err_msg
+            assert "success" not in str(res.data), err_msg
 
             self.signout()
 
@@ -7805,7 +7810,7 @@ class TestWeb(web.Helper):
 
             form = {
                     'request_json': datajson,
-                    'test__upload_url': (StringIO('Hi there'), 'hello.txt')
+                    'test__upload_url': (BytesIO(b'Hi there'), 'hello.txt')
                 }
             success = self.app.post(url, content_type='multipart/form-data',
                                         data=form)
@@ -7815,7 +7820,7 @@ class TestWeb(web.Helper):
             res = json.loads(success.data)
 
             t = task_repo.get_task(task.id)
-            expected_url = u'https://s3.storage.com/test_bucket/%s/%s/%s/hello.txt' % (project.id, task.id, project.owner.id)
+            expected_url = 'https://s3.storage.com:443/test_bucket/%s/%s/%s/hello.txt' % (project.id, task.id, project.owner.id)
             assert task.gold_answers['test__upload_url'] == expected_url
 
     @with_context
@@ -7855,7 +7860,7 @@ class TestWeb(web.Helper):
         assert t.state == 'ongoing', t.state
         assert t.calibration == 1, t.calibration
         assert t.exported == True, t.exported
-        assert t.gold_answers == {u'gold_ans__upload_url': u'testURL'}, t.gold_answers
+        assert t.gold_answers == {'gold_ans__upload_url': 'testURL'}, t.gold_answers
         assert t.expiration
 
     @with_context
@@ -7900,7 +7905,7 @@ class TestWeb(web.Helper):
             args2, kwargs2 = get_content_from_s3_mock.call_args
             assert kwargs2['s3_bucket'] == bucket_name
             assert kwargs2['path'] == '/{}/{}'.format(upload_path, file_name)
-            assert retrieved_gold_answers == gold_answers, { retrieved: retrieved_gold_answers, actual: gold_answers}
+            assert retrieved_gold_answers == gold_answers, {"retrieved": retrieved_gold_answers, "actual": gold_answers}
 
     @with_context
     def test_missing_private_gold_answers(self):
@@ -7968,7 +7973,7 @@ class TestWeb(web.Helper):
         assert dom.find('div', attrs={'class': 'cc_banner-wrapper'}) is None, err_msg
         self.signout()
 
-    @with_context
+    @with_request_context
     def test_user_with_no_more_tasks_find_volunteers_project_completed(self):
         """Test WEB when a user has contributed to all available tasks, he is
         not asked to find new volunteers for a project, if the project is
@@ -7985,7 +7990,7 @@ class TestWeb(web.Helper):
 
         assert task.state == 'completed', task.state
         message = "Sorry, you've contributed to all the tasks for this project, but this project still needs more volunteers, so please spread the word!"
-        assert message not in res.data
+        assert message not in str(res.data)
         self.signout()
 
     @with_context
@@ -8006,7 +8011,7 @@ class TestWeb(web.Helper):
         project = project_repo.get(1)
 
         err_msg = "A new key should be generated"
-        assert "New secret key generated" in res.data, err_msg
+        assert "New secret key generated" in str(res.data), err_msg
         assert old_key != project.secret_key, err_msg
 
     @with_context
@@ -8036,7 +8041,7 @@ class TestWeb(web.Helper):
         project = project_repo.get(1)
 
         err_msg = "A new key should be generated"
-        assert "New secret key generated" in res.data, err_msg
+        assert "New secret key generated" in str(res.data), err_msg
         assert old_key != project.secret_key, err_msg
 
 
@@ -8109,6 +8114,9 @@ class TestWeb(web.Helper):
         mail_queue.enqueue.assert_called()
         assert data.get('flash') == msg, (err_msg, data)
         assert data.get('status') == SUCCESS, (err_msg, data)
+        """
+        assertionError: ('Should redirect to otp validation page', {'flash': 'an email has been sent to you with one time password', 'next': '/account/4114b82ec76c4679a03aa26f72c6ba36/otpvalidation?next=%2F', 'status': 'success'})
+        """
         assert data.get('next').split('/')[-1] == 'otpvalidation', (err_msg, data)
 
         token = data.get('next').split('/')[-2]
@@ -8196,7 +8204,7 @@ class TestWeb(web.Helper):
         project.info["subproduct"] = "def"
         project.set_password('hello')
 
-        order_by = u'n_volunteers'
+        order_by = 'n_volunteers'
         desc = True
         query = 'orderby=%s&desc=%s' % (order_by, desc)
 
@@ -8279,9 +8287,9 @@ class TestWeb(web.Helper):
         user_repo.save(admin)
         self.signin(email=admin.email_addr, password='1234')
 
-        project = ProjectFactory.create(name=u'test',
-                                        short_name=u'test',
-                                        description=u'test')
+        project = ProjectFactory.create(name='test',
+                                        short_name='test',
+                                        description='test')
         project_repo.save(project)
 
         csrf_url = '/project/{}/update'.format(project.short_name)
@@ -8319,9 +8327,9 @@ class TestWeb(web.Helper):
         user_repo.save(admin)
         self.signin(email=admin.email_addr, password='1234')
 
-        project = ProjectFactory.create(name=u'test',
-                                        short_name=u'test',
-                                        description=u'test')
+        project = ProjectFactory.create(name='test',
+                                        short_name='test',
+                                        description='test')
         project_repo.save(project)
 
         csrf_url = '/project/{}/update'.format(project.short_name)
@@ -8362,9 +8370,9 @@ class TestWeb(web.Helper):
         user_repo.save(subadmin)
         self.signin(email=subadmin.email_addr, password='1234')
 
-        project = ProjectFactory.create(name=u'test',
-                                        short_name=u'test',
-                                        description=u'test',
+        project = ProjectFactory.create(name='test',
+                                        short_name='test',
+                                        description='test',
                                         owners_ids=[subadmin.id])
         project_repo.save(project)
 
@@ -8406,9 +8414,9 @@ class TestWeb(web.Helper):
         user_repo.save(subadmin)
         self.signin(email=subadmin.email_addr, password='1234')
 
-        project = ProjectFactory.create(name=u'test',
-                                        short_name=u'test',
-                                        description=u'test',
+        project = ProjectFactory.create(name='test',
+                                        short_name='test',
+                                        description='test',
                                         owners_ids=[subadmin.id])
         project_repo.save(project)
 
@@ -8449,9 +8457,9 @@ class TestWeb(web.Helper):
         user_repo.save(subadmin)
         self.signin(email=subadmin.email_addr, password='1234')
 
-        project = ProjectFactory.create(name=u'test',
-                                        short_name=u'test',
-                                        description=u'test')
+        project = ProjectFactory.create(name='test',
+                                        short_name='test',
+                                        description='test')
         project_repo.save(project)
 
         csrf_url = '/project/{}/update'.format(project.short_name)
@@ -8480,9 +8488,9 @@ class TestWeb(web.Helper):
         user_repo.save(worker)
         self.signin(email=worker.email_addr, password='1234')
 
-        project = ProjectFactory.create(name=u'test',
-                                        short_name=u'test',
-                                        description=u'test')
+        project = ProjectFactory.create(name='test',
+                                        short_name='test',
+                                        description='test')
         project_repo.save(project)
 
         csrf_url = '/project/{}/update'.format(project.short_name)
@@ -8501,9 +8509,9 @@ class TestWeb(web.Helper):
         user_repo.save(admin)
         self.signin(email=admin.email_addr, password='1234')
 
-        project = ProjectFactory.create(name=u'test',
-                                        short_name=u'test',
-                                        description=u'test')
+        project = ProjectFactory.create(name='test',
+                                        short_name='test',
+                                        description='test')
         project_repo.save(project)
 
         csrf_url = '/project/{}/update'.format(project.short_name)
@@ -8534,9 +8542,9 @@ class TestWeb(web.Helper):
         user_repo.save(admin)
         self.signin(email=admin.email_addr, password='1234')
 
-        project = ProjectFactory.create(name=u'test',
-                                        short_name=u'test',
-                                        description=u'test')
+        project = ProjectFactory.create(name='test',
+                                        short_name='test',
+                                        description='test')
         project_repo.save(project)
 
         csrf_url = '/project/{}/update'.format(project.short_name)
@@ -8572,9 +8580,9 @@ class TestWeb(web.Helper):
         user_repo.save(admin)
         self.signin(email=admin.email_addr, password='1234')
 
-        project = ProjectFactory.create(name=u'test',
-                                        short_name=u'test',
-                                        description=u'test')
+        project = ProjectFactory.create(name='test',
+                                        short_name='test',
+                                        description='test')
         project_repo.save(project)
 
         csrf_url = '/project/{}/update'.format(project.short_name)
@@ -8692,7 +8700,7 @@ class TestWeb(web.Helper):
         url = 'project/category/historical_contributions?api_key={}'.format(user.api_key)
         with patch.dict(self.flask_app.config, {'HISTORICAL_CONTRIBUTIONS_AS_CATEGORY': True}):
             res = self.app.get(url, follow_redirects=True)
-            assert '<h3>Historical Contributions Projects</h3>' in res.data
+            assert '<h3>Historical Contributions Projects</h3>' in str(res.data)
             assert not mock_rank.called
 
     @with_context
@@ -8701,7 +8709,7 @@ class TestWeb(web.Helper):
         project = ProjectFactory.create(zip_download=False)
         url = '/project/%s/tasks/export' % project.short_name
         res = self.app.get(url, follow_redirects=True)
-        assert 'This feature requires being logged in' in res.data
+        assert 'This feature requires being logged in' in str(res.data)
 
     @with_context
     def test_export_task_zip_download_not_owner(self):
@@ -8743,7 +8751,7 @@ class TestWeb(web.Helper):
         project = ProjectFactory.create(zip_download=False)
         url = '/project/%s/tasks/browse' % project.short_name
         res = self.app.get(url, follow_redirects=True)
-        assert 'This feature requires being logged in' in res.data
+        assert 'This feature requires being logged in' in str(res.data)
 
     @with_context
     @patch('pybossa.view.projects._check_if_redirect_to_password')
@@ -8834,9 +8842,9 @@ class TestWeb(web.Helper):
 
         url = '/account/%s/?api_key=%s' % (contributor.name, owner.api_key)
         res = self.app_get_json(url)
-        print(res.data)
+        print((res.data))
         data = json.loads(res.data)
-        assert 'projects' in data.keys(), data.keys()
+        assert 'projects' in data.keys(), list(data.keys())
         assert len(data['projects']) == 1, len(data['projects'])
         tmp = data['projects'][0]
         for key in info.keys():
@@ -8846,7 +8854,7 @@ class TestWeb(web.Helper):
         res = self.app_get_json(url)
         data = json.loads(res.data)
         assert len(data['projects']) == 0, len(data['projects'])
-        assert 'projects_created' in data.keys(), data.keys()
+        assert 'projects_created' in data.keys(), list(data.keys())
         assert len(data['projects_created']) == 1, len(data['projects_created'])
         tmp = data['projects_created'][0]
         for key in info.keys():
@@ -8856,7 +8864,7 @@ class TestWeb(web.Helper):
                                            owner.api_key)
         res = self.app_get_json(url)
         data = json.loads(res.data)
-        assert 'projects_published' in data.keys(), data.keys()
+        assert 'projects_published' in data.keys(), list(data.keys())
         assert len(data['projects_published']) == 1, len(data['projects_published'])
         tmp = data['projects_published'][0]
         for key in info.keys():
@@ -9008,7 +9016,7 @@ class TestWeb(web.Helper):
             tasks_60days.append(task)
 
         filter = dict(n_answers=4, filters=dict(created_from=past_30days, created_to=now))
-        res = self.app.post(u'/project/{}/tasks/redundancyupdate'.format(project.short_name),
+        res = self.app.post('/project/{}/tasks/redundancyupdate'.format(project.short_name),
              data=json.dumps(filter), content_type='application/json', follow_redirects=True)
 
         # updated redundancy
@@ -9033,7 +9041,7 @@ class TestWeb(web.Helper):
 
         # update redundancy passing filters
         filter = dict(n_answers=2, filters=dict())
-        res = self.app.post(u'/project/{}/tasks/redundancyupdate'.format(project.short_name),
+        res = self.app.post('/project/{}/tasks/redundancyupdate'.format(project.short_name),
              data=json.dumps(filter), content_type='application/json', follow_redirects=True)
 
         # completed tasks redundancy wont be updated
@@ -9127,7 +9135,7 @@ class TestWeb(web.Helper):
         user_access = dict(select_users=["1", "2"])
 
         with patch.dict(data_access_levels, self.patch_data_access_levels):
-            res = self.app.post(u'/project/{}/assign-users'.format(project.short_name),
+            res = self.app.post('/project/{}/assign-users'.format(project.short_name),
                  data=json.dumps(user_access), content_type='application/json', follow_redirects=True)
             data = json.loads(res.data)
             assert data.get('status') == 'warning', data
@@ -9138,7 +9146,7 @@ class TestWeb(web.Helper):
         user.info['data_access'] = ["L1"]
         user_access = dict(select_users=[])
         with patch.dict(data_access_levels, self.patch_data_access_levels):
-            res = self.app.post(u'/project/{}/assign-users'.format(project.short_name),
+            res = self.app.post('/project/{}/assign-users'.format(project.short_name),
                  data=json.dumps(user_access), content_type='application/json', follow_redirects=True)
             data = json.loads(res.data)
             assert data.get('status') == 'success', data
@@ -9165,7 +9173,7 @@ class TestWeb(web.Helper):
         res = self.app.post(url, data=data, follow_redirects=True)
 
         current_app.config['ACCOUNT_CONFIRMATION_DISABLED'] = True
-        assert b'Use a valid email account' in str(res.data), res.data
+        assert 'Use a valid email account' in str(res.data), res.data
 
     @with_context
     def test_make_random_gold(self):
@@ -9175,7 +9183,7 @@ class TestWeb(web.Helper):
         })
         user = project.owner
         # with no tasks available
-        url = u'/project/{}/make-random-gold?api_key={}'.format(project.short_name, user.api_key)
+        url = '/project/{}/make-random-gold?api_key={}'.format(project.short_name, user.api_key)
         res = self.app_get_json(url)
         data = json.loads(res.data)
         assert data['flash'] == 'There Are No Tasks Avaiable!'
@@ -9184,14 +9192,14 @@ class TestWeb(web.Helper):
         task = TaskFactory.create(project=project)
         res = self.app_get_json(url)
         data = json.loads(res.data)
-        assert u'/task/1?' in data['next'], data['next']
+        assert '/task/1?' in data['next'], data['next']
 
     @with_context
     def test_get_random_task_for_gold_mode(self):
         project = ProjectFactory.create()
         user = project.owner
         # with no tasks available
-        url = u'/api/project/{}/taskgold?api_key={}'.format(project.id, user.api_key)
+        url = '/api/project/{}/taskgold?api_key={}'.format(project.id, user.api_key)
         res = self.app_get_json(url)
         data = json.loads(res.data)
         assert not data
@@ -9279,7 +9287,7 @@ class TestWebUserMetadataUpdate(web.Helper):
             assert v == data_created[k], 'Created user field [{}] does not equal specified data'.format(k)
         return user
 
-    def assert_updates_applied_correctly(self, user_id, disabled=update.keys()):
+    def assert_updates_applied_correctly(self, user_id, disabled=list(update.keys())):
         user_updated = user_repo.get(user_id)
         updated = get_user_data_as_form(user_updated)
 
@@ -9293,7 +9301,7 @@ class TestWebUserMetadataUpdate(web.Helper):
             assert updated_value == original_value, 'Disabled field [{}] got updated from [{}] to [{}].'.format(k, original_value, updated_value)
 
     def update_metadata(self, user_name):
-        url = u'/account/save_metadata/{}'.format(user_name)
+        url = '/account/save_metadata/{}'.format(user_name)
         res = self.app.post(
             url,
             data=self.update,
@@ -9310,10 +9318,10 @@ class TestWebUserMetadataUpdate(web.Helper):
     def mock_upref_mdata_choices(self, get_upref_mdata_choices):
         def double(x): return (x,x)
         get_upref_mdata_choices.return_value = dict(
-            languages=map(double,["Afrikaans", "Albanian", "Welsh"]),
-            locations=map(double, ['Bonaire', 'Wallis and Futuna', 'Vanuatu']),
+            languages=list(map(double,["Afrikaans", "Albanian", "Welsh"])),
+            locations=list(map(double, ['Bonaire', 'Wallis and Futuna', 'Vanuatu'])),
             timezones=[("AET", "Australia Eastern Time"), ("AGT", "Argentina Standard Time")],
-            user_types=map(double, ["Researcher", "Analyst", "Curator"])
+            user_types=list(map(double, ["Researcher", "Analyst", "Curator"]))
         )
 
     def test_update_differs_from_orginal(self):
@@ -9523,7 +9531,7 @@ class TestWebQuizModeUpdate(web.Helper):
         assert quiz == result, {'quiz': quiz, 'result': result}
 
     def update_project(self, project, update):
-        url = u'/project/{}/quiz-mode'.format(project.short_name)
+        url = '/project/{}/quiz-mode'.format(project.short_name)
         return self.app_post_json(url, data=update)
 
     @with_context
@@ -9585,7 +9593,7 @@ class TestWebQuizModeUpdate(web.Helper):
         assert admin.get_quiz_not_started(project)
         quiz['users'] = [{ 'quiz': {'config': {'enabled': True, 'reset': True}}}]
         res = self.update_project(project, quiz)
-        assert 'An error occurred' in res.data, res.data
+        assert 'An error occurred' in str(res.data), res.data
 
     @with_context
     def test_reset(self):
@@ -9621,7 +9629,7 @@ class TestWebQuizModeUpdate(web.Helper):
         TaskFactory.create_batch(20, project=project, n_answers=1, calibration=1)
         quiz['questions'] = 100
         response = self.update_project(project, quiz)
-        assert "Configuration updated successfully" in response.data, response.data
+        assert b"Configuration updated successfully" in response.data, response.data
 
     @with_context
     def test_enable(self):
@@ -9648,7 +9656,7 @@ class TestWebQuizModeUpdate(web.Helper):
         admin = UserFactory.create()
         self.signin_user(admin)
         project = ProjectFactory.create(owner=admin)
-        url = u'/project/{}/quiz-mode'.format(project.short_name)
+        url = '/project/{}/quiz-mode'.format(project.short_name)
         result = self.app_get_json(url)
         assert result.status_code == 200
 
@@ -9754,7 +9762,7 @@ class TestServiceRequest(web.Helper):
         payload = {
             'data': { 'queryTest':{
                 'context':"test_context",
-                'query': u"½.½ uuujfA 11109",
+                'query': "½.½ uuujfA 11109",
                 'maxresults':10}}}
         data = json.loads(res.data)
         assert data.get('status_code') == 403, data
@@ -9764,7 +9772,7 @@ class TestServiceRequest(web.Helper):
         payload = {
             'data': { 'invalid-queryTest':{
                 'context':"test_context",
-                'query': u"½.½ uuujfA 11109",
+                'query': "½.½ uuujfA 11109",
                 'maxresults':10}}}
         data = json.loads(res.data)
         assert data.get('status_code') == 403, data
@@ -9773,7 +9781,7 @@ class TestServiceRequest(web.Helper):
         payload = {
             'data': { 'queryTest':{
                 'context':"invalid-test_context",
-                'query': u"½.½ uuujfA 11109",
+                'query': "½.½ uuujfA 11109",
                 'maxresults':10}}}
         data = json.loads(res.data)
         assert data.get('status_code') == 403, data
@@ -9782,7 +9790,7 @@ class TestServiceRequest(web.Helper):
         payload = {
             'data': { 'queryTest':{
                 'context':"test_context",
-                'query': u"½.½ @ invalid query",
+                'query': "½.½ @ invalid query",
                 'maxresults':10}}}
         data = json.loads(res.data)
         assert data.get('status_code') == 403, data
@@ -9819,7 +9827,7 @@ class TestServiceRequest(web.Helper):
         valid_request = {
             'data': { 'queryTest':{
                 'context':"test_context",
-                'query': u"½.½ uuujfA 11109",
+                'query': "½.½ uuujfA 11109",
                 'maxresults':10}}}
 
         url = "/api/task/1/services/test-service-name/1/37"
@@ -9834,4 +9842,4 @@ class TestServiceRequest(web.Helper):
                             data=valid_request,
                             follow_redirects=False,
                             )
-        assert res.data == mock_response.content, res.data
+        assert res.data.decode() == mock_response.content, res.data

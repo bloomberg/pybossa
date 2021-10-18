@@ -213,7 +213,7 @@ def stats_dates(project_id, period='15 day'):
                     obj[tmp_date.strftime('%Y-%m-%d')] = 0
         return obj
 
-    dates = _fill_empty_days(dates.keys(), dates)
+    dates = _fill_empty_days(list(dates.keys()), dates)
     if app_settings.config.get('DISABLE_ANONYMOUS_ACCESS'):
         dates_auth = dates # all users are auth users
         return dates, dates_anon, dates_auth
@@ -235,7 +235,7 @@ def stats_dates(project_id, period='15 day'):
     for row in results:
         dates_auth[row.d] = row.count
 
-    dates_auth = _fill_empty_days(dates_auth.keys(), dates_auth)
+    dates_auth = _fill_empty_days(list(dates_auth.keys()), dates_auth)
 
     # Get all answers per date for anon
     sql = text('''
@@ -254,7 +254,7 @@ def stats_dates(project_id, period='15 day'):
     for row in results:
         dates_anon[row.d] = row.count
 
-    dates_anon = _fill_empty_days(dates_anon.keys(), dates_anon)
+    dates_anon = _fill_empty_days(list(dates_anon.keys()), dates_anon)
 
     return dates, dates_anon, dates_auth
 
@@ -417,7 +417,7 @@ def stats_format_dates(project_id, dates, dates_anon, dates_auth):
     dayNewAnonStats = dict(label=gettext("Anonymous"), values=[])
     dayNewAuthStats = dict(label=gettext("Authenticated"), values=[])
 
-    answer_dates = sorted(list(set(dates_anon.keys() + dates_auth.keys())))
+    answer_dates = sorted(list(set(list(dates_anon.keys()) + list(dates_auth.keys()))))
     total = 0
 
     for d in sorted(dates.keys()):
@@ -544,7 +544,7 @@ def update_stats(project_id, period='2 week'):
 
     sum(dates.values())
 
-    sorted(dates.iteritems(), key=operator.itemgetter(0))
+    sorted(iter(dates.items()), key=operator.itemgetter(0))
 
     dates_stats = stats_format_dates(project_id, dates,
                                      dates_anon, dates_auth)

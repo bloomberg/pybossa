@@ -20,11 +20,10 @@ from pybossa.dashboard.jobs import new_users_week, returning_users_week
 from pybossa.dashboard.data import format_new_users, format_returning_users
 from pybossa.core import db
 from datetime import datetime, timedelta
-from default import Test, with_context
-from factories.user_factory import UserFactory
-from factories.taskrun_factory import TaskRunFactory
-from mock import patch, MagicMock
-from sqlalchemy import text
+from test import Test, with_context
+from test.factories.user_factory import UserFactory
+from test.factories.taskrun_factory import TaskRunFactory
+from unittest.mock import patch, MagicMock
 
 
 class TestDashBoardNewUsers(Test):

@@ -16,12 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, db, with_context
 from nose.tools import assert_raises
 from sqlalchemy.exc import IntegrityError
+
 from pybossa.model.user import User
-from pybossa.model.project import Project
-from copy import deepcopy
+from test import Test, db, with_context
 
 
 class TestModelUser(Test):
@@ -114,8 +113,8 @@ class TestModelUser(Test):
         assert public_attributes.sort() == user.public_attributes().sort()
         data = user.to_public_json()
         err_msg = "There are some keys that should not be public"
-        assert data.keys().sort() == public_attributes.sort(), err_msg
-        all_attributes = user.dictize().keys()
+        assert list(data.keys()).sort() == public_attributes.sort(), err_msg
+        all_attributes = list(user.dictize().keys())
         s = set(public_attributes)
         private_attributes = [x for x in all_attributes if x not in s]
         for attr in private_attributes:
@@ -137,4 +136,4 @@ class TestModelUser(Test):
 
         data = user.to_public_json()
         err_msg = "There are some keys that should not be public"
-        assert data.get('info').keys().sort() == public_info_keys.sort(), err_msg
+        assert list(data.get('info').keys()).sort() == public_info_keys.sort(), err_msg

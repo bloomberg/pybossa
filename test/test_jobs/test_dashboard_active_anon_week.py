@@ -19,10 +19,10 @@
 from pybossa.dashboard.jobs import active_anon_week
 from pybossa.dashboard.data import format_anon_week
 from pybossa.core import db
-from factories.taskrun_factory import TaskRunFactory, AnonymousTaskRunFactory
+from test.factories.taskrun_factory import TaskRunFactory, AnonymousTaskRunFactory
 from datetime import datetime
-from default import Test, with_context
-from mock import patch, MagicMock
+from test import Test, with_context
+from unittest.mock import patch, MagicMock
 
 
 class TestDashBoardActiveAnon(Test):

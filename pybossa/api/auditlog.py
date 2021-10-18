@@ -19,7 +19,7 @@
 PYBOSSA api module for exposing domain object Auditlog via an API.
 """
 from pybossa.model.auditlog import Auditlog
-from api_base import APIBase
+from .api_base import APIBase
 from werkzeug.exceptions import MethodNotAllowed
 
 

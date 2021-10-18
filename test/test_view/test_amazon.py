@@ -17,8 +17,8 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from mock import patch, MagicMock
-from default import flask_app, with_context
+from unittest.mock import patch, MagicMock
+from test import flask_app, with_context
 from pybossa.s3_client import NoSuchBucket, PrivateBucket
 
 
@@ -36,7 +36,7 @@ class TestAmazonS3API(object):
         resp = flask_app.test_client().get('/amazon/bucket/%s' % bucket_name)
 
         client_instance.objects.assert_called_with(bucket_name)
-        assert resp.data == json.dumps(objects), resp.data
+        assert resp.data == json.dumps(objects).encode(), resp.data
 
     @with_context
     @patch('pybossa.view.amazon.S3Client')

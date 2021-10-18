@@ -16,18 +16,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import db, with_context
-from test_api import TestAPI
-from mock import patch, call
-
-from factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory
-
-from pybossa.repositories import ProjectRepository
-from pybossa.repositories import TaskRepository
-from pybossa.repositories import ResultRepository
-from helper.gig_helper import make_admin
 from datetime import datetime, timedelta
 
+from pybossa.repositories import ProjectRepository
+from pybossa.repositories import ResultRepository
+from pybossa.repositories import TaskRepository
+from test import db, with_context
+from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, \
+    UserFactory
+from test.helper.gig_helper import make_admin
+from test.test_api import TestAPI
 
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)
@@ -61,7 +59,7 @@ class TestCompletedTaskAPI(TestAPI):
 
         # correct result
         assert data[0]['project_id'] == 1, data
-        assert data[0]['state'] == u'completed', data
+        assert data[0]['state'] == 'completed', data
 
         # call completedtask but with wrong project_id
         url = '/api/completedtask?project_id=99999999&api_key=api-key1'

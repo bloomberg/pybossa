@@ -16,10 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 # Cache global variables for timeouts
+from sqlalchemy.exc import IntegrityError
 
-from default import Test, db, with_context
+from test import Test, db, with_context
 from nose.tools import assert_raises
-from factories import ProjectFactory, CategoryFactory
+from test.factories import ProjectFactory, CategoryFactory
 from pybossa.repositories import ProjectRepository
 from pybossa.exc import WrongObjectError, DBIntegrityError
 from werkzeug.exceptions import BadRequest
@@ -329,13 +330,14 @@ class TestProjectRepositoryForProjects(Test):
 
     @with_context
     def test_update_fails_if_integrity_error(self):
-        """Test update raises a DBIntegrityError if the instance to be updated
+        """Test update raises a IntegrityError if the instance to be updated
         lacks a required value"""
 
         project = ProjectFactory.create()
         project.name = None
 
-        assert_raises(DBIntegrityError, self.project_repo.update, project)
+        # self.project_repo.update(project) generates IntegrityError
+        assert_raises(IntegrityError, self.project_repo.update, project)
 
 
     @with_context
@@ -363,7 +365,7 @@ class TestProjectRepositoryForProjects(Test):
     @with_context
     def test_delete_also_removes_dependant_resources(self):
         """Test delete removes project tasks and taskruns too"""
-        from factories import TaskFactory, TaskRunFactory, BlogpostFactory
+        from test.factories import TaskFactory, TaskRunFactory, BlogpostFactory
         from pybossa.repositories import TaskRepository, BlogRepository
 
         project = ProjectFactory.create()

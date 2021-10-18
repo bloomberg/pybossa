@@ -16,9 +16,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, with_context
+from test import Test, with_context
 from pybossa.cache import categories as cached_categories
-from factories import CategoryFactory, ProjectFactory
+from test.factories import CategoryFactory, ProjectFactory
 
 
 class TestCategoriesCache(Test):
@@ -50,4 +50,4 @@ class TestCategoriesCache(Test):
 
         for field in fields:
             assert field in used_categories[0].keys()
-        assert len(fields) == len(used_categories[0].keys())
+        assert len(fields) == len(list(used_categories[0].keys()))

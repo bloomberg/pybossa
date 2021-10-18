@@ -17,11 +17,11 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
 from flask import Response
-from default import with_context, Test
-from mock import patch, MagicMock
+from test import with_context, Test
+from unittest.mock import patch
 from pybossa.messages import *
 from pybossa.core import user_repo
-from factories import UserFactory
+from test.factories import UserFactory
 
 
 class TestLDAP(Test):
@@ -108,7 +108,7 @@ class TestLDAP(Test):
     def test_twitter_no_login(self, mock_twitter, url_for_mock):
         """Test Twitter no_login arg allows using Twitter importer."""
         url = '/twitter/?no_login=1'
-        mock_twitter.authorize.return_value = Response(302)
+        mock_twitter.authorize.return_value = Response(status=302)
         url_for_mock.return_value = 'url'
         with patch.dict(self.flask_app.config, {'LDAP_HOST': '127.0.0.1'}):
             res = self.app.get(url)

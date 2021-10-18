@@ -26,6 +26,9 @@ from sqlalchemy import text
 class ResultRepository(Repository):
 
     def get(self, id):
+        # bytes to unicode string
+        if type(id) == bytes:
+            id = id.decode()
         return self.db.session.query(Result).get(id)
 
     def get_by(self, **attributes):

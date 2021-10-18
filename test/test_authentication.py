@@ -17,12 +17,12 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import jwt
-from default import Test, with_context
+from test import Test, with_context
 from pybossa.auth import jwt_authorize_project
 from pybossa.auth import handle_error as handle_error_upstream
 from pybossa.auth.errcodes import *
-from factories import ProjectFactory
-from mock import patch, MagicMock
+from test.factories import ProjectFactory
+from unittest.mock import patch, MagicMock
 
 
 class TestAuthentication(Test):
@@ -32,8 +32,8 @@ class TestAuthentication(Test):
         """Test AUTHENTICATION works"""
         self.create()
         res = self.app.get('/?api_key=%s' % self.api_key)
-        assert '<a href="/account/signout"' in res.data, res.data
-        assert 'checkpoint::logged-in::tester' in res.data, res.data
+        assert '<a href="/account/signout"' in str(res.data), str(res.data)
+        assert 'checkpoint::logged-in::tester' in str(res.data), str(res.data)
 
 
 def handle_error(error):
@@ -91,7 +91,7 @@ class TestJwtAuthorization(Test):
         """Test JWT bearer token and something else."""
         mymock.side_effect = handle_error
         project = ProjectFactory.create()
-        bearer = 'Bearer %s algo' % project.secret_key
+        bearer = 'Bearer {} algo'.format(project.secret_key).encode()
         res = jwt_authorize_project(project, bearer)
         assert res == INVALID_HEADER_BEARER_TOKEN, res
 
