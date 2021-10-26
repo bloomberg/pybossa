@@ -1194,12 +1194,8 @@ def description_from_long_description(desc, long_desc):
 def generate_bsso_account_notification(user):
     from pybossa.core import user_repo
     warning = False if user.get('metadata', {}).get('user_type') else True
-    if warning:
-        admins_email_list = [u.email_addr for u in user_repo.filter_by(admin=True)]
-        template_type = 'adminbssowarning'
-    else:
-        admins_email_list = current_app.config.get('ALERT_LIST',[])
-        template_type = 'adminbssonotification'
+    template_type = 'adminbssowarning' if warning else 'adminbssonotification'
+    admins_email_list = current_app.config.get('ALERT_LIST',[])
 
     template = '/account/email/{}'.format(template_type)
 
