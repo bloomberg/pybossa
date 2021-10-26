@@ -22,6 +22,7 @@ from factories import UserFactory
 from pybossa.view import bloomberg as bb
 from nose.tools import assert_raises, assert_true
 from pybossa.view.account import generate_bsso_account_notification
+from pybossa.util import get_s3_bucket_name
 
 class TestBloomberg(Test):
     def setUp(self):
@@ -176,3 +177,17 @@ class TestBloomberg(Test):
         mock_bsso_alert = mock_alert
         user = {'firstName': [u'test2'], 'emailAddress': ['test2@test.com'], 'lastName': [u'test2'], 'PVFLevels': [u'PVF_GUTS_3'], 'username': [u'test2'], 'firmId': [u'000000'] }
         assert generate_bsso_account_notification(user) != None
+
+    @with_context
+    def test_get_s3_bucket_name_found(self):
+        result1 = get_s3_bucket_name('https://www.s3.amazonaws.com/test')
+        result2 = get_s3_bucket_name('https://s3.amazonaws.com/test')
+        result3 = get_s3_bucket_name('https://none.com/test')
+
+        assert result1 != None
+        assert len(result1) > 0
+
+        assert result2 != None
+        assert len(result2) > 0
+
+        assert result3 == None

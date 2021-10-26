@@ -1203,7 +1203,8 @@ def generate_bsso_account_notification(user):
     server_url = current_app.config.get('SERVER_URL')
     brand = current_app.config.get('BRAND')
 
-    subject = 'A new account has been created via BSSO for {}'.format(brand)
+    warning_msg = " (missing user type)" if warning else ""
+    subject = 'A new account has been created via BSSO for {}{}'.format(brand, warning_msg)
     msg = dict(subject=subject,
                recipients=admins_email_list)
 
