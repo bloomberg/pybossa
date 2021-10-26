@@ -146,6 +146,7 @@ class TestBloomberg(Test):
         mock_auth.get_attributes.return_value = user
         res = self.app.post('/bloomberg/login', method='POST', content_type='multipart/form-data', data={'RelayState': redirect_url})
         msg = generate_bsso_account_notification(user)
+        # Verify successful result: An account for user has been auto-generated using information from BSSO. Please check their user type. (adminbssonotification.html)
         assert "check" in msg['body']
         assert res.status_code == 302, res.status_code
     
@@ -162,6 +163,7 @@ class TestBloomberg(Test):
         mock_auth.get_attributes.return_value = user
         res = self.app.post('/bloomberg/login', method='POST', content_type='multipart/form-data', data={'RelayState': redirect_url})
         msg = generate_bsso_account_notification(user)
+        # Verify successfuly result with a warning: This firm id is not on the list of recognized firms. Please ensure this is a valid user of brand. (adminbssowarning.html)
         assert "valid" in msg['body']
         assert res.status_code == 302, res.status_code
 
