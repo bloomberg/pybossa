@@ -16,13 +16,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
-from mock import patch, Mock, mock_open
+from unittest.mock import patch, Mock, mock_open
 from pybossa.importers.csv import BulkTaskLocalCSVImport, BulkTaskGDImport
 from pybossa.encryption import AESWithGCM
-from nose.tools import assert_raises
+from nose.tools import assert_equal, assert_raises
 from pybossa.importers import BulkImportException
-from default import with_context, Test
-from nose.tools import assert_equal
+from test import with_context, Test
+
 
 def merge_dicts(dict1, dict2):
     result = dict1.copy()
@@ -38,37 +38,37 @@ class TestBulkTaskLocalCSVImport(Test):
         super(TestBulkTaskLocalCSVImport, self).setUp()
 
     def test_importer_type_local_csv(self):
-        assert isinstance(self.importer, BulkTaskLocalCSVImport) is True
+        assert isinstance(self.importer, BulkTaskLocalCSVImport)
         # confirm object is not of type other than BulkTaskLocalCSVImport
-        assert isinstance(self.importer, BulkTaskGDImport) is False
+        assert not isinstance(self.importer, BulkTaskGDImport)
 
     @with_context
     @patch('pybossa.importers.csv.get_import_csv_file')
     def test_count_tasks_returns_0_row(self, s3_get):
-        with patch('pybossa.importers.csv.io.open', mock_open(read_data=u'Foo,Bar\n'), create=True):
+        with patch('pybossa.importers.csv.io.open', mock_open(read_data='Foo,Bar\n'), create=True):
             number_of_tasks = self.importer.count_tasks()
-            assert number_of_tasks is 0, number_of_tasks
+            assert number_of_tasks == 0, number_of_tasks
 
     @with_context
     @patch('pybossa.importers.csv.get_import_csv_file')
     def test_count_tasks_returns_1_row(self, s3_get):
-        with patch('pybossa.importers.csv.io.open', mock_open(read_data=u'Foo,Bar\n1,2\n'), create=True):
+        with patch('pybossa.importers.csv.io.open', mock_open(read_data='Foo,Bar\n1,2\n'), create=True):
             number_of_tasks = self.importer.count_tasks()
-            assert number_of_tasks is 1, number_of_tasks
+            assert number_of_tasks == 1, number_of_tasks
 
     @with_context
     @patch('pybossa.importers.csv.get_import_csv_file')
     def test_count_tasks_returns_2_rows(self, s3_get):
-        with patch('pybossa.importers.csv.io.open', mock_open(read_data=u'Foo,Bar\n1,2\naaa,bbb\n'), create=True):
+        with patch('pybossa.importers.csv.io.open', mock_open(read_data='Foo,Bar\n1,2\naaa,bbb\n'), create=True):
             number_of_tasks = self.importer.count_tasks()
-            assert number_of_tasks is 2, number_of_tasks
+            assert number_of_tasks == 2, number_of_tasks
 
     @with_context
     @patch('pybossa.importers.csv.get_import_csv_file')
     def test_gold_answers_import(self, s3_get):
-        expected_t1_gold_ans = {u'ans': u'3', u'ans2': u'4', u'ans3': u'5'}
-        expected_t2_gold_ans = {u'ans': u'a1', u'ans2': u'a2', u'ans3': u'a3'}
-        with patch('pybossa.importers.csv.io.open', mock_open(read_data=u'Foo,Bar,ans_gold,ans2_gold,ans3_gold\n1,2,3,4,5\naaa,bbb,a1,a2,a3\n'), create=True):
+        expected_t1_gold_ans = {'ans': '3', 'ans2': '4', 'ans3': '5'}
+        expected_t2_gold_ans = {'ans': 'a1', 'ans2': 'a2', 'ans3': 'a3'}
+        with patch('pybossa.importers.csv.io.open', mock_open(read_data='Foo,Bar,ans_gold,ans2_gold,ans3_gold\n1,2,3,4,5\naaa,bbb,a1,a2,a3\n'), create=True):
             [t1, t2] = self.importer.tasks()
             assert_equal(t1['gold_answers'], expected_t1_gold_ans), t1
             assert_equal(t2['gold_answers'], expected_t2_gold_ans), t2
@@ -78,13 +78,13 @@ class TestBulkTaskLocalCSVImport(Test):
     @patch('pybossa.importers.csv.data_access_levels')
     def test_priv_fields_import(self, mock_data_access, s3_get):
         mock_data_access = True
-        expected_t1_priv_field = {u'Bar2': u'4', u'Bar': u'3'}
-        expected_t1_gold_ans = {u'ans2': u'5', u'ans': u'2', u'ans3': u'6'}
-        expected_t2_priv_field = {u'Bar2': u'd', u'Bar': u'c'}
-        expected_t2_gold_ans = {u'ans2': u'e', u'ans': u'b', u'ans3': u'f'}
+        expected_t1_priv_field = {'Bar2': '4', 'Bar': '3'}
+        expected_t1_gold_ans = {'ans2': '5', 'ans': '2', 'ans3': '6'}
+        expected_t2_priv_field = {'Bar2': 'd', 'Bar': 'c'}
+        expected_t2_gold_ans = {'ans2': 'e', 'ans': 'b', 'ans3': 'f'}
 
         with patch('pybossa.importers.csv.io.open', mock_open(
-            read_data=u'Foo,ans_gold,Bar_priv,Bar2_priv,ans2_gold,ans3_priv_gold\n1,2,3,4,5,6\na,b,c,d,e,f\n'), create=True):
+            read_data='Foo,ans_gold,Bar_priv,Bar2_priv,ans2_gold,ans3_priv_gold\n1,2,3,4,5,6\na,b,c,d,e,f\n'), create=True):
             [t1, t2] = self.importer.tasks()
             assert_equal(t1['private_fields'], expected_t1_priv_field), t1
             assert_equal(t1['gold_answers'], expected_t1_gold_ans), t1
@@ -106,17 +106,17 @@ class TestBulkTaskLocalCSVImport(Test):
         }
         with patch.dict(self.flask_app.config, config):
             number_of_tasks = self.importer.count_tasks()
-            assert number_of_tasks is 1, number_of_tasks
+            assert number_of_tasks == 1, number_of_tasks
 
     @with_context
     @patch('pybossa.importers.csv.get_import_csv_file')
     def test_typed_fields_import(self, s3_get):
-        expected_t1_priv_field = {u'Bar2': u'4', u'Bar': u'3', u'ans12': [], u'ans13': 1.3, u'ans14': True, u'ans15': None}
-        expected_t1_gold_ans = {u'ans2': u'5', u'ans': u'2', u'ans3': u'6', u'ans8': False, u'ans9': -2, u'ans10': True, u'ans11': None, u'ans16': [], u'ans17': 1.3, u'ans18': True, u'ans19': None}
-        expected_t1_field = {u'Foo': u'1', u'ans4': {u'a':1} ,u'ans5': 1.5, u'ans6': True, u'ans7': None}
-        expected_t2_priv_field = {u'Bar2': u'd', u'Bar': u'c', u'ans12': None, u'ans13': 0, u'ans14': True, u'ans15': None}
-        expected_t2_gold_ans = {u'ans2': u'e', u'ans': u'b', u'ans3': u'f', u'ans8': None, u'ans9': 0, u'ans10': True, u'ans11': None, u'ans16': None, u'ans17': 0, u'ans18': True, u'ans19': None}
-        expected_t2_field = {u'Foo': u'a', u'ans4': [1,2] ,u'ans5': 3, u'ans6': False, u'ans7': None}
+        expected_t1_priv_field = {'Bar2': '4', 'Bar': '3', 'ans12': [], 'ans13': 1.3, 'ans14': True, 'ans15': None}
+        expected_t1_gold_ans = {'ans2': '5', 'ans': '2', 'ans3': '6', 'ans8': False, 'ans9': -2, 'ans10': True, 'ans11': None, 'ans16': [], 'ans17': 1.3, 'ans18': True, 'ans19': None}
+        expected_t1_field = {'Foo': '1', 'ans4': {'a':1} ,'ans5': 1.5, 'ans6': True, 'ans7': None}
+        expected_t2_priv_field = {'Bar2': 'd', 'Bar': 'c', 'ans12': None, 'ans13': 0, 'ans14': True, 'ans15': None}
+        expected_t2_gold_ans = {'ans2': 'e', 'ans': 'b', 'ans3': 'f', 'ans8': None, 'ans9': 0, 'ans10': True, 'ans11': None, 'ans16': None, 'ans17': 0, 'ans18': True, 'ans19': None}
+        expected_t2_field = {'Foo': 'a', 'ans4': [1,2] ,'ans5': 3, 'ans6': False, 'ans7': None}
         fields = {
             'Foo': ['1', 'a', '7', 'g', '14', 'm'],
             'ans_gold': ['2', 'b', '8', 'h', '15', 'n'],
@@ -142,11 +142,11 @@ class TestBulkTaskLocalCSVImport(Test):
             'ans19_priv_gold_null': ['null', 'null', 'null', 'null', 'null', 'null']
         }
         rows = []
-        rows.append(','.join(fields.iterkeys()))
+        rows.append(','.join(iter(fields.keys())))
         for i in range(6):
-            rows.append(','.join(map(lambda x: x[i], fields.itervalues())))
-        data = unicode('\n'.join(rows))
-        print data
+            rows.append(','.join([x[i] for x in iter(fields.values())]))
+        data = str('\n'.join(rows))
+        print(data)
         form_data = {'type': 'localCSV', 'csv_filename': 'fakefile.csv'}
 
         with patch('pybossa.importers.csv.io.open', mock_open(read_data= data), create=True):
@@ -188,8 +188,8 @@ class TestBulkTaskLocalCSVImport(Test):
 
         for is_private in [True, False]:
             with patch('pybossa.importers.csv.data_access_levels', is_private):
-                for field, value in invalid_fields.iteritems():
-                    data = u"{}\n{}".format(field, value)
+                for field, value in invalid_fields.items():
+                    data = "{}\n{}".format(field, value)
                     with patch('pybossa.importers.csv.io.open', mock_open(read_data= data), create=True):
                         with assert_raises(BulkImportException):
                             [t1] = self.importer.tasks()
@@ -227,7 +227,7 @@ class TestBulkTaskLocalCSVImport(Test):
 
         for is_private in [True, False]:
             with patch('pybossa.importers.csv.data_access_levels', is_private):
-                for header, field_name in fields.iteritems():
-                    with patch('pybossa.importers.csv.io.open', mock_open(read_data= unicode(header)), create=True):
+                for header, field_name in fields.items():
+                    with patch('pybossa.importers.csv.io.open', mock_open(read_data= str(header)), create=True):
                         field_names = BulkTaskLocalCSVImport(**form_data).fields()
                         assert field_names == ({field_name} if field_name else set()), {'field_names': field_names, 'field_name': field_name}

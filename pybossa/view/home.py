@@ -26,7 +26,7 @@ from pybossa.cache import users as cached_users
 from pybossa.cache import categories as cached_cat
 from pybossa.util import rank, handle_content_type
 from jinja2.exceptions import TemplateNotFound
-from projects import index as project_index
+from .projects import index as project_index
 
 blueprint = Blueprint('home', __name__)
 

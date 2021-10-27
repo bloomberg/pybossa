@@ -17,11 +17,11 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from default import with_context
+from test import with_context
 import json
-from helper import web
-from mock import patch, MagicMock
-from factories import ProjectFactory, TaskFactory, UserFactory
+from test.helper import web
+from unittest.mock import patch, MagicMock
+from test.factories import ProjectFactory, TaskFactory, UserFactory
 from pybossa.core import signer
 from pybossa.encryption import AESWithGCM
 from boto.exception import S3ResponseError
@@ -102,7 +102,7 @@ class TestFileproxy(web.Helper):
         }):
             res = self.app.get(req_url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
-            assert res.data == 'the content', res.data
+            assert res.data == b'the content', res.data
 
     @with_context
     @patch('pybossa.cloud_store_api.s3.create_connection')
@@ -128,7 +128,7 @@ class TestFileproxy(web.Helper):
         }):
             res = self.app.get(req_url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
-            assert res.data == 'the content', res.data
+            assert res.data == b'the content', res.data
 
     @with_context
     @patch('pybossa.cloud_store_api.s3.create_connection')
@@ -188,7 +188,7 @@ class TestFileproxy(web.Helper):
         }):
             res = self.app.get(req_url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
-            assert res.data == 'the content', res.data
+            assert res.data == b'the content', res.data
 
     @with_context
     @patch('pybossa.cloud_store_api.s3.create_connection')
@@ -223,7 +223,7 @@ class TestFileproxy(web.Helper):
         }):
             res = self.app.get(req_url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
-            assert res.data == 'the content', res.data
+            assert res.data == b'the content', res.data
 
     @with_context
     @patch('pybossa.cloud_store_api.s3.create_connection')
@@ -367,7 +367,7 @@ class TestHDFSproxy(web.Helper):
         with patch.dict(self.flask_app.config, self.app_config):
             res = self.app.get(req_url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
-            assert res.data == 'the content', res.data
+            assert res.data == b'the content', res.data
 
     @with_context
     @patch('pybossa.view.fileproxy.HDFSKerberos.get')
@@ -398,7 +398,7 @@ class TestHDFSproxy(web.Helper):
         with patch.dict(self.flask_app.config, self.app_config):
             res = self.app.get(req_url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
-            assert res.data == 'the content', res.data
+            assert res.data == b'the content', res.data
 
     @with_context
     @patch('pybossa.view.fileproxy.HDFSKerberos.get')
@@ -455,7 +455,7 @@ class TestHDFSproxy(web.Helper):
         with patch.dict(self.flask_app.config, self.app_config):
             res = self.app.get(req_url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
-            assert res.data == 'the content', res.data
+            assert res.data == b'the content', res.data
 
 
 def test_is_file_url():
@@ -557,7 +557,7 @@ class TestEncryptedPayload(web.Helper):
         with patch.dict(self.flask_app.config, self.app_config):
             res = self.app.get(url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
-            assert res.data == content, res.data
+            assert res.data == content.encode(), res.data
 
     @with_context
     @patch('pybossa.view.fileproxy.requests.get')
@@ -588,7 +588,7 @@ class TestEncryptedPayload(web.Helper):
         with patch.dict(self.flask_app.config, self.app_config):
             res = self.app.get(url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
-            assert res.data == content, res.data
+            assert res.data == content.encode(), res.data
 
     @with_context
     @patch('pybossa.view.fileproxy.requests.get')
@@ -614,7 +614,7 @@ class TestEncryptedPayload(web.Helper):
         with patch.dict(self.flask_app.config, self.app_config):
             res = self.app.get(url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
-            assert res.data == '', res.data
+            assert res.data == b'', res.data
 
     @with_context
     @patch('pybossa.view.fileproxy.requests.get')
@@ -685,7 +685,7 @@ class TestEncryptedPayload(web.Helper):
             with patch.dict(self.flask_app.config, self.app_config):
                 res = self.app.get(url, follow_redirects=True)
                 assert res.status_code == 200, res.status_code
-                assert res.data == content, res.data
+                assert res.data == content.encode(), res.data
 
         with patch('pybossa.view.fileproxy.has_lock') as has_lock:
             has_lock.return_value = False

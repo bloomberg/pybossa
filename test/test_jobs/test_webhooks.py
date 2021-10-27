@@ -19,13 +19,13 @@
 import json
 import requests
 from pybossa.jobs import webhook
-from default import Test, with_context, FakeResponse, db
-from factories import ProjectFactory
-from factories import TaskFactory
-from factories import TaskRunFactory
-from factories import WebhookFactory
-from factories import UserFactory
-from mock import patch, MagicMock
+from test import Test, with_context, FakeResponse, db
+from test.factories import ProjectFactory
+from test.factories import TaskFactory
+from test.factories import TaskRunFactory
+from test.factories import WebhookFactory
+from test.factories import UserFactory
+from unittest.mock import patch, MagicMock
 from datetime import datetime
 from pybossa.repositories import ResultRepository, WebhookRepository
 from pybossa.core import sentinel

@@ -15,8 +15,9 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from helper import web
-from default import model, db
+from pybossa import model
+from test.helper import web
+from test import db
 
 
 class Helper(web.Helper):

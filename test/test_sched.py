@@ -17,23 +17,18 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-import random
+from unittest.mock import patch
 
-from mock import patch
-
-from helper import sched
-from default import Test, db, with_context
-from pybossa.model.task import Task
-from pybossa.model.project import Project
-from pybossa.model.user import User
-from pybossa.model.task_run import TaskRun
-from pybossa.model.category import Category
-from pybossa.core import task_repo, project_repo
-from factories import TaskFactory, ProjectFactory, TaskRunFactory, UserFactory
-from factories import AnonymousTaskRunFactory, ExternalUidTaskRunFactory
-from factories import reset_all_pk_sequences
 import pybossa
+from pybossa.core import task_repo, project_repo
+from pybossa.model.task import Task
+from pybossa.model.task_run import TaskRun
 from pybossa.sched import release_user_locks_for_project, has_lock, TIMEOUT
+from test import Test, db, with_context
+from test.factories import AnonymousTaskRunFactory
+from test.factories import TaskFactory, ProjectFactory, TaskRunFactory, \
+    UserFactory
+from test.helper import sched
 
 
 class TestSched(sched.Helper):
@@ -239,7 +234,7 @@ class TestSched(sched.Helper):
         res = self.app.get(url)
         data = json.loads(res.data)
         task_id = data['id']
-        print data
+        print(data)
         assert task_id, data
         assert has_lock(task_id, user.id, TIMEOUT)
 
@@ -693,7 +688,8 @@ class TestSched(sched.Helper):
         for t in tasks[0:10]:
             TaskRunFactory.create_batch(10, task=t, project=project)
 
-        tasks = db.session.query(Task).filter_by(project_id=project.id, state='ongoing').all()
+        # order by id ascending explicitly since default ordering is not supported in the model
+        tasks = db.session.query(Task).filter_by(project_id=project.id, state='ongoing').order_by(Task.id).all()
         assert tasks[0].n_answers == 10
 
         url = 'api/project/%s/newtask?api_key=%s' % (project.id, owner.api_key)
@@ -719,7 +715,7 @@ class TestSched(sched.Helper):
         for t in tasks[0:10]:
             TaskRunFactory.create_batch(10, task=t, project=project)
 
-        tasks = db.session.query(Task).filter_by(project_id=project.id, state='ongoing').all()
+        tasks = db.session.query(Task).filter_by(project_id=project.id, state='ongoing').order_by(Task.id).all()
         assert tasks[0].n_answers == 10
 
         url = 'api/project/%s/newtask?limit=2&orderby=id&api_key=%s' % (project_id, owner.api_key)
@@ -729,7 +725,7 @@ class TestSched(sched.Helper):
         err_msg = "User should get a task"
         i = 0
         for t in data:
-            print t['id']
+            print(t['id'])
             assert 'project_id' in t.keys(), err_msg
             assert t['project_id'] == project_id, err_msg
             assert t['id'] == tasks[i].id, (err_msg, t, tasks[i].id)

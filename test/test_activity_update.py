@@ -15,10 +15,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from default import Test, with_context
+from test import Test, with_context
 from pybossa.view.account import get_update_feed
 
-from factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory, BlogpostFactory
+from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory, BlogpostFactory
+
 
 class TestActivityFeed(Test):
 

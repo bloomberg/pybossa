@@ -15,15 +15,16 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from default import db, with_context
-from factories import ProjectFactory, UserFactory
-from helper import web
+from test import db, with_context
+from test.factories import ProjectFactory, UserFactory
+from test.helper import web
 from pybossa.repositories import UserRepository, ProjectRepository
 import json
-from helper.gig_helper import make_subadmin
+from test.helper.gig_helper import make_subadmin
 
 project_repo = ProjectRepository(db)
 user_repo = UserRepository(db)
+
 
 class TestProjectTransferOwnership(web.Helper):
 
@@ -33,7 +34,7 @@ class TestProjectTransferOwnership(web.Helper):
         project = ProjectFactory.create()
         url = '/project/%s/transferownership' % project.short_name
         res = self.app_get_json(url, follow_redirects=True)
-        assert 'signin' in res.data, res.data
+        assert 'signin' in str(res.data), res.data
 
     @with_context
     def test_transfer_auth_not_owner_get(self):

@@ -92,7 +92,7 @@ class ProjectReportCsvExporter(CsvExporter):
                  tempfile.NamedTemporaryFile(delete=False) as zipped_datafile:
                 try:
                     for line in csv_task_generator:
-                        datafile.write(str(line))
+                        datafile.write(str(line).encode())  # write() accepts bytes only
                     datafile.flush()
                     csv_task_generator.close()  # delete temp csv file
                     _zip = self._zip_factory(zipped_datafile.name)

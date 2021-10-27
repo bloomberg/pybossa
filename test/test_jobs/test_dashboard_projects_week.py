@@ -24,9 +24,9 @@ from pybossa.dashboard.data import (
     )
 from pybossa.core import db, auditlog_repo
 from pybossa.repositories import ProjectRepository
-from factories.project_factory import ProjectFactory
-from default import Test, with_context
-from mock import patch, MagicMock
+from test.factories.project_factory import ProjectFactory
+from test import Test, with_context
+from unittest.mock import patch, MagicMock
 from datetime import datetime, date
 from pybossa.auditlogger import AuditLogger
 

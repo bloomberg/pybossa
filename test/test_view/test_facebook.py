@@ -15,10 +15,10 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from default import Test, with_context
+from test import Test, with_context
 from pybossa.view.facebook import manage_user, manage_user_login
-from mock import patch
-from factories import UserFactory
+from unittest.mock import patch
+from test.factories import UserFactory
 from pybossa.util import username_from_full_name
 from pybossa.core import newsletter
 

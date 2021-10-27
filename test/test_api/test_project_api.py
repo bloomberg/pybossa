@@ -15,23 +15,22 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-import json
-from mock import patch, call, MagicMock
-from default import db, with_context, with_context_settings, flask_app
-from nose.tools import assert_equal, assert_raises
 import copy
-from test_api import TestAPI
-from helper.gig_helper import make_subadmin, make_admin
+import json
+from unittest.mock import patch, call, MagicMock
 
-from factories import (ProjectFactory, TaskFactory, TaskRunFactory, AnonymousTaskRunFactory, UserFactory,
-                       CategoryFactory, AuditlogFactory)
+from nose.tools import assert_equal
 
-from pybossa.core import signer
-from pybossa.repositories import ProjectRepository
-from pybossa.repositories import TaskRepository
-from pybossa.repositories import ResultRepository
 from pybossa.model.project import Project
-
+from pybossa.repositories import ProjectRepository
+from pybossa.repositories import ResultRepository
+from pybossa.repositories import TaskRepository
+from test import db, with_context
+from test.factories import (ProjectFactory, TaskFactory, TaskRunFactory,
+                            AnonymousTaskRunFactory, UserFactory,
+                            CategoryFactory, AuditlogFactory)
+from test.helper.gig_helper import make_subadmin, make_admin
+from test.test_api import TestAPI
 
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)
@@ -396,13 +395,13 @@ class TestProjectAPI(TestAPI):
         make_subadmin(users[1])
         cat1 = CategoryFactory.create()
         cat2 = CategoryFactory.create()
-        name = u'XXXX Project'
+        name = 'XXXX Project'
         data = dict(
             name=name,
             short_name='xxxx-project',
             description='description',
             owner_id=1,
-            long_description=u'Long Description\n================',
+            long_description='Long Description\n================',
             password="hello",
             info=dict(
                 data_classification=dict(input_data="L4 - public", output_data="L4 - public"),
@@ -434,7 +433,7 @@ class TestProjectAPI(TestAPI):
             short_name='xxxx-project2',
             description='description2',
             owner_id=1,
-            long_description=u'Long Description\n================',
+            long_description='Long Description\n================',
             password="hello",
             info=dict(
                 task_presenter='taskpresenter',
@@ -462,7 +461,7 @@ class TestProjectAPI(TestAPI):
             description='description3',
             owner_id=1,
             category_id=cat2.id,
-            long_description=u'Long Description\n================',
+            long_description='Long Description\n================',
             password="hello",
             info=dict(
                 data_classification=dict(input_data="L4 - public", output_data="L4 - public"),
@@ -488,7 +487,7 @@ class TestProjectAPI(TestAPI):
             description='description4',
             owner_id=1,
             category_id=5014,
-            long_description=u'Long Description\n================',
+            long_description='Long Description\n================',
             password="hello",
             info=dict(
                 task_presenter='taskpresenter',
@@ -520,10 +519,10 @@ class TestProjectAPI(TestAPI):
                             data=data)
         err = json.loads(res.data)
         err_msg = "ValueError exception should be raised"
-        assert res.status_code == 415, err
+        assert res.status_code == 500, err
         assert err['action'] == 'POST', err
         assert err['status'] == 'failed', err
-        assert err['exception_cls'] == "ValueError", err_msg
+        assert err['exception_cls'] == "JSONDecodeError", err_msg
         # Now with a JSON object but not valid
         data = json.dumps(data)
         res = self.app.post('/api/project?api_key=' + users[1].api_key,
@@ -662,7 +661,7 @@ class TestProjectAPI(TestAPI):
             short_name='',
             description='',
             owner_id=1,
-            long_description=u'Long Description\n================',
+            long_description='Long Description\n================',
             password="hello",
             info=dict(
                 data_classification=dict(input_data="L4 - public", output_data="L4 - public"),
@@ -684,16 +683,16 @@ class TestProjectAPI(TestAPI):
         res = self.app.put('/api/project/%s?api_key=%s' % (id_, users[1].api_key),
                            data=datajson)
         err = json.loads(res.data)
-        assert res.status_code == 415, err
+        assert res.status_code == 500, err
         assert err['status'] == 'failed', err
         assert err['action'] == 'PUT', err
-        assert err['exception_cls'] == 'ValueError', err
+        assert err['exception_cls'] == 'JSONDecodeError', err
 
         # With wrong args in the URL
         data = dict(
             name=name,
             short_name='xxxx-project',
-            long_description=u'Long Description\n================',
+            long_description='Long Description\n================',
             password="hello")
 
         datajson = json.dumps(data)
@@ -740,7 +739,7 @@ class TestProjectAPI(TestAPI):
         data = dict(
             name=name,
             short_name='project',
-            long_description=u'Long Description',
+            long_description='Long Description',
             password="hello")
 
         datajson = json.dumps(data)
@@ -801,13 +800,13 @@ class TestProjectAPI(TestAPI):
 
         hasher_mock.generate_password_hash.return_value = "hashedpwd"
 
-        name = u'XXXX Project'
+        name = 'XXXX Project'
         data = dict(
             name=name,
             short_name='xxxx-project',
             description='description',
             owner_id=subadmin.id,
-            long_description=u'Long Description\n================',
+            long_description='Long Description\n================',
             password="hello",
             info=dict(
                 task_presenter='taskpresenter',
@@ -834,16 +833,16 @@ class TestProjectAPI(TestAPI):
 
         out = project_repo.get_by(name=name)
         assert out, out
-        assert_equal(out.short_name, u'xxxx-project'), out
-        assert_equal(out.owner.name, u'user2')
+        assert_equal(out.short_name, 'xxxx-project'), out
+        assert_equal(out.owner.name, 'user2')
         assert_equal(out.owners_ids, [subadmin.id])
         assert_equal(out.info, {
-            u'data_classification': {u'input_data': u'L4 - public', u'output_data': u'L4 - public'}, 
-            u'data_access': [u'L4'], 
-            u'passwd_hash': u'hashedpwd', 
-            u'kpi': 0.5,
-            u'product': u'abc',
-            u'subproduct': u'def',
+            'data_classification': {'input_data': 'L4 - public', 'output_data': 'L4 - public'}, 
+            'data_access': ['L4'], 
+            'passwd_hash': 'hashedpwd', 
+            'kpi': 0.5,
+            'product': 'abc',
+            'subproduct': 'def',
             })
         id_ = out.id
 
@@ -859,16 +858,16 @@ class TestProjectAPI(TestAPI):
         assert out.get('status') == 'failed', res.data
 
         # Admin can create project with task presenter
-        name=u'XXXX Project 2'
+        name='XXXX Project 2'
         data = dict(
             name=name,
-            short_name=u'xxxx-project-2',
-            description=u'description',
+            short_name='xxxx-project-2',
+            description='description',
             owner_id=admin.id,
-            long_description=u'Long Description\n================',
-            password=u'hello',
+            long_description='Long Description\n================',
+            password='hello',
             info=dict(
-                task_presenter=u'taskpresenter',
+                task_presenter='taskpresenter',
                 data_classification=dict(input_data="L4 - public", output_data="L4 - public"),
                 kpi=0.5,
                 product="abc",
@@ -880,17 +879,17 @@ class TestProjectAPI(TestAPI):
                             data=newdata)
         out = project_repo.get_by(name=name)
         assert out, out
-        assert_equal(out.short_name, u'xxxx-project-2'), out
-        assert_equal(out.owner.name, u'user1')
+        assert_equal(out.short_name, 'xxxx-project-2'), out
+        assert_equal(out.owner.name, 'user1')
         assert_equal(out.owners_ids, [1])
         assert_equal(out.info, {
-            u'kpi': 0.5, 
-            u'task_presenter': u'taskpresenter', 
-            u'passwd_hash': u'hashedpwd', 
-            u'data_classification': {u'input_data': u'L4 - public', u'output_data': u'L4 - public'}, 
-            u'data_access': [u'L4'],
-            u'product': u'abc',
-            u'subproduct': u'def',
+            'kpi': 0.5, 
+            'task_presenter': 'taskpresenter', 
+            'passwd_hash': 'hashedpwd', 
+            'data_classification': {'input_data': 'L4 - public', 'output_data': 'L4 - public'}, 
+            'data_access': ['L4'],
+            'product': 'abc',
+            'subproduct': 'def',
             })
         id_ = out.id
 
@@ -907,13 +906,13 @@ class TestProjectAPI(TestAPI):
         assert_equal(out.owner.name, 'user1')
         assert_equal(out.owners_ids, [1])
         assert_equal(out.info, {
-            u'kpi': 0.5, 
-            u'task_presenter': u'new-taskpresenter', 
-            u'data_classification': {u'input_data': u'L4 - public', u'output_data': u'L4 - public'}, 
-            u'data_access': [u'L4'], 
-            u'passwd_hash': u'hashedpwd',
-            u'product': u'abc',
-            u'subproduct': u'def',
+            'kpi': 0.5, 
+            'task_presenter': 'new-taskpresenter', 
+            'data_classification': {'input_data': 'L4 - public', 'output_data': 'L4 - public'}, 
+            'data_access': ['L4'], 
+            'passwd_hash': 'hashedpwd',
+            'product': 'abc',
+            'subproduct': 'def',
             })
         assert out.id == id_, out
 
@@ -923,14 +922,14 @@ class TestProjectAPI(TestAPI):
             a name used by the Flask app as a URL endpoint"""
         users = UserFactory.create_batch(2, subadmin=True)
         CategoryFactory.create()
-        name = u'XXXX Project'
+        name = 'XXXX Project'
         data = dict(
             name=name,
             short_name='new',
             description='description',
             owner_id=1,
             password="hello",
-            long_description=u'Long Description\n================')
+            long_description='Long Description\n================')
         data = json.dumps(data)
         res = self.app.post('/api/project?api_key=' + users[1].api_key,
                             data=data)
@@ -966,11 +965,11 @@ class TestProjectAPI(TestAPI):
         # PUT with not JSON data
         res = self.app.put(url, data=data)
         err = json.loads(res.data)
-        assert res.status_code == 415, err
+        assert res.status_code == 500, err
         assert err['status'] == 'failed', err
         assert err['target'] == 'project', err
         assert err['action'] == 'PUT', err
-        assert err['exception_cls'] == 'ValueError', err
+        assert err['exception_cls'] == 'JSONDecodeError', err
 
         # PUT with not allowed args
         res = self.app.put(url + "&foo=bar", data=json.dumps(data))
@@ -1030,7 +1029,7 @@ class TestProjectAPI(TestAPI):
         assert len(taskruns) == data['done'], data
 
         # Add a new TaskRun and check again
-        taskrun = AnonymousTaskRunFactory.create(task=tasks[0], info={'answer': u'hello'})
+        taskrun = AnonymousTaskRunFactory.create(task=tasks[0], info={'answer': 'hello'})
 
         res = self.app.get('/api/project/1/userprogress', follow_redirects=True)
         data = json.loads(res.data)
@@ -1074,7 +1073,7 @@ class TestProjectAPI(TestAPI):
         assert len(taskruns) == data['done'], error_msg
 
         # Add a new TaskRun and check again
-        taskrun = TaskRunFactory.create(task=tasks[0], info={'answer': u'hello'}, user=user)
+        taskrun = TaskRunFactory.create(task=tasks[0], info={'answer': 'hello'}, user=user)
 
         url = '/api/project/1/userprogress?api_key=%s' % user.api_key
         res = self.app.get(url, follow_redirects=True)
@@ -1157,7 +1156,6 @@ class TestProjectAPI(TestAPI):
     @with_context
     def test_task_progress(self):
         """Test API taskprogress as anonymous works"""
-        from pybossa import data_access
         user = UserFactory.create(admin=True)
         project = ProjectFactory.create(owner=user)
         tasks = TaskFactory.create_batch(3, project=project)
@@ -1199,15 +1197,15 @@ class TestProjectAPI(TestAPI):
         # query for the count of all task count using null keyword
         res = self.app.get('/api/project/1/taskprogress?Fruit=NULL', follow_redirects=True, headers=headers)
         assert res.status_code == 200
-        assert res.data == '''{"task_count": 1}'''
+        assert res.data == b'''{"task_count": 1}'''
 
         # assert the result count is 0
         res = self.app.get('/api/project/1/taskprogress?Fruit=INVALID', follow_redirects=True, headers=headers)
-        assert res.data == '''{"task_count": 0}'''
+        assert res.data == b'''{"task_count": 0}'''
 
         # query with filter
         res = self.app.get('/api/project/1/taskprogress?Fruit=apple', follow_redirects=True, headers=headers)
-        assert res.data == '''{"task_count": 2}'''
+        assert res.data == b'''{"task_count": 2}'''
 
     @with_context
     def test_delete_project_cascade(self):
@@ -1310,7 +1308,7 @@ class TestProjectAPI(TestAPI):
         # Get an empty task
         url = '/api/project/%s/newtask?offset=1000&api_key=%s' % (project.id, user.api_key)
         res = self.app.get(url)
-        assert res.data == '{}', res.data
+        assert res.data == b'{}', res.data
 
     @with_context
     @patch('pybossa.repositories.project_repository.uploader')
@@ -1336,7 +1334,7 @@ class TestProjectAPI(TestAPI):
             short_name='name',
             description='description',
             owner_id=user.id,
-            long_description=u'Long Description\n================',
+            long_description='Long Description\n================',
             info={},
             id=222,
             created='today',
@@ -1372,7 +1370,7 @@ class TestProjectAPI(TestAPI):
             short_name='name',
             description='description',
             owner_id=user.id,
-            long_description=u'Long Description\n================',
+            long_description='Long Description\n================',
             info={'task_presenter': '<div>'},
             published=True)
         data = json.dumps(data)
@@ -1551,7 +1549,7 @@ class TestProjectAPI(TestAPI):
         res = self.app.put(url, data=json.dumps(payload))
         project = project_repo.get(project.id)
 
-        for key, value in old_info.iteritems():
+        for key, value in old_info.items():
             if not payload['info'].get(key):
                 assert project.info.get(key) == value
 
@@ -1576,7 +1574,7 @@ class TestProjectAPI(TestAPI):
         res = self.app.put(url, data=json.dumps(payload))
         project = project_repo.get(project.id)
 
-        for key, value in old_info.iteritems():
+        for key, value in old_info.items():
             if not payload['info'].get(key):
                 assert project.info.get(key) == value
 
@@ -1587,13 +1585,13 @@ class TestProjectAPI(TestAPI):
         user, subadmin = UserFactory.create_batch(2)
         make_subadmin(subadmin)
         CategoryFactory.create()
-        name = u'XXXX Project'
+        name = 'XXXX Project'
         data = dict(
             name=name,
             short_name='xxxx-project',
             description='description',
             owner_id=1,
-            long_description=u'Long Description\n================',
+            long_description='Long Description\n================',
             password="hello",
             info=dict(
                 data_classification=dict(input_data="L4 - public", output_data="L4 - public"),
@@ -1623,14 +1621,14 @@ class TestProjectAPI(TestAPI):
         project_levels = ['L4']
         project_users = [users[0].id, users[1].id]
         CategoryFactory.create()
-        name = u'My Project'
+        name = 'My Project'
         headers = [('Authorization', users[1].api_key)]
         new_project = dict(
             name=name,
             short_name='my-project',
             description='my-project-description',
             owner_id=1,
-            long_description=u'my project\nlong description',
+            long_description='my project\nlong description',
             password='hello',
             info=dict(
                 data_access=project_levels,
@@ -1686,14 +1684,14 @@ class TestProjectAPI(TestAPI):
         project_levels = ['BAD']
         project_users = [users[0].id, users[1].id]
 
-        name = u'My Project'
+        name = 'My Project'
         headers = [('Authorization', users[1].api_key)]
         new_project = dict(
             name=name,
             short_name='my-project',
             description='my-project-description',
             owner_id=1,
-            long_description=u'my project\nlong description',
+            long_description='my project\nlong description',
             password='hello',
             info=dict(data_access=project_levels, project_users=project_users))
         new_project = json.dumps(new_project)
@@ -1707,7 +1705,7 @@ class TestProjectAPI(TestAPI):
             assert error['action'] == 'POST', error
             assert error['target'] == 'project', error
             assert error['exception_cls'] == 'ValueError', error
-            message = u'Invalid access levels {}'.format(', '.join(project_levels))
+            message = 'Invalid access levels {}'.format(', '.join(project_levels))
             assert error['exception_msg'] == message, error
 
     @with_context
@@ -1723,14 +1721,14 @@ class TestProjectAPI(TestAPI):
         project_users = [users[0].id, users[1].id]
 
         CategoryFactory.create()
-        name = u'My Project'
+        name = 'My Project'
         headers = [('Authorization', users[1].api_key)]
         new_project = dict(
             name=name,
             short_name='my-project',
             description='my-project-description',
             owner_id=1,
-            long_description=u'my project\nlong description',
+            long_description='my project\nlong description',
             password='hello',
             info=dict(
                 data_access=project_levels, 
@@ -1751,7 +1749,7 @@ class TestProjectAPI(TestAPI):
             assert error['action'] == 'POST', error
             assert error['target'] == 'project', error
             assert error['exception_cls'] == 'ValueError', error
-            message = u'Data access level mismatch. Cannot assign user {} to project'.format(', '.join(map(str, project_users)))
+            message = 'Data access level mismatch. Cannot assign user {} to project'.format(', '.join(map(str, project_users)))
             assert error['exception_msg'] == message, error
 
 
@@ -1775,19 +1773,19 @@ class TestProjectAPI(TestAPI):
 
         self.set_proj_passwd_cookie(project, user_l3)
         # without data_access, user should be able to get project
-        res = self.app.get(u'api/project/{}?api_key={}'.format(project.id, user_l3.api_key))
+        res = self.app.get('api/project/{}?api_key={}'.format(project.id, user_l3.api_key))
         assert res.status_code == 200, 'without data access, user should get project with project password'
 
         # with data_access, user should not be able to get project unless user is assigned to project
         with patch.dict(data_access.data_access_levels, self.patch_data_access_levels):
             # res = self.app.get(u'api/project/{}?api_key={}'.format(project.id, user_l1.api_key))
-            res = self.app.get(u'api/project/{}?api_key={}'.format(project.id, user_l3.api_key))
+            res = self.app.get('api/project/{}?api_key={}'.format(project.id, user_l3.api_key))
             assert_equal(res.status, '403 FORBIDDEN', 'without data access, user should get project with project password')
 
             # assign user to project
             project.info['project_users'] = [user_l3.id]
             project_repo.update(project)
-            res = self.app.get(u'api/project/{}?api_key={}'.format(project.id, user_l3.api_key))
+            res = self.app.get('api/project/{}?api_key={}'.format(project.id, user_l3.api_key))
             assert res.status_code == 200, 'user assigned to project should have obtained project'
             data = json.loads(res.data)
             assert data['short_name'] == project.short_name
@@ -2027,7 +2025,6 @@ class TestProjectAPI(TestAPI):
         # Call API method to retrieve locks.
         res = self.app.get('/project/{}/locks/'.format(project.short_name), headers=headers, follow_redirects=True)
         res_data = json.loads(res.data)
-
         assert res.status_code == 200, "POST project locks api should be successful"
         assert len(res_data) == 1, "Successful count of locked tasks 1."
         assert res_data[0].get('name') == user.name, "Successful locked task user name"

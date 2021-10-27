@@ -62,7 +62,7 @@ def perform_check(check):
 
 
 def perform_checks():
-    return {check: perform_check(fn) for check, fn in checks.iteritems()}
+    return {check: perform_check(fn) for check, fn in checks.items()}
 
 
 @blueprint.route('/')
@@ -70,7 +70,7 @@ def perform_checks():
 @talisman(force_https=False)
 def healthcheck():
     response = perform_checks()
-    healthy =  all(response.itervalues())
+    healthy =  all(response.values())
     status = 200 if healthy else 500
     return Response(json.dumps(response), status=status,
                     mimetype='application/json')

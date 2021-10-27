@@ -17,13 +17,12 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-import StringIO
-from default import with_context
+import io
+from test import with_context
 from pybossa.util import unicode_csv_reader
-from factories import UserFactory
-from helper import web
-from factories import TaskFactory, ProjectFactory, TaskRunFactory, UserFactory
-from mock import patch
+from test.helper import web
+from test.factories import TaskFactory, ProjectFactory, UserFactory
+from unittest.mock import patch
 from pybossa.jobs import export_all_users
 
 
@@ -141,7 +140,10 @@ class TestExportUsers(web.Helper):
         data = args[0]['attachments'][0].data
 
         assert restricted.name not in data
-        csv_content = StringIO.StringIO(data)
+
+        # Get rid of NUL data
+        csv_content = io.StringIO(data.replace('\x00', ''))
+
         csvreader = unicode_csv_reader(csv_content)
         # number of users is -1 because the first row in csv are the headers
         number_of_users = -1

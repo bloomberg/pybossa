@@ -1,12 +1,11 @@
 # -*- coding: utf8 -*-
 import json
-from mock import patch
+from unittest.mock import patch
 
-from default import db, with_context
-from factories import ProjectFactory
-from helper import web
+from test import with_context
+from test.factories import ProjectFactory
+from test.helper import web
 from pybossa import data_access
-from default import flask_app
 
 
 class TestProjectSettings(web.Helper):

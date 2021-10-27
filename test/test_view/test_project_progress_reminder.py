@@ -1,12 +1,10 @@
 # -*- coding: utf8 -*-
 from bs4 import BeautifulSoup
-import json
-from mock import patch
 
-from default import db, with_context
-from factories import ProjectFactory, TaskFactory
-from helper import web
 from pybossa.repositories import ProjectRepository, UserRepository
+from test import db, with_context
+from test.factories import ProjectFactory, TaskFactory
+from test.helper import web
 
 project_repo = ProjectRepository(db)
 user_repo = UserRepository(db)

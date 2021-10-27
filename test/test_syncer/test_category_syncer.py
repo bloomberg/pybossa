@@ -16,14 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-import json
-from mock import patch
-from nose.tools import assert_raises
-from requests import Response
-from pybossa.syncer import NotEnabled
+from unittest.mock import patch
+
 from pybossa.syncer.category_syncer import CategorySyncer
-from default import Test, db, with_context
-from factories import ProjectFactory, UserFactory, CategoryFactory
+from test import Test, with_context
+from test.factories import CategoryFactory
 
 
 class TestCategorySyncer(Test):

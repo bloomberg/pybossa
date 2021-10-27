@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 
-from mock import patch
 from pybossa.task_creator_helper import _get_task_expiration
 
 

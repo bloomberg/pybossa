@@ -16,10 +16,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from StringIO import StringIO
-from mock import patch, Mock, MagicMock
-import boto
-from default import Test, with_context
+from io import StringIO
+from unittest.mock import patch, MagicMock
+from test import Test, with_context
 from pybossa.cloud_store_api.s3 import *
 from pybossa.cloud_store_api.connection import ProxiedKey
 from pybossa.encryption import AESWithGCM
@@ -34,13 +33,14 @@ class TestS3Uploader(Test):
     default_config = {
         'S3_DEFAULT': {
             'host': 's3.storage.com',
+            'port': 443,
             'auth_headers': [('test', 'name')]
         }
     }
 
     def test_check_valid_type(self):
         with NamedTemporaryFile() as fp:
-            fp.write('hello world')
+            fp.write(b'hello world')
             fp.flush()
             check_type(fp.name)
 
@@ -57,21 +57,21 @@ class TestS3Uploader(Test):
     @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
     def test_upload_from_string(self, set_contents):
         with patch.dict(self.flask_app.config, self.default_config):
-            url = s3_upload_from_string('bucket', u'hello world', 'test.txt')
-            assert url == 'https://s3.storage.com/bucket/test.txt', url
+            url = s3_upload_from_string('bucket', 'hello world', 'test.txt')
+            assert url == 'https://s3.storage.com:443/bucket/test.txt', url
 
     @with_context
     @patch('pybossa.cloud_store_api.s3.io.open')
     def test_upload_from_string_exception(self, open):
         open.side_effect = IOError
         assert_raises(IOError, s3_upload_from_string,
-                      'bucket', u'hellow world', 'test.txt')
+                      'bucket', 'hellow world', 'test.txt')
 
     @with_context
     @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
     def test_upload_from_string_return_key(self, set_contents):
         with patch.dict(self.flask_app.config, self.default_config):
-            key = s3_upload_from_string('bucket', u'hello world', 'test.txt',
+            key = s3_upload_from_string('bucket', 'hello world', 'test.txt',
                                         return_key_only=True)
             assert key == 'test.txt', key
 
@@ -84,7 +84,7 @@ class TestS3Uploader(Test):
                                  filename='test.txt',
                                  name='fieldname')
             url = s3_upload_file_storage('bucket', fstore)
-            assert url == 'https://s3.storage.com/bucket/test.txt', url
+            assert url == 'https://s3.storage.com:443/bucket/test.txt', url
 
     @with_context
     @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
@@ -130,7 +130,7 @@ class TestS3Uploader(Test):
         with patch.dict(self.flask_app.config, config):
             fp = get_file_from_s3('test_bucket', '/the/key', decrypt=True)
             content = fp.read()
-            assert content == 'hello world'
+            assert content == b'hello world'
 
     @with_context
     def test_no_checksum_key(self):

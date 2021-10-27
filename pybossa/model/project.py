@@ -77,7 +77,9 @@ class Project(db.Model, DomainObject):
     #: If emails are sent to users about new tasks
     email_notif = Column(Boolean, default=False)
 
-    tasks = relationship(Task, cascade='all, delete, delete-orphan', backref='project')
+    # as __mapper_args__ in the Task model has been removed, add order_by in
+    # the relationship - https://github.com/sqlalchemy/sqlalchemy/issues/5870
+    tasks = relationship(Task, cascade='all, delete, delete-orphan', backref='project', order_by='Task.id')
     task_runs = relationship(TaskRun, backref='project',
                              cascade='all, delete-orphan',
                              order_by='TaskRun.finish_time.desc()')

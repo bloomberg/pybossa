@@ -16,23 +16,27 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-import settings_test
 from pybossa.sentinel import Sentinel
 from pybossa.contributions_guard import ContributionsGuard
 from pybossa.model.task import Task
-from mock import patch
+from unittest.mock import patch
 import settings_test
 
 
 class FakeApp(object):
     def __init__(self):
+        # Redis Authentication required
+        pwd = getattr(settings_test, 'REDIS_PWD', None)
+
         if all(hasattr(settings_test, attr) for attr in
             ['REDIS_MASTER_DNS', 'REDIS_SLAVE_DNS', 'REDIS_PORT']):
             self.config = dict(REDIS_MASTER_DNS=settings_test.REDIS_MASTER_DNS,
                 REDIS_SLAVE_DNS=settings_test.REDIS_SLAVE_DNS,
-                REDIS_PORT=settings_test.REDIS_PORT)
+                REDIS_PORT=settings_test.REDIS_PORT,
+                REDIS_PWD=pwd)
         else:
-            self.config = { 'REDIS_SENTINEL': settings_test.REDIS_SENTINEL }
+            self.config = {'REDIS_SENTINEL': settings_test.REDIS_SENTINEL, 'REDIS_PWD': pwd}
+
 
 class TestContributionsGuard(object):
 
@@ -48,18 +52,19 @@ class TestContributionsGuard(object):
     # Task requested guard tests
 
     def test_stamp_registers_specific_user_id_and_task(self):
-        key = 'pybossa:task_requested:user:33:task:22'
+        # Python redis client always returns bytes string by default
+        key = b'pybossa:task_requested:user:33:task:22'
 
         self.guard.stamp(self.task, self.auth_user)
 
-        assert key in self.connection.keys(), self.connection.keys()
+        assert key in self.connection.keys(), list(self.connection.keys())
 
     def test_stamp_registers_specific_user_ip_and_task_if_no_id_provided(self):
-        key = 'pybossa:task_requested:user:127.0.0.1:task:22'
+        key = b'pybossa:task_requested:user:127.0.0.1:task:22'
 
         self.guard.stamp(self.task, self.anon_user)
 
-        assert key in self.connection.keys(), self.connection.keys()
+        assert key in self.connection.keys(), list(self.connection.keys())
 
     def test_stamp_expires_in_one_hour(self):
         key = 'pybossa:task_requested:user:33:task:22'
@@ -76,7 +81,7 @@ class TestContributionsGuard(object):
 
         self.guard.stamp(self.task, self.anon_user)
 
-        assert self.connection.get(key) == 'now'
+        assert self.connection.get(key) == b'now'
 
     def test_check_task_stamped_returns_False_for_non_stamped_task(self):
         assert self.guard.check_task_stamped(self.task, self.auth_user) is False
@@ -105,18 +110,18 @@ class TestContributionsGuard(object):
     # Task presented guard tests
 
     def test_stamp_presented_time_registers_specific_user_id_and_task(self):
-        key = 'pybossa:task_presented:user:33:task:22'
+        key = b'pybossa:task_presented:user:33:task:22'
 
         self.guard.stamp_presented_time(self.task, self.auth_user)
 
-        assert key in self.connection.keys(), self.connection.keys()
+        assert key in self.connection.keys(), list(self.connection.keys())
 
     def test_stamp_presented_time_registers_user_as_None_and_task_if_no_id_provided(self):
-        key = 'pybossa:task_presented:user:None:task:22'
+        key = b'pybossa:task_presented:user:None:task:22'
 
         self.guard.stamp_presented_time(self.task, self.anon_user)
 
-        assert key in self.connection.keys(), self.connection.keys()
+        assert key in self.connection.keys(), list(self.connection.keys())
 
     def test_stamp_presented_time_expires_in_one_hour(self):
         key = 'pybossa:task_presented:user:33:task:22'
@@ -133,7 +138,7 @@ class TestContributionsGuard(object):
 
         self.guard.stamp_presented_time(self.task, self.auth_user)
 
-        assert self.connection.get(key) == 'now'
+        assert self.connection.get(key) == b'now'
 
     def test_check_task_presented_stamped_returns_False_for_non_stamped_task(self):
         assert self.guard.check_task_presented_timestamp(self.task, self.auth_user) is False

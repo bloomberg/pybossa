@@ -15,12 +15,12 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from default import Test, with_context
+from test import Test, with_context
 from pybossa.news import get_news, notify_news_admins
 from pybossa.core import sentinel
-from factories import UserFactory
+from test.factories import UserFactory
 try:
-    import cPickle as pickle
+    import pickle as pickle
 except ImportError:  # pragma: no cover
     import pickle
 

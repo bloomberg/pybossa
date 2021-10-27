@@ -37,9 +37,15 @@ class UserRepository(Repository):
         self.db = db
 
     def get(self, id):
+        # bytes to unicode string
+        if type(id) == bytes:
+            id = id.decode()
         return self.db.session.query(User).get(id)
 
     def get_by_name(self, name):
+        # bytes to unicode string
+        if type(name) == bytes:
+            name = name.decode()
         return self.db.session.query(User).filter_by(name=name).first()
 
     def get_by(self, **attributes):
@@ -62,7 +68,7 @@ class UserRepository(Repository):
         filters['restrict'] = False
         query_args, queries, headlines, orders = self.generate_query_from_keywords(User, None, **filters)
         query = self.db.session.query(User).filter(*query_args)
-        query = query.filter(sqlalchemy.not_(User.email_addr.contains(u'@del.com'))).order_by(User.id)
+        query = query.filter(sqlalchemy.not_(User.email_addr.contains('@del.com'))).order_by(User.id)
         return query.all()
 
     def search_by_name(self, keyword, **filters):
@@ -118,7 +124,7 @@ class UserRepository(Repository):
 
     def fake_user_id(self, user):
         faker = Faker()
-        cp = CryptoPAn(current_app.config.get('CRYPTOPAN_KEY'))
+        cp = CryptoPAn(current_app.config.get('CRYPTOPAN_KEY').encode())
         task_runs = self.db.session.query(TaskRun).filter_by(user_id=user.id)
         for tr in task_runs:
             tr.user_id = None
@@ -168,7 +174,7 @@ class UserRepository(Repository):
         return self.db.session.query(User).filter(func.lower(User.email_addr) == email_addr).first()
 
     def get_info_columns(self):
-        return [u'languages', u'locations', u'work_hours_from', u'work_hours_to', u'timezone', u'user_type', u'additional_comments']
+        return ['languages', 'locations', 'work_hours_from', 'work_hours_to', 'timezone', 'user_type', 'additional_comments']
 
     def smart_search(self, current_user_is_admin, where, query_params):
         sql = text('''

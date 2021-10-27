@@ -17,10 +17,10 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 # Cache global variables for timeouts
 
-from mock import patch
-from default import Test, db, with_context
+from unittest.mock import patch
+from test import Test, db, with_context
 from nose.tools import assert_raises
-from factories import TaskRunFactory, ProjectFactory
+from test.factories import TaskRunFactory, ProjectFactory
 from pybossa.repositories import WebhookRepository
 from pybossa.exc import WrongObjectError, DBIntegrityError
 from pybossa.model.webhook import Webhook

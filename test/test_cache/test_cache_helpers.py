@@ -16,9 +16,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, db, with_context
-from factories import (ProjectFactory, TaskFactory, TaskRunFactory,
-                      AnonymousTaskRunFactory, UserFactory)
+from test import Test, with_context, with_request_context
+from test.factories import (ProjectFactory, TaskFactory, TaskRunFactory, UserFactory)
 from pybossa.cache import helpers
 from pybossa.cache.project_stats import update_stats
 
@@ -193,7 +192,7 @@ class TestHelpersCache(Test):
         task = TaskFactory.create(project=project)
 
         n_gold_tasks = helpers.n_unexpired_gold_tasks(project.id)
-        assert n_gold_tasks == 0, n_available_tasks
+        assert n_gold_tasks == 0
 
     @with_context
     def test_n_unexpired_gold_tasks_has_tasks(self):
@@ -201,7 +200,7 @@ class TestHelpersCache(Test):
         task = TaskFactory.create_batch(3, project=project, calibration=1)
 
         n_gold_tasks = helpers.n_unexpired_gold_tasks(project.id)
-        assert n_gold_tasks == 3, n_available_tasks
+        assert n_gold_tasks == 3
 
     @with_context
     def test_n_unexpired_gold_tasks_expired_tasks(self):
@@ -211,7 +210,7 @@ class TestHelpersCache(Test):
             expiration='2012-01-01T00:00:00')
 
         n_gold_tasks = helpers.n_unexpired_gold_tasks(project.id)
-        assert n_gold_tasks == 0, n_available_tasks
+        assert n_gold_tasks == 0
 
     @with_context
     def test_n_unexpired_gold_tasks_mixed_tasks(self):
@@ -223,7 +222,7 @@ class TestHelpersCache(Test):
             expiration='2012-01-01T00:00:00')
 
         n_gold_tasks = helpers.n_unexpired_gold_tasks(project.id)
-        assert n_gold_tasks == 2, n_available_tasks
+        assert n_gold_tasks == 2
 
     @with_context
     def test_n_unexpired_gold_tasks_unexpired_tasks(self):
@@ -235,9 +234,9 @@ class TestHelpersCache(Test):
             expiration='2999-01-01T00:00:00')
 
         n_gold_tasks = helpers.n_unexpired_gold_tasks(project.id)
-        assert n_gold_tasks == 4, n_available_tasks
+        assert n_gold_tasks == 4
 
-    @with_context
+    @with_request_context
     def test_check_contributing_state_completed(self):
         """Test check_contributing_state returns 'completed' for a project with all
         tasks completed and user that has contributed to it"""
@@ -253,7 +252,7 @@ class TestHelpersCache(Test):
         assert task.state == 'completed', task.state
         assert contributing_state == 'completed', contributing_state
 
-    @with_context
+    @with_request_context
     def test_check_contributing_state_completed_user_not_contributed(self):
         """Test check_contributing_state returns 'completed' for a project with all
         tasks completed even if the user has not contributed to it"""

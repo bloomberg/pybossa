@@ -30,6 +30,9 @@ class ProjectStatsRepository(Repository):
         self.db = db
 
     def get(self, id):
+        # bytes to unicode string
+        if type(id) == bytes:
+            id = id.decode()
         return self.db.session.query(ProjectStats).get(id)
 
     def filter_by(self, limit=None, offset=0, yielded=False, last_id=None,

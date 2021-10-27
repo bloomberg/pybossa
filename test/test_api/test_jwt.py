@@ -15,12 +15,10 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-import json
-from default import flask_app, with_context
-from mock import patch, Mock
-from test_api import TestAPI
-from factories import ProjectFactory
 from pybossa.auth import jwt_authorize_project
+from test import with_context
+from test.factories import ProjectFactory
+from test.test_api import TestAPI
 
 
 class TestJwtAPI(TestAPI):

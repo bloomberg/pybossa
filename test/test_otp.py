@@ -1,11 +1,11 @@
-from default import with_context, with_context_settings
+from test import with_context, with_context_settings
 from pybossa import otp
 from flask import current_app
 
 @with_context
 def test_create_otp():
     user_email = 'test@test.com'
-    secret = str(otp.generate_otp_secret(user_email))
+    secret = str(otp.generate_otp_secret(user_email)).encode()
     assert otp.retrieve_user_otp_secret(user_email) == secret, ('', secret)
 
 

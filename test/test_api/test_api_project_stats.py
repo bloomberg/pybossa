@@ -16,22 +16,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import with_context
-from test_api import TestAPI
-from factories import ProjectFactory, TaskFactory, TaskRunFactory
-from pybossa.repositories import ProjectStatsRepository
+
 import pybossa.cache.project_stats as stats
+from test import with_request_context
+from test.factories import ProjectFactory, TaskFactory, TaskRunFactory
+from test.test_api import TestAPI
+
 
 class TestProjectStatsAPI(TestAPI):
 
-    @with_context
+    @with_request_context
     def test_query_projectstats(self):
         """Test API query for project stats endpoint works"""
         project_stats = []
         projects = ProjectFactory.create_batch(3)
         for project in projects:
             for task in TaskFactory.create_batch(4, project=project, n_answers=3):
-              TaskRunFactory.create(task=task)
+                TaskRunFactory.create(task=task)
             stats.update_stats(project.id)
             ps = stats.get_stats(project.id, full=True)
             project_stats.append(ps)
