@@ -22,6 +22,7 @@ from factories import UserFactory
 from pybossa.view import bloomberg as bb
 from nose.tools import assert_raises, assert_true
 from pybossa.view.account import generate_bsso_account_notification
+from pybossa.util import get_s3_bucket_name
 
 class TestBloomberg(Test):
     def setUp(self):
@@ -142,10 +143,11 @@ class TestBloomberg(Test):
         mock_auth.process_response.return_value = None
         mock_auth.is_authenticated = True 
         mock_one_login.return_value = mock_auth
-        user = {'firstName': [u'test1'], 'emailAddress': ['test1@test.com'], 'lastName': [u'test1'], 'PVFLevels': [u'PVF_GUTS_3'], 'username': [u'test1'], 'firmId': [u'905877'], 'user_type': "Test firm id 3"}
+        user = {'firstName': [u'test1'], 'emailAddress': ['test1@test.com'], 'lastName': [u'test1'], 'PVFLevels': [u'PVF_GUTS_3'], 'username': [u'test1'], 'firmId': [u'905877'], 'metadata': {'user_type': "Test firm id 3"}}
         mock_auth.get_attributes.return_value = user
         res = self.app.post('/bloomberg/login', method='POST', content_type='multipart/form-data', data={'RelayState': redirect_url})
         msg = generate_bsso_account_notification(user)
+        # Verify successful result: An account for user has been auto-generated using information from BSSO. Please check their user type. (adminbssonotification.html)
         assert "check" in msg['body']
         assert res.status_code == 302, res.status_code
     
@@ -162,6 +164,7 @@ class TestBloomberg(Test):
         mock_auth.get_attributes.return_value = user
         res = self.app.post('/bloomberg/login', method='POST', content_type='multipart/form-data', data={'RelayState': redirect_url})
         msg = generate_bsso_account_notification(user)
+        # Verify successfuly result with a warning: This firm id is not on the list of recognized firms. Please ensure this is a valid user of brand. (adminbssowarning.html)
         assert "valid" in msg['body']
         assert res.status_code == 302, res.status_code
 
@@ -174,3 +177,17 @@ class TestBloomberg(Test):
         mock_bsso_alert = mock_alert
         user = {'firstName': [u'test2'], 'emailAddress': ['test2@test.com'], 'lastName': [u'test2'], 'PVFLevels': [u'PVF_GUTS_3'], 'username': [u'test2'], 'firmId': [u'000000'] }
         assert generate_bsso_account_notification(user) != None
+
+    @with_context
+    def test_get_s3_bucket_name_found(self):
+        result1 = get_s3_bucket_name('https://www.s3.amazonaws.com/test')
+        result2 = get_s3_bucket_name('https://s3.amazonaws.com/test')
+        result3 = get_s3_bucket_name('https://none.com/test')
+
+        assert result1 != None
+        assert len(result1) > 0
+
+        assert result2 != None
+        assert len(result2) > 0
+
+        assert result3 == None
