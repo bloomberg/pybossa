@@ -139,11 +139,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
             task = format_task(row)
             task_rank_info.append((task, score))
 
-<<<<<<< HEAD
-        # get the available tasks for current worker
-=======
         # get a list of available tasks for current worker
->>>>>>> 8a326ab68558682a67db2b9b386a9a9bd0826a66
         total_count = len(task_rank_info)
         tasks = select_available_tasks(task_rank_info, locked_tasks_in_project,
                                         project_id, user_id, offset+limit,
@@ -151,41 +147,15 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         tasks = tasks[offset: offset+limit]
 
     else:
-<<<<<<< HEAD
-        if args.get(order_by) == "lock":
-            pass
-        else:
-            sql +=  " ORDER BY %s LIMIT :limit OFFSET :offset" % (args.get('order_by') or 'id ASC')"
-=======
         # construct task browse page for owners/admins
         if not "lock_status" in order_by:
             sql += " LIMIT :limit OFFSET :offset"
->>>>>>> 8a326ab68558682a67db2b9b386a9a9bd0826a66
             params["limit"] = limit
             params["offset"] = offset
 
         results = session.execute(text(sql), params)
         task_rank_info = []
 
-<<<<<<< HEAD
-        locks = get_locked_tasks()
-
-        for row in results:
-            task = format_task(row, locks)
-            lock_score = 0
-            if row.id in locks:
-                lock_score = -1
-            else:
-                lock_score = task.pct_status
-
-            task_rank_info.append((task, lock_score))
-
-        if args.get("order_by") == "lock ASC":
-            task_rank_info = heapq.nlargest(offset+limit, task_rank_info,
-                                        key=lambda tup: tup[1])
-            tasks = task_rank_info[offset: offset+limit]
-        elif order_by = "lock DEC":
-=======
         for row in results:
             task = format_task(row, locked_tasks_in_project.get(row.id, []))
             lock_score = 0
@@ -201,48 +171,11 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                                         key=lambda tup: tup[1])
             tasks = task_rank_info[offset: offset+limit]
         elif order_by == "lock_status desc":
->>>>>>> 8a326ab68558682a67db2b9b386a9a9bd0826a66
             task_rank_info = heapq.nsmallest(offset+limit, task_rank_info,
                                         key=lambda tup: tup[1])
             tasks = task_rank_info[offset: offset+limit]
         else:
             tasks = task_rank_info
-<<<<<<< HEAD
-
-
-    # results = session.execute(text(sql), params)
-    # task_rank_info = []
-
-    # user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
-
-    # for row in results:
-    #     score = 0
-    #     w_pref = row.worker_pref or {}
-    #     w_filter = row.worker_filter or {}
-    #     user_pref = row.user_pref or {}
-    #     # for worker-view, validate worker_filter and compute preference score
-    #     if filter_user_prefs:
-    #         if not user_meet_task_requirement(row.id, w_filter, user_profile):
-    #             # exclude tasks for which the user is unqualified
-    #             continue
-    #         if not args.get('order_by'):
-    #             # if there is no sort defined, sort task by preference scores
-    #             score = get_task_preference_score(w_pref, user_profile)
-
-
-    #     finish_time = format_date(row.ft)
-    #     created = format_date(row.created)
-    #     task = dict(id=row.id, n_task_runs=row.n_task_runs,
-    #                 n_answers=row.n_answers, priority_0=row.priority_0,
-    #                 finish_time=finish_time, created=created,
-    #                 calibration=row.calibration,
-    #                 userPrefLang=user_pref.get("languages", []),
-    #                 userPrefLoc=user_pref.get("locations", []))
-    #     task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
-    #     task_rank_info.append((task, score))
-
-=======
->>>>>>> 8a326ab68558682a67db2b9b386a9a9bd0826a66
 
     return total_count, [t[0] for t in tasks]
 
