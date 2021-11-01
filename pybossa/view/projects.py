@@ -1474,7 +1474,8 @@ def tasks_browse(short_name, page=1, records_per_page=None):
 
     try:
         args = parse_tasks_browse_args(request.args)
-        if current_user.subadmin or current_user.admin or current_user.id in project.owners_ids:
+        view_type = request.args.get('view')
+        if view_type != 'tasklist' and (current_user.subadmin or current_user.admin or current_user.id in project.owners_ids):
             # owners and (sub)admin have full access, default size page for owner view is 10
             per_page = records_per_page if records_per_page in allowed_records_per_page else 10
         elif scheduler == Schedulers.task_queue:
