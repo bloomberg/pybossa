@@ -1696,6 +1696,43 @@ def bulk_priority_update(short_name):
     except Exception as e:
         return ErrorStatus().format_exception(e, 'priorityupdate', 'POST')
 
+@blueprint.route('/<short_name>/tasks/assign-workersupdate', methods=['POST'])
+def bulk_update_assign_worker(short_name):
+    import copy
+    from sqlalchemy.orm.attributes import flag_modified
+    # extract data from request.args
+    req_data = request.json
+    assign_worker_emails = req_data.get('assign_workers', [])
+    task_ids = req_data.get("taskIds", [])
+
+    project, owner, ps = project_by_shortname(short_name)
+
+    print(req_data)
+    print(assign_worker_emails)
+
+    # update the task.user_pref.assign_user to append the email addr
+    for task_id in task_ids:
+        if task_id is not None:
+            t = task_repo.get_task_by(project_id=project.id,
+                                      id=int(task_id))
+            print("before update")
+            print(t)
+
+            user_pref = t.user_pref or {}
+            assign_user = user_pref.get("assign_user", [])
+            assign_user.extend(assign_worker_emails)
+            user_pref["assign_user"] = assign_user
+            t.user_pref = user_pref
+            flag_modified(t, "user_pref")
+
+            print("after update")
+            print(t)
+
+            task_repo.update(t)
+
+    # return response
+    return Response('{}', 200, mimetype='application/json')
+
 
 @crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/redundancyupdate', methods=['POST'])
