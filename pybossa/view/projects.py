@@ -1701,6 +1701,9 @@ def bulk_update_assign_worker(short_name):
     import copy
     from sqlalchemy.orm.attributes import flag_modified
     # extract data from request.args
+
+    import pdb; pdb.set_trace()
+    print(request)
     req_data = request.json
     assign_worker_emails = req_data.get('assign_workers', [])
     task_ids = req_data.get("taskIds", [])
@@ -1710,11 +1713,16 @@ def bulk_update_assign_worker(short_name):
     print(req_data)
     print(assign_worker_emails)
 
-    # update the task.user_pref.assign_user to append the email addr
+    if not task_ids:
+        # get task_ids from db
+        args = parse_tasks_browse_args(request.json.get('filters'))
+        tasks = task_repo.get_tasks_by_filters(project, args)
+        task_ids = [t.id for t in tasks]
+
     for task_id in task_ids:
         if task_id is not None:
             t = task_repo.get_task_by(project_id=project.id,
-                                      id=int(task_id))
+                                    id=int(task_id))
             print("before update")
             print(t)
 
@@ -1729,6 +1737,7 @@ def bulk_update_assign_worker(short_name):
             print(t)
 
             task_repo.update(t)
+
 
     # return response
     return Response('{}', 200, mimetype='application/json')
