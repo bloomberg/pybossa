@@ -357,7 +357,7 @@ def task_category_to_sql_filter(project_id, task_category_key, exclude):
     return filters, category
 
 
-def get_task_category_info(project_id, user_id, exclude = False):
+def get_task_category_info(project_id, user_id):
     """Get reserved category info for a given user under a given project"""
     sql_filters, category_config = "", []
 
@@ -373,7 +373,12 @@ def get_task_category_info(project_id, user_id, exclude = False):
     category = ":".join(["{}:*".format(field) for field in category_config])
     lock_manager = LockManager(sentinel.master, timeout)
     category_key = lock_manager.get_task_category_lock(project_id, user_id, category)
-    # TODO: exclude category if there are certain categories reserved by other user
+    if not category_key:
+        # no reserved category found for the user
+        # exclude category when its reserved by other user
+        category_key = lock_manager.get_task_category_lock(project_id=project_id, user_id=None, category=category)
+        exclude = len(category_key) > 0
+
     sql_filters, category = task_category_to_sql_filter(project_id, category_key, exclude)
     return sql_filters, category
 
@@ -458,10 +463,10 @@ def select_task_for_gold_mode(project, user_id):
 
 @locked_scheduler
 def get_locked_task(project_id, user_id=None, limit=1, rand_within_priority=False,
-                    task_type='gold_last'):
+                    task_type='gold_last', task_category_filters=""):
     return locked_task_sql(project_id, user_id=user_id, limit=limit,
                            rand_within_priority=rand_within_priority, task_type=task_type,
-                           filter_user_prefs=False)
+                           filter_user_prefs=False, task_category_filters=task_category_filters)
 
 
 @locked_scheduler
