@@ -143,7 +143,7 @@ class Exporter(object):
         if isinstance(uploader, local.LocalUploader):
             filepath = safe_join(uploader.upload_folder, container)
         else:
-            print("The method Exporter _download_path should not be used for Rackspace etc.!")  # TODO: Log this stuff
+            print("The method Exporter _download_path should not be used other than local uploader!")  # TODO: Log this stuff
             filepath = container
         return filepath
 
@@ -184,10 +184,6 @@ class Exporter(object):
                                 as_attachment=True,
                                 attachment_filename=zip_result['filename'])
                 return res
-            else:
-                return redirect(url_for('rackspace', filename=filename,
-                                        container=self._container(project),
-                                        _external=True))
 
     def response_zip(self, project, ty, **kwargs):
         return self.get_zip(project, ty, **kwargs)

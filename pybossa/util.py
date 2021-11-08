@@ -648,7 +648,7 @@ def fuzzyboolean(value):
 def get_avatar_url(upload_method, avatar, container, external):
     """Return absolute URL for avatar."""
     upload_method = upload_method.lower()
-    if upload_method in ['rackspace', 'cloud']:
+    if upload_method in ['cloud']:
         return url_for(upload_method,
                        filename=avatar,
                        container=container)

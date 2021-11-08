@@ -1046,9 +1046,6 @@ class TestRankProjects(object):
     @patch('pybossa.util.url_for')
     def test_get_avatar_url(self, mock_url_for):
         """Test get_avatar_url works."""
-        util.get_avatar_url('rackspace', '1.png', '1', True)
-        mock_url_for.assert_called_with('rackspace', container='1', filename='1.png')
-
         util.get_avatar_url('local', '1.png', '1', True)
         mock_url_for.assert_called_with('uploads.uploaded_file',
                                         _external=True,

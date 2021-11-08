@@ -115,7 +115,6 @@ requirements = [
     "pyldap==3.0.0.post1",
     "pyOpenSSL==21.0.0",
     "pyparsing==2.4.7",
-    "pyrax==1.9.5",
     "python-dateutil==2.8.2",
     "python-editor==1.0.4",
     "python-keystoneclient==4.3.0",
@@ -125,8 +124,6 @@ requirements = [
     "python3-saml==1.12.0",  # upgrade from python-saml (requires test)
     "pytz==2021.1",
     "PyYAML==5.4.1",
-    "rackspace-auth-openstack==1.3",
-    "rackspace-novaclient==2.1",
     "raven==6.10.0",
     "rax-default-network-flags-python-novaclient-ext==0.4.0",
     "rax-scheduled-images-python-novaclient-ext==0.3.1",

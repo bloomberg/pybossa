@@ -206,10 +206,6 @@ class TaskCsvExporter(CsvExporter):
             # http://greenbytes.de/tech/tc2231/#encoding-2231-char
             # res.headers['Content-Disposition'] = 'attachment; filename*=%s' % filename
             return res
-        else:
-            return redirect(url_for('rackspace', filename=filename,
-                                    container=self._container(project),
-                                    _external=True))
 
     def make_zip(self, project, obj, expanded=False, filters=None, disclose_gold=False):
         file_format = 'csv'
