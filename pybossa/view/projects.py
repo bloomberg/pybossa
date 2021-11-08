@@ -1491,6 +1491,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
             args["display_columns"] = ['task_id', 'priority', 'created']
             args["display_info_columns"] = project.info.get('tasklist_columns', [])
+            args["view"] = view_type
             columns = args["display_info_columns"]
             # default page size for worker view is 100
             per_page = records_per_page if records_per_page in allowed_records_per_page else 100
