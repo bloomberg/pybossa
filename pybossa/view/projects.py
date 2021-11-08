@@ -1574,6 +1574,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         location_options = valid_user_preferences.get('locations')
         rdancy_upd_exp = current_app.config.get('REDUNDANCY_UPDATE_EXPIRATION', 30)
         data = dict(template='/projects/tasks_browse.html',
+                    users=[],
                     project=project_sanitized,
                     owner=owner_sanitized,
                     tasks=page_tasks,
@@ -1700,47 +1701,78 @@ def bulk_priority_update(short_name):
 def bulk_update_assign_worker(short_name):
     import copy
     from sqlalchemy.orm.attributes import flag_modified
-    # extract data from request.args
 
     import pdb; pdb.set_trace()
+
     print(request)
-    req_data = request.json
-    assign_worker_emails = req_data.get('assign_workers', [])
-    task_ids = req_data.get("taskIds", [])
-
+    response = {}
     project, owner, ps = project_by_shortname(short_name)
+    print(request.data)
+    data = json.loads(request.data)
 
-    print(req_data)
-    print(assign_worker_emails)
+    if data.get("add") is None and data.get("remove") is None:
+        # read data and return users
 
-    if not task_ids:
-        # get task_ids from db
-        args = parse_tasks_browse_args(request.json.get('filters'))
-        tasks = task_repo.get_tasks_by_filters(project, args)
-        task_ids = [t.id for t in tasks]
-
-    for task_id in task_ids:
-        if task_id is not None:
+        task_id = data.get("taskId")
+        if task_id:
+            # use filters tp populate user list
             t = task_repo.get_task_by(project_id=project.id,
-                                    id=int(task_id))
-            print("before update")
-            print(t)
+                                        id=int(task_id))
+            assign_users = []
+            if t.user_pref:
+                assign_users = t.user_pref.get("assign_user", [])
 
-            user_pref = t.user_pref or {}
-            assign_user = user_pref.get("assign_user", [])
-            assign_user.extend(assign_worker_emails)
-            user_pref["assign_user"] = assign_user
-            t.user_pref = user_pref
-            flag_modified(t, "user_pref")
+            # assign_user
+            # [{"fullname": "joe", "email": ".."}]
+            response['assign_users'] = assign_users
+        else:
+            # if it's bulk update
+            # use filters tp read all tasks and gneerate assign_users list
+            pass
 
-            print("after update")
-            print(t)
+        # get a list of all users can be assigned to task
+        all_users = [{"fullname": ".."}]
+        response["all_users"] = all_users
 
-            task_repo.update(t)
+    else:
+        # update tasks with assign worker values
+        print(request)
+
+        assign_worker_emails = req_data.get('assign_workers', [])
+        task_ids = req_data.get("taskIds", [])
+
+        print(req_data)
+        print(assign_worker_emails)
+
+        if not task_ids:
+            # get task_ids from db
+            args = parse_tasks_browse_args(request.json.get('filters'))
+            tasks = task_repo.get_tasks_by_filters(project, args)
+            task_ids = [t.id for t in tasks]
+
+        for task_id in task_ids:
+            if task_id is not None:
+                t = task_repo.get_task_by(project_id=project.id,
+                                        id=int(task_id))
+                print("before update")
+                print(t)
+
+                user_pref = t.user_pref or {}
+                assign_user = user_pref.get("assign_user", [])
+                assign_user.extend(assign_worker_emails)
+                user_pref["assign_user"] = assign_user
+                t.user_pref = user_pref
+                flag_modified(t, "user_pref")
+
+                print("after update")
+                print(t)
+
+                task_repo.update(t)
 
 
-    # return response
-    return Response('{}', 200, mimetype='application/json')
+        return Response(json.dumps(response), 200, mimetype='application/json')
+
+
 
 
 @crossdomain(origin='*', headers=cors_headers)
