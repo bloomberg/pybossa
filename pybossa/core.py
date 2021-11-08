@@ -150,10 +150,6 @@ def setup_uploader(app):
     if upload_method == 'local':
         from pybossa.uploader.local import LocalUploader
         uploader = LocalUploader()
-    # if upload_method == 'rackspace':  # pragma: no cover
-    #     from pybossa.uploader.rackspace import RackspaceUploader
-    #     uploader = RackspaceUploader()
-    #     app.url_build_error_handlers.append(uploader.external_url_handler)
     if upload_method == 'cloud':  # pragma: no cover
         from pybossa.uploader.cloud_store import CloudStoreUploader
         uploader = CloudStoreUploader()
