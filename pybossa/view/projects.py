@@ -1704,8 +1704,6 @@ def bulk_update_assign_worker(short_name):
     import copy
     from sqlalchemy.orm.attributes import flag_modified
 
-    import pdb; pdb.set_trace()
-
     print(request)
     response = {}
     project, owner, ps = project_by_shortname(short_name)
