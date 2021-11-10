@@ -1733,7 +1733,6 @@ def bulk_update_assign_worker(short_name):
         # get a list of all users can be assigned to task
         all_users = [{"fullname": ".."}]
         response["all_users"] = all_users
-
     else:
         # update tasks with assign worker values
         print(request)
@@ -1768,12 +1767,7 @@ def bulk_update_assign_worker(short_name):
                 print(t)
 
                 task_repo.update(t)
-
-
-        return Response(json.dumps(response), 200, mimetype='application/json')
-
-
-
+    return Response(json.dumps(response), 200, mimetype='application/json')
 
 @crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/redundancyupdate', methods=['POST'])
