@@ -1738,9 +1738,10 @@ def bulk_update_assign_worker(short_name):
         all_user_data = []
         for user in all_users:
             user_data = dict()
-            user_data['full_name'] = user.fullname
+            user_data['fullname'] = user.fullname
             user_data['email'] = user.email_addr
             all_user_data.append(user_data)
+            print(user_data)
         response["all_users"] = all_user_data
     else:
         # update tasks with assign worker values
