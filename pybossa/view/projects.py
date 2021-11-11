@@ -1702,7 +1702,7 @@ def bulk_update_assign_worker(short_name):
     import copy
     from sqlalchemy.orm.attributes import flag_modified
 
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
 
     print(request)
     response = {}
@@ -1731,8 +1731,15 @@ def bulk_update_assign_worker(short_name):
             pass
 
         # get a list of all users can be assigned to task
-        all_users = [{"fullname": ".."}]
-        response["all_users"] = all_users
+        all_users = user_repo.get_all()
+        print(all_users[0])
+        all_user_data = []
+        for user in all_users:
+            user_data = dict()
+            user_data['full_name'] = user.fullname
+            user_data['email'] = user.email_addr
+            all_user_data.append(user_data)
+        response["all_users"] = all_user_data
 
     else:
         # update tasks with assign worker values
@@ -1770,7 +1777,7 @@ def bulk_update_assign_worker(short_name):
                 task_repo.update(t)
 
 
-        return Response(json.dumps(response), 200, mimetype='application/json')
+    return Response(json.dumps(response), 200, mimetype='application/json')
 
 
 
