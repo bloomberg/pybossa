@@ -1474,7 +1474,8 @@ def tasks_browse(short_name, page=1, records_per_page=None):
 
     try:
         args = parse_tasks_browse_args(request.args)
-        if current_user.subadmin or current_user.admin or current_user.id in project.owners_ids:
+        view_type = request.args.get('view')
+        if view_type != 'tasklist' and (current_user.subadmin or current_user.admin or current_user.id in project.owners_ids):
             # owners and (sub)admin have full access, default size page for owner view is 10
             per_page = records_per_page if records_per_page in allowed_records_per_page else 10
         elif scheduler == Schedulers.task_queue:
@@ -1490,6 +1491,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
             args["display_columns"] = ['task_id', 'priority', 'created']
             args["display_info_columns"] = project.info.get('tasklist_columns', [])
+            args["view"] = view_type
             columns = args["display_info_columns"]
             # default page size for worker view is 100
             per_page = records_per_page if records_per_page in allowed_records_per_page else 100
@@ -1740,7 +1742,6 @@ def bulk_update_assign_worker(short_name):
             user_data['email'] = user.email_addr
             all_user_data.append(user_data)
         response["all_users"] = all_user_data
-
     else:
         # update tasks with assign worker values
         print(request)
@@ -1775,12 +1776,7 @@ def bulk_update_assign_worker(short_name):
                 print(t)
 
                 task_repo.update(t)
-
-
     return Response(json.dumps(response), 200, mimetype='application/json')
-
-
-
 
 @crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/redundancyupdate', methods=['POST'])
