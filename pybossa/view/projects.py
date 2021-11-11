@@ -1721,8 +1721,8 @@ def bulk_update_assign_worker(short_name):
             t = task_repo.get_task_by(project_id=project.id,
                                         id=int(task_id))
             assign_users = []
-            if t.user_pref:
-                assign_users = t.user_pref.get("assign_user", [])
+            # if t.user_pref:
+            #     assign_users = t.user_pref.get("assign_user", [])
 
             # assign_user
             # [{"fullname": "joe", "email": ".."}]
@@ -1747,24 +1747,25 @@ def bulk_update_assign_worker(short_name):
         # update tasks with assign worker values
         print(request)
 
-        assign_worker_emails = req_data.get('assign_workers', [])
-        task_ids = req_data.get("taskIds", [])
+        assign_workers = data.get('add', [])
+        remove_workers = data.get('remove', [])
 
-        print(req_data)
-        print(assign_worker_emails)
+        assign_worker_emails = [w["email"] for w in assign_workers]
+        removes_worker_emails = [w["email"] for w in remove_workers]
 
-        if not task_ids:
+        task_id = data.get("taskId")
+
+        if not task_id:
             # get task_ids from db
-            args = parse_tasks_browse_args(request.json.get('filters'))
+            args = parse_tasks_browse_args(data.get('filters'), {})
             tasks = task_repo.get_tasks_by_filters(project, args)
             task_ids = [t.id for t in tasks]
-
+        else:
+            task_ids = [task_id]
         for task_id in task_ids:
             if task_id is not None:
                 t = task_repo.get_task_by(project_id=project.id,
                                         id=int(task_id))
-                print("before update")
-                print(t)
 
                 user_pref = t.user_pref or {}
                 assign_user = user_pref.get("assign_user", [])
@@ -1773,8 +1774,6 @@ def bulk_update_assign_worker(short_name):
                 t.user_pref = user_pref
                 flag_modified(t, "user_pref")
 
-                print("after update")
-                print(t)
 
                 task_repo.update(t)
     return Response(json.dumps(response), 200, mimetype='application/json')
