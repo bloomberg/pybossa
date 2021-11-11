@@ -1223,8 +1223,8 @@ def task_presenter(short_name, task_id):
             flash(markup.format(msg_1, msg_2), "warning")
 
     scheduler = project.info.get('sched', "default")
-    if not (current_user.admin or current_user.id in project.owners_ids):
-        # Users without admin privilege have to be on task_queue-cherry_pick or be locked to task to view
+    if (not (current_user.admin or current_user.id in project.owners_ids)) or request.args.get('view') == 'tasklist':
+        # Allow lock when scheduler is task_queue and user is a worker or user is admin/subadminm/coowner in task view.
         if scheduler == sched.Schedulers.task_queue and mode == "cherry_pick":
             lock_task_for_user(task_id, project.id, current_user.id)
         elif not sched.can_read_task(task, current_user):
