@@ -1721,16 +1721,28 @@ def bulk_update_assign_worker(short_name):
             t = task_repo.get_task_by(project_id=project.id,
                                         id=int(task_id))
             assign_users = []
-            # if t.user_pref:
-            #     assign_users = t.user_pref.get("assign_user", [])
-
-            # assign_user
-            # [{"fullname": "joe", "email": ".."}]
+            if t.user_pref:
+                assign_user_emails = set(t.user_pref.get("assign_user", []))
+                for user_email in assign_user_emails:
+                    fullname = user_repo.search_by_email(user_email).fullname
+                    assign_users.append({'fullname': fullname, 'email': user_email})
             response['assign_users'] = assign_users
         else:
             # if it's bulk update
             # use filters tp read all tasks and gneerate assign_users list
-            pass
+            args = parse_tasks_browse_args(data.get('filters'), {})
+            tasks = task_repo.get_tasks_by_filters(project, args)
+            task_ids = [t.id for t in tasks]
+            assign_user_emails = set()
+            for task_id in task_ids:
+                t = task_repo.get_task_by(project_id=project.id,
+                                        id=int(task_id))
+                assign_user_emails.union(set(t.user_pref.get("assign_user", [])))
+            assign_users = []
+            for user_email in assign_user_emails:
+                fullname = user_repo.search_by_email(user_email).fullname
+                assign_users.append({'fullname': fullname, 'email': user_email})
+            response['assign_users'] = assign_users
 
         # get a list of all users can be assigned to task
         all_users = user_repo.get_all()
@@ -1751,7 +1763,7 @@ def bulk_update_assign_worker(short_name):
         remove_workers = data.get('remove', [])
 
         assign_worker_emails = [w["email"] for w in assign_workers]
-        removes_worker_emails = [w["email"] for w in remove_workers]
+        remove_worker_emails = [w["email"] for w in remove_workers]
 
         task_id = data.get("taskId")
 
