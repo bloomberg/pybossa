@@ -1223,8 +1223,8 @@ def task_presenter(short_name, task_id):
             flash(markup.format(msg_1, msg_2), "warning")
 
     scheduler = project.info.get('sched', "default")
-    if not (current_user.admin or current_user.id in project.owners_ids):
-        # Users without admin privilege have to be on task_queue-cherry_pick or be locked to task to view
+    if (not (current_user.admin or current_user.id in project.owners_ids)) or request.args.get('view') == 'tasklist':
+        # Allow lock when scheduler is task_queue and user is a worker or user is admin/subadminm/coowner in task view.
         if scheduler == sched.Schedulers.task_queue and mode == "cherry_pick":
             lock_task_for_user(task_id, project.id, current_user.id)
         elif not sched.can_read_task(task, current_user):
@@ -1474,7 +1474,8 @@ def tasks_browse(short_name, page=1, records_per_page=None):
 
     try:
         args = parse_tasks_browse_args(request.args)
-        if current_user.subadmin or current_user.admin or current_user.id in project.owners_ids:
+        view_type = request.args.get('view')
+        if view_type != 'tasklist' and (current_user.subadmin or current_user.admin or current_user.id in project.owners_ids):
             # owners and (sub)admin have full access, default size page for owner view is 10
             per_page = records_per_page if records_per_page in allowed_records_per_page else 10
         elif scheduler == Schedulers.task_queue:
@@ -1490,6 +1491,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
             args["display_columns"] = ['task_id', 'priority', 'created']
             args["display_info_columns"] = project.info.get('tasklist_columns', [])
+            args["view"] = view_type
             columns = args["display_info_columns"]
             # default page size for worker view is 100
             per_page = records_per_page if records_per_page in allowed_records_per_page else 100
