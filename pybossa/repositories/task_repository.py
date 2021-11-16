@@ -280,7 +280,7 @@ class TaskRepository(Repository):
         self._delete_zip_files_from_store(project)
 
     def get_tasks_by_filters(self, project, filters=None):
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         filters = filters or {}
         conditions, params = get_task_filters(filters)
         print(conditions)

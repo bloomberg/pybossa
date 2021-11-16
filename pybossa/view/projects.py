@@ -1704,7 +1704,6 @@ def bulk_update_assign_worker(short_name):
     import copy
     from sqlalchemy.orm.attributes import flag_modified
 
-    # import pdb; pdb.set_trace()
 
     print(request)
     response = {}
@@ -1712,10 +1711,14 @@ def bulk_update_assign_worker(short_name):
     print(request.data)
     data = json.loads(request.data)
 
+    # assign_user_cadidates instead of assign_user
+
     if data.get("add") is None and data.get("remove") is None:
         # read data and return users
 
         task_id = data.get("taskId")
+        bulk_update = False
+        assign_user_emails = []
         if task_id:
             # use filters tp populate user list
             t = task_repo.get_task_by(project_id=project.id,
@@ -1728,9 +1731,12 @@ def bulk_update_assign_worker(short_name):
                     assign_users.append({'fullname': fullname, 'email': user_email})
             response['assign_users'] = assign_users
         else:
+            bulk_update = True
             # if it's bulk update
             # use filters tp read all tasks and gneerate assign_users list
-            args = parse_tasks_browse_args(data.get('filters'), {})
+            # import pdb; pdb.set_trace()
+            print(data.get('filters'))
+            args = parse_tasks_browse_args(data.get('filters'))
             tasks = task_repo.get_tasks_by_filters(project, args)
             task_ids = [t.id for t in tasks]
             assign_user_emails = set()
@@ -1749,11 +1755,16 @@ def bulk_update_assign_worker(short_name):
         print(all_users[0])
         all_user_data = []
         for user in all_users:
+
+            # Exclude currently assigned users in the candidate list ONLY for single task update
+            if user.email_addr in assign_user_emails and not bulk_update:
+                continue
             user_data = dict()
             user_data['fullname'] = user.fullname
             user_data['email'] = user.email_addr
             all_user_data.append(user_data)
             print(user_data)
+        print(bulk_update)
         response["all_users"] = all_user_data
     else:
         # update tasks with assign worker values
@@ -1778,14 +1789,22 @@ def bulk_update_assign_worker(short_name):
             if task_id is not None:
                 t = task_repo.get_task_by(project_id=project.id,
                                         id=int(task_id))
-
+                # add new users 
                 user_pref = t.user_pref or {}
                 assign_user = user_pref.get("assign_user", [])
                 assign_user.extend(assign_worker_emails)
+                # remove all duplicates
+                assign_user = list(set(assign_user))
+
+                # remove users 
+                for remove_user_email in remove_worker_emails:
+                    if remove_user_email in assign_user:
+                        assign_user.remove(remove_user_email)
+
                 user_pref["assign_user"] = assign_user
+
                 t.user_pref = user_pref
                 flag_modified(t, "user_pref")
-
 
                 task_repo.update(t)
     return Response(json.dumps(response), 200, mimetype='application/json')
