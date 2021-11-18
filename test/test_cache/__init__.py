@@ -460,7 +460,7 @@ class TestCacheMemoizeFunctions(object):
     def test_cache_min_timeout(self):
         """Test CACHE cache for min timeout value."""
 
-        @cache(key_prefix='my_cached_func', tiemout=0)
+        @cache(key_prefix='my_cached_func', timeout=0)
         def my_func(*args, **kwargs):
             return [args, kwargs]
 
