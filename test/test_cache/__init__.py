@@ -436,3 +436,32 @@ class TestCacheMemoizeFunctions(object):
             return None
         my_func('a')
         assert len(test_sentinel.master.keys()) == 1
+
+    def test_memoized_min_timeout(self):
+        """Test CACHE memoize for min timeout value."""
+
+        @memoize(timeout=0)
+        def my_func(*args, **kwargs):
+            return [args, kwargs]
+        my_func('a')
+        assert len(test_sentinel.master.keys()) == 1
+
+    def test_memoized_essentials_min_timeout(self):
+        """Test CACHE memoize_essentials for min timeout value."""
+
+        @memoize_essentials(timeout=0, essentials=[0])
+        def my_func(*args, **kwargs):
+            return [args, kwargs]
+
+        my_func('a', kwarg='kwarg')
+        assert len(test_sentinel.master.keys()) == 1
+
+    def test_cache_min_timeout(self):
+        """Test CACHE cache for min timeout value."""
+
+        @memoize_essentials(timeout=0, essentials=[0])
+        def my_func(*args, **kwargs):
+            return [args, kwargs]
+
+        my_func('a', kwarg='kwarg')
+        assert len(test_sentinel.master.keys()) == 1
