@@ -29,10 +29,10 @@ class FakeApp(object):
         pwd = getattr(settings_test, 'REDIS_PWD', None)
 
         if all(hasattr(settings_test, attr) for attr in
-            ['REDIS_MASTER_DNS', 'REDIS_SLAVE_DNS', 'REDIS_PORT']):
+            ['REDIS_MASTER_DNS', 'REDIS_SLAVE_DNS', 'RQ_DASHBOARD_REDIS_PORT']):
             self.config = dict(REDIS_MASTER_DNS=settings_test.REDIS_MASTER_DNS,
                 REDIS_SLAVE_DNS=settings_test.REDIS_SLAVE_DNS,
-                REDIS_PORT=settings_test.REDIS_PORT,
+                RQ_DASHBOARD_REDIS_PORT=settings_test.RQ_DASHBOARD_REDIS_PORT,
                 REDIS_PWD=pwd)
         else:
             self.config = {'REDIS_SENTINEL': settings_test.REDIS_SENTINEL, 'REDIS_PWD': pwd}

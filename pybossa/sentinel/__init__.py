@@ -36,11 +36,11 @@ class Sentinel(object):
         }
         if app.config.get('REDIS_MASTER_DNS') and \
             app.config.get('REDIS_SLAVE_DNS') and \
-            app.config.get('REDIS_PORT'):
+            app.config.get('RQ_DASHBOARD_REDIS_PORT'):
             self.master = StrictRedis(host=app.config['REDIS_MASTER_DNS'],
-                port=app.config['REDIS_PORT'], **conn_kwargs)
+                port=app.config['RQ_DASHBOARD_REDIS_PORT'], **conn_kwargs)
             self.slave = StrictRedis(host=app.config['REDIS_SLAVE_DNS'],
-                port=app.config['REDIS_PORT'], **conn_kwargs)
+                port=app.config['RQ_DASHBOARD_REDIS_PORT'], **conn_kwargs)
         else:
             self.connection = sentinel.Sentinel(app.config['REDIS_SENTINEL'],
                                                 **conn_kwargs)

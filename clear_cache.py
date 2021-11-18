@@ -5,9 +5,9 @@ from redis import StrictRedis
 
 db = getattr(settings, 'REDIS_DB', 0)
 if all(hasattr(settings, attr) for attr in
-    ['REDIS_MASTER_DNS', 'REDIS_PORT']):
+    ['REDIS_MASTER_DNS', 'RQ_DASHBOARD_REDIS_PORT']):
     conn = StrictRedis(host=settings.REDIS_MASTER_DNS,
-        port=settings.REDIS_PORT, db=db)
+        port=settings.RQ_DASHBOARD_REDIS_PORT, db=db)
 else:
     sentinel = Sentinel(RS)
     conn = sentinel.master_for('mymaster')

@@ -16,9 +16,9 @@ def run_scheduler():
         'password': app_settings.config.get('REDIS_PWD')
     }
     if all(app_settings.config.get(attr) for attr in
-        ['REDIS_MASTER_DNS', 'REDIS_PORT']):
+        ['REDIS_MASTER_DNS', 'RQ_DASHBOARD_REDIS_PORT']):
         master = StrictRedis(host=app_settings.config['REDIS_MASTER_DNS'],
-            port=app_settings.config['REDIS_PORT'], **conn_kwargs)
+            port=app_settings.config['RQ_DASHBOARD_REDIS_PORT'], **conn_kwargs)
     else:
         sentinel = Sentinel(app_settings.config['REDIS_SENTINEL'])
         master = sentinel.master_for(app_settings.config['REDIS_MASTER'], **conn_kwargs)
