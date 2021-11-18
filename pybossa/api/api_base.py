@@ -107,10 +107,10 @@ class APIBase(MethodView):
     def refresh_cache(self, cls_name, oid):
         """Refresh the cache."""
         if caching.get(cls_name):
-           if cls_name != 'Category' and cls_name != 'Announcement':
-              caching.get(cls_name)['refresh'](oid)
-           else:
-              caching.get(cls_name)['refresh']()
+            if cls_name not in ['Category', 'Announcement']:
+                caching.get(cls_name)['refresh'](oid)
+            else:
+                caching.get(cls_name)['refresh']()
 
     def valid_args(self):
         """Check if the domain object args are valid."""
