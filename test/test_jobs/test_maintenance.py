@@ -68,7 +68,7 @@ class TestMaintenance(Test):
             response = check_failed()
             msg = "JOBS: ['1'] You have failed the system."
             assert msg == response, response
-            mock_requeue_job.assert_called_with('1')
+            assert mock_requeue_job.call_args.args[0] == '1'
             assert not mock_send_mail.called
         response = check_failed()
         assert mock_send_mail.called

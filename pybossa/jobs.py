@@ -1143,12 +1143,15 @@ def news():
     for url in urls:
         d = feedparser.parse(url)
         tmp = get_news(score)
+        print(url)
         if (d.entries and (len(tmp) == 0)
            or (tmp[0]['updated'] != d.entries[0]['updated'])):
             mapping = dict()
             mapping[pickle.dumps(d.entries[0])] = float(score)
             sentinel.master.zadd(FEED_KEY, mapping)
             notify = True
+            print("changing notify = true")
+
         score += 1
     if notify:
         notify_news_admins()
@@ -1174,7 +1177,7 @@ def check_failed():
             ttl = current_app.config.get('FAILED_JOBS_MAILS')*24*60*60
             sentinel.master.setex(KEY, ttl, 1)
         if int(sentinel.slave.get(KEY)) < FAILED_JOBS_RETRIES:
-            requeue_job(job_id)
+            requeue_job(job_id, redis_conn)
         else:
             KEY = 'pybossa:job:failed:mailed:%s' % job_id
             if (not sentinel.slave.exists(KEY) and
