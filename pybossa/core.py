@@ -373,9 +373,12 @@ def setup_blueprints(app):
 
 def is_admin():
     """Check if user is admin."""
+    print("checking if user is admin")
     if current_user.is_anonymous:
+        print("current_user.is_anonymous")
         return abort(401)
     if current_user.admin is False:
+        print("current_user.admin is False")
         return abort(403)
 
 

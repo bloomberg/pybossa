@@ -166,18 +166,18 @@ class TestWeeklyStats(Test):
 class TestWeeklyReport(Test):
 
     # TODO: RDISCROWD-4605 get_weekly_admin_report_jobs returns empty iterator
-    # @with_context
-    # @patch('pybossa.jobs.datetime')
-    # def test_get_jobs_on_monday(self, mock_datetime):
-    #     """Test JOB get jobs for weekly report works on Monday."""
-    #     mock_date = MagicMock()
-    #     mock_date.strftime.return_value = 'Monday'
-    #     mock_datetime.today.return_value = mock_date
-    #
-    #     jobs = get_weekly_admin_report_jobs()
-    #     job_0 = next(jobs)
-    #     job_1 = next(jobs)
-    #     assert_raises(StopIteration, jobs.__next__)
+    @with_context
+    @patch('pybossa.jobs.datetime')
+    def test_get_jobs_on_monday(self, mock_datetime):
+        """Test JOB get jobs for weekly report works on Monday."""
+        mock_date = MagicMock()
+        mock_date.strftime.return_value = 'Monday'
+        mock_datetime.today.return_value = mock_date
+
+        jobs = get_weekly_admin_report_jobs()
+        job_0 = next(jobs)
+        job_1 = next(jobs)
+        assert_raises(StopIteration, jobs.__next__)
 
     @with_context
     @patch('pybossa.jobs.datetime')
@@ -191,22 +191,22 @@ class TestWeeklyReport(Test):
         assert_raises(StopIteration, jobs.__next__)
 
     # TODO: RDISCROWD-4605 get_weekly_admin_report_jobs return empty iterator
-    # @with_context
-    # @patch('pybossa.jobs.datetime')
-    # def test_get_jobs_only_on_monday_variant(self, mock_datetime):
-    #     """Test JOB get jobs for weekly report works only on Monday variant."""
-    #     mock_date = MagicMock()
-    #     mock_date.strftime.return_value = 'Monday'
-    #     mock_datetime.today.return_value = mock_date
-    #
-    #     jobs = [job for job in get_weekly_admin_report_jobs()]
-    #     assert len(jobs) == 2, len(jobs)
-    #     assert jobs[0]['name'] == mail_project_report
-    #     assert jobs[0]['args'][0]['user_id'] == 0
-    #     assert jobs[0]['timeout'] == self.flask_app.config.get('TIMEOUT')
-    #     assert jobs[0]['queue'] == 'low'
-    #
-    #     assert jobs[1]['name'] == export_all_users
-    #     assert jobs[1]['args'][0] == 'csv'
-    #     assert jobs[1]['timeout'] == self.flask_app.config.get('TIMEOUT')
-    #     assert jobs[1]['queue'] == 'low'
+    @with_context
+    @patch('pybossa.jobs.datetime')
+    def test_get_jobs_only_on_monday_variant(self, mock_datetime):
+        """Test JOB get jobs for weekly report works only on Monday variant."""
+        mock_date = MagicMock()
+        mock_date.strftime.return_value = 'Monday'
+        mock_datetime.today.return_value = mock_date
+
+        jobs = [job for job in get_weekly_admin_report_jobs()]
+        assert len(jobs) == 2, len(jobs)
+        assert jobs[0]['name'] == mail_project_report
+        assert jobs[0]['args'][0]['user_id'] == 0
+        assert jobs[0]['timeout'] == self.flask_app.config.get('TIMEOUT')
+        assert jobs[0]['queue'] == 'low'
+
+        assert jobs[1]['name'] == export_all_users
+        assert jobs[1]['args'][0] == 'csv'
+        assert jobs[1]['timeout'] == self.flask_app.config.get('TIMEOUT')
+        assert jobs[1]['queue'] == 'low'
