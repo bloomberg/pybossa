@@ -48,7 +48,7 @@ class TestNews(Test):
         tmp = get_news()
         assert len(tmp) == 1, len(tmp)
         err_msg = "Notify user should be notified"
-        assert self.get_notify_users(user) == '1', self.get_notify_users(user)
+        assert self.get_notify_users(user).decode() == '1', self.get_notify_users(user)
 
 
     # TODO: RDISCROWD-4605
@@ -64,7 +64,7 @@ class TestNews(Test):
         tmp = get_news()
         assert len(tmp) == 1, len(tmp)
         err_msg = "Notify user should be notified"
-        assert self.get_notify_users(user) == '1', self.get_notify_users(user)
+        assert self.get_notify_users(user).decode() == '1', self.get_notify_users(user)
 
     @with_context
     @patch('feedparser.parse')
