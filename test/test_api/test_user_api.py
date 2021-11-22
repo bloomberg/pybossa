@@ -16,14 +16,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import with_context, Test
-from nose.tools import assert_raises
-from werkzeug.exceptions import MethodNotAllowed
-from pybossa.api.user import UserAPI
-from test_api import TestAPI
-from pybossa.core import db
-from mock import patch, MagicMock
-from factories import UserFactory
+from unittest.mock import patch, MagicMock
+
+from test import with_context, Test
+from test.factories import UserFactory
 
 
 class TestUserAPI(Test):
@@ -70,7 +66,7 @@ class TestUserAPI(Test):
         data = json.loads(res.data)
         user = data
         assert user['name'] == expected_user.name, data
-        assert 'info' in user.keys(), user.keys()
+        assert 'info' in user.keys(), list(user.keys())
         assert user['info']['extra'] == 'foo'
         assert user['info']['badges'] == [1,2,3]
 
@@ -550,7 +546,7 @@ class TestUserAPI(Test):
             assert error['action'] == 'PUT', error
             assert error['target'] == 'user', error
             assert error['exception_cls'] == 'ValueError', error
-            message = u'Invalid access levels {}'.format(', '.join(user_levels))
+            message = 'Invalid access levels {}'.format(', '.join(user_levels))
             assert error['exception_msg'] == message, error
 
             user_levels = ["L1", "L2"]

@@ -17,23 +17,15 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-import random
 
-from mock import patch
-
-from helper import sched
-from default import Test, db, with_context
 from pybossa.model.task import Task
-from pybossa.model.project import Project
-from pybossa.model.user import User
 from pybossa.model.task_run import TaskRun
-from pybossa.model.category import Category
 from pybossa.sched import get_depth_first_all_task
-from pybossa.core import task_repo, project_repo
-from factories import TaskFactory, ProjectFactory, TaskRunFactory, UserFactory
-from factories import AnonymousTaskRunFactory, ExternalUidTaskRunFactory
-from factories import reset_all_pk_sequences
-import pybossa
+from test import db, with_context
+from test.factories import AnonymousTaskRunFactory
+from test.factories import TaskFactory, ProjectFactory, TaskRunFactory, \
+    UserFactory
+from test.helper import sched
 
 
 class TestSched(sched.Helper):
@@ -752,7 +744,7 @@ class TestSched(sched.Helper):
         err_msg = "User should get a task"
         i = 0
         for t in data:
-            print t['id']
+            print(t['id'])
             assert 'project_id' in t.keys(), err_msg
             assert t['project_id'] == project_id, err_msg
             assert t['id'] == all_tasks[i].id, (err_msg, t, all_tasks[i].id)

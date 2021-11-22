@@ -15,12 +15,12 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from helper import web
-from default import with_context
-from factories import ProjectFactory
+from test.helper import web
+from test import with_context
+from test.factories import ProjectFactory
 from pybossa.core import user_repo
 from pybossa.view.projects import project_event_stream
-from mock import patch, MagicMock
+from unittest.mock import patch, MagicMock
 
 
 class TestWebSse(web.Helper):
@@ -34,7 +34,7 @@ class TestWebSse(web.Helper):
         private_uri = '/project/%s/privatestream' % project.short_name
         res = self.app.get(private_uri, follow_redirects=True)
         assert res.status_code == 200, res.status_code
-        assert 'This feature requires being logged in.' in res.data, res.data
+        assert 'This feature requires being logged in.' in res.data.decode(), res.data
 
     @with_context
     def test_stream_uri_private_auth(self):
@@ -99,7 +99,7 @@ class TestWebSse(web.Helper):
         assert mock_sse.called
         assert mock_sse.called_once_with(project.short_name, 'private')
         assert res.status_code == 200
-        assert res.data == self.fake_sse_response, res.data
+        assert res.data.decode() == self.fake_sse_response, res.data
 
     @with_context
     def test_stream_uri_private_admin_404(self):
@@ -140,7 +140,7 @@ class TestWebSse(web.Helper):
         assert mock_sse.called
         assert mock_sse.called_once_with(project.short_name, 'public')
         assert res.status_code == 200
-        assert res.data == self.fake_sse_response, res.data
+        assert res.data.decode() == self.fake_sse_response, res.data
 
     @with_context
     @patch('pybossa.view.projects.project_event_stream')
@@ -199,7 +199,7 @@ class TestWebSse(web.Helper):
         assert mock_sse.called
         assert mock_sse.called_once_with(project.short_name, 'public')
         assert res.status_code == 200
-        assert res.data == self.fake_sse_response, res.data
+        assert res.data.decode() == self.fake_sse_response, res.data
 
     @patch('pybossa.view.projects.sentinel.master.pubsub')
     def test_project_event_stream(self, mock_pubsub):

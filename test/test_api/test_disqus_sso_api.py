@@ -16,10 +16,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import db, with_context
-from test_api import TestAPI
-from mock import patch
-from factories import UserFactory
+from unittest.mock import patch
+
+from test import with_context
+from test.factories import UserFactory
+from test.test_api import TestAPI
+
 
 class TestDisqusSSO(TestAPI):
 
@@ -71,7 +73,9 @@ class TestDisqusSSO(TestAPI):
         assert res.status_code == 405, res.status_code
         assert data['status_code'] == 405, data
         assert data['status'] == 'failed', data
-        assert data['exception_msg'] == 'Disqus keys are missing'
+
+        # data['exception_msg'] could be different in different flask version
+        assert data['exception_cls'] == 'MethodNotAllowed'
 
     @with_context
     def test_anon_no_keys(self):
@@ -83,4 +87,4 @@ class TestDisqusSSO(TestAPI):
         assert res.status_code == 405, res.status_code
         assert data['status_code'] == 405, data
         assert data['status'] == 'failed', data
-        assert data['exception_msg'] == 'Disqus keys are missing'
+        assert data['exception_cls'] == 'MethodNotAllowed'

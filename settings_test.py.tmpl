@@ -38,7 +38,7 @@ ANNOUNCEMENT_LEVELS = {
     'user': {'display': 'User', 'level': 30}
 }
 ANNOUNCEMENT_LEVEL_OPTIONS = [
-    {'text': v['display'], 'value': v['level']} for k, v in ANNOUNCEMENT_LEVELS.iteritems()
+    {'text': v['display'], 'value': v['level']} for k, v in ANNOUNCEMENT_LEVELS.items()
 ]
 LOCALES = [('en', 'English'), ('es', u'Español'),
            ('it', 'Italiano'), ('fr', u'Français'),
@@ -230,4 +230,4 @@ FIRM_TO_TYPE = {
     905877: "Test firm id 3"
 }
 
-
+CONTACT_ENABLE = ''

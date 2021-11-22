@@ -139,7 +139,11 @@ class ProjectSyncer(Syncer):
         for owner_id in owners_ids:
             res = self.get_target_user(owner_id, self.target_key)
             if res.ok:
-                data = res.json()
+
+                # res.json() gets TypeError: must be str, not bytes
+                # see https://github.com/psf/requests/issues/4879
+                # data = res.json()
+                data = json.loads(res.content)
                 owner_emails.append(data.get('email_addr'))
 
         return owner_emails

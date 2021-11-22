@@ -19,7 +19,7 @@
 PYBOSSA api module for exposing domain object PerformanceStats via an API.
 """
 from pybossa.model.performance_stats import PerformanceStats
-from api_base import APIBase
+from .api_base import APIBase
 from werkzeug.exceptions import MethodNotAllowed
 
 

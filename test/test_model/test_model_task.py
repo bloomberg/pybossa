@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, db, with_context
+from test import Test, db, with_context
 from nose.tools import assert_raises
 from sqlalchemy.exc import IntegrityError
 from pybossa.model.user import User
@@ -39,7 +39,7 @@ class TestModelTask(Test):
         db.session.add(user)
         db.session.commit()
         user = db.session.query(User).first()
-        category = Category(name=u'cat', short_name=u'cat', description=u'cat')
+        category = Category(name='cat', short_name='cat', description='cat')
         project = Project(name='Application', short_name='app', description='desc',
                   owner_id=user.id, category=category)
         db.session.add(project)

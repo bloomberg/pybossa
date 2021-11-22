@@ -20,10 +20,10 @@ from pybossa.dashboard.jobs import new_tasks_week, new_task_runs_week
 from pybossa.dashboard.data import format_new_task_runs, format_new_tasks
 from pybossa.core import db
 from datetime import datetime, timedelta
-from factories.taskrun_factory import TaskRunFactory, AnonymousTaskRunFactory
-from factories.task_factory import TaskFactory
-from default import Test, with_context
-from mock import patch, MagicMock
+from test.factories.taskrun_factory import TaskRunFactory, AnonymousTaskRunFactory
+from test.factories.task_factory import TaskFactory
+from test import Test, with_context
+from unittest.mock import patch, MagicMock
 
 
 class TestDashBoardNewTask(Test):

@@ -386,5 +386,5 @@ def management_dashboard_stats_cached():
 
     if not stats_cached:
         # reset stats for any missing stat
-        map(delete_cache_group, management_dashboard_stats)
+        list(map(delete_cache_group, management_dashboard_stats))
     return stats_cached

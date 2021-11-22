@@ -22,7 +22,7 @@ from flask import url_for, safe_join, send_file, redirect
 from pybossa.core import uploader, task_repo
 from pybossa.uploader import local
 from pybossa.exporter.json_export import JsonExporter
-from export_helpers import browse_tasks_export, browse_tasks_export_count
+from .export_helpers import browse_tasks_export, browse_tasks_export_count
 
 TASK_GOLD_FIELDS = [
     'calibration',
@@ -72,7 +72,7 @@ class TaskJsonExporter(JsonExporter):
             user['user_type'] = user.get('info', {}).get('metadata', {}).get('user_type')
             allowed_attributes = ['name', 'fullname', 'user_type', 'created',
                                   'email_addr', 'admin', 'subadmin']
-            user = {k: v for (k, v) in user.iteritems() if k in allowed_attributes}
+            user = {k: v for (k, v) in user.items() if k in allowed_attributes}
             obj_dict['user'] = user
         except:
             pass
@@ -91,7 +91,7 @@ class TaskJsonExporter(JsonExporter):
             row[keys[-1]] = value
 
         new_row = {}
-        for k, v in row.iteritems():
+        for k, v in row.items():
             key_split = k.split('__', 1)
             if len(key_split) > 1 and key_split[0] in ('task', 'user'):
                 set_nested_value(new_row, key_split, v)

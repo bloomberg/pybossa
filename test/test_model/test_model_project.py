@@ -16,13 +16,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, db, with_context
+from test import Test, db, with_context
 from nose.tools import assert_raises
-from mock import patch
+from unittest.mock import patch
 from pybossa.model.project import Project
 from pybossa.model.user import User
 from sqlalchemy.exc import IntegrityError
-from factories import ProjectFactory
+from test.factories import ProjectFactory
 
 
 class TestModelProject(Test):

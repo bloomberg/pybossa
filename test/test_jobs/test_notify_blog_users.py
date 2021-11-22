@@ -17,12 +17,12 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 from pybossa.jobs import notify_blog_users
-from default import Test, with_context, flask_app
-from factories import BlogpostFactory
-from factories import TaskRunFactory
-from factories import ProjectFactory
-from factories import UserFactory
-from mock import patch, MagicMock
+from test import Test, with_context, flask_app
+from test.factories import BlogpostFactory
+from test.factories import TaskRunFactory
+from test.factories import ProjectFactory
+from test.factories import UserFactory
+from unittest.mock import patch, MagicMock
 
 queue = MagicMock()
 queue.enqueue.return_value = True

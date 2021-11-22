@@ -16,10 +16,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from mock import patch, MagicMock
+from unittest.mock import patch, MagicMock
 from nose.tools import assert_raises
-import json
 from pybossa.s3_client import S3Client, NoSuchBucket, PrivateBucket
+
 
 class TestS3Client(object):
 
@@ -120,7 +120,7 @@ class TestS3Client(object):
 
         objects = S3Client().objects('test-pybossa')
 
-        assert objects == [u'16535035993_1080p.mp4', u'BFI-demo.mp4'], objects
+        assert objects == ['16535035993_1080p.mp4', 'BFI-demo.mp4'], objects
 
     @patch('pybossa.s3_client.requests')
     def test_objects_not_returns_folders_inside_bucket(self, requests):

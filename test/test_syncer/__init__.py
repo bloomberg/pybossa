@@ -17,9 +17,9 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from mock import patch, Mock
-from default import Test, with_context
-from factories import ProjectFactory
+from unittest.mock import patch
+from test import Test, with_context
+from test.factories import ProjectFactory
 from nose.tools import assert_raises
 
 

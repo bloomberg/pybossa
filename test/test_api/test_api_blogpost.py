@@ -17,21 +17,23 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
 import io
-from default import db, with_context
-from test_api import TestAPI
+from test import db, with_context
+from test.test_api import TestAPI
 
-from factories import UserFactory, BlogpostFactory, ProjectFactory
+from test.factories import UserFactory, BlogpostFactory, ProjectFactory
 
 from pybossa.repositories import BlogRepository
-from mock import patch
-from helper.gig_helper import make_subadmin
+from unittest.mock import patch
+from test.helper.gig_helper import make_subadmin
 blog_repo = BlogRepository(db)
+
 
 class TestBlogpostAPI(TestAPI):
 
     @with_context
     def test_blogpost_query_list_project_ids(self):
         """Get a list of blogposts using a list of project_ids."""
+
         projects = ProjectFactory.create_batch(3)
         blogposts = []
         for project in projects:
@@ -53,7 +55,6 @@ class TestBlogpostAPI(TestAPI):
         res = self.app.get(url + '&orderby=created&desc=true')
         data = json.loads(res.data)
         assert data[0]['id'] == blogposts[-1].id
-
 
     @with_context
     def test_query_blogpost(self):

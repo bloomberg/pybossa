@@ -17,8 +17,8 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import jwt
-from mock import patch, Mock
-from default import Test, with_context
+from unittest.mock import patch
+from test import Test, with_context
 from pybossa.cloud_store_api.connection import create_connection, CustomAuthHandler, CustomProvider
 from nose.tools import assert_raises
 from boto.auth_handler import NotReadyToAuthenticate
@@ -75,6 +75,7 @@ class TestS3Connection(Test):
     def test_proxied_connection(self, make_request):
         params = {
             'host': 's3.test.com',
+            'port': 443,
             'object_service': 'tests3',
             'client_secret': 'abcd',
             'client_id': 'test_id',
@@ -88,18 +89,21 @@ class TestS3Connection(Test):
         headers = args[3]
         assert headers['x-objectservice-id'] == 'TESTS3'
 
-        jwt_payload = jwt.decode(headers['jwt'], 'abcd', algorithm='HS256')
+        # jwt.decode accepts 'algorithms' arguments, not 'algorithm'
+        # Reference: https://pyjwt.readthedocs.io/en/stable/api.html#jwt.decode
+        jwt_payload = jwt.decode(headers['jwt'], 'abcd', algorithms=['HS256'])
         assert jwt_payload['path'] == '/test_bucket/test_key'
 
         bucket = conn.get_bucket('test_bucket', validate=False)
         key = bucket.get_key('test_key', validate=False)
-        assert key.generate_url(0).split('?')[0] == 'https://s3.test.com/test_bucket/test_key'
+        assert key.generate_url(0).split('?')[0] == 'https://s3.test.com:443/test_bucket/test_key'
 
     @with_context
     @patch('pybossa.cloud_store_api.connection.S3Connection.make_request')
     def test_proxied_connection_url(self, make_request):
         params = {
             'host': 's3.test.com',
+            'port': 443,
             'object_service': 'tests3',
             'client_secret': 'abcd',
             'client_id': 'test_id',
@@ -114,9 +118,9 @@ class TestS3Connection(Test):
         headers = args[3]
         assert headers['x-objectservice-id'] == 'TESTS3'
 
-        jwt_payload = jwt.decode(headers['jwt'], 'abcd', algorithm='HS256')
+        jwt_payload = jwt.decode(headers['jwt'], 'abcd', algorithms=['HS256'])
         assert jwt_payload['path'] == '/test/test_bucket/test_key'
 
         bucket = conn.get_bucket('test_bucket', validate=False)
         key = bucket.get_key('test_key', validate=False)
-        assert key.generate_url(0).split('?')[0] == 'https://s3.test.com/test/test_bucket/test_key'
+        assert key.generate_url(0).split('?')[0] == 'https://s3.test.com:443/test/test_bucket/test_key'

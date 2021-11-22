@@ -34,12 +34,12 @@ class Unique(object):
         self.query_function = query_function
         self.field_name = field_name
         if not message:  # pragma: no cover
-            message = lazy_gettext(u'This item already exists')
+            message = lazy_gettext('This item already exists')
         self.message = message
 
     def __call__(self, form, form_field):
         field_value = form_field.data
-        if isinstance(field_value, basestring):
+        if isinstance(field_value, str):
             field_value = form_field.data.strip()
         filters = {self.field_name: field_value}
         check = self.query_function(**filters)
@@ -63,7 +63,7 @@ class UniqueCaseInsensitive(Unique):
             message=message)
 
     def __call__(self, form, form_field):
-        if not isinstance(form_field.data, basestring):
+        if not isinstance(form_field.data, str):
             return False
         form_field.data = form_field.data.strip().lower()
         super(UniqueCaseInsensitive, self).__call__(form, form_field)
@@ -75,7 +75,7 @@ class NotAllowedChars(object):
 
     def __init__(self, message=None):
         if not message:
-            self.message = lazy_gettext(u'%s and whitespace symbols are forbidden'
+            self.message = lazy_gettext('%s and whitespace symbols are forbidden'
                                         % self.not_valid_chars.strip())
         else:  # pragma: no cover
             self.message = message
@@ -93,7 +93,7 @@ class CommaSeparatedIntegers(object):
     def __init__(self, message=None):
         if not message:
             self.message = lazy_gettext(
-                u'Only comma separated values are allowed, no spaces')
+                'Only comma separated values are allowed, no spaces')
 
         else:  # pragma: no cover
             self.message = message
@@ -109,7 +109,7 @@ class Webhook(object):
 
     def __init__(self, message=None):
         if not message:
-            self.message = lazy_gettext(u'Invalid URL')
+            self.message = lazy_gettext('Invalid URL')
 
         else:  # pragma: no cover
             self.message = message
@@ -121,7 +121,7 @@ class Webhook(object):
                 if r.status_code != 200:
                     raise ValidationError(self.message)
         except requests.exceptions.ConnectionError:
-            raise ValidationError(lazy_gettext(u"Connection error"))
+            raise ValidationError(lazy_gettext("Connection error"))
 
 
 class ReservedName(object):
@@ -131,7 +131,7 @@ class ReservedName(object):
     def __init__(self, blueprint, message=None):
         self.blueprint = blueprint
         if not message:  # pragma: no cover
-            message = lazy_gettext(u'This name is used by the system.')
+            message = lazy_gettext('This name is used by the system.')
         self.message = message
 
     def __call__(self, form, field):
@@ -203,7 +203,7 @@ class TimeFieldsValidator(object):
 class UserTypeValiadator(object):
     def __init__(self, message=None):
         if not message:
-            message = message = lazy_gettext(u'Invalid data access')
+            message = message = lazy_gettext('Invalid data access')
         self.message = message
 
     def __call__(self, form, field):
@@ -211,7 +211,7 @@ class UserTypeValiadator(object):
         access_levels = field.data
         valid, valid_data_access = valid_user_type_based_data_access(user_type, access_levels)
         if not valid:
-            self.message = lazy_gettext(u'Invalid data access {}. Valid data access(s) for user type {} are {}'
+            self.message = lazy_gettext('Invalid data access {}. Valid data access(s) for user type {} are {}'
                 .format(','.join(access_levels), user_type, ', '.join(valid_data_access)))
             raise ValidationError(self.message)
 

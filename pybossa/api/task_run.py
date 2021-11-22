@@ -33,7 +33,7 @@ from flask import current_app as app
 from flask_login import current_user
 from werkzeug.exceptions import Forbidden, BadRequest
 
-from api_base import APIBase
+from .api_base import APIBase
 from pybossa.model.task_run import TaskRun
 from pybossa.util import get_user_id_or_ip
 from pybossa.core import task_repo, sentinel, anonymizer, project_repo, user_repo, task_repo
@@ -194,7 +194,7 @@ class TaskRunAPI(APIBase):
 def _upload_files_from_json(task_run_info, upload_path, with_encryption):
     if not isinstance(task_run_info, dict):
         return
-    for key, value in task_run_info.iteritems():
+    for key, value in task_run_info.items():
         if key.endswith('__upload_url'):
             filename = value.get('filename')
             content = value.get('content')

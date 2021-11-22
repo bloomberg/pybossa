@@ -22,7 +22,7 @@ This package adds GET method for:
     * users
 
 """
-from api_base import APIBase, error, jsonpify, ratelimits, ratelimit
+from .api_base import APIBase, error, jsonpify, ratelimits, ratelimit
 from pybossa.model.user import User
 from werkzeug.exceptions import MethodNotAllowed, Forbidden
 from flask import request
@@ -68,7 +68,7 @@ class UserAPI(APIBase):
             return tmp
         else:
             privacy = self._is_user_private(user_data)
-            for attribute in user_data.keys():
+            for attribute in list(user_data.keys()):  # make a copy of views
                 self._remove_attribute_if_private(attribute, user_data, privacy)
             return user_data
 

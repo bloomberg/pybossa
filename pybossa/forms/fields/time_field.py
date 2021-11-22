@@ -17,15 +17,13 @@
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
 
-
-from __future__ import absolute_import
-
 import datetime
 import time
 
 from wtforms.fields import Field
 
 from wtforms_components.widgets import TimeInput
+
 
 class TimeField(Field):
     widget = TimeInput()

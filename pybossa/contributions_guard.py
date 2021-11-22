@@ -47,7 +47,9 @@ class ContributionsGuard(object):
     def retrieve_timestamp(self, task, user):
         """Get the cached timestamp for a task requested by a user."""
         key = self._create_key(task, user)
-        return self.conn.get(key)
+        timestamp = self.conn.get(key)
+        # If timestamp is not None, convert it to unicode string
+        return timestamp and timestamp.decode()
 
     def _create_key(self, task, user):
         """Create a Redis key for a given task and a user."""
@@ -77,7 +79,9 @@ class ContributionsGuard(object):
     def retrieve_presented_timestamp(self, task, user):
         """Get the cached timestamp for a task presented to a user."""
         key = self._create_presented_time_key(task, user)
-        return self.conn.get(key)
+        timestamp = self.conn.get(key)
+        # If timestamp is not None, convert it to unicode string
+        return timestamp and timestamp.decode()
 
     def _create_presented_time_key(self, task, user):
         """Create a Redis key for the presented time of a given task

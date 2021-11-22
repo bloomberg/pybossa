@@ -18,18 +18,18 @@
 
 from datetime import date, timedelta
 from wtforms import ValidationError
-from nose.tools import raises, assert_raises
+from nose.tools import raises
 from flask import current_app
 
-from default import Test, db, with_context
+from test import Test, db, with_context, with_request_context
 from pybossa.forms.forms import (RegisterForm, LoginForm, EMAIL_MAX_LENGTH,
     USER_NAME_MAX_LENGTH, USER_FULLNAME_MAX_LENGTH, BulkTaskLocalCSVImportForm,
     RegisterFormWithUserPrefMetadata, UserPrefMetadataForm,
     ProjectReportForm, ProjectForm)
 from pybossa.forms import validator
 from pybossa.repositories import UserRepository
-from factories import UserFactory
-from mock import patch, MagicMock
+from test.factories import UserFactory
+from unittest.mock import patch, MagicMock
 from werkzeug.datastructures import MultiDict
 import six
 from pybossa.forms.dynamic_forms import dynamic_project_form
@@ -69,7 +69,7 @@ class TestValidator(Test):
             u = validator.CommaSeparatedIntegers()
             u.__call__(f, f.email)
 
-    @with_context
+    @with_request_context
     @raises(ValidationError)
     def test_reserved_names_account_signin(self):
         """Test VALIDATOR ReservedName for account URLs"""
@@ -78,7 +78,7 @@ class TestValidator(Test):
         val = validator.ReservedName('account', current_app)
         val(form, form.name)
 
-    @with_context
+    @with_request_context
     @raises(ValidationError)
     def test_reserved_names_project_published(self):
         """Test VALIDATOR ReservedName for project URLs"""
@@ -87,7 +87,7 @@ class TestValidator(Test):
         val = validator.ReservedName('project', current_app)
         val(form, form.name)
 
-    @with_context
+    @with_request_context
     @raises(ValidationError)
     def test_check_password_strength(self):
         """Test VALIDATOR CheckPasswordStrength for new user password"""
@@ -96,7 +96,7 @@ class TestValidator(Test):
         u = validator.CheckPasswordStrength()
         u.__call__(form, form.password)
 
-    @with_context
+    @with_request_context
     @raises(ValidationError)
     def test_check_password_strength_custom_message(self):
         """Test VALIDATOR CheckPasswordStrength with custom message """
@@ -105,7 +105,7 @@ class TestValidator(Test):
         u = validator.CheckPasswordStrength(message='custom message')
         u.__call__(form, form.password)
 
-    @with_context
+    @with_request_context
     def test_check_password_strength_no_policy(self):
         """Test VALIDATOR CheckPasswordStrength with no password policy """
         form = RegisterForm()
@@ -179,20 +179,20 @@ class TestRegisterForm(Test):
 
     fields = ['fullname', 'name', 'email_addr', 'password', 'confirm']
 
-    @with_context
+    @with_request_context
     def test_register_form_contains_fields(self):
         form = RegisterForm()
 
         for field in self.fields:
             assert form.__contains__(field), 'Field %s is not in form' %field
 
-    @with_context
+    @with_request_context
     def test_register_form_validates_with_valid_fields(self):
         form = RegisterForm(**self.fill_in_data)
 
         assert form.validate()
 
-    @with_context
+    @with_request_context
     def test_register_form_unique_name(self):
         form = RegisterForm(**self.fill_in_data)
         user = UserFactory.create(name='mylion')
@@ -200,7 +200,7 @@ class TestRegisterForm(Test):
         assert not form.validate()
         assert "The user name is already taken" in form.errors['name'], form.errors
 
-    @with_context
+    @with_request_context
     def test_register_name_length(self):
         self.fill_in_data['name'] = 'a'
         form = RegisterForm(**self.fill_in_data)
@@ -209,7 +209,7 @@ class TestRegisterForm(Test):
         assert not form.validate()
         assert error_message in form.errors['name'], form.errors
 
-    @with_context
+    @with_request_context
     def test_register_name_allowed_chars(self):
         self.fill_in_data['name'] = '$#&amp;\/|'
         form = RegisterForm(**self.fill_in_data)
@@ -217,16 +217,16 @@ class TestRegisterForm(Test):
         assert not form.validate()
         assert "$#&\\/| and whitespace symbols are forbidden" in form.errors['name'], form.errors
 
-    @with_context
+    @with_request_context
     def test_register_name_reserved_name(self):
         self.fill_in_data['name'] = 'signin'
 
         form = RegisterForm(**self.fill_in_data)
 
         assert not form.validate()
-        assert u'This name is used by the system.' in form.errors['name'], form.errors
+        assert 'This name is used by the system.' in form.errors['name'], form.errors
 
-    @with_context
+    @with_request_context
     def test_register_form_unique_email(self):
         form = RegisterForm(**self.fill_in_data)
         user = UserFactory.create(email_addr='tyrion@casterly.rock')
@@ -236,12 +236,12 @@ class TestRegisterForm(Test):
 
     @with_context
     def test_register_form_email_unicode(self):
-        self.fill_in_data['email_addr'] = u'tyrion@casterly.rock'
+        self.fill_in_data['email_addr'] = 'tyrion@casterly.rock'
         form = RegisterForm(**self.fill_in_data)
 
         assert form.validate()
 
-    @with_context
+    @with_request_context
     def test_register_form_unique_email_case_insensitive(self):
         self.fill_in_data['email_addr'] = 'TYRION@CASTERLY.ROCK'
         form = RegisterForm(**self.fill_in_data)
@@ -250,16 +250,16 @@ class TestRegisterForm(Test):
         assert not form.validate()
         assert "Email is already taken" in form.errors['email_addr'], form.errors
 
-    @with_context
+    @with_request_context
     def test_register_form_unique_email_case_insensitive_unicode(self):
-        self.fill_in_data['email_addr'] = u'TYRION@CASTERLY.ROCK'
+        self.fill_in_data['email_addr'] = 'TYRION@CASTERLY.ROCK'
         form = RegisterForm(**self.fill_in_data)
         user = UserFactory.create(email_addr='tyrion@casterly.rock')
 
         assert not form.validate()
         assert "Email is already taken" in form.errors['email_addr'], form.errors
 
-    @with_context
+    @with_request_context
     def test_register_email_length(self):
         self.fill_in_data['email_addr'] = ''
         form = RegisterForm(**self.fill_in_data)
@@ -268,7 +268,7 @@ class TestRegisterForm(Test):
         assert not form.validate()
         assert error_message in form.errors['email_addr'], form.errors
 
-    @with_context
+    @with_request_context
     def test_register_email_valid_format(self):
         self.fill_in_data['email_addr'] = 'notanemail'
         form = RegisterForm(**self.fill_in_data)
@@ -276,7 +276,7 @@ class TestRegisterForm(Test):
         assert not form.validate()
         assert "Invalid email address." in form.errors['email_addr'], form.errors
 
-    @with_context
+    @with_request_context
     def test_register_fullname_length(self):
         self.fill_in_data['fullname'] = 'a'
         form = RegisterForm(**self.fill_in_data)
@@ -285,7 +285,7 @@ class TestRegisterForm(Test):
         assert not form.validate()
         assert error_message in form.errors['fullname'], form.errors
 
-    @with_context
+    @with_request_context
     def test_register_password_required(self):
         self.fill_in_data['password'] = ''
         form = RegisterForm(**self.fill_in_data)
@@ -293,7 +293,7 @@ class TestRegisterForm(Test):
         assert not form.validate()
         assert "Password cannot be empty" in form.errors['password'], form.errors
 
-    @with_context
+    @with_request_context
     def test_register_password_missmatch(self):
         self.fill_in_data['confirm'] = 'badpasswd'
         form = RegisterForm(**self.fill_in_data)
@@ -301,13 +301,13 @@ class TestRegisterForm(Test):
         assert not form.validate()
         assert "Passwords must match" in form.errors['password'], form.errors
 
-    @with_context
+    @with_request_context
     def test_register_password_valid_password(self):
         self.fill_in_data['password'] = self.fill_in_data['confirm'] = 'Abcd12345!'
         form = RegisterForm(**self.fill_in_data)
         assert form.validate()
 
-    @with_context
+    @with_request_context
     def test_generate_password(self):
         data = dict(**self.fill_in_data)
         data.pop('password')
@@ -324,7 +324,7 @@ class TestBulkTaskLocalCSVForm(Test):
         super(TestBulkTaskLocalCSVForm, self).setUp()
         self.form_data = {'csv_filename': 'sample.csv'}
 
-    @with_context
+    @with_request_context
     @patch('pybossa.forms.forms.request')
     def test_import_request_with_no_file_returns_none(self, mock_request):
         mock_request.method = 'POST'
@@ -333,7 +333,7 @@ class TestBulkTaskLocalCSVForm(Test):
         return_value = form.get_import_data()
         assert return_value['type'] is 'localCSV' and return_value['csv_filename'] is None
 
-    @with_context
+    @with_request_context
     @patch('pybossa.forms.forms.request')
     def test_import_blank_local_csv_file_returns_none(self, mock_request):
         mock_request.method = 'POST'
@@ -342,9 +342,9 @@ class TestBulkTaskLocalCSVForm(Test):
         mock_request.files = dict(file=mock_file)
         form = BulkTaskLocalCSVImportForm(**self.form_data)
         return_value = form.get_import_data()
-        assert return_value['type'] is 'localCSV' and return_value['csv_filename'] is None
+        assert return_value['type'] == 'localCSV' and return_value['csv_filename'] is None
 
-    @with_context
+    @with_request_context
     @patch('pybossa.forms.forms.request')
     def test_import_invalid_local_csv_file_ext_returns_none(self, mock_request):
         mock_request.method = 'POST'
@@ -353,12 +353,14 @@ class TestBulkTaskLocalCSVForm(Test):
         mock_request.files = dict(file=mock_file)
         form = BulkTaskLocalCSVImportForm(**self.form_data)
         return_value = form.get_import_data()
-        assert return_value['type'] is 'localCSV' and return_value['csv_filename'] is None
+        assert return_value['type'] == 'localCSV' and return_value['csv_filename'] is None
 
-    @with_context
+    @with_request_context
     @patch('pybossa.util.s3_upload_file_storage')
     @patch('pybossa.forms.forms.request')
-    @patch('pybossa.forms.forms.current_user')
+    @patch('pybossa.util.current_user')
+    # using 'pybossa.forms.forms.current_user' will cause current_user
+    # becoming anonymous in pybossa.util
     def test_import_upload_path_works(self, mock_user, mock_request,
                                       mock_upload):
         url = 'https://s3.amazonaws.com/bucket/hello.csv'
@@ -372,7 +374,7 @@ class TestBulkTaskLocalCSVForm(Test):
             mock_request.files = dict(file=mock_file)
             form = BulkTaskLocalCSVImportForm(**self.form_data)
             return_value = form.get_import_data()
-            assert return_value['type'] is 'localCSV', return_value
+            assert return_value['type'] == 'localCSV', return_value
             assert return_value['csv_filename'] == url, return_value
 
 
@@ -394,7 +396,7 @@ class TestRegisterFormWithUserPrefMetadata(Test):
                                     timezones=[("", ""), ("ACT", "Australia Central Time")],
                                     user_types=[("Researcher", "Researcher"), ("Analyst", "Analyst")])
 
-    @with_context
+    @with_request_context
     def test_register_form_with_upref_mdata_contains_fields(self):
         form = RegisterFormWithUserPrefMetadata()
 
@@ -470,14 +472,14 @@ class TestRegisterFormWithUserPrefMetadata(Test):
                         'work_hours_to':
                             ['Work Hours From, Work Hours To, and Timezone must be filled out for submission'],
                         'locations':
-                            [u"'someloc' is not a valid choice for this field"],
+                            ["'someloc' is not a valid choice for this field"],
                         'user_type':
-                            [u'Not a valid choice'],
+                            ['Not a valid choice'],
                         'languages':
-                            [u"'somelang' is not a valid choice for this field"],
+                            ["'somelang' is not a valid choice for this field"],
                         'work_hours_from':
                             ['Work Hours From, Work Hours To, and Timezone must be filled out for submission'],
                         'timezone':
-                            [u'Not a valid choice', 'Work Hours From, Work Hours To, and Timezone must be filled out for submission']
+                            ['Not a valid choice', 'Work Hours From, Work Hours To, and Timezone must be filled out for submission']
                         }
         assert form.errors == expected_form_errors

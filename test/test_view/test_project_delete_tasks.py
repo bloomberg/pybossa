@@ -15,17 +15,13 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-import json
-from mock import patch
 
-from default import db, with_context
-from factories import ProjectFactory, TaskFactory, UserFactory, TaskRunFactory
-from helper import web
-from helper.gig_helper import make_subadmin, make_admin
-from pybossa.repositories import UserRepository, ProjectRepository, TaskRepository, WebhookRepository, ResultRepository
-from pybossa.view.projects import render_template, task_queue
-from pybossa.cache import projects as cached_projects
-
+from pybossa.repositories import UserRepository, ProjectRepository, \
+    TaskRepository, WebhookRepository, ResultRepository
+from pybossa.view.projects import task_queue
+from test import db, with_context
+from test.factories import ProjectFactory, TaskFactory, UserFactory
+from test.helper import web
 
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)
@@ -59,7 +55,7 @@ class TestProjectDeleteTasks(web.Helper):
         expected = "Tasks and taskruns with no associated results have been deleted"
         resp = self.app.post('/project/%s/tasks/delete' % project.short_name,
                              follow_redirects=True, data={'force_reset': 'on'})
-        assert expected in resp.data
+        assert expected in str(resp.data)
         tasks = task_repo.filter_tasks_by(project_id=project.id)
         assert len(tasks) == 0
 
@@ -77,7 +73,7 @@ class TestProjectDeleteTasks(web.Helper):
         expected = "You will receive an email when the tasks deletion is complete."
         resp = self.app.post('/project/%s/tasks/delete' % project.short_name,
                              follow_redirects=True, data={'force_reset': 'on'})
-        assert expected in resp.data
+        assert expected in str(resp.data)
         tasks = task_repo.filter_tasks_by(project_id=project.id)
         # deletion task added to queue
         assert len(task_queue) == 1

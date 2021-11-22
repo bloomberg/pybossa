@@ -37,9 +37,15 @@ class ProjectRepository(Repository):
 
     # Methods for Project objects
     def get(self, id):
+        # bytes to unicode string
+        if type(id) == bytes:
+            id = id.decode()
         return self.db.session.query(Project).get(id)
 
     def get_by_shortname(self, short_name):
+        # bytes to unicode string
+        if type(short_name) == bytes:
+            short_name = short_name.decode()
         return self.db.session.query(Project).filter_by(short_name=short_name).first()
 
     def get_by(self, **attributes):

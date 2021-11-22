@@ -30,6 +30,9 @@ class BlogRepository(Repository):
         self.db = db
 
     def get(self, id):
+        # bytes to unicode string
+        if type(id) == bytes:
+            id = id.decode()
         return self.db.session.query(Blogpost).get(id)
 
     def get_by(self, **attributes):

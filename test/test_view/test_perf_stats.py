@@ -1,9 +1,8 @@
 import json
-from mock import patch
 
-from default import db, with_context
-from factories import ProjectFactory, UserFactory, TaskRunFactory, PerformanceStatsFactory
-from helper import web
+from test import db, with_context
+from test.factories import ProjectFactory, UserFactory, TaskRunFactory, PerformanceStatsFactory
+from test.helper import web
 from pybossa.repositories import ProjectRepository, UserRepository, PerformanceStatsRepository
 
 project_repo = ProjectRepository(db)
@@ -18,7 +17,7 @@ class TestPerfStats(web.Helper):
         project = ProjectFactory.create(published=True)
         url = '/project/%s/performancestats?api_key=%s' % (project.short_name, project.owner.api_key)
         res = self.app.get(url)
-        assert 'Performance Statistics' in res.data, res.data
+        assert 'Performance Statistics' in str(res.data), res.data
 
     @with_context
     def test_not_owner_has_access_to_own_stats(self):

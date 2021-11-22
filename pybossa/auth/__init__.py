@@ -19,27 +19,26 @@
 import inspect
 from flask import abort
 from flask_login import current_user
-from pybossa.core import announcement_repo, task_repo, project_repo, result_repo
-from pybossa.core import project_stats_repo
+from pybossa.core import task_repo, project_repo, result_repo
 from pybossa.auth.errcodes import *
 
 import jwt
 from flask import jsonify
 from jwt import exceptions
 
-import project
-import projectstats
-import task
-import taskrun
-import category
-import user
-import token
-import announcement
-import blogpost
-import auditlog
-import webhook
-import result
-import helpingmaterial
+from . import project
+from . import projectstats
+from . import task
+from . import taskrun
+from . import category
+from . import user
+from . import token
+from . import announcement
+from . import blogpost
+from . import auditlog
+from . import webhook
+from . import result
+from . import helpingmaterial
 from pybossa.auth import performancestats
 assert project
 assert projectstats
@@ -122,16 +121,24 @@ def jwt_authorize_project(project, payload):
             return handle_error(INVALID_HEADER_MISSING)
         parts = payload.split()
 
-        if parts[0].lower() != 'bearer':
+        # payload can be either str or bytes
+        if type(parts[0]) == bytes:
+            b = parts[0].lower()
+        else:
+            b = str(parts[0].lower()).encode()
+
+        if b != b'bearer':
             return handle_error(INVALID_HEADER_BEARER)
         elif len(parts) == 1:
             return handle_error(INVALID_HEADER_TOKEN)
         elif len(parts) > 2:
             return handle_error(INVALID_HEADER_BEARER_TOKEN)
 
+        # jwt.decode accepts 'algorithms' arguments, not 'algorithm'
+        # Reference: https://pyjwt.readthedocs.io/en/stable/api.html#jwt.decode
         data = jwt.decode(parts[1],
                           project.secret_key,
-                          'H256')
+                          algorithms=['HS256'])
         if (data['project_id'] == project.id
             and data['short_name'] == project.short_name):
             return True

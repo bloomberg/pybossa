@@ -16,14 +16,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import db, with_context
-from test_api import TestAPI, get_pwd_cookie
-from mock import patch, call
-from factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory
 
 from pybossa.repositories import ProjectRepository
-from pybossa.repositories import TaskRepository
 from pybossa.repositories import ResultRepository
+from pybossa.repositories import TaskRepository
+from test import db, with_context
+from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, \
+    UserFactory
+from test.test_api import TestAPI, get_pwd_cookie
 
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)

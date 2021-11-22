@@ -16,10 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-#from default import db
-from mock import Mock, MagicMock, PropertyMock
-from pyrax.fakes import FakeContainer
-
+from unittest.mock import MagicMock, PropertyMock
 
 fake_container = MagicMock()
 fake_container.make_public.return_value = True

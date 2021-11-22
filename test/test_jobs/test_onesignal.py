@@ -17,12 +17,13 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from pybossa.jobs import push_notification
-from default import Test, with_context
-from mock import patch, MagicMock, call
-from factories import ProjectFactory, UserFactory, CategoryFactory
-from pybossa.core import project_repo
+from unittest.mock import patch
+
 from flask import url_for
+
+from pybossa.jobs import push_notification
+from test import Test, with_context
+from test.factories import ProjectFactory, UserFactory, CategoryFactory
 
 
 class TestOnesignal(Test):

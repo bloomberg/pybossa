@@ -16,13 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import db, with_context
-from nose.tools import assert_equal
-from test_api import TestAPI
-
-from factories import TaskFactory, UserFactory
 
 from pybossa.repositories import TaskRepository
+from test import db, with_context
+from test.factories import TaskFactory, UserFactory
+from test.test_api import TestAPI
 
 task_repo = TaskRepository(db)
 
@@ -184,7 +182,7 @@ class TestFavoritesAPI(TestAPI):
         task = TaskFactory.create()
         url = self.url + '?api_key=%s' % user.api_key
         res = self.app.post(url, data=json.dumps(dict(task_id=task.id, id=3)))
-        print res.data
+        print(res.data)
         data = json.loads(res.data)
         assert res.status_code == 415, res.status_code
         assert data['status_code'] == 415, data

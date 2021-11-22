@@ -120,7 +120,7 @@ class Repository(object):
         else:
             if type(info) == dict:
                 clauses.append(_entity_descriptor(model, 'info') == info)
-            if type(info) == str or type(info) == unicode:
+            if type(info) == str or type(info) == str:
                 try:
                     info = json.loads(info)
                     if type(info) == int or type(info) == float:
@@ -252,17 +252,17 @@ class Repository(object):
         return query.all()
 
 
-from project_repository import ProjectRepository
-from project_stats_repository import ProjectStatsRepository
-from user_repository import UserRepository
-from announcement_repository import AnnouncementRepository
-from blog_repository import BlogRepository
-from task_repository import TaskRepository
-from auditlog_repository import AuditlogRepository
-from webhook_repository import WebhookRepository
-from result_repository import ResultRepository
-from helping_repository import HelpingMaterialRepository
-from performance_stats_repository import PerformanceStatsRepository
+from .project_repository import ProjectRepository
+from .project_stats_repository import ProjectStatsRepository
+from .user_repository import UserRepository
+from .announcement_repository import AnnouncementRepository
+from .blog_repository import BlogRepository
+from .task_repository import TaskRepository
+from .auditlog_repository import AuditlogRepository
+from .webhook_repository import WebhookRepository
+from .result_repository import ResultRepository
+from .helping_repository import HelpingMaterialRepository
+from .performance_stats_repository import PerformanceStatsRepository
 
 assert ProjectRepository
 assert ProjectStatsRepository

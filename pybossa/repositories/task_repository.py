@@ -43,6 +43,9 @@ class TaskRepository(Repository):
 
     # Methods for queries on Task objects
     def get_task(self, id):
+        # bytes to unicode string
+        if type(id) == bytes:
+            id = id.decode()
         return self.db.session.query(Task).get(id)
 
     def get_task_by(self, **attributes):
@@ -63,12 +66,12 @@ class TaskRepository(Repository):
         filters.pop('state', None) # exclude state param
         if exp is not None:
             query = self.db.session.query(Task).\
-                filter(or_(Task.state == u'completed', Task.calibration == 1)).\
+                filter(or_(Task.state == 'completed', Task.calibration == 1)).\
                 filter(Task.exported == exp).\
                 filter_by(**filters)
         else:
             query = self.db.session.query(Task).\
-                filter(or_(Task.state == u'completed', Task.calibration == 1)).\
+                filter(or_(Task.state == 'completed', Task.calibration == 1)).\
                 filter_by(**filters)
 
         results = self._filter_query(query, Task, limit, offset, last_id, yielded, desc)
@@ -89,7 +92,7 @@ class TaskRepository(Repository):
 
         query = self.db.session.query(TaskRun).join(Task).\
             filter(TaskRun.task_id == Task.id).\
-            filter(or_(Task.state == u'completed', Task.calibration == 1)).\
+            filter(or_(Task.state == 'completed', Task.calibration == 1)).\
             filter(*conditions).\
             filter_by(**filters)
 

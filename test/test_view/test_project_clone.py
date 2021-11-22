@@ -17,11 +17,12 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 from bs4 import BeautifulSoup
 
-from default import Test, db, with_context
-from helper.web import Helper
-from factories import ProjectFactory, UserFactory
-from mock import patch
+from test import with_context
+from test.helper.web import Helper
+from test.factories import ProjectFactory, UserFactory
+from unittest.mock import patch
 from pybossa.core import project_repo
+
 
 class TestProjectClone(Helper):
 
@@ -66,7 +67,7 @@ class TestProjectClone(Helper):
         url = '/project/%s/clone?api_key=%s' % (project.short_name, project.owner.api_key)
         res = self.app.post(url, data=data)
         assert res.status_code == 200, res.data
-        assert 'Please correct the errors' in res.data, res.data
+        assert 'Please correct the errors' in str(res.data), res.data
 
     @with_context
     def test_clone_project_copy_assigned_users(self):

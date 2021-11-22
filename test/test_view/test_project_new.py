@@ -15,12 +15,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from bs4 import BeautifulSoup
 
-from default import with_context
+from test import with_context
 from flask import current_app
-from helper.web import Helper
-from factories import UserFactory
+from test.helper.web import Helper
+from test.factories import UserFactory
 
 
 class TestProjectNew(Helper):
@@ -37,7 +36,7 @@ class TestProjectNew(Helper):
         finally:
             # Reset the key value so that not affecting other tests
             current_app.config['DATA_CLASSIFICATION'] = data_classification
-            print(current_app.config['DATA_CLASSIFICATION'])
+            print((current_app.config['DATA_CLASSIFICATION']))
 
         assert res.status_code == 200, res.data
 

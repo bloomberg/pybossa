@@ -16,14 +16,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, with_context, flask_app
+from test import Test, with_context, flask_app
 from pybossa.jobs import import_tasks, task_repo, get_autoimport_jobs
-from pybossa.model.task import Task
 from pybossa.importers import ImportReport
-from factories import ProjectFactory, TaskFactory, UserFactory
-from mock import patch
+from test.factories import ProjectFactory, UserFactory
+from unittest.mock import patch
 from rq.timeouts import JobTimeoutException
 from nose.tools import assert_raises
+
 
 class TestImportTasksJob(Test):
 
@@ -104,7 +104,7 @@ class TestImportTasksJob(Test):
                  'It was able to process approximately {} tasks.',
                  'Please break up your task upload into smaller CSV files.',
                  'Thank you,\n',
-                 u'The {} team.']).format(project.name, uploader_name,
+                 'The {} team.']).format(project.name, uploader_name,
                                          0, self.flask_app.config['BRAND'])
 
             email_data = dict(recipients=[project.owner.email_addr],
@@ -121,10 +121,10 @@ class TestImportTasksJob(Test):
         project = ProjectFactory.create()
         form_data = {'type': 'csv', 'csv_url': 'http://google.es'}
         subject = 'Tasks Import to your project %s' % project.name
-        msg = (u'Import tasks to your project {0} by {1} failed. Error: Very bad very bad'
+        msg = ('Import tasks to your project {0} by {1} failed. Error: Very bad very bad'
                .format(project.name, uploader_name))
         with patch.dict(self.flask_app.config, {'BRAND': 'GOT'}):
-            body = (u'Hello,\n\n{0}\n\nPlease contact {1} administrator,\nThe {1} team.'
+            body = ('Hello,\n\n{0}\n\nPlease contact {1} administrator,\nThe {1} team.'
                     .format(msg, self.flask_app.config['BRAND']))
 
             email_data = dict(recipients=[project.owner.email_addr],

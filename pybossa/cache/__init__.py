@@ -32,7 +32,7 @@ from functools import wraps
 from pybossa.core import sentinel
 
 try:
-    import cPickle as pickle
+    import pickle as pickle
 except ImportError:  # pragma: no cover
     import pickle
 
@@ -67,9 +67,9 @@ def get_key_to_hash(*args, **kwargs):
     key_to_hash = ""
     # First args
     for i in args:
-        key_to_hash += u":%s" % i
+        key_to_hash += ":%s" % i
     # Attach any kwargs
-    for key in sorted(kwargs.iterkeys()):
+    for key in sorted(kwargs.keys()):
         key_to_hash += ":%s" % kwargs[key]
     return key_to_hash
 
@@ -90,7 +90,7 @@ def add_key_to_cache_groups(key_to_add, cache_group_keys_arg, *args, **kwargs):
         cache_group_key = None
         if isinstance(cache_group_key_arg, list):
             cache_group_key = '_'.join(str(args[i]) for i in cache_group_key_arg)
-        elif isinstance(cache_group_key_arg, basestring):
+        elif isinstance(cache_group_key_arg, str):
             cache_group_key = cache_group_key_arg
         elif callable(cache_group_key_arg):
             cache_group_key = cache_group_key_arg(*args, **kwargs)
