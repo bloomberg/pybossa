@@ -50,8 +50,6 @@ def notify_news_admins():
     user_repo = UserRepository(db)
     admins = user_repo.filter_by(admin=True)
 
-    print("notify_news_admins")
-    print(admins)
     for admin in admins:
         key = NOTIFY_ADMIN + str(admin.id)
         sentinel.master.set(key, 1)

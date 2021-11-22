@@ -52,7 +52,6 @@ class TestMaintenance(Test):
         msg = "You have not failed the system"
         assert msg == response, response
 
-    # TODO: RDISCROWD-4605 TypeError: missing a required argument: 'connection'
     @with_context
     @patch('pybossa.jobs.send_mail')
     @patch('rq.requeue_job', autospec=True)

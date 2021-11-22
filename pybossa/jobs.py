@@ -1143,14 +1143,12 @@ def news():
     for url in urls:
         d = feedparser.parse(url)
         tmp = get_news(score)
-        print(url)
         if (d.entries and (len(tmp) == 0)
            or (tmp[0]['updated'] != d.entries[0]['updated'])):
             mapping = dict()
             mapping[pickle.dumps(d.entries[0])] = float(score)
             sentinel.master.zadd(FEED_KEY, mapping)
             notify = True
-            print("changing notify = true")
 
         score += 1
     if notify:

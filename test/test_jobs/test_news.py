@@ -37,7 +37,6 @@ class TestNews(Test):
         key = "notify:admin:%s" % user.id
         return sentinel.master.delete(key)
 
-    # TODO: RDISCROWD-4605
     @with_context
     @patch('feedparser.parse')
     def test_news(self, feedparser_mock):
@@ -50,8 +49,6 @@ class TestNews(Test):
         err_msg = "Notify user should be notified"
         assert self.get_notify_users(user).decode() == '1', self.get_notify_users(user)
 
-
-    # TODO: RDISCROWD-4605
     @with_context
     @patch('feedparser.parse')
     def test_news_no_new_items(self, feedparser_mock):

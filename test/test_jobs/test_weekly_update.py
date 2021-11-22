@@ -165,7 +165,6 @@ class TestWeeklyStats(Test):
 
 class TestWeeklyReport(Test):
 
-    # TODO: RDISCROWD-4605 get_weekly_admin_report_jobs returns empty iterator
     @with_context
     @patch('pybossa.jobs.datetime')
     def test_get_jobs_on_monday(self, mock_datetime):
@@ -190,7 +189,6 @@ class TestWeeklyReport(Test):
         jobs = get_weekly_admin_report_jobs()
         assert_raises(StopIteration, jobs.__next__)
 
-    # TODO: RDISCROWD-4605 get_weekly_admin_report_jobs return empty iterator
     @with_context
     @patch('pybossa.jobs.datetime')
     def test_get_jobs_only_on_monday_variant(self, mock_datetime):
