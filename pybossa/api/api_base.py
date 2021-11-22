@@ -46,7 +46,8 @@ from pybossa.model import DomainObject, announcement
 from pybossa.model.task import Task
 from pybossa.cache.projects import clean_project
 from pybossa.cache.users import delete_user_summary_id
-from pybossa.cache.categories import reset
+from pybossa.cache.categories import reset as reset_categories
+from pybossa.cache.announcements import reset as reset_announcements
 
 repos = {'Task': {'repo': task_repo, 'filter': 'filter_tasks_by',
                   'get': 'get_task', 'save': 'save', 'update': 'update',
@@ -83,7 +84,8 @@ repos = {'Task': {'repo': task_repo, 'filter': 'filter_tasks_by',
 
 caching = {'Project': {'refresh': clean_project},
            'User': {'refresh': delete_user_summary_id},
-           'Category': {'refresh': reset}}
+           'Category': {'refresh': reset_categories},
+           'Announcement': {'refresh': reset_announcements}}
 
 cors_headers = ['Content-Type', 'Authorization']
 
@@ -105,10 +107,10 @@ class APIBase(MethodView):
     def refresh_cache(self, cls_name, oid):
         """Refresh the cache."""
         if caching.get(cls_name):
-           if cls_name != 'Category':
-              caching.get(cls_name)['refresh'](oid)
-           else:
-              caching.get(cls_name)['refresh']
+            if cls_name not in ['Category', 'Announcement']:
+                caching.get(cls_name)['refresh'](oid)
+            else:
+                caching.get(cls_name)['refresh']()
 
     def valid_args(self):
         """Check if the domain object args are valid."""
