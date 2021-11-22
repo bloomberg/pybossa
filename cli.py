@@ -251,7 +251,6 @@ def bootstrap_avatars():
                             print("Something failed, this project will use the placehoder.")
 
 
-
 def resize_avatars():
     """Resize avatars to 512px."""
     pass
