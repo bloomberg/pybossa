@@ -44,6 +44,8 @@ except ImportError:  # pragma: no cover
     REDIS_KEYPREFIX = settings.REDIS_KEYPREFIX
     os.environ['PYBOSSA_REDIS_CACHE_DISABLED'] = '1'
 
+DEFAULT_TIMEOUT = 300
+MIN_TIMEOUT = 1
 ONE_DAY = 24 * 60 * 60
 ONE_HOUR = 60 * 60
 HALF_HOUR = 30 * 60
@@ -114,7 +116,9 @@ def cache(key_prefix, timeout=300, cache_group_keys=None):
 
     """
     if timeout is None:
-        timeout = 300
+        timeout = DEFAULT_TIMEOUT
+    elif timeout < MIN_TIMEOUT:
+        timeout = MIN_TIMEOUT
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -143,7 +147,9 @@ def memoize(timeout=300, cache_group_keys=None):
 
     """
     if timeout is None:
-        timeout = 300
+        timeout = DEFAULT_TIMEOUT
+    elif timeout < MIN_TIMEOUT:
+        timeout = MIN_TIMEOUT
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -176,7 +182,9 @@ def memoize_essentials(timeout=300, essentials=None, cache_group_keys=None):
 
     """
     if timeout is None:
-        timeout = 300
+        timeout = DEFAULT_TIMEOUT
+    elif timeout < MIN_TIMEOUT:
+        timeout = MIN_TIMEOUT
     if essentials is None:
         essentials = []
     def decorator(f):
