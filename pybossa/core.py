@@ -97,12 +97,36 @@ def create_app(run_as_server=True):
     setup_schedulers(app)
     return app
 
+# construct rq_dashboard config
+RQ_DASHBOARD_LEGACY_CONFIG_OPTIONS = {
+    "REDIS_URL": "RQ_DASHBOARD_REDIS_URL",
+    "REDIS_HOST": "RQ_DASHBOARD_REDIS_HOST",
+    "REDIS_PORT": "RQ_DASHBOARD_REDIS_PORT",
+    "REDIS_PASSWORD": "RQ_DASHBOARD_REDIS_PASSWORD",
+    "REDIS_DB": "RQ_DASHBOARD_REDIS_DB",
+    "REDIS_SENTINELS": "RQ_DASHBOARD_REDIS_SENTINELS",
+    "REDIS_MASTER_NAME": "RQ_DASHBOARD_REDIS_MASTER_NAME",
+    "RQ_POLL_INTERVAL": "RQ_DASHBOARD_POLL_INTERVAL",
+    "WEB_BACKGROUND": "RQ_DASHBOARD_WEB_BACKGROUND",
+    "DELETE_JOBS": "RQ_DASHBOARD_DELETE_JOBS",
+}
+
+def upgrade_rq_config(config):
+    """
+    rq_dashboard requires specific parameter name in config: https://pypi.org/project/rq-dashboard/
+    old configuration options will be deprecated soon so updates old options with new ones.
+    """
+    for old_name, new_name in RQ_DASHBOARD_LEGACY_CONFIG_OPTIONS.items():
+        if old_name in config:
+            config[new_name] = config[old_name]
+
 
 def configure_app(app):
     """Configure web app."""
     app.config.from_object(default_settings)
     if app_settings.config_path:
         app.config.from_pyfile(app_settings.config_path)
+    upgrade_rq_config(app.config)
 
     # Override DB in case of testing
     if app.config.get('SQLALCHEMY_DATABASE_TEST_URI'):

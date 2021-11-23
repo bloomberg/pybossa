@@ -1174,7 +1174,7 @@ def check_failed():
             ttl = current_app.config.get('FAILED_JOBS_MAILS')*24*60*60
             sentinel.master.setex(KEY, ttl, 1)
         if int(sentinel.slave.get(KEY)) < FAILED_JOBS_RETRIES:
-            requeue_job(job_id)
+            requeue_job(job_id, sentinel.master)
         else:
             KEY = 'pybossa:job:failed:mailed:%s' % job_id
             if (not sentinel.slave.exists(KEY) and

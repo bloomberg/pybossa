@@ -37,34 +37,31 @@ class TestNews(Test):
         key = "notify:admin:%s" % user.id
         return sentinel.master.delete(key)
 
-    # TODO: RDISCROWD-4605
-    # @with_context
-    # @patch('feedparser.parse')
-    # def test_news(self, feedparser_mock):
-    #     """Test NEWS works."""
-    #     user = UserFactory.create(admin=True)
-    #     feedparser_mock.return_value = self.d
-    #     news()
-    #     tmp = get_news()
-    #     assert len(tmp) == 1, len(tmp)
-    #     err_msg = "Notify user should be notified"
-    #     assert self.get_notify_users(user) == '1', err_msg
+    @with_context
+    @patch('feedparser.parse')
+    def test_news(self, feedparser_mock):
+        """Test NEWS works."""
+        user = UserFactory.create(admin=True)
+        feedparser_mock.return_value = self.d
+        news()
+        tmp = get_news()
+        assert len(tmp) == 1, len(tmp)
+        err_msg = "Notify user should be notified"
+        assert self.get_notify_users(user).decode() == '1', self.get_notify_users(user)
 
-
-    # TODO: RDISCROWD-4605
-    # @with_context
-    # @patch('feedparser.parse')
-    # def test_news_no_new_items(self, feedparser_mock):
-    #     """Test NEWS no new items works."""
-    #     user = UserFactory.create(admin=True)
-    #     feedparser_mock.return_value = self.d
-    #     news()
-    #     feedparser_mock.return_value = self.d
-    #     news()
-    #     tmp = get_news()
-    #     assert len(tmp) == 1, len(tmp)
-    #     err_msg = "Notify user should be notified"
-    #     assert self.get_notify_users(user) == '1', err_msg
+    @with_context
+    @patch('feedparser.parse')
+    def test_news_no_new_items(self, feedparser_mock):
+        """Test NEWS no new items works."""
+        user = UserFactory.create(admin=True)
+        feedparser_mock.return_value = self.d
+        news()
+        feedparser_mock.return_value = self.d
+        news()
+        tmp = get_news()
+        assert len(tmp) == 1, len(tmp)
+        err_msg = "Notify user should be notified"
+        assert self.get_notify_users(user).decode() == '1', self.get_notify_users(user)
 
     @with_context
     @patch('feedparser.parse')
