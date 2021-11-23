@@ -1149,7 +1149,6 @@ def news():
             mapping[pickle.dumps(d.entries[0])] = float(score)
             sentinel.master.zadd(FEED_KEY, mapping)
             notify = True
-
         score += 1
     if notify:
         notify_news_admins()

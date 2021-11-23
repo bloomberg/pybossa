@@ -126,8 +126,6 @@ def configure_app(app):
     if app_settings.config_path:
         app.config.from_pyfile(app_settings.config_path)
     upgrade_rq_config(app.config)
-    print("*********** create_app")
-    print(app.config)
 
     # Override DB in case of testing
     if app.config.get('SQLALCHEMY_DATABASE_TEST_URI'):
