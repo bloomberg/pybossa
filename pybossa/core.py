@@ -113,7 +113,8 @@ RQ_DASHBOARD_LEGACY_CONFIG_OPTIONS = {
 
 def upgrade_rq_config(config):
     """
-    Updates old configuration options with new ones.
+    rq_dashboard requires specific parameter name in config: https://pypi.org/project/rq-dashboard/
+    old configuration options will be deprecated soon so updates old options with new ones.
     """
     for old_name, new_name in RQ_DASHBOARD_LEGACY_CONFIG_OPTIONS.items():
         if old_name in config:
