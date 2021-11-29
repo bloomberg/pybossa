@@ -1,12 +1,12 @@
-from default import Test, with_context, flask_app
-from factories import ProjectFactory, UserFactory, TaskFactory, TaskRunFactory
-from pybossa.jobs import export_tasks
-from mock import patch, MagicMock
+from unittest.mock import patch
+
 from nose.tools import assert_raises
 from unidecode import unidecode
-from StringIO import StringIO
-import zipfile
-import unittest
+
+from pybossa.jobs import export_tasks
+from test import Test, with_context
+from test.factories import ProjectFactory, UserFactory, TaskFactory, \
+    TaskRunFactory
 
 
 class TestExport(Test):
@@ -79,8 +79,8 @@ class TestExport(Test):
         project = ProjectFactory.create(name='test_project')
         task = TaskFactory.create(project=project)
         TaskRunFactory.create(project=project, task=task,
-            info={'text': u'Test String', 'object': {'a': 1},
-            'list': [{'name': u'Julia', 'lastName': u'Rivera'}, {'name': u'Lola', 'lastName': u'Santos'}]})
+            info={'text': 'Test String', 'object': {'a': 1},
+            'list': [{'name': 'Julia', 'lastName': 'Rivera'}, {'name': 'Lola', 'lastName': 'Santos'}]})
 
         export_tasks(user.email_addr, project.short_name, 'task', False, 'csv')
         args, kwargs = mail.send.call_args
@@ -202,7 +202,7 @@ class TestExport(Test):
         message = args[0]
         assert message.recipients[0] == user.email_addr, message.recipients
         proj_name = unidecode(project.short_name)
-        expected_subject = u'Data export failed for your project: {}'.format(project.name)
+        expected_subject = 'Data export failed for your project: {}'.format(project.name)
         assert message.subject == expected_subject, message.subject
 
     @with_context

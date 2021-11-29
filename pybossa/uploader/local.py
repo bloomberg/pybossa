@@ -23,10 +23,11 @@ This module exports:
     * Local class: for uploading files to a local filesystem.
 
 """
+from werkzeug.utils import secure_filename
+
 from pybossa.uploader import Uploader
 import os
 from flask import send_from_directory
-from werkzeug import secure_filename
 
 
 class LocalUploader(Uploader):

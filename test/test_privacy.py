@@ -18,10 +18,10 @@
 
 import json
 from bs4 import BeautifulSoup
-from helper import web as web_helper
-from default import flask_app, with_context
-from mock import patch
-from factories import ProjectFactory, UserFactory, TaskFactory, TaskRunFactory
+from test.helper import web as web_helper
+from test import flask_app, with_context, with_request_context
+from unittest.mock import patch
+from test.factories import ProjectFactory, UserFactory, TaskFactory, TaskRunFactory
 from pybossa.cache.project_stats import update_stats
 
 
@@ -199,7 +199,7 @@ class TestPrivacyWebPublic(web_helper.Helper):
         assert dom.find(id='enforce_privacy') is None, err_msg
         self.signout()
 
-    @with_context
+    @with_request_context
     def test_07_user_public_profile_json(self):
         '''Test PRIVACY user public profile privacy is respected for API access'''
         # As Anonymous user
@@ -214,7 +214,7 @@ class TestPrivacyWebPublic(web_helper.Helper):
         full_url = 'https://%s%s/' % (self.flask_app.config['SERVER_NAME'], url)
         res = self.app.get(full_url, content_type='application/json')
         data = json.loads(res.data)
-        print data.keys()
+        print(list(data.keys()))
         # this data should be public visible in user
         err_msg = 'name should be public'
         assert data['user']['name'] == owner.name, err_msg
@@ -242,7 +242,7 @@ class TestPrivacyWebPublic(web_helper.Helper):
         err_msg = 'valid_email should not be public'
         assert 'valid_email' not in data['user'], err_msg
         # public projects data
-        print data
+        print(data)
         project = data['projects'][0]
         err_msg = 'info should be public'
         assert 'info' in project, err_msg
@@ -326,7 +326,7 @@ class TestPrivacyWebPrivacy(web_helper.Helper):
         self.signout
         # As Authenticated user but ADMIN
         res = self.signin(email=self.root_addr, password=self.root_password)
-        print res.data
+        print(res.data)
         res = self.app.get(url, follow_redirects=True)
         dom = BeautifulSoup(res.data)
         # TODO: old requirement, remove in future versions
@@ -343,7 +343,7 @@ class TestPrivacyWebPrivacy(web_helper.Helper):
         url = '/account'
         res = self.app.get(url, follow_redirects=True)
         err_msg = 'Community page should not be shown to anonymous users'
-        assert 'This feature requires being logged in' in res.data, err_msg
+        assert 'This feature requires being logged in' in str(res.data), err_msg
         # As Authenticated user but NOT ADMIN
         res = self.app.get(url + '?api_key=%s' % user.api_key,
                            follow_redirects=True)
@@ -367,7 +367,7 @@ class TestPrivacyWebPrivacy(web_helper.Helper):
         url = '/leaderboard'
         res = self.app.get(url, follow_redirects=True)
         err_msg = 'Leaderboard page should not be shown to anonymous users'
-        assert 'This feature requires being logged in' in res.data, err_msg
+        assert 'This feature requires being logged in' in str(res.data), err_msg
         # As Authenticated user but NOT ADMIN
         res = self.app.get(url + '?api_key=%s' % user.api_key, follow_redirects=True)
         dom = BeautifulSoup(res.data)
@@ -389,7 +389,7 @@ class TestPrivacyWebPrivacy(web_helper.Helper):
         # As Anonymou user
         url = '/stats'
         res = self.app.get(url, follow_redirects=True)
-        assert 'This feature requires being logged in' in res.data
+        assert 'This feature requires being logged in' in str(res.data)
         # As Authenticated user but NOT ADMIN
         self.signin()
         res = self.app.get(url + '?api_key=%s' % user.api_key, follow_redirects=True)
@@ -405,7 +405,7 @@ class TestPrivacyWebPrivacy(web_helper.Helper):
         self.signout()
 
     @patch.dict(flask_app.config, {'ENFORCE_PRIVACY': True})
-    @with_context
+    @with_request_context
     def test_05_app_stats_index(self):
         '''Test PRIVACY project stats privacy is respected'''
         # As Anonymou user
@@ -415,7 +415,7 @@ class TestPrivacyWebPrivacy(web_helper.Helper):
         url = '/project/%s/stats' % task.project.short_name
         update_stats(task.project.id)
         res = self.app.get(url, follow_redirects=True)
-        assert 'This feature requires being logged in' in res.data, res.data
+        assert 'This feature requires being logged in' in str(res.data), res.data
         # As Authenticated user but NOT ADMIN
         self.set_proj_passwd_cookie(task.project, user)
         res = self.app.get(url + '?api_key=%s' % user.api_key,
@@ -441,7 +441,7 @@ class TestPrivacyWebPrivacy(web_helper.Helper):
         url = '/account/%s' % owner.name
         res = self.app.get(url, follow_redirects=True)
         err_msg = 'Public User Profile page should not be shown to anonymous users'
-        assert 'This feature requires being logged in' in res.data, err_msg
+        assert 'This feature requires being logged in' in str(res.data), err_msg
         # As Authenticated user but NOT ADMIN
         res = self.app.get(url + '?api_key=%s' % user.api_key, follow_redirects=True)
         dom = BeautifulSoup(res.data)

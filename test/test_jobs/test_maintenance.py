@@ -19,9 +19,9 @@
 from pybossa.core import sentinel
 from pybossa.jobs import (check_failed, get_maintenance_jobs,
     disable_users_job)
-from default import Test, with_context
-from mock import patch, MagicMock
-from factories import UserFactory
+from test import Test, with_context
+from unittest.mock import patch, MagicMock
+from test.factories import UserFactory
 import datetime
 
 class TestMaintenance(Test):
@@ -34,13 +34,13 @@ class TestMaintenance(Test):
     @with_context
     def test_get_maintenance_jobs(self):
         """Test get maintenance jobs works."""
-        res = get_maintenance_jobs().next()
+        res = next(get_maintenance_jobs())
         assert res['queue'] == 'maintenance'
 
     @with_context
     @patch('pybossa.jobs.send_mail')
     @patch('rq.requeue_job', autospec=True)
-    @patch('rq.get_failed_queue', autospec=True)
+    @patch('rq.registry.FailedJobRegistry', autospec=True)
     def test_check_failed_variant(self, mock_failed_queue, mock_requeue_job, mock_send_mail):
         """Test JOB check failed works when no failed jobs."""
         fq = MagicMock
@@ -55,7 +55,7 @@ class TestMaintenance(Test):
     @with_context
     @patch('pybossa.jobs.send_mail')
     @patch('rq.requeue_job', autospec=True)
-    @patch('rq.get_failed_queue', autospec=True)
+    @patch('rq.registry.FailedJobRegistry', autospec=True)
     def test_check_failed(self, mock_failed_queue, mock_requeue_job, mock_send_mail):
         """Test JOB check failed works."""
         fq = MagicMock
@@ -67,7 +67,7 @@ class TestMaintenance(Test):
             response = check_failed()
             msg = "JOBS: ['1'] You have failed the system."
             assert msg == response, response
-            mock_requeue_job.assert_called_with('1')
+            assert mock_requeue_job.call_args.args[0] == '1'
             assert not mock_send_mail.called
         response = check_failed()
         assert mock_send_mail.called

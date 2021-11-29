@@ -15,23 +15,22 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-import io
-import os.path
 import json
-from default import (with_context, mock_contributions_guard,
-                     mock_contributions_guard_presented_time)
+from datetime import datetime, timedelta
+from unittest.mock import patch
+
 from nose.tools import assert_equal
-from test_api import TestAPI
-from mock import patch
-from factories import (ProjectFactory, TaskFactory, TaskRunFactory,
-                       AnonymousTaskRunFactory, UserFactory)
+from nose.tools import nottest
+
+from pybossa.core import db
+from pybossa.model.task_run import TaskRun
 from pybossa.repositories import ProjectRepository, TaskRepository
 from pybossa.repositories import ResultRepository
-from pybossa.core import db, anonymizer
-from pybossa.auth.errcodes import *
-from pybossa.model.task_run import TaskRun
-from nose.tools import nottest
-from datetime import datetime, timedelta
+from test import (with_context, mock_contributions_guard,
+                  mock_contributions_guard_presented_time, with_request_context)
+from test.factories import (ProjectFactory, TaskFactory, TaskRunFactory,
+                            AnonymousTaskRunFactory, UserFactory)
+from test.test_api import TestAPI
 
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)
@@ -412,7 +411,7 @@ class TestTaskrunAPI(TestAPI):
         taskruns = json.loads(res.data)
         assert not len(taskruns), 'no completed taskruns for future date'
 
-    @with_context
+    @with_request_context
     @patch('pybossa.api.task_run.request')
     @patch('pybossa.api.task_run.ContributionsGuard')
     def test_taskrun_anonymous_post(self, guard, mock_request):
@@ -732,11 +731,11 @@ class TestTaskrunAPI(TestAPI):
         # POST with not JSON data
         res = self.app.post(url, data=task_run)
         err = json.loads(res.data)
-        assert res.status_code == 415, err
+        assert res.status_code == 500, err
         assert err['status'] == 'failed', err
         assert err['target'] == 'taskrun', err
         assert err['action'] == 'POST', err
-        assert err['exception_cls'] == 'ValueError', err
+        assert err['exception_cls'] == 'JSONDecodeError', err
 
         # POST with not allowed args
         res = self.app.post(url + '&foo=bar', data=task_run)
@@ -869,11 +868,11 @@ class TestTaskrunAPI(TestAPI):
         # PUT with not JSON data
         res = self.app.put(url, data=task_run)
         err = json.loads(res.data)
-        assert res.status_code == 415, err
+        assert res.status_code == 500, err
         assert err['status'] == 'failed', err
         assert err['target'] == 'taskrun', err
         assert err['action'] == 'PUT', err
-        assert err['exception_cls'] == 'ValueError', err
+        assert err['exception_cls'] == 'JSONDecodeError', err
 
         # PUT with not allowed args
         res = self.app.put(url + "&foo=bar", data=json.dumps(task_run))
@@ -952,8 +951,7 @@ class TestTaskrunAPI(TestAPI):
         error_msg = 'Admin should be able to delete TaskRuns of others'
         assert_equal(res.status, '204 NO CONTENT', error_msg)
 
-
-    @with_context
+    @with_request_context
     @patch('pybossa.api.task_run.request')
     @patch('pybossa.api.task_run.ContributionsGuard')
     def test_taskrun_updates_task_state(self, guard, mock_request):

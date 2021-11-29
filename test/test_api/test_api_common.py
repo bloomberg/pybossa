@@ -17,15 +17,14 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
 import datetime
-from default import with_context
-from test_api import TestAPI
+from test import db, with_context
+from test.test_api import TestAPI
 from pybossa.core import project_repo
 
-from factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory
+from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory
 
-from mock import patch
+from unittest.mock import patch
 from pybossa.repositories import TaskRepository
-from default import db
 
 
 class TestApiCommon(TestAPI):
@@ -121,7 +120,6 @@ class TestApiCommon(TestAPI):
         res = self.app.get('/api/project?all=1&created=%s&limit=100&api_key=%s' % (year, owner.api_key))
         data = json.loads(res.data)
         assert len(data) == 30, len(data)
-
 
     @with_context
     def test_get_query_with_api_key_and_all(self):
@@ -234,8 +232,6 @@ class TestApiCommon(TestAPI):
                 assert user_res['name'] == 'user1', data
                 assert res.mimetype == 'application/json', res
 
-
-
     @with_context
     def test_get_query_with_api_key_context(self):
         """ Test API GET query with an API-KEY requesting only APIKEY results."""
@@ -295,7 +291,6 @@ class TestApiCommon(TestAPI):
                 assert res.status_code == 200
                 assert len(data) == 0, "No taskrun to be returned for regular user"
 
-
     @with_context
     def test_query_search_wrongfield(self):
         """ Test API query search works"""
@@ -335,7 +330,6 @@ class TestApiCommon(TestAPI):
             assert 'rank' not in d.keys()
             assert 'headline'  not in d.keys()
 
-
     @with_context
     def test_query_sql_injection(self):
         """Test API SQL Injection is not allowed works"""
@@ -367,18 +361,16 @@ class TestApiCommon(TestAPI):
         project = ProjectFactory.create()
         res = self.app.get('/api/project/%s?callback=mycallback' % project.id)
         err_msg = "mycallback should be included in the response"
-        print res.data
-        assert "mycallback" in res.data, err_msg
+        assert "mycallback" in res.data.decode(), err_msg
         err_msg = "Status code should be 200"
         assert res.status_code == 200, err_msg
-
 
     def test_cors(self):
         """Test CORS decorator works."""
         res = self.app.options('/api/project/1',
-                           headers={'Access-Control-Request-Method': 'GET',
-                                    'Access-Control-Request-Headers': 'Authorization',
-                           })
+                               headers={'Access-Control-Request-Method': 'GET',
+                                        'Access-Control-Request-Headers': 'Authorization',
+                                        })
         err_msg = "CORS should be enabled"
         assert res.headers['Access-Control-Allow-Origin'] == '*', err_msg
         methods = ['PUT', 'HEAD', 'DELETE', 'OPTIONS', 'GET']
@@ -393,7 +385,6 @@ class TestApiCommon(TestAPI):
                      'Access-Control-Request-Headers': header}
             res = self.app.options('/api/project/1', headers=headers)
             assert res.headers['Access-Control-Allow-Headers'] == header, err_msg
-
 
     @with_context
     def test_api_app_access_with_secure_app_access_enabled(self):
@@ -427,7 +418,7 @@ class TestApiCommon(TestAPI):
 
             # correct result
             assert data[0]['project_id'] == 1, data
-            assert data[0]['state'] == u'completed', data
+            assert data[0]['state'] == 'completed', data
 
             # test api with incorrect api_key
             url = '/api/completedtask?project_id=1&api_key=BAD-api-key'
@@ -438,8 +429,9 @@ class TestApiCommon(TestAPI):
             url = "/project/%s?api_key=api-key1" % project.short_name
             res = self.app.get(url, follow_redirects=True, headers=headers)
             err_msg = 'app access should not be allowed with SECURE_APP_ACCESS enabled'
-            assert "Sign in" in res.data, err_msg
 
+            # res.data is bytes type
+            assert "Sign in" in res.data.decode(), err_msg
 
     @with_context
     def test_api_app_access_with_secure_app_access_disabled(self):
@@ -468,7 +460,7 @@ class TestApiCommon(TestAPI):
 
             # correct result
             assert data[0]['project_id'] == 1, data
-            assert data[0]['state'] == u'completed', data
+            assert data[0]['state'] == 'completed', data
 
             # test api with incorrect api_key
             url = '/api/completedtask?project_id=1&api_key=bad-api-key'
@@ -479,7 +471,7 @@ class TestApiCommon(TestAPI):
             url = "/project/%s?api_key=api-key1" % project.short_name
             res = self.app.get(url, follow_redirects=True)
             err_msg = 'app access should be allowed with SECURE_APP_ACCESS disabled'
-            assert not "Sign in" in res.data, err_msg
-            assert "Statistics" in res.data
-            assert 'id="percent-completed"' in res.data
-            assert "<div>100%</div>" in res.data
+            assert "Sign in" not in res.data.decode(), err_msg
+            assert "Statistics" in res.data.decode()
+            assert 'id="percent-completed"' in res.data.decode()
+            assert "<div>100%</div>" in res.data.decode()

@@ -16,16 +16,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import db, with_context
+from unittest.mock import patch
+
 from nose.tools import assert_equal
-from test_api import TestAPI
-from mock import patch, call
+
 from pybossa.core import project_repo, task_repo, result_repo
-from helper.gig_helper import make_subadmin
-
-from factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory
-
 from pybossa.repositories import ResultRepository
+from test import db, with_context
+from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, \
+    UserFactory
+from test.helper.gig_helper import make_subadmin
+from test.test_api import TestAPI
 
 
 class TestResultAPI(TestAPI):
@@ -108,7 +109,7 @@ class TestResultAPI(TestAPI):
         url = '/api/result?orderby=created&desc=true&all=1&api_key=' + user.api_key
         res = self.app.get(url)
         data = json.loads(res.data)
-        print data
+        print(data)
         err_msg = "It should get the last item first."
         assert data[0]['created'] == '2119-01-01T14:37:30.642119', err_msg
 
@@ -287,11 +288,11 @@ class TestResultAPI(TestAPI):
         url = '/api/result?api_key=%s' % user.api_key
         res = self.app.post(url, data=data)
         err = json.loads(res.data)
-        assert res.status_code == 415, err
+        assert res.status_code == 500, err
         assert err['status'] == 'failed', err
         assert err['target'] == 'result', err
         assert err['action'] == 'POST', err
-        assert err['exception_cls'] == 'ValueError', err
+        assert err['exception_cls'] == 'JSONDecodeError', err
 
         # POST with not allowed args
         res = self.app.post(url + '&foo=bar', data=json.dumps(data))
@@ -330,7 +331,6 @@ class TestResultAPI(TestAPI):
     def test_result_put_with_reserved_fields_returns_error(self):
         user = UserFactory.create()
         result = self.create_result(owner=user)
-        print result
         url = '/api/result/%s?api_key=%s' % (result.id, user.api_key)
         data = {'created': 'today',
                 'project_id': 1,
@@ -381,11 +381,11 @@ class TestResultAPI(TestAPI):
         # PUT with not JSON data
         res = self.app.put(url, data=None)
         err = json.loads(res.data)
-        assert res.status_code == 415, err
+        assert res.status_code == 500, err
         assert err['status'] == 'failed', err
         assert err['target'] == 'result', err
         assert err['action'] == 'PUT', err
-        assert err['exception_cls'] == 'ValueError', err
+        assert err['exception_cls'] == 'JSONDecodeError', err
 
         # PUT with not allowed args
         res = self.app.put(url + "&foo=bar", data=json.dumps(data))

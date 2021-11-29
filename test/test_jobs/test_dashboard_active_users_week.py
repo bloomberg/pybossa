@@ -19,10 +19,10 @@
 from pybossa.dashboard.jobs import active_users_week
 from pybossa.dashboard.data import format_users_week
 from pybossa.core import db
-from factories.taskrun_factory import TaskRunFactory, AnonymousTaskRunFactory
-from default import Test, with_context
+from test.factories.taskrun_factory import TaskRunFactory, AnonymousTaskRunFactory
+from test import Test, with_context
 from datetime import datetime
-from mock import patch, MagicMock
+from unittest.mock import patch, MagicMock
 
 
 class TestDashBoardActiveUsers(Test):

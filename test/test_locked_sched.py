@@ -16,9 +16,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from helper import sched
+from test.helper import sched
 from pybossa.core import project_repo
-from factories import TaskFactory, ProjectFactory, UserFactory
+from test.factories import TaskFactory, ProjectFactory, UserFactory
 from pybossa.sched import (
     Schedulers,
     get_task_users_key,
@@ -30,10 +30,10 @@ from pybossa.sched import (
 )
 from pybossa.core import sentinel
 from pybossa.contributions_guard import ContributionsGuard
-from default import with_context, flask_app
+from test import with_context
 import json
-from mock import patch
-from helper.gig_helper import make_admin, make_subadmin
+from unittest.mock import patch
+from test.helper.gig_helper import make_admin, make_subadmin
 
 
 class TestLockedSched(sched.Helper):
@@ -261,7 +261,9 @@ class TestLockedSched(sched.Helper):
         timeout = 100
         acquire_lock(task.id, user.id, limit, timeout)
         task_id, _ = get_task_id_and_duration_for_project_user(project.id, user.id)
-        assert get_task_id_project_id_key(task.id) in sentinel.master.keys()
+
+        # Redis client returns bytes string in Python3
+        assert get_task_id_project_id_key(task.id).encode() in sentinel.master.keys()
         assert task.id == task_id
 
     @with_context
@@ -269,7 +271,7 @@ class TestLockedSched(sched.Helper):
         """ Test tasks assigned by locked scheduler are as per access levels set for user, task and project"""
 
         from pybossa import data_access
-        from test_api import get_pwd_cookie
+        from test.test_api import get_pwd_cookie
 
         owner = UserFactory.create(id=500)
         user_l1 = UserFactory.create(id=501, info=dict(data_access=["L1"]))
@@ -311,7 +313,7 @@ class TestLockedSched(sched.Helper):
         """ Test tasks assigned by locked scheduler are as per access levels set for user and project"""
 
         from pybossa import data_access
-        from test_api import get_pwd_cookie
+        from test.test_api import get_pwd_cookie
 
         owner = UserFactory.create(id=500)
         user_l1 = UserFactory.create(id=502, info=dict(data_access=["L1"]))

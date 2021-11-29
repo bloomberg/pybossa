@@ -16,18 +16,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
-from pybossa.core import task_repo, user_repo
-from pybossa.sched import get_user_pref_task, Schedulers
-from itsdangerous import SignatureExpired
-from default import db, with_context
-from test_api import TestAPI, get_pwd_cookie
-from factories import (ProjectFactory, TaskFactory, UserFactory)
-from datetime import datetime, timedelta
-from mock import patch
-
-
+from pybossa.core import user_repo
 from pybossa.repositories import ProjectRepository
+from pybossa.sched import Schedulers
+from test import db, with_context
+from test.factories import (ProjectFactory, TaskFactory, UserFactory)
+from test.test_api import TestAPI, get_pwd_cookie
+
 project_repo = ProjectRepository(db)
 
 
@@ -105,7 +103,10 @@ class TestNewtaskPasswd(TestAPI):
         assert c
         self.app.set_cookie('/', c, v)
 
-        now = datetime.utcnow()
+        # Resolve the issue: TypeError: can't subtract offset-naive and offset-aware datetimes
+        # now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
+
         url = '/api/project/%s/newtask?api_key=%s' % (project.id, user.api_key)
         res = self.app.get(url)
         assert res.status_code == 200, res
@@ -135,7 +136,10 @@ class TestNewtaskPasswd(TestAPI):
         assert c
         self.app.set_cookie('/', c, v)
 
-        now = datetime.utcnow()
+        # Resolve the issue: TypeError: can't subtract offset-naive and offset-aware datetimes
+        # now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
+
         url = '/api/project/%s/newtask?api_key=%s' % (project.id, user.api_key)
         res = self.app.get(url)
         assert res.status_code == 200, (res, res.data)
@@ -176,11 +180,12 @@ class TestNewtaskPasswd(TestAPI):
             headers = {'Content-Type': 'application/json'}
             res = self.app.get(url, headers=headers)
             next_url = json.loads(res.data)['next']
-            print next_url
+            print(next_url)
             headers = {'Authorization': user.api_key}
             res = self.app.get(next_url, headers=headers)
 
-            assert 'Enter the password to contribute to this project' in res.data, res.data
+            # res.data is bytes type
+            assert b'Enter the password to contribute to this project' in res.data, res.data
 
     @with_context
     def test_newtask_no_gold_answers(self):

@@ -1,15 +1,16 @@
-from helper import web
-from default import db, with_context
-from factories import ProjectFactory, UserFactory, TaskFactory, TaskRunFactory
-from pybossa.repositories import UserRepository, ProjectRepository
+from test.helper import web
+from test import db, with_context
+from test.factories import ProjectFactory, UserFactory, TaskFactory, TaskRunFactory
+from pybossa.repositories import ProjectRepository
 from pybossa import exporter
 from pybossa.exporter.csv_reports_export import ProjectReportCsvExporter
-from mock import patch
+from unittest.mock import patch, MagicMock
 from nose.tools import assert_raises
 from pybossa.cache.projects import get_project_report_projectdata
+from pybossa.core import user_repo, uploader
 
 project_repo = ProjectRepository(db)
-from pybossa.core import user_repo
+
 
 class TestProjectReport(web.Helper):
 
@@ -110,18 +111,20 @@ class TestProjectReport(web.Helper):
         project = ProjectFactory.create(owner=user)
         url = '/project/%s/projectreport/export' % project.short_name
         res = self.app.get(url)
-        assert "Generate project report" in res.data, res.data
-        assert "Start date" in res.data, res.data
-        assert "End date" in res.data, res.data
+        assert "Generate project report" in str(res.data), res.data
+        assert "Start date" in str(res.data), res.data
+        assert "End date" in str(res.data), res.data
 
     @with_context
+    @patch('pybossa.exporter.uploader.file_exists', return_value=True)
     @patch.object(exporter.os, 'remove')
-    def test_project_report_delete_existing_report(self, mock_os_remove):
+    def test_project_report_delete_existing_report(self, mock_os_remove, mock_file_exists):
         """Test project report is generated with deleting existing report zip"""
         self.register()
         self.signin()
         user = user_repo.get(1)
         project = ProjectFactory.create(owner=user)
         url = '/project/%s/projectreport/export' % project.short_name
+
         res = self.app.post(url)
         assert mock_os_remove.called

@@ -16,15 +16,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-import json
-from default import Test, with_context, FakeResponse
-from factories import UserFactory, ProjectFactory, TaskRunFactory
-from pybossa.jobs import export_userdata, send_mail
-from pybossa.core import user_repo
-from pybossa.exporter.json_export import JsonExporter
-from mock import patch, MagicMock
+from unittest.mock import patch
+
 from flask import current_app, render_template, url_for
-from flask_mail import Message
+
+from pybossa.jobs import export_userdata
+from test import Test, with_context
+from test.factories import UserFactory, ProjectFactory, TaskRunFactory
+
 
 #@patch('pybossa.jobs.uploader')
 class TestExportAccount(Test):

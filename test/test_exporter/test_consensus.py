@@ -17,14 +17,15 @@
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from StringIO import StringIO
+from io import BytesIO
 from zipfile import ZipFile
 
-from default import Test, with_context
+from test import Test, with_context
 from pybossa.exporter.consensus_exporter import export_consensus, format_consensus
-from mock import patch
-from factories import ProjectFactory, TaskFactory, TaskRunFactory
-from pandas import DataFrame
+from unittest.mock import patch
+from test.factories import ProjectFactory, TaskFactory, TaskRunFactory
+import pandas as pd
+
 
 class TestConsensusExporter(Test):
 
@@ -34,17 +35,20 @@ class TestConsensusExporter(Test):
         task = TaskFactory.create(project=project, info={'test': 2}, n_answers=1)
         task2 = TaskFactory.create(project=project, info={'test': 2}, n_answers=1, calibration=1)
         task3 = TaskFactory.create(project=project, info={'test': 2}, n_answers=1, calibration=1)
-        task_run = TaskRunFactory.create(task=task, info={'hello': u'你好'})
-        task_run2 = TaskRunFactory.create(task=task2, info={'hello': u'你好'})
+        task_run = TaskRunFactory.create(task=task, info={'hello': '你好'})
+        task_run2 = TaskRunFactory.create(task=task2, info={'hello': '你好'})
         with export_consensus(project, 'tsk', 'csv', False, None) as fp:
             zipfile = ZipFile(fp)
             filename = zipfile.namelist()[0]
-            df = DataFrame.from_csv(StringIO(zipfile.read(filename)))
+
+            # from_csv is deprecated now
+            # zipfile.read() returns bytes so use BytesIO
+            df = pd.read_csv(BytesIO(zipfile.read(filename)))
             df = df.sort_values(by=['task_id'])
         rows = df.reset_index().to_dict(orient='records')
         assert len(rows) == 2
         row = rows[0]
-        assert json.loads(row['task_run__info'])[task_run.user.name] == {'hello': u'你好'}
+        assert json.loads(row['task_run__info'])[task_run.user.name] == {'hello': '你好'}
         assert any(r['gold'] for r in rows)
 
     @with_context
@@ -53,16 +57,16 @@ class TestConsensusExporter(Test):
         task = TaskFactory.create(project=project, info={'test': 2}, n_answers=1)
         task2 = TaskFactory.create(project=project, info={'test': 2}, n_answers=1, calibration=1)
         task3 = TaskFactory.create(project=project, info={'test': 2}, n_answers=1, calibration=1)
-        task_run = TaskRunFactory.create(task=task, info={'hello': u'你好'})
-        task_run2 = TaskRunFactory.create(task=task2, info={'hello': u'你好'})
+        task_run = TaskRunFactory.create(task=task, info={'hello': '你好'})
+        task_run2 = TaskRunFactory.create(task=task2, info={'hello': '你好'})
         with export_consensus(project, 'tsk', 'csv', True, None) as fp:
             zipfile = ZipFile(fp)
             filename = zipfile.namelist()[0]
-            df = DataFrame.from_csv(StringIO(zipfile.read(filename)))
+            df = pd.read_csv(BytesIO(zipfile.read(filename)))
             df = df.sort_values(by=['task_id'])
         rows = df.reset_index().to_dict(orient='records')
         assert len(rows) == 2
-        assert json.loads(rows[0]['task_run__info'])[task_run.user.name] == {'hello': u'你好'}
+        assert json.loads(rows[0]['task_run__info'])[task_run.user.name] == {'hello': '你好'}
         assert any(r['gold'] for r in rows)
 
     @with_context

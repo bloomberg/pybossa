@@ -17,14 +17,15 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 # Cache global variables for timeouts
 
-from default import Test, db, with_context
-from mock import patch
-from nose.tools import assert_raises
-from factories import TaskFactory, TaskRunFactory, ProjectFactory
-from pybossa.repositories import TaskRepository, ProjectRepository
-from pybossa.exc import WrongObjectError, DBIntegrityError
-from pybossa.model.task import Task
 import json
+from unittest.mock import patch
+
+from nose.tools import assert_raises
+
+from pybossa.exc import WrongObjectError, DBIntegrityError
+from pybossa.repositories import TaskRepository, ProjectRepository
+from test import Test, db, with_context
+from test.factories import TaskFactory, TaskRunFactory, ProjectFactory
 
 project_repo = ProjectRepository(db)
 

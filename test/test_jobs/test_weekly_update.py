@@ -16,11 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, with_context, flask_app
+from test import Test, with_context, flask_app, with_request_context
 from pybossa.jobs import get_weekly_stats_update_projects, get_weekly_admin_report_jobs
 from pybossa.jobs import send_weekly_stats_project, mail_project_report, export_all_users
-from factories import TaskRunFactory, UserFactory, ProjectFactory, TaskFactory
-from mock import patch, MagicMock
+from test.factories import TaskRunFactory, UserFactory, ProjectFactory, TaskFactory
+from unittest.mock import patch, MagicMock
 from nose.tools import assert_raises
 
 
@@ -40,7 +40,7 @@ class TestWeeklyStats(Test):
         mock_datetime.today.return_value = mock_date
 
         jobs = get_weekly_stats_update_projects()
-        assert_raises(StopIteration, jobs.next)
+        assert_raises(StopIteration, jobs.__next__)
 
     @with_context
     @patch('pybossa.jobs.datetime')
@@ -77,7 +77,7 @@ class TestWeeklyStats(Test):
         mock_datetime.today.return_value = mock_date
 
         jobs = get_weekly_stats_update_projects()
-        assert_raises(StopIteration, jobs.next)
+        assert_raises(StopIteration, jobs.__next__)
 
     @with_context
     @patch('pybossa.jobs.datetime')
@@ -117,7 +117,7 @@ class TestWeeklyStats(Test):
         mock_datetime.today.return_value = mock_date
 
         jobs = get_weekly_stats_update_projects()
-        assert_raises(StopIteration, jobs.next)
+        assert_raises(StopIteration, jobs.__next__)
 
     @with_context
     @patch('pybossa.jobs.datetime')
@@ -140,7 +140,7 @@ class TestWeeklyStats(Test):
             assert job['timeout'] == self.flask_app.config.get('TIMEOUT')
             assert job['queue'] == 'low'
 
-    @with_context
+    @with_request_context
     @patch('pybossa.jobs.enqueue_job')
     def test_send_email(self, mock):
         """Test JOB send email works."""
@@ -165,7 +165,6 @@ class TestWeeklyStats(Test):
 
 class TestWeeklyReport(Test):
 
-
     @with_context
     @patch('pybossa.jobs.datetime')
     def test_get_jobs_on_monday(self, mock_datetime):
@@ -177,7 +176,7 @@ class TestWeeklyReport(Test):
         jobs = get_weekly_admin_report_jobs()
         job_0 = next(jobs)
         job_1 = next(jobs)
-        assert_raises(StopIteration, jobs.next)
+        assert_raises(StopIteration, jobs.__next__)
 
     @with_context
     @patch('pybossa.jobs.datetime')
@@ -188,7 +187,7 @@ class TestWeeklyReport(Test):
         mock_datetime.today.return_value = mock_date
 
         jobs = get_weekly_admin_report_jobs()
-        assert_raises(StopIteration, jobs.next)
+        assert_raises(StopIteration, jobs.__next__)
 
     @with_context
     @patch('pybossa.jobs.datetime')

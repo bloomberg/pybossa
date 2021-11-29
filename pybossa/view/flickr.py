@@ -45,10 +45,11 @@ def logout():
 @blueprint.route('/oauth-authorized')
 def oauth_authorized():
     """Authorize Flickr login."""
-    next_url = request.args.get('next')
+    # if next_url is None, redirect(next_url) could throw exception
+    next_url = request.args.get('next') or url_for_app_type('home.home')
     resp = flickr.oauth.authorized_response()
     if resp is None:
-        flash(u'You denied the request to sign in.')
+        flash('You denied the request to sign in.')
         return redirect(next_url)
     if isinstance(resp, OAuthException):
         flash('Access denied: %s' % resp.message)

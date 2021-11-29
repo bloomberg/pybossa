@@ -16,16 +16,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, db, with_context, flask_app
-from factories import BlogpostFactory
-from factories import TaskRunFactory
-from factories import ProjectFactory
-from factories import UserFactory
-from mock import patch, MagicMock
+from unittest.mock import patch, MagicMock
+
 from pybossa.jobs import check_and_send_task_notifications, notify_task_progress
+from test import Test, with_context
+from test.factories import ProjectFactory
 
 queue = MagicMock()
 queue.enqueue.return_value = True
+
 
 class TestSendTaskNotification(Test):
 

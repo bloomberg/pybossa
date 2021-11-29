@@ -2,14 +2,12 @@ import io
 import os
 import re
 from tempfile import NamedTemporaryFile
-from urlparse import urlparse
+from urllib.parse import urlparse
 import boto
-from boto.s3.key import Key
-from six import BytesIO
 from flask import current_app as app
 from werkzeug.utils import secure_filename
 import magic
-from werkzeug.exceptions import BadRequest, InternalServerError
+from werkzeug.exceptions import BadRequest
 from pybossa.cloud_store_api.connection import create_connection
 from pybossa.encryption import AESWithGCM
 import json
@@ -32,7 +30,8 @@ allowed_mime_types = ['application/pdf',
                       'application/vnd.ms-excel',
                       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                       'audio/mpeg',
-                      'audio/wav']
+                      'audio/wav',
+                      'application/json']
 
 
 DEFAULT_CONN = 'S3_DEFAULT'
@@ -83,12 +82,30 @@ def s3_upload_file_storage(s3_bucket, source_file, headers=None, directory='',
                            conn_name=DEFAULT_CONN, with_encryption=False):
     """
     Upload a werzkeug FileStorage content to s3
+    The FileStorage content can be either a StringIO or BytesIO
     """
     filename = source_file.filename
     headers = headers or {}
     headers['Content-Type'] = source_file.content_type
-    tmp_file = NamedTemporaryFile(delete=False)
-    source_file.save(tmp_file.name)
+
+    # mode is depended on the mode in the stream
+    if isinstance(source_file.stream, io.BytesIO):
+        mode = 'w+b'
+    elif isinstance(source_file.stream, io.StringIO):
+        mode = 'w+t'
+    else:
+        mode = source_file.stream.mode
+
+    # tmp_file is opened in the mode depending on the
+    # source_file(FileStorage type)
+    tmp_file = NamedTemporaryFile(delete=False, mode=mode)
+
+    # When using the file name (tmp_file.name), save method in the FileStorage
+    # class can only open the file in binary mode. Using opened file object
+    # 'tmp_file' so that the open mode can be controlled outside of save method
+    source_file.save(tmp_file)
+    tmp_file.flush()
+
     upload_root_dir = app.config.get('S3_UPLOAD_DIRECTORY')
     return s3_upload_tmp_file(
             s3_bucket, tmp_file, filename, headers, directory, file_type_check,
@@ -106,12 +123,16 @@ def s3_upload_tmp_file(s3_bucket, tmp_file, filename,
     try:
         if file_type_check:
             check_type(tmp_file.name)
-        content =  tmp_file.read()
+        content = tmp_file.read()
         if with_encryption:
             secret = app.config.get('FILE_ENCRYPTION_KEY')
             cipher = AESWithGCM(secret)
             content = cipher.encrypt(content)
-        fp = BytesIO(content)
+
+        # make sure content is a bytes string
+        if type(content) == str:
+            content = content.encode()
+        fp = io.BytesIO(content)  # BytesIO accepts bytes string
         url = s3_upload_file(s3_bucket, fp, filename, headers, upload_root_dir,
                              directory, return_key_only, conn_name)
     finally:
@@ -169,6 +190,8 @@ def get_s3_bucket_key(s3_bucket, s3_url, conn_name=DEFAULT_CONN):
 def get_file_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN, decrypt=False):
     content = get_content_from_s3(s3_bucket, path, conn_name, decrypt)
     temp_file = NamedTemporaryFile()
+    if type(content) == str:
+        content = content.encode()
     temp_file.write(content)
     temp_file.seek(0)
     return temp_file
@@ -182,6 +205,8 @@ def get_content_and_key_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN,
             secret = app.config.get('FILE_ENCRYPTION_KEY')
         cipher = AESWithGCM(secret)
         content = cipher.decrypt(content)
+    if type(content) == bytes:
+        content = content.decode()
     return content, key
 
 def get_content_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN, decrypt=False):

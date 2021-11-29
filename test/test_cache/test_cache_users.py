@@ -16,12 +16,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, with_context
+from test import Test, with_context
 from pybossa.cache import users as cached_users
 from pybossa.model.user import User
 from pybossa.leaderboard.jobs import leaderboard as update_leaderboard
 
-from factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory
+from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory
 
 
 class TestUsersCache(Test):
@@ -108,7 +108,7 @@ class TestUsersCache(Test):
         update_leaderboard()
         first_in_rank = cached_users.rank_and_score(users[3].id)
         last_in_rank = cached_users.rank_and_score(users[0].id)
-        print first_in_rank
+        print(first_in_rank)
         assert first_in_rank['rank'] == 1, first_in_rank['rank']
         assert first_in_rank['score'] == 4, first_in_rank['score']
         assert last_in_rank['rank'] == 4, last_in_rank['rank']
@@ -476,7 +476,7 @@ class TestUsersCache(Test):
 
         for field in fields:
             assert field in leaderboard[0].keys(), field
-        assert len(leaderboard[0].keys()) == len(fields)
+        assert len(list(leaderboard[0].keys())) == len(fields)
 
     @with_context
     def test_get_total_users_returns_0_if_no_users(self):
@@ -523,7 +523,7 @@ class TestUsersCache(Test):
 
         for field in fields:
             assert field in users[0].keys(), field
-        assert len(users[0].keys()) == len(fields)
+        assert len(list(users[0].keys())) == len(fields)
 
 
     @with_context

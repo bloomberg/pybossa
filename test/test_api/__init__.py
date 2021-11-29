@@ -15,11 +15,12 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-
-from default import Test, with_context
-from factories import reset_all_pk_sequences
-from werkzeug.utils import parse_cookie
 from datetime import datetime
+
+from dateutil.parser import parse
+from werkzeug.http import parse_cookie
+
+from test import Test
 
 
 def get_pwd_cookie(short_name, res):
@@ -27,13 +28,18 @@ def get_pwd_cookie(short_name, res):
     raw_cookie = None
     cookies = res.headers.get_all('Set-Cookie')
     for c in cookies:
-        for k, v in parse_cookie(c).iteritems():
-            if k == u'%spswd' % short_name:
+        for k, v in parse_cookie(c).items():
+            if k == '%spswd' % short_name:
                 cookie = k, v
                 raw_cookie = c
     params = (v.strip().split('=') for v in raw_cookie.split(';'))
     expires = dict(params)['Expires']
-    expires = datetime.strptime(expires, '%a, %d-%b-%Y %H:%M:%S GMT')
+
+    # parse() function can parse different formats, including
+    # '%d-%b-%Y %H:%M:%S GMT' and '%d %b %Y %H:%M:%S GMT'.
+    # Using datetime.strptime() limits a single format
+    expires = parse(expires)
+
     return cookie[0], cookie[1], expires
 
 

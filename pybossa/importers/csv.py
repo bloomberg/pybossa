@@ -19,10 +19,9 @@
 import numbers
 import types
 import requests
-from StringIO import StringIO
+from io import StringIO
 from flask_babel import gettext
 from pybossa.util import unicode_csv_reader, validate_required_fields
-from pybossa.util import unicode_csv_reader
 
 from .base import BulkTaskImport, BulkImportException
 from flask import request
@@ -37,7 +36,7 @@ type_map = {
     # Python considers booleans to be numbers so we need an extra check for that.
     'number': lambda x: isinstance(x, numbers.Real) and type(x) is not bool,
     'bool': lambda x: isinstance(x, bool),
-    'null': lambda x: isinstance(x, types.NoneType)
+    'null': lambda x: isinstance(x, type(None))
 }
 
 def get_value(header, value_string, data_type):
@@ -311,7 +310,7 @@ class BulkTaskCSVImport(BulkTaskCSVImportBase):
             raise BulkImportException(msg, 'error')
 
         r.encoding = 'utf-8'
-        csvcontent = StringIO(r.text)
+        csvcontent = StringIO(r.text.replace('\x00', ''))  # Get rid of NUL data
         return unicode_csv_reader(csvcontent)
 
 class BulkTaskGDImport(BulkTaskCSVImport):

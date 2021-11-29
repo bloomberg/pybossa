@@ -18,11 +18,12 @@
 
 import json
 
-from mock import patch
-from default import Test, with_context
+from unittest.mock import patch
+from test import Test, with_context
 from pybossa.hateoas import Hateoas
-from factories import (ProjectFactory, TaskRunFactory, TaskFactory,
+from test.factories import (ProjectFactory, TaskRunFactory, TaskFactory,
     UserFactory)
+
 
 class TestHateoas(Test):
 

@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from urlparse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs
 from functools import wraps
 from flask import Blueprint, current_app, Response, request
 from flask_login import current_user, login_required
@@ -176,7 +176,7 @@ def encrypt_task_response_data(task_id, project_id, data):
     secret = get_encryption_key(project)
     cipher = AESWithGCM(secret)
     content = json.dumps(data)
-    content = cipher.encrypt(content.encode('utf8')).decode('utf8')
+    content = cipher.encrypt(content.encode('utf8'))
     return content
 
 

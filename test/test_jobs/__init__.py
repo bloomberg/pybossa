@@ -19,9 +19,10 @@
 from datetime import datetime
 from pybossa.jobs import create_dict_jobs, enqueue_periodic_jobs,\
     get_quarterly_date, get_periodic_jobs
-from mock import patch
+from unittest.mock import patch
 from nose.tools import assert_raises
-from default import with_context, Test
+from test import with_context, Test
+
 
 def jobs():
     """Generator."""

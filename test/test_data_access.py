@@ -15,15 +15,15 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from default import with_context, db, Test
-from mock import patch
-from werkzeug.exceptions import BadRequest
 from collections import namedtuple
-from factories import ProjectFactory, TaskFactory, UserFactory
-from nose.tools import nottest, assert_raises
-from pybossa.core import user_repo, task_repo
-from pybossa.model.task import Task
+from unittest.mock import patch
+
+from nose.tools import assert_raises
+from werkzeug.exceptions import BadRequest
+
 from pybossa import data_access
+from test import with_context, Test
+
 
 class TestAccessLevels(Test):
 

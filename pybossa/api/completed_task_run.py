@@ -24,7 +24,7 @@ This package adds GET method for:
 """
 from flask import request, Response
 from flask_login import current_user
-from api_base import APIBase
+from .api_base import APIBase
 from pybossa.model.task_run import TaskRun
 from pybossa.error import ErrorStatus
 from pybossa.core import task_repo

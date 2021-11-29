@@ -16,11 +16,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from mock import patch
+from unittest.mock import patch
 from nose.tools import assert_raises
 from pybossa.importers import BulkImportException
 from pybossa.importers.csv import BulkTaskCSVImport
-from default import FakeResponse, with_context, flask_app
+from test import FakeResponse, with_context, with_request_context
+
 
 @patch('pybossa.importers.csv.requests.get')
 class TestBulkTaskCSVImport(object):
@@ -60,7 +61,10 @@ class TestBulkTaskCSVImport(object):
 
         with assert_raises(BulkImportException) as context:
             self.importer.count_tasks()
-        assert context.exception[0] == msg, context.exception
+
+        # context.exception is an Exception type.
+        # It has args attribute. It is subscriptable.
+        assert context.exception.args[0] == msg, context.exception
 
     def test_count_tasks_raises_exception_if_not_CSV_file(self, request):
         html_request = FakeResponse(text='Not a CSV', status_code=200,
@@ -71,7 +75,7 @@ class TestBulkTaskCSVImport(object):
 
         with assert_raises(BulkImportException) as context:
             self.importer.count_tasks()
-        assert context.exception[0] == msg, context.exception
+        assert context.exception.args[0] == msg, context.exception
 
     def test_count_tasks_raises_exception_if_dup_header(self, request):
         csv_file = FakeResponse(text='Foo,Bar,Foo\n1,2,3', status_code=200,
@@ -82,7 +86,7 @@ class TestBulkTaskCSVImport(object):
 
         with assert_raises(BulkImportException) as context:
             self.importer.count_tasks()
-        assert context.exception[0] == msg, context.exception
+        assert context.exception.args[0] == msg, context.exception
 
     def test_tasks_raises_exception_if_file_forbidden(self, request):
         forbidden_request = FakeResponse(text='Forbidden', status_code=403,
@@ -93,7 +97,7 @@ class TestBulkTaskCSVImport(object):
 
         with assert_raises(BulkImportException) as context:
             self.importer.tasks()
-        assert context.exception[0] == msg, context.exception
+        assert context.exception.args[0] == msg, context.exception
 
     def test_tasks_raises_exception_if_not_CSV_file(self, request):
         html_request = FakeResponse(text='Not a CSV', status_code=200,
@@ -104,7 +108,7 @@ class TestBulkTaskCSVImport(object):
 
         with assert_raises(BulkImportException) as context:
             self.importer.tasks()
-        assert context.exception[0] == msg, context.exception
+        assert context.exception.args[0] == msg, context.exception
 
     def test_tasks_raises_exception_if_dup_header(self, request):
         csv_file = FakeResponse(text='Foo,Bar,Foo\n1,2,3', status_code=200,
@@ -114,8 +118,8 @@ class TestBulkTaskCSVImport(object):
         msg = "The file you uploaded has two headers with the same name."
 
         with assert_raises(BulkImportException) as context:
-            self.importer.tasks().next()
-        assert context.exception[0] == msg, context.exception
+            next(self.importer.tasks())
+        assert context.exception.args[0] == msg, context.exception
 
     def test_tasks_raises_exception_if_empty_headers(self, request):
         csv_file = FakeResponse(text='Foo,Bar,\n1,2,3', status_code=200,
@@ -125,10 +129,10 @@ class TestBulkTaskCSVImport(object):
         msg = "The file you uploaded has an empty header on column 3."
 
         with assert_raises(BulkImportException) as context:
-            self.importer.tasks().next()
-        assert context.exception[0] == msg, context.exception
+            next(self.importer.tasks())
+        assert context.exception.args[0] == msg, context.exception
 
-    @with_context
+    @with_request_context
     def test_tasks_raises_exception_if_headers_row_mismatch(self, request):
         csv_file = FakeResponse(text='Foo,Bar,Baz\n1,2,3,4', status_code=200,
                                 headers={'content-type': 'text/plain'},
@@ -137,8 +141,8 @@ class TestBulkTaskCSVImport(object):
         msg = "The file you uploaded has an extra value on row 2."
 
         with assert_raises(BulkImportException) as context:
-            self.importer.tasks().next()
-        assert context.exception[0] == msg, context.exception
+            next(self.importer.tasks())
+        assert context.exception.args[0] == msg, context.exception
 
     @with_context
     def test_tasks_return_tasks_with_only_info_fields(self, request):
@@ -148,9 +152,9 @@ class TestBulkTaskCSVImport(object):
         request.return_value = csv_file
 
         tasks = self.importer.tasks()
-        task = tasks.next()
+        task = next(tasks)
 
-        assert task == {"info": {u'Bar': u'2', u'Foo': u'1', u'Baz': u'3'}}, task
+        assert task == {"info": {'Bar': '2', 'Foo': '1', 'Baz': '3'}}, task
 
     @with_context
     def test_tasks_return_tasks_with_non_info_fields_too(self, request):
@@ -161,19 +165,19 @@ class TestBulkTaskCSVImport(object):
         request.return_value = csv_file
 
         tasks = self.importer.tasks()
-        task = tasks.next()
+        task = next(tasks)
 
-        assert task == {'info': {u'Foo': u'1', u'Bar': u'2'},
-                        u'priority_0': u'3'}, task
+        assert task == {'info': {'Foo': '1', 'Bar': '2'},
+                        'priority_0': '3'}, task
 
     @with_context
     def test_tasks_works_with_encodings_other_than_utf8(self, request):
-        csv_file = FakeResponse(text=u'Foo\nM\xc3\xbcnchen', status_code=200,
+        csv_file = FakeResponse(text='Foo\nM\xc3\xbcnchen', status_code=200,
                                 headers={'content-type': 'text/plain'},
                                 encoding='ISO-8859-1')
         request.return_value = csv_file
 
         tasks = self.importer.tasks()
-        task = tasks.next()
+        task = next(tasks)
 
         assert csv_file.encoding == 'utf-8'

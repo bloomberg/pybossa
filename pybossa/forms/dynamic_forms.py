@@ -2,7 +2,7 @@ from flask_babel import lazy_gettext
 from flask_wtf import FlaskForm as Form
 from wtforms import SelectField, validators, TextField, BooleanField
 from pybossa.forms.fields.select_two import Select2Field
-from validator import AmpPvfValidator
+from .validator import AmpPvfValidator
 
 import wtforms
 

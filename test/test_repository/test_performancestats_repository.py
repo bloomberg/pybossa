@@ -1,5 +1,5 @@
-from default import Test, db, with_context
-from factories import PerformanceStatsFactory, UserFactory, ProjectFactory
+from test import Test, db, with_context
+from test.factories import PerformanceStatsFactory, UserFactory, ProjectFactory
 from pybossa.repositories import PerformanceStatsRepository
 from pybossa.model.performance_stats import StatType
 from pybossa.exc import DBIntegrityError

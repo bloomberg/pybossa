@@ -16,13 +16,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, with_context
+from test import Test, with_context
 from pybossa.cache.project_stats import *
-from factories import UserFactory, ProjectFactory, TaskFactory, \
+from test.factories import ProjectFactory, TaskFactory, \
     TaskRunFactory, AnonymousTaskRunFactory
 import pytz
 from datetime import date, datetime, timedelta
-from mock import patch
+from unittest.mock import patch
 import app_settings
 
 

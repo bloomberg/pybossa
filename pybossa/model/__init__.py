@@ -74,17 +74,19 @@ class DomainObject(object):
     def undictize(cls, dict_):
         raise NotImplementedError()
 
+    # in Python3 __str__ should return a unicode string
     def __str__(self):  # pragma: no cover
-        return self.__unicode__().encode('utf8')
+        return self.__repr__()
 
-    def __unicode__(self): # pragma: no cover
-        repr = u'<%s' % self.__class__.__name__
+    # __unicode__() magic method is not used in Python3. Renaming it to __repr__
+    def __repr__(self): # pragma: no cover
+        repr = '<%s' % self.__class__.__name__
         table = class_mapper(self.__class__).mapped_table
         for col in table.c:
             try:
-                repr += u' %s=%s' % (col.name, getattr(self, col.name))
-            except Exception, inst:
-                repr += u' %s=%s' % (col.name, inst)
+                repr += ' %s=%s' % (col.name, getattr(self, col.name))
+            except Exception as inst:
+                repr += ' %s=%s' % (col.name, inst)
 
         repr += '>'
         return repr

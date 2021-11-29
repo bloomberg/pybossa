@@ -19,9 +19,9 @@
 from pybossa.core import sentinel
 from pybossa.jobs import news
 from pybossa.news import get_news
-from default import Test, with_context, FakeResponse, db
-from factories import UserFactory
-from mock import patch, MagicMock, call
+from test import Test, with_context
+from test.factories import UserFactory
+from unittest.mock import patch, MagicMock, call
 
 
 class TestNews(Test):
@@ -47,7 +47,7 @@ class TestNews(Test):
         tmp = get_news()
         assert len(tmp) == 1, len(tmp)
         err_msg = "Notify user should be notified"
-        assert self.get_notify_users(user) == '1', err_msg
+        assert self.get_notify_users(user).decode() == '1', self.get_notify_users(user)
 
     @with_context
     @patch('feedparser.parse')
@@ -61,7 +61,7 @@ class TestNews(Test):
         tmp = get_news()
         assert len(tmp) == 1, len(tmp)
         err_msg = "Notify user should be notified"
-        assert self.get_notify_users(user) == '1', err_msg
+        assert self.get_notify_users(user).decode() == '1', self.get_notify_users(user)
 
     @with_context
     @patch('feedparser.parse')

@@ -373,8 +373,9 @@ def get_user_profile_metadata(user_id):
     info = user.info or {} if user else {}
     return info.get("metadata", {}).get('profile')
 
+
 def get_user_email(user_id):
-    user= get_user_by_id(user_id)
+    user = get_user_by_id(user_id)
     return user.email_addr if user else None
 
 

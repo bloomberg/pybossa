@@ -143,7 +143,7 @@ ANNOUNCEMENT_LEVELS = {
     'user': {'display': 'User', 'level': 30}
 }
 ANNOUNCEMENT_LEVEL_OPTIONS = [
-    {'text': v['display'], 'value': v['level']} for k, v in ANNOUNCEMENT_LEVELS.iteritems()
+    {'text': v['display'], 'value': v['level']} for k, v in ANNOUNCEMENT_LEVELS.items()
 ]
 
 ## Enforce Privacy Mode, by default is disabled
@@ -169,11 +169,6 @@ ALLOWED_EXTENSIONS = ['js', 'css', 'png', 'jpg', 'jpeg', 'gif', 'zip']
 ## If you want to use the local uploader configure which folder
 UPLOAD_METHOD = 'local'
 UPLOAD_FOLDER = 'uploads'
-
-## If you want to use Rackspace for uploads, configure it here
-# RACKSPACE_USERNAME = 'username'
-# RACKSPACE_API_KEY = 'apikey'
-# RACKSPACE_REGION = 'ORD'
 
 ## Default number of users shown in the leaderboard
 # LEADERBOARD = 20

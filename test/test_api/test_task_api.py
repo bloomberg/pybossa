@@ -16,21 +16,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import db, with_context
+from unittest.mock import patch, call
+
 from nose.tools import assert_equal
-from test_api import TestAPI
-from mock import patch, call
-from helper.gig_helper import make_subadmin
 
-from factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory
-from factories import AnonymousTaskRunFactory, ExternalUidTaskRunFactory
-
-from pybossa.repositories import ProjectRepository
-from pybossa.repositories import TaskRepository
-from pybossa.repositories import ResultRepository
-from pybossa.model.counter import Counter
-from helper.gig_helper import make_subadmin, make_admin
 from pybossa.api.task import TaskAPI
+from pybossa.model.counter import Counter
+from pybossa.repositories import ProjectRepository
+from pybossa.repositories import ResultRepository
+from pybossa.repositories import TaskRepository
+from test import db, with_context
+from test.factories import ExternalUidTaskRunFactory
+from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, \
+    UserFactory
+from test.helper.gig_helper import make_subadmin, make_admin
+from test.test_api import TestAPI
 
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)
@@ -496,7 +496,7 @@ class TestTaskAPI(TestAPI):
         assert len(data) == 10, data
         # Correct result
         assert data[0]['project_id'] == 1, data
-        assert data[0]['state'] == u'ongoing', data
+        assert data[0]['state'] == 'ongoing', data
 
         # Limits
         res = self.app.get('/api/task?project_id=1&limit=5&all=1&api_key=' + user.api_key)
@@ -552,7 +552,7 @@ class TestTaskAPI(TestAPI):
         # Correct result
         for t in data:
             assert t['project_id'] == project_oc.id, data
-            assert t['state'] == u'ongoing', data
+            assert t['state'] == 'ongoing', data
 
         # Limits
         res = self.app.get("/api/task?project_id=1&limit=5&api_key=" + user.api_key)
@@ -610,7 +610,7 @@ class TestTaskAPI(TestAPI):
         # Correct result
         for t in data:
             assert t['project_id'] == project_oc.id, data
-            assert t['state'] == u'ongoing', data
+            assert t['state'] == 'ongoing', data
 
         # Limits
         res = self.app.get("/api/task?project_id=1&limit=5&api_key=" + user_two.api_key)
@@ -692,11 +692,11 @@ class TestTaskAPI(TestAPI):
         url = '/api/task?api_key=%s' % user.api_key
         res = self.app.post(url, data=data)
         err = json.loads(res.data)
-        assert res.status_code == 415, err
+        assert res.status_code == 500, err
         assert err['status'] == 'failed', err
         assert err['target'] == 'task', err
         assert err['action'] == 'POST', err
-        assert err['exception_cls'] == 'ValueError', err
+        assert err['exception_cls'] == 'JSONDecodeError', err
 
         # POST with not allowed args
         res = self.app.post(url + '&foo=bar', data=json.dumps(data))
@@ -821,11 +821,11 @@ class TestTaskAPI(TestAPI):
         # PUT with not JSON data
         res = self.app.put(url, data=data)
         err = json.loads(res.data)
-        assert res.status_code == 415, err
+        assert res.status_code == 500, err
         assert err['status'] == 'failed', err
         assert err['target'] == 'task', err
         assert err['action'] == 'PUT', err
-        assert err['exception_cls'] == 'ValueError', err
+        assert err['exception_cls'] == 'JSONDecodeError', err
 
         # PUT with not allowed args
         res = self.app.put(url + "&foo=bar", data=json.dumps(data))
@@ -901,7 +901,7 @@ class TestTaskAPI(TestAPI):
         ## anonymous
         res = self.app.delete('/api/task/%s' % task.id)
         error_msg = 'Anonymous should not be allowed to delete'
-        print res.status
+        print(res.status)
         assert_equal(res.status, '401 UNAUTHORIZED', error_msg)
 
         ### real user but not allowed as not owner!
@@ -924,7 +924,7 @@ class TestTaskAPI(TestAPI):
         url = '/api/task/%s?api_key=%s' % (task.id, user.api_key)
         res = self.app.delete(url)
         assert_equal(res.status, '204 NO CONTENT', res.data)
-        assert res.data == '', res.data
+        assert res.data == b'', res.data  # res.data is bytes type
 
         #### root user
         url = '/api/task/%s?api_key=%s' % (root_task.id, admin.api_key)
@@ -1063,7 +1063,7 @@ class TestTaskAPI(TestAPI):
         for i in range(9):
             task['info']['bar'] = i
             res = self.app.post(url, data=json.dumps(task))
-            print res
+            print(res)
             created_task = json.loads(res.data)
         items = db.session.query(Counter).filter_by(project_id=project.id).all()
         assert len(items) == 10, len(items)

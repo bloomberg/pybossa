@@ -16,10 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import Test, with_context
-from helper.web import Helper
-from factories import ProjectFactory, UserFactory
-from mock import patch
+from test import with_context
+from test.helper.web import Helper
+from test.factories import ProjectFactory, UserFactory
+from unittest.mock import patch
+
 
 class TestProjectContact(Helper):
 
@@ -27,7 +28,7 @@ class TestProjectContact(Helper):
     @patch('pybossa.view.projects.mail_queue.enqueue')
     def test_project_contact_success(self, enqueue):
         """Test Project Contact Success."""
-        message = u'hello'
+        message = 'hello'
 
         admin, owner, user = UserFactory.create_batch(3)
 
@@ -84,7 +85,7 @@ class TestProjectContact(Helper):
     @patch('pybossa.view.projects.mail_queue.enqueue')
     def test_project_contact_no_disabled_owner(self, enqueue):
         """Test Project Contact not emailing a disabled co-owner."""
-        message = u'hello'
+        message = 'hello'
 
         admin, owner, user = UserFactory.create_batch(3)
 
@@ -117,7 +118,7 @@ class TestProjectContact(Helper):
     @patch('pybossa.view.projects.mail_queue.enqueue')
     def test_project_contact_no_non_admin_subadmin_owner(self, enqueue):
         """Test Project Contact not emailing a co-owner who is not an admin nor subadmin."""
-        message = u'hello'
+        message = 'hello'
 
         admin, owner, user = UserFactory.create_batch(3)
 
@@ -156,7 +157,7 @@ class TestProjectContact(Helper):
 
         # Make a request to the api.
         url = '/project/invalid/contact?api_key=' + user.api_key
-        data = dict(message=u'hello')
+        data = dict(message='hello')
         res = self.app.post(url, headers={'X-CSRFToken': csrf}, content_type='application/json', data=json.dumps(data))
 
         # Verify status code from response.

@@ -15,13 +15,12 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from default import Test, with_context
-from mock import patch
-from mock import MagicMock
-from factories import UserFactory
-from pybossa.view import bloomberg as bb
-from nose.tools import assert_raises, assert_true
+from unittest.mock import MagicMock, patch
+
 from pybossa.view.account import generate_bsso_account_notification
+from test import Test, with_context
+from test.factories import UserFactory
+
 from pybossa.util import get_s3_bucket_name
 
 class TestBloomberg(Test):
@@ -78,7 +77,7 @@ class TestBloomberg(Test):
         mock_auth.process_response.return_value = None
         mock_auth.is_authenticated = False
         mock_one_login.return_value = mock_auth
-        mock_auth.get_attributes.return_value = {'firstName': [u'test'], 'emailAddress': ['test@test.com'], 'lastName': [u'test'], 'username': [u'test'], 'firmId': [u'1234567']}
+        mock_auth.get_attributes.return_value = {'firstName': ['test'], 'emailAddress': ['test@test.com'], 'lastName': ['test'], 'username': ['test'], 'firmId': ['1234567']}
         res = self.app.post('/bloomberg/login', method='POST', content_type='multipart/form-data', data={'RelayState': redirect_url})
         assert mock_create_account.called == False
         assert res.status_code == 302, res.status_code
@@ -95,7 +94,7 @@ class TestBloomberg(Test):
         mock_auth.process_response.return_value = None
         mock_auth.is_authenticated = True 
         mock_one_login.return_value = mock_auth
-        mock_auth.get_attributes.return_value = {'firstName': [u'test'], 'lastName': [u'test'], 'emailAddress': [u'test@bloomberg.net'], 'username': [u'test'], 'firmId': [u'1234567']}
+        mock_auth.get_attributes.return_value = {'firstName': ['test'], 'lastName': ['test'], 'emailAddress': ['test@bloomberg.net'], 'username': ['test'], 'firmId': ['1234567']}
         res = self.app.post('/bloomberg/login', method='POST', content_type='multipart/form-data', data={'RelayState': redirect_url})
         assert mock_create_account.called
         assert res.status_code == 302, res.status_code
@@ -112,7 +111,7 @@ class TestBloomberg(Test):
         mock_auth.process_response.return_value = None
         mock_auth.is_authenticated = True 
         mock_one_login.return_value = mock_auth
-        mock_auth.get_attributes.return_value = {'firstName': [u'test'], 'lastName': [u'test'], 'emailAddress': [u'test@bloomberg.net'], 'username': [u'test'], 'firmId': [u'1234567']}
+        mock_auth.get_attributes.return_value = {'firstName': ['test'], 'lastName': ['test'], 'emailAddress': ['test@bloomberg.net'], 'username': ['test'], 'firmId': ['1234567']}
         res = self.app.post('/bloomberg/login', method='POST', content_type='multipart/form-data', data={'RelayState': redirect_url})
         assert mock_create_account.called
         assert res.status_code == 302, res.status_code
@@ -129,7 +128,7 @@ class TestBloomberg(Test):
         mock_auth.is_authenticated = True
         mock_one_login.return_value = mock_auth
         mock_sign_in.side_effect = Exception()
-        mock_auth.get_attributes.return_value = {'firstName': [u'test'], 'emailAddress': ['test@test.com'], 'lastName': [u'test'], 'PVFLevels': [u'PVF_GUTS_3'], 'username': [u'test'], 'firmId': [u'1234567']}
+        mock_auth.get_attributes.return_value = {'firstName': ['test'], 'emailAddress': ['test@test.com'], 'lastName': ['test'], 'PVFLevels': ['PVF_GUTS_3'], 'username': ['test'], 'firmId': ['1234567']}
         res = self.app.post('/bloomberg/login', method='POST', content_type='multipart/form-data', data={'RelayState': redirect_url})
         assert mock_create_account.called 
         assert res.status_code == 302, res.status_code
@@ -143,7 +142,7 @@ class TestBloomberg(Test):
         mock_auth.process_response.return_value = None
         mock_auth.is_authenticated = True 
         mock_one_login.return_value = mock_auth
-        user = {'firstName': [u'test1'], 'emailAddress': ['test1@test.com'], 'lastName': [u'test1'], 'PVFLevels': [u'PVF_GUTS_3'], 'username': [u'test1'], 'firmId': [u'905877'], 'metadata': {'user_type': "Test firm id 3"}}
+        user = {'firstName': ['test1'], 'emailAddress': ['test1@test.com'], 'lastName': ['test1'], 'PVFLevels': ['PVF_GUTS_3'], 'username': ['test1'], 'firmId': ['905877'], 'metadata': {'user_type': "Test firm id 3"}}
         mock_auth.get_attributes.return_value = user
         res = self.app.post('/bloomberg/login', method='POST', content_type='multipart/form-data', data={'RelayState': redirect_url})
         msg = generate_bsso_account_notification(user)
@@ -160,7 +159,7 @@ class TestBloomberg(Test):
         mock_auth.process_response.return_value = None
         mock_auth.is_authenticated = True 
         mock_two_login.return_value = mock_auth
-        user = {'firstName': [u'test2'], 'emailAddress': ['test2@test.com'], 'lastName': [u'test2'], 'username': [u'test2'], 'firmId': [u'0000000']}
+        user = {'firstName': ['test2'], 'emailAddress': ['test2@test.com'], 'lastName': ['test2'], 'username': ['test2'], 'firmId': ['0000000']}
         mock_auth.get_attributes.return_value = user
         res = self.app.post('/bloomberg/login', method='POST', content_type='multipart/form-data', data={'RelayState': redirect_url})
         msg = generate_bsso_account_notification(user)
@@ -175,7 +174,7 @@ class TestBloomberg(Test):
         mock_alert.body = None
         mock_alert.html = None
         mock_bsso_alert = mock_alert
-        user = {'firstName': [u'test2'], 'emailAddress': ['test2@test.com'], 'lastName': [u'test2'], 'PVFLevels': [u'PVF_GUTS_3'], 'username': [u'test2'], 'firmId': [u'000000'] }
+        user = {'firstName': ['test2'], 'emailAddress': ['test2@test.com'], 'lastName': ['test2'], 'PVFLevels': ['PVF_GUTS_3'], 'username': ['test2'], 'firmId': ['000000'] }
         assert generate_bsso_account_notification(user) != None
 
     @with_context

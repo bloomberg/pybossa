@@ -19,11 +19,12 @@
 
 import os
 import tempfile
-from default import Test
+from test import Test
 from pybossa.uploader.local import LocalUploader
-from mock import patch
+from unittest.mock import patch
 from werkzeug.datastructures import FileStorage
 from nose.tools import assert_raises
+
 
 class TestLocalUploader(Test):
 

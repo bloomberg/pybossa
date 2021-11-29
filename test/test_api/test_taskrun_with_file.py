@@ -16,11 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from StringIO import StringIO
-from default import with_context
-from test_api import TestAPI
-from mock import patch
-from factories import ProjectFactory, TaskFactory
+from io import BytesIO
+from test import with_context
+from test.test_api import TestAPI
+from unittest.mock import patch
+from test.factories import ProjectFactory, TaskFactory
 from pybossa.core import db
 from pybossa.model.task_run import TaskRun
 from pybossa.cloud_store_api.s3 import s3_upload_from_string
@@ -30,10 +30,12 @@ from pybossa.encryption import AESWithGCM
 class TestTaskrunWithFile(TestAPI):
 
     host = 's3.storage.com'
+    port = 443  # adding a port to be deterministic
     bucket = 'test_bucket'
     patch_config = {
         'S3_TASKRUN': {
             'host': host,
+            'port': port,
             'auth_headers': [('a', 'b')]
         },
         'S3_BUCKET': 'test_bucket'
@@ -89,13 +91,14 @@ class TestTaskrunWithFile(TestAPI):
             url = res['info']['test__upload_url']
             args = {
                 'host': self.host,
+                'port': self.port,
                 'bucket': self.bucket,
                 'project_id': project.id,
                 'task_id': task.id,
                 'user_id': project.owner.id,
                 'filename': 'hello.txt'
             }
-            expected = 'https://{host}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
+            expected = 'https://{host}:{port}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
             assert url == expected, url
 
     @with_context
@@ -138,9 +141,10 @@ class TestTaskrunWithFile(TestAPI):
             )
             datajson = json.dumps(data)
 
+            # 'test__upload_url' requires bytes
             form = {
                 'request_json': datajson,
-                'test__upload_url': (StringIO('Hi there'), 'hello.txt')
+                'test__upload_url': (BytesIO(b'Hi there'), 'hello.txt')
             }
 
             url = '/api/taskrun?api_key=%s' % project.owner.api_key
@@ -153,13 +157,14 @@ class TestTaskrunWithFile(TestAPI):
             url = res['info']['test__upload_url']
             args = {
                 'host': self.host,
+                'port': self.port,
                 'bucket': self.bucket,
                 'project_id': project.id,
                 'task_id': task.id,
                 'user_id': project.owner.id,
                 'filename': 'hello.txt'
             }
-            expected = 'https://{host}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
+            expected = 'https://{host}:{port}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
             assert url == expected, url
 
     @with_context
@@ -179,7 +184,7 @@ class TestTaskrunWithFile(TestAPI):
 
             form = {
                 'request_json': datajson,
-                'test': (StringIO('Hi there'), 'hello.txt')
+                'test': (BytesIO(b'Hi there'), 'hello.txt')
             }
 
             url = '/api/taskrun?api_key=%s' % project.owner.api_key
@@ -190,14 +195,15 @@ class TestTaskrunWithFile(TestAPI):
             set_content.assert_not_called()
 
 
-
 class TestTaskrunWithSensitiveFile(TestAPI):
 
     host = 's3.storage.com'
+    port = 443
     bucket = 'test_bucket'
     patch_config = {
         'S3_TASKRUN': {
             'host': host,
+            'port': port,
             'auth_headers': [('a', 'b')]
         },
         'ENABLE_ENCRYPTION': True,
@@ -240,13 +246,14 @@ class TestTaskrunWithSensitiveFile(TestAPI):
             url = res['info']['pyb_answer_url']
             args = {
                 'host': self.host,
+                'port': self.port,
                 'bucket': self.bucket,
                 'project_id': project.id,
                 'task_id': task.id,
                 'user_id': project.owner.id,
                 'filename': 'pyb_answer.json'
             }
-            expected = 'https://{host}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
+            expected = 'https://{host}:{port}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
             assert url == expected, url
 
             aes = AESWithGCM('testkey')
@@ -265,13 +272,14 @@ class TestTaskrunWithSensitiveFile(TestAPI):
 
             args = {
                 'host': self.host,
+                'port': self.port,
                 'bucket': self.bucket,
                 'project_id': project.id,
                 'task_id': task.id,
                 'user_id': project.owner.id,
                 'filename': 'hello.txt'
             }
-            expected = 'https://{host}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
+            expected = 'https://{host}:{port}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
             assert actual_content['test__upload_url'] == expected
             assert actual_content['another_field'] == 42
 
@@ -292,7 +300,7 @@ class TestTaskrunWithSensitiveFile(TestAPI):
 
             form = {
                 'request_json': datajson,
-                'test__upload_url': (StringIO('Hi there'), 'hello.txt')
+                'test__upload_url': (BytesIO(b'Hi there'), 'hello.txt')
             }
 
             url = '/api/taskrun?api_key=%s' % project.owner.api_key
@@ -305,13 +313,14 @@ class TestTaskrunWithSensitiveFile(TestAPI):
             url = res['info']['pyb_answer_url']
             args = {
                 'host': self.host,
+                'port': self.port,
                 'bucket': self.bucket,
                 'project_id': project.id,
                 'task_id': task.id,
                 'user_id': project.owner.id,
                 'filename': 'pyb_answer.json'
             }
-            expected = 'https://{host}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
+            expected = 'https://{host}:{port}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
             assert url == expected, url
 
     @with_context
@@ -353,11 +362,12 @@ class TestTaskrunWithSensitiveFile(TestAPI):
             url = res['info']['pyb_answer_url']
             args = {
                 'host': self.host,
+                'port': self.port,
                 'bucket': self.bucket,
                 'project_id': project.id,
                 'task_id': task.id,
                 'user_id': project.owner.id,
                 'filename': 'pyb_answer.json'
             }
-            expected = 'https://{host}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
+            expected = 'https://{host}:{port}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
             assert url == expected, url

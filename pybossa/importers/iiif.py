@@ -80,11 +80,11 @@ class BulkTaskIIIFImporter(BulkTaskImport):
 
     def _get_validated_manifest(self, manifest_uri, version):
         """Return a validated manifest."""
-        r = requests.get(manifest_uri)
-        if r.status_code != 200:
-            err_msg = 'Invalid manifest URI: {} error'.format(r.status_code)
+        res = requests.get(manifest_uri)
+        if res.status_code != 200:
+            err_msg = 'Invalid manifest URI: {} error'.format(res.status_code)
             raise BulkImportException(err_msg)
-        reader = ManifestReader(r.text, version=version)
+        reader = ManifestReader(res.text, version=version)
         try:
             mf = reader.read()
             mf_json = mf.toJSON()

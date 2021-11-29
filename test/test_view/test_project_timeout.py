@@ -17,9 +17,9 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 from bs4 import BeautifulSoup
 
-from default import Test, db, with_context
-from factories import ProjectFactory
-from helper.web import Helper
+from test import with_context
+from test.factories import ProjectFactory
+from test.helper.web import Helper
 
 
 class TestProjectTimeout(Helper):
@@ -67,7 +67,7 @@ class TestProjectTimeout(Helper):
         data = {'minutes': 0, 'seconds': 20}
         url = '/project/%s/tasks/timeout?api_key=%s' % (project.short_name, project.owner.api_key)
         res = self.app.post(url, data=data)
-        assert 'Timeout should be between 30 seconds and 210 minutes' in res.data
+        assert 'Timeout should be between 30 seconds and 210 minutes' in str(res.data)
 
     @with_context
     def test_set_timeout_too_high_seconds(self):
@@ -75,7 +75,7 @@ class TestProjectTimeout(Helper):
         data = {'minutes': 0, 'seconds': 211 * 60}
         url = '/project/%s/tasks/timeout?api_key=%s' % (project.short_name, project.owner.api_key)
         res = self.app.post(url, data=data)
-        assert 'Timeout should be between 30 seconds and 210 minutes' in res.data
+        assert 'Timeout should be between 30 seconds and 210 minutes' in str(res.data)
 
     @with_context
     def test_set_timeout_too_high_minutes(self):
@@ -83,7 +83,7 @@ class TestProjectTimeout(Helper):
         data = {'minutes': 211, 'seconds': 0}
         url = '/project/%s/tasks/timeout?api_key=%s' % (project.short_name, project.owner.api_key)
         res = self.app.post(url, data=data)
-        assert 'Timeout should be between 30 seconds and 210 minutes' in res.data
+        assert 'Timeout should be between 30 seconds and 210 minutes' in str(res.data)
 
     @with_context
     def test_set_timeout_invalid(self):
@@ -91,5 +91,5 @@ class TestProjectTimeout(Helper):
         data = {'minutes': 30}
         url = '/project/%s/tasks/timeout?api_key=%s' % (project.short_name, project.owner.api_key)
         res = self.app.post(url, data=data)
-        print(res.data)
-        assert 'Please correct the errors' in res.data
+        print((res.data))
+        assert 'Please correct the errors' in str(res.data)

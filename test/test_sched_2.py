@@ -16,14 +16,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from helper import sched
-from default import with_context
+from test.helper import sched
+from test import with_context, with_request_context
 import json
 import time
-from mock import patch
-from factories import TaskFactory, ProjectFactory, TaskRunFactory, UserFactory
+from unittest.mock import patch
+from test.factories import TaskFactory, ProjectFactory, UserFactory
 from pybossa.redis_lock import get_active_user_count, register_active_user, unregister_active_user, EXPIRE_LOCK_DELAY
 from pybossa.core import sentinel
+
 
 class TestSched(sched.Helper):
     def setUp(self):
@@ -55,9 +56,8 @@ class TestSched(sched.Helper):
         count = get_active_user_count(project.id, sentinel.master)
         assert not count
 
-
     # Tests
-    @with_context
+    @with_request_context
     @patch('pybossa.api.pwd_manager.ProjectPasswdManager.password_needed')
     @patch('pybossa.api.task_run.request')
     def test_incremental_tasks(self, mock_request, passwd_needed):
@@ -81,7 +81,7 @@ class TestSched(sched.Helper):
         # Get the only task with no runs!
         res = self.app.get('api/project/1/newtask')
         data = json.loads(res.data)
-        print "Task:%s" % data['id']
+        print("Task:%s" % data['id'])
         # Check that we received a clean Task
         assert data.get('info'), data
         assert not data.get('info').get('last_answer')
