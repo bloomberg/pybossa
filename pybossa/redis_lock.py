@@ -28,7 +28,7 @@ USER_TASKS_KEY_PREFIX = 'pybossa:user:task_acquired:timestamps:{0}'
 TASK_ID_PROJECT_ID_KEY_PREFIX = 'pybossa:task_id:project_id:{0}'
 ACTIVE_USER_KEY = 'pybossa:active_users_in_project:{}'
 EXPIRE_LOCK_DELAY = 5
-EXPIRE_TASK_CATEGORY_RESERVATION_DELAY = 30*60
+EXPIRE_RESERVE_TASK_LOCK_DELAY = 30*60
 
 
 def get_active_user_key(project_id):
@@ -184,7 +184,7 @@ class LockManager(object):
         if to_delete:
             self._redis.hdel(resource_id, *to_delete)
 
-    def _release_expired_task_category_locks(self, resource_id, now):
+    def _release_expired_reserve_task_locks(self, resource_id, now):
         expiration = self._redis.get(resource_id)
         if now > expiration:
             self._redis.delete(resource_id)
@@ -211,9 +211,12 @@ class LockManager(object):
         if exclude_user and not user_id:
             raise BadRequest('Missing user id')
 
-        resource_id = "reserve_task_category:project:{}:category:{}:".format(project_id, "*" if not category else category)
-        resource_id += "user:{}:".format("*" if not user_id or exclude_user else user_id)
-        resource_id += "task:{}".format("*" if not task_id else task_id)
+        resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
+            project_id,
+            "*" if not category else category,
+            "*" if not user_id or exclude_user else user_id,
+            "*" if not task_id else task_id
+        )
 
         category_keys = self._redis.keys(resource_id)
         if not category_keys:
@@ -229,24 +232,19 @@ class LockManager(object):
         return category_keys
 
 
-    def aquire_task_category_lock(self, project_id, task_id, user_id, category):
+    def aquire_reserve_task_lock(self, project_id, task_id, user_id, category):
         if not(project_id or user_id or task_id or category):
             raise BadRequest('Missing required parameters')
 
         # check task category reserved by user
-        resource_id = "reserve_task_category:project:{}:category:{}:user:{}:task:{}".format(project_id, category, user_id, task_id)
+        resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(project_id, category, user_id, task_id)
 
         timestamp = time()
-        self._release_expired_task_category_locks(resource_id, timestamp)
-        expiration = timestamp + self._duration + EXPIRE_TASK_CATEGORY_RESERVATION_DELAY
+        self._release_expired_reserve_task_locks(resource_id, timestamp)
+        expiration = timestamp + self._duration + EXPIRE_RESERVE_TASK_LOCK_DELAY
         return self._redis.set(resource_id, expiration)
 
 
-    def release_task_category_lock(self, project_id, user_id, category_key, task_id = None):
-        if not(project_id or user_id or category_key):
-            raise BadRequest('Missing required parameters')
-
-        task_key = task_id if task_id else "*"
-        resource_id = "reserve_task_category:project:{}:category:{}:user:{}:task:{}".format(project_id, category_key, user_id, task_key)
-        keys = self._redis.keys(resource_id)
-        return self._redis.delete(*keys)
+    def release_reserve_task_lock(self, resource_id, pipeline):
+        cache = pipeline or self._redis
+        cache.expire(resource_id, EXPIRE_RESERVE_TASK_LOCK_DELAY)
