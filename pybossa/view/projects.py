@@ -1734,25 +1734,34 @@ def bulk_update_assign_worker(short_name):
             bulk_update = True
             # if it's bulk update
             # use filters tp read all tasks and gneerate assign_users list
-            # import pdb; pdb.set_trace()
             print(json.loads(data.get('filters')))
             args = parse_tasks_browse_args(json.loads(data.get('filters', '')))
             tasks = task_repo.get_tasks_by_filters(project, args)
             task_ids = [t.id for t in tasks]
             assign_user_emails = set()
+            import pdb; pdb.set_trace()
+
             for task_id in task_ids:
                 t = task_repo.get_task_by(project_id=project.id,
                                         id=int(task_id))
-                assign_user_emails.union(set(t.user_pref.get("assign_user", [])))
+                assign_user_emails = assign_user_emails.union(set(t.user_pref.get("assign_user", [])))
             assign_users = []
             for user_email in assign_user_emails:
-                fullname = user_repo.search_by_email(user_email).fullname
+                user = user_repo.search_by_email(user_email)
+                if not user:
+                    # use the email if the user is not found in the user repo
+                    fullname = user_email + ' (user not found)'
+                    # these user emails were assigned via csv but are not found 
+                    #  you can remove these users from the assigned users list.. OR add them to the user repo
+                    # sanity check on the CSV import? fix the problem where it happens
+                else:
+                    fullname = user.fullname 
                 assign_users.append({'fullname': fullname, 'email': user_email})
             response['assign_users'] = assign_users
 
         # get a list of all users can be assigned to task
         if bool(data_access_levels):
-            all_users = project.get_project_users()
+            all_users = user_repo.get_users(project.get_project_users())
         else:
             all_users = user_repo.get_all()
         all_user_data = []
