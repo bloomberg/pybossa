@@ -1735,8 +1735,8 @@ def bulk_update_assign_worker(short_name):
             # if it's bulk update
             # use filters tp read all tasks and gneerate assign_users list
             # import pdb; pdb.set_trace()
-            print(data.get('filters'))
-            args = parse_tasks_browse_args(data.get('filters'))
+            print(json.loads(data.get('filters')))
+            args = parse_tasks_browse_args(json.loads(data.get('filters', '')))
             tasks = task_repo.get_tasks_by_filters(project, args)
             task_ids = [t.id for t in tasks]
             assign_user_emails = set()
@@ -1751,8 +1751,10 @@ def bulk_update_assign_worker(short_name):
             response['assign_users'] = assign_users
 
         # get a list of all users can be assigned to task
-        all_users = user_repo.get_all()
-        print(all_users[0])
+        if bool(data_access_levels):
+            all_users = project.get_project_users()
+        else:
+            all_users = user_repo.get_all()
         all_user_data = []
         for user in all_users:
 
@@ -1780,7 +1782,7 @@ def bulk_update_assign_worker(short_name):
 
         if not task_id:
             # get task_ids from db
-            args = parse_tasks_browse_args(data.get('filters'), {})
+            args = parse_tasks_browse_args(json.loads(data.get('filters', '')))
             tasks = task_repo.get_tasks_by_filters(project, args)
             task_ids = [t.id for t in tasks]
         else:
@@ -1832,7 +1834,7 @@ def bulk_redundancy_update(short_name):
             })
 
         else:
-            args = parse_tasks_browse_args(request.json.get('filters'))
+            args = parse_tasks_browse_args(json.loads(data.get('filters', '')))
             tasks_not_updated = task_repo.update_tasks_redundancy(project, n_answers, args)
             notify_redundancy_updates(tasks_not_updated)
             if tasks_not_updated:
