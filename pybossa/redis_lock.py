@@ -232,7 +232,7 @@ class LockManager(object):
         return category_keys
 
 
-    def aquire_reserve_task_lock(self, project_id, task_id, user_id, category):
+    def acquire_reserve_task_lock(self, project_id, task_id, user_id, category):
         if not(project_id or user_id or task_id or category):
             raise BadRequest('Missing required parameters')
 

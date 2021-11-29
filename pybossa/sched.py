@@ -348,7 +348,7 @@ def locked_scheduler(query_factory):
             remaining = float('inf') if calibration else n_answers - taskcount
             if acquire_lock(task_id, user_id, remaining, timeout):
                 # reserve tasks
-                aquire_reserve_task_lock(project_id, task_id, user_id, timeout)
+                acquire_reserve_task_lock(project_id, task_id, user_id, timeout)
                 return _lock_task_for_user(task_id, project_id, user_id, timeout, calibration)
         return []
 
@@ -595,23 +595,23 @@ def release_reserve_task_lock_by_keys(resource_ids, timeout, pipeline=None):
         lock_manager.release_reserve_task_lock(resource_id, pipeline)
 
 
-def aquire_reserve_task_lock(project_id, task_id, user_id, timeout, pipeline=None, execute=True):
+def acquire_reserve_task_lock(project_id, task_id, user_id, timeout, pipeline=None, execute=True):
     task = task_repo.get_task(task_id)
     project = project_repo.get(project_id)
     if not (task and project and project.info.get("sched", "default") in [Schedulers.task_queue]):
-        return
+        return False
 
     reserve_task_config = project.info.get("reserve_tasks", {}).get("category", [])
-    category_exist = all(task.info.get(field, False) for field in reserve_task_config)
+    category_exist = reserve_task_config and all(task.info.get(field, False) for field in reserve_task_config)
     if not category_exist:
-        return
+        return False
 
     category = ["{}:{}".format(field, task.info.get(field)) for field in reserve_task_config]
     category = ":".join(category)
     redis_conn = sentinel.master
     pipeline = pipeline or redis_conn.pipeline(transaction=True)
     lock_manager = LockManager(redis_conn, timeout)
-    if lock_manager.aquire_reserve_task_lock(project_id, task_id, user_id, category):
+    if lock_manager.acquire_reserve_task_lock(project_id, task_id, user_id, category):
         # lock_manager.acquire_lock(user_tasks_key, task_id, float('inf'), pipeline=pipeline)
         # if execute:
         #     return all(not isinstance(r, Exception) for r in pipeline.execute())

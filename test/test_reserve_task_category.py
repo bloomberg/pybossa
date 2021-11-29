@@ -20,12 +20,15 @@ from mock import patch
 from default import with_context
 from helper import sched
 from factories import TaskFactory, ProjectFactory, UserFactory
-from pybossa.core import project_repo
+from pybossa.core import project_repo, sentinel
 from pybossa.sched import (
     Schedulers,
     reserve_task_sql_filters,
-    get_reserve_task_category_info
+    get_reserve_task_category_info,
+    acquire_reserve_task_lock,
+    release_reserve_task_lock_by_keys
 )
+import time
 
 class TestReserveTaskCategory(sched.Helper):
 
@@ -119,3 +122,38 @@ class TestReserveTaskCategory(sched.Helper):
         sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project.id, timeout, owner.id)
         assert sql_filters == " AND (task.info->>'y' IN ('2') AND task.info->>'x' IN ('1') AND task.info->>'z' IN ('3') AND task.info->>'name2' IN ('value2') AND task.info->>'name1' IN ('value1')) " and \
             category_keys == expected_category_keys, "sql_filters, category_keys must be non empty"
+
+    @with_context
+    def test_acquire_and_release_reserve_task_lock(self):
+        user = UserFactory.create()
+        # project w/o reserve_tasks configured don't acquire lock
+        project_info = dict(sched="task_queue_scheduler")
+        task_info = dict(field_1="abc", field_2=123)
+        category_fields = ["field_1", "field_2"]
+        project = ProjectFactory.create(owner=user, info=project_info)
+        task = TaskFactory.create_batch(1, project=project, n_answers=1, info=task_info)[0]
+        timeout = 100
+
+        assert acquire_reserve_task_lock(project.id, task.id, user.id, timeout) == False, "reserve task cannot be acquired due to missing required config"
+        project.info['reserve_tasks'] = {
+            "category": ["some_field"]
+        }
+        project_repo.save(project)
+        assert acquire_reserve_task_lock(project.id, task.id, user.id, timeout) == False, "task not having reserve tasks config fields"
+
+        project.info['reserve_tasks'] = {
+            "category": category_fields
+        }
+        project_repo.save(project)
+        acquire_reserve_task_lock(project.id, task.id, user.id, timeout)
+        category_key = ":".join(["{}:{}".format(field, task.info[field]) for field in category_fields])
+        expected_reserve_task_key = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
+            project.id, category_key, user.id, task.id
+        )
+        assert expected_reserve_task_key in sentinel.master.keys(), "reserve task key must exist in redis cache"
+
+        # release reserve task lock
+        with patch("pybossa.redis_lock.EXPIRE_RESERVE_TASK_LOCK_DELAY", 1):
+            release_reserve_task_lock_by_keys([expected_reserve_task_key], timeout)
+            time.sleep(1)
+        assert expected_reserve_task_key not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
