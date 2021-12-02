@@ -85,6 +85,7 @@ from sqlalchemy.sql import text
 from pybossa.core import db
 from pybossa.cache.task_browse_helpers import get_searchable_columns
 from pybossa.view.projects import get_locked_tasks
+from pybossa.redis_lock import EXPIRE_LOCK_DELAY
 
 task_fields = [
     "id",
@@ -483,7 +484,7 @@ def cancel_task(task_id=None):
             current_app.logger.info(
                 'Project {} - user {} cancelled task {}'
                 .format(project.id, current_user.id, task_id))
-            release_reserve_task_lock_by_id(project.id, task_id, current_user.id, timeout)
+            release_reserve_task_lock_by_id(project.id, task_id, current_user.id, timeout, expiry=EXPIRE_LOCK_DELAY)
 
 
     return Response(json.dumps({'success': True}), 200, mimetype="application/json")

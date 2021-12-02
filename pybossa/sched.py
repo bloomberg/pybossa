@@ -27,7 +27,8 @@ from pybossa.core import db, sentinel, project_repo, task_repo
 from redis_lock import (LockManager, get_active_user_key, get_user_tasks_key,
                         get_task_users_key, get_task_id_project_id_key,
                         register_active_user, unregister_active_user,
-                        get_active_user_count)
+                        get_active_user_count,
+                        EXPIRE_RESERVE_TASK_LOCK_DELAY)
 from contributions_guard import ContributionsGuard
 from werkzeug.exceptions import BadRequest, Forbidden
 import random
@@ -569,7 +570,7 @@ def acquire_lock(task_id, user_id, limit, timeout, pipeline=None, execute=True):
     return False
 
 
-def release_reserve_task_lock_by_id(project_id, task_id, user_id, timeout):
+def release_reserve_task_lock_by_id(project_id, task_id, user_id, timeout, expiry=EXPIRE_RESERVE_TASK_LOCK_DELAY):
     reserve_key = get_reserve_task_key(task_id)
     if not reserve_key:
         return
@@ -579,10 +580,10 @@ def release_reserve_task_lock_by_id(project_id, task_id, user_id, timeout):
     lock_manager = LockManager(redis_conn, timeout)
     resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
         project_id, reserve_key, user_id, task_id)
-    lock_manager.release_reserve_task_lock(resource_id, pipeline)
+    lock_manager.release_reserve_task_lock(resource_id, pipeline, expiry)
 
 
-def release_reserve_task_lock_by_keys(resource_ids, timeout, pipeline=None):
+def release_reserve_task_lock_by_keys(resource_ids, timeout, pipeline=None, expiry=EXPIRE_RESERVE_TASK_LOCK_DELAY):
     if not resource_ids:
         return
 
@@ -590,7 +591,7 @@ def release_reserve_task_lock_by_keys(resource_ids, timeout, pipeline=None):
     pipeline = redis_conn.pipeline(transaction=True)
     lock_manager = LockManager(redis_conn, timeout)
     for resource_id in resource_ids:
-        lock_manager.release_reserve_task_lock(resource_id, pipeline)
+        lock_manager.release_reserve_task_lock(resource_id, pipeline, expiry)
 
 
 def acquire_reserve_task_lock(project_id, task_id, user_id, timeout, pipeline=None, execute=True):

@@ -153,7 +153,7 @@ class TestReserveTaskCategory(sched.Helper):
         assert expected_reserve_task_key in sentinel.master.keys(), "reserve task key must exist in redis cache"
 
         # release reserve task lock
-        with patch("pybossa.redis_lock.EXPIRE_RESERVE_TASK_LOCK_DELAY", 1):
-            release_reserve_task_lock_by_keys([expected_reserve_task_key], timeout)
-            time.sleep(1)
+        expiry = 1
+        release_reserve_task_lock_by_keys([expected_reserve_task_key], timeout, expiry=expiry)
+        time.sleep(expiry)
         assert expected_reserve_task_key not in sentinel.master.keys(), "reserve task key should not exist in redis cache"

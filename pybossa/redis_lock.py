@@ -245,6 +245,6 @@ class LockManager(object):
         return self._redis.set(resource_id, expiration)
 
 
-    def release_reserve_task_lock(self, resource_id, pipeline):
+    def release_reserve_task_lock(self, resource_id, pipeline, expiry):
         cache = pipeline or self._redis
-        cache.expire(resource_id, EXPIRE_RESERVE_TASK_LOCK_DELAY)
+        cache.expire(resource_id, expiry)
