@@ -296,7 +296,7 @@ def locked_scheduler(query_factory):
                 # excluding the ones reserved by other users
                 exclude_user = True
                 sql_filters, category_keys = get_reserve_task_category_info(
-                    reserve_task_config, project_id, timeout, user_id, None, exclude_user
+                    reserve_task_config, project_id, timeout, user_id, exclude_user
                 )
 
         limit = current_app.config.get('DB_MAXIMUM_BATCH_SIZE') if filter_user_prefs else user_count + 5
@@ -316,7 +316,7 @@ def locked_scheduler(query_factory):
             exclude_user = True
             release_reserve_task_lock_by_keys(category_keys, timeout)
             sql_filters, category_keys = get_reserve_task_category_info(
-                reserve_task_config, project_id, timeout, user_id, None, exclude_user
+                reserve_task_config, project_id, timeout, user_id, exclude_user
             )
             sql = query_factory(project_id, user_id=user_id, limit=limit,
                             rand_within_priority=rand_within_priority,
@@ -370,8 +370,8 @@ def reserve_task_sql_filters(project_id, reserve_task_keys, exclude):
     # ex "co:name:IBM:ticker:IBM_US" would be converted to
     # "task.info->>'co_name' IN ('IBM')"
     filters_dict = {}
+    regex_key = "reserve_task:project:{}:category:(.+?):user".format(project_id)
     for item in reserve_task_keys:
-        regex_key = "reserve_task:project:{}:category:(.+?):user".format(project_id)
         data = re.search(regex_key, item)
         if not data:
             continue
@@ -423,14 +423,12 @@ def get_reserve_task_key(task_id):
     return reserve_key
 
 
-def get_reserve_task_category_info(reserve_task_config, project_id, timeout, user_id, task_id=None, exclude_user=False):
+def get_reserve_task_category_info(reserve_task_config, project_id, timeout, user_id, exclude_user=False):
     """Get reserved category info for a given user under a given project"""
     sql_filters, category_keys = "", []
 
     if not reserve_task_config:
         return sql_filters, category_keys
-
-
 
     category = ":".join(["{}:*".format(field) for field in sorted(reserve_task_config)])
     lock_manager = LockManager(sentinel.master, timeout)
@@ -612,9 +610,6 @@ def acquire_reserve_task_lock(project_id, task_id, user_id, timeout, pipeline=No
     pipeline = pipeline or redis_conn.pipeline(transaction=True)
     lock_manager = LockManager(redis_conn, timeout)
     if lock_manager.acquire_reserve_task_lock(project_id, task_id, user_id, category):
-        # lock_manager.acquire_lock(user_tasks_key, task_id, float('inf'), pipeline=pipeline)
-        # if execute:
-        #     return all(not isinstance(r, Exception) for r in pipeline.execute())
         return True
     return False
 

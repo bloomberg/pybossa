@@ -199,7 +199,7 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
         user_filter_list = cached_users.get_user_filters(user_id)
         reserve_task_config = project_info.get("reserve_tasks", {}).get("category", [])
         timeout = project_info.get("timeout", TIMEOUT)
-        reserve_task_filter, _ = get_reserve_task_category_info(reserve_task_config, project_id, timeout, user_id, None, True)
+        reserve_task_filter, _ = get_reserve_task_category_info(reserve_task_config, project_id, timeout, user_id, True)
         sql = '''
                SELECT task.id, worker_filter FROM task
                WHERE project_id=:project_id AND state !='completed'
