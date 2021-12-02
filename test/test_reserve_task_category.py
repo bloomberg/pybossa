@@ -26,9 +26,14 @@ from pybossa.sched import (
     reserve_task_sql_filters,
     get_reserve_task_category_info,
     acquire_reserve_task_lock,
-    release_reserve_task_lock_by_keys
+    release_reserve_task_lock_by_keys,
+    release_reserve_task_lock_by_id,
+    get_reserve_task_key
 )
 import time
+from nose.tools import assert_raises
+from werkzeug.exceptions import BadRequest
+
 
 class TestReserveTaskCategory(sched.Helper):
 
@@ -157,3 +162,125 @@ class TestReserveTaskCategory(sched.Helper):
         release_reserve_task_lock_by_keys([expected_reserve_task_key], timeout, expiry=expiry)
         time.sleep(expiry)
         assert expected_reserve_task_key not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
+
+
+    @with_context
+    def test_reserve_task_category_lock_raises_exceptions(self):
+        # missing project_id raises exception
+        with assert_raises(BadRequest):
+            get_reserve_task_category_info(["x", "y"], None, 1, 1)
+
+        # missing user id and passing exclude user raises exception
+        with assert_raises(BadRequest):
+            get_reserve_task_category_info(["x", "y"], 1, 1, user_id=None, exclude_user=True)
+
+        _, category_keys = get_reserve_task_category_info(["x", "y"], 1, 1, 1)
+        assert not category_keys, "reserve task category keys should not be present"
+
+        user = UserFactory.create()
+        project = ProjectFactory.create(
+            owner=user,
+            info=dict(
+                sched="task_queue_scheduler",
+                reserve_tasks=dict(
+                    category=["field_1", "field_2"]
+                )
+            )
+        )
+        task = TaskFactory.create_batch(
+            1, project=project, n_answers=1,
+            info=dict(field_1="abc", field_2=123)
+        )[0]
+        with assert_raises(BadRequest):
+            acquire_reserve_task_lock(project.id, task.id, None, 1)
+
+
+    @with_context
+    def test_reserve_task_category_lock_exclude_user(self):
+        # with exclude_user = True, exclude user category key for user id = ``
+        reserve_task_config = ["field_1", "field_2"]
+        user = UserFactory.create()
+        project = ProjectFactory.create(
+            owner=user,
+            info=dict(
+                sched="task_queue_scheduler",
+                reserve_tasks=dict(
+                    category=reserve_task_config
+                )
+            )
+        )
+        tasks = TaskFactory.create_batch(
+            2, project=project, n_answers=1,
+            info=dict(field_1="abc", field_2=123)
+        )
+
+        non_excluded_user_id = 2
+        acquire_reserve_task_lock(project.id, tasks[0].id, user.id, 1)
+        acquire_reserve_task_lock(project.id, tasks[1].id, non_excluded_user_id, 1)
+        expected_category_keys = [
+            "reserve_task:project:{}:category:field_1:abc:field_2:123:user:{}:task:{}".format(
+                project.id, non_excluded_user_id, tasks[1].id
+            )]
+        _, category_keys = get_reserve_task_category_info(reserve_task_config, 1, 1, user.id, exclude_user=True)
+        assert category_keys == expected_category_keys, "reserve task category keys should exclude user {} reserve category key".format(user.id)
+        # cleanup; release reserve task lock
+        expiry = 1
+        release_reserve_task_lock_by_id(project.id, tasks[0].id, user.id, 1, expiry=expiry)
+        release_reserve_task_lock_by_id(project.id, tasks[1].id, non_excluded_user_id, 1, expiry=expiry)
+
+
+    @with_context
+    def test_release_reserve_task_lock_by_id(self):
+        timeout = 100
+        category_fields = ["field_1", "field_2"]
+        user = UserFactory.create()
+        # project w/o reserve_tasks configured don't acquire lock
+        project = ProjectFactory.create(
+            owner=user,
+            info=dict(
+                sched="task_queue_scheduler",
+                reserve_tasks=dict(
+                    category=category_fields
+                )
+            )
+        )
+        task = TaskFactory.create_batch(
+            1, project=project, n_answers=1,
+            info=dict(field_1="abc", field_2=123)
+        )[0]
+        acquire_reserve_task_lock(project.id, task.id, user.id, timeout)
+        category_key = ":".join(["{}:{}".format(field, task.info[field]) for field in category_fields])
+        expected_reserve_task_key = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
+            project.id, category_key, user.id, task.id
+        )
+        assert expected_reserve_task_key in sentinel.master.keys(), "reserve task key must exist in redis cache"
+
+        # release reserve task lock
+        expiry = 1
+        release_reserve_task_lock_by_id(project.id, task.id, user.id, timeout, expiry=expiry)
+        time.sleep(expiry)
+        assert expected_reserve_task_key not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
+
+
+    @with_context
+    def test_get_reserve_task_key(self):
+        category_fields = ["field_1", "field_2"]
+        task_info = dict(field_1="abc", field_2=123)
+        expected_key = ":".join(["{}:{}".format(field, task_info[field]) for field in sorted(category_fields)])
+        user = UserFactory.create()
+        # project w/o reserve_tasks configured don't acquire lock
+        project = ProjectFactory.create(
+            owner=user,
+            info=dict(
+                sched="task_queue_scheduler",
+                reserve_tasks=dict(
+                    category=category_fields
+                )
+            )
+        )
+        task = TaskFactory.create_batch(
+            1, project=project, n_answers=1,
+            info=task_info
+        )[0]
+        reserve_key = get_reserve_task_key(task.id)
+        assert reserve_key == expected_key, "reserve key expected to be {}".format(expected_key)

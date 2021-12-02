@@ -252,12 +252,6 @@ def get_candidate_task_ids(project_id, user_id=None, user_ip=None,
     data = query.limit(limit).offset(offset).all()
     return _handle_tuples(data)
 
-def task_contains_category(task_id, category):
-    task = task_repo.get_task(task_id)
-    if not (task and category):
-        return False
-    return all([field in task.info for field in category])
-
 
 def locked_scheduler(query_factory):
     @wraps(query_factory)
@@ -272,8 +266,6 @@ def locked_scheduler(query_factory):
         if offset > 0:
             return None
         project = project_repo.get(project_id)
-        if not project:
-            raise Forbidden('Invalid project_id')
         timeout = project.info.get('timeout', TIMEOUT)
         task_queue_scheduler = project.info.get("sched", "default") in [Schedulers.task_queue]
         reserve_task_config = project.info.get("reserve_tasks", {}).get("category", [])
