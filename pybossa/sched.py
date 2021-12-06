@@ -27,7 +27,8 @@ from pybossa.core import db, sentinel, project_repo, task_repo
 from redis_lock import (LockManager, get_active_user_key, get_user_tasks_key,
                         get_task_users_key, get_task_id_project_id_key,
                         register_active_user, unregister_active_user,
-                        get_active_user_count)
+                        get_active_user_count,
+                        EXPIRE_RESERVE_TASK_LOCK_DELAY)
 from contributions_guard import ContributionsGuard
 from werkzeug.exceptions import BadRequest, Forbidden
 import random
@@ -37,6 +38,7 @@ from pybossa.cache import task_browse_helpers as cached_task_browse_helpers
 from flask import current_app
 from pybossa import data_access
 from datetime import datetime
+import re
 
 
 session = db.slave_session
@@ -129,6 +131,7 @@ def after_save(task_run, conn):
           '127.0.0.1'
     if is_locking_scheduler(scheduler):
         release_lock(task_run.task_id, uid, TIMEOUT)
+        release_reserve_task_lock_by_id(task_run.project_id, task_run.task_id, uid, TIMEOUT)
 
 
 def get_breadth_first_task(project_id, user_id=None, user_ip=None,
@@ -256,31 +259,78 @@ def locked_scheduler(query_factory):
                                  external_uid=None, limit=1, offset=0,
                                  orderby='priority_0', desc=True,
                                  rand_within_priority=False, task_type='gold_last',
-                                 filter_user_prefs=False):
+                                 filter_user_prefs=False,
+                                 task_category_filters=""):
         if offset > 2:
             raise BadRequest('')
         if offset > 0:
             return None
+        project = project_repo.get(project_id)
+        timeout = project.info.get('timeout', TIMEOUT)
+        task_queue_scheduler = project.info.get("sched", "default") in [Schedulers.task_queue]
+        reserve_task_config = project.info.get("reserve_tasks", {}).get("category", [])
         task_id, lock_seconds = get_task_id_and_duration_for_project_user(project_id, user_id)
         if lock_seconds > 10:
             task = session.query(Task).get(task_id)
             if task:
                 return [task]
+        task_id = None
         user_count = get_active_user_count(project_id, sentinel.master)
         assign_user = json.dumps({'assign_user': [cached_users.get_user_email(user_id)]}) if user_id else None
         current_app.logger.info(
             "Project {} - number of current users: {}"
             .format(project_id, user_count))
 
+        sql_filters, exclude_user = "", False
+        if task_queue_scheduler and reserve_task_config:
+            sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project_id, timeout, user_id)
+            if not category_keys:
+                # no category reserved by current user. search categories
+                # excluding the ones reserved by other users
+                current_app.logger.info(
+                    "Project %s, user %s, %s", project_id, user_id,
+                    "No task category reserved by user. Search tasks excuding categories reserved by other users"
+                )
+                exclude_user = True
+                sql_filters, category_keys = get_reserve_task_category_info(
+                    reserve_task_config, project_id, timeout, user_id, exclude_user
+                )
+                current_app.logger.info("SQL filter excuding task categories reserved by other users. sql filter %s", sql_filters)
+
+        limit = current_app.config.get('DB_MAXIMUM_BATCH_SIZE') if filter_user_prefs else user_count + 5
         sql = query_factory(project_id, user_id=user_id, limit=limit,
                             rand_within_priority=rand_within_priority,
-                            task_type=task_type)
-        limit = current_app.config.get('DB_MAXIMUM_BATCH_SIZE') if filter_user_prefs else user_count + 5
+                            task_type=task_type, task_category_filters=sql_filters)
         rows = session.execute(sql, dict(project_id=project_id,
                                          user_id=user_id,
                                          assign_user=assign_user,
                                          limit=limit))
+
+        if task_queue_scheduler and reserve_task_config and rows and not rows.rowcount and not exclude_user:
+            # With task category reserved by user and no records returned,
+            # no ongoing tasks with task category reserved by user exist.
+            # Hence, query db for tasks excluding task categories reserved
+            # by other users passing exclude_users = True
+            current_app.logger.info(
+                "Project %s, user %s, %s", project_id, user_id,
+                "No task exist with task category already reserved by user. Search tasks excuding categories reserved by other users"
+            )
+            exclude_user = True
+            release_reserve_task_lock_by_keys(category_keys, timeout)
+            sql_filters, category_keys = get_reserve_task_category_info(
+                reserve_task_config, project_id, timeout, user_id, exclude_user
+            )
+            current_app.logger.info("SQL filter excuding task categories reserved by other users. sql filter %s", sql_filters)
+            sql = query_factory(project_id, user_id=user_id, limit=limit,
+                            rand_within_priority=rand_within_priority,
+                            task_type=task_type, task_category_filters=sql_filters)
+            rows = session.execute(sql, dict(project_id=project_id,
+                                            user_id=user_id,
+                                            assign_user=assign_user,
+                                            limit=limit))
+
         user_profile = cached_users.get_user_profile_metadata(user_id)
+
         if filter_user_prefs:
             # validate user qualification and calculate task preference score
             user_profile = json.loads(user_profile) if user_profile else {}
@@ -300,16 +350,110 @@ def locked_scheduler(query_factory):
             timeout = timeout or TIMEOUT
             remaining = float('inf') if calibration else n_answers - taskcount
             if acquire_lock(task_id, user_id, remaining, timeout):
+                # reserve tasks
+                acquire_reserve_task_lock(project_id, task_id, user_id, timeout)
                 return _lock_task_for_user(task_id, project_id, user_id, timeout, calibration)
-
         return []
 
     return template_get_locked_task
 
 
+
+def reserve_task_sql_filters(project_id, reserve_task_keys, exclude):
+    # build sql query filter from task category cache key
+    # return sql filter for matching task category keys and list of
+    # task category keys that qualifies for a given project_id
+
+    filters, category_keys = "", []
+
+    if not (project_id and len(reserve_task_keys)):
+        return filters, category_keys
+
+    # convert task category redis cache key to sql query
+    # ex "co:name:IBM:ticker:IBM_US" would be converted to
+    # "task.info->>'co_name' IN ('IBM')"
+    filters_dict = {}
+    current_app.logger.info("Project %s, exclude %s. Build sql filter from reserver task keys", project_id, exclude)
+    current_app.logger.info("reserve tasks keys: %s", json.dumps(reserve_task_keys))
+    regex_key = "reserve_task:project:{}:category:(.+?):user".format(project_id)
+    for item in reserve_task_keys:
+        data = re.search(regex_key, item)
+        if not data:
+            continue
+
+        category_keys += [item]
+        category = data.group(1)
+        category_fv = category.split(":")
+        for i in range(0, len(category_fv), 2):
+            key, value = category_fv[i], category_fv[i + 1]
+            if key in filters_dict:
+                if value not in filters_dict[key]:
+                    filters_dict[key] += [value]
+            else:
+                filters_dict[key] = [value]
+
+    # TODO: pull task # from category keys, look for values from task._add_user_info
+    # generate sql_filter considering value field type instead.
+    data = []
+    for key, value in filters_dict.items():
+        val = ["'{}'".format(val) for val in value]
+        data += ["task.info->>'{}' IN ({})".format(key, ", ".join(val))]
+    if not data:
+        current_app.logger.info("sql filter %s, reserve keys %s", filters, json.dumps(category_keys))
+        return filters, category_keys
+
+    exclude_clause = "IS NOT TRUE" if exclude else ""
+    filters = "({}) {}".format(" AND ".join(data), exclude_clause)
+    filters = " AND {}".format(filters) if filters else filters
+    current_app.logger.info("sql filter %s, reserve keys %s", filters, json.dumps(category_keys))
+    return filters, category_keys
+
+
+def get_reserve_task_key(task_id):
+    reserve_key = ""
+    task = task_repo.get_task(task_id)
+    if not task:
+        return reserve_key
+
+    project = project_repo.get(task.project_id)
+    if not (project and project.info.get("sched", "default") in [Schedulers.task_queue]):
+        return reserve_key
+
+    reserve_task_config = project.info.get("reserve_tasks", {}).get("category", [])
+    if not reserve_task_config:
+        return reserve_key
+
+    if not all(field in task.info for field in reserve_task_config):
+        return reserve_key
+
+    reserve_key = ":".join(["{}:{}".format(field, task.info[field]) for field in sorted(reserve_task_config)])
+    return reserve_key
+
+
+def get_reserve_task_category_info(reserve_task_config, project_id, timeout, user_id, exclude_user=False):
+    """Get reserved category info for a given user under a given project"""
+    sql_filters, category_keys = "", []
+
+    if not reserve_task_config:
+        return sql_filters, category_keys
+
+    category = ":".join(["{}:*".format(field) for field in sorted(reserve_task_config)])
+    lock_manager = LockManager(sentinel.master, timeout)
+    category_keys = lock_manager.get_task_category_lock(project_id, user_id, category, exclude_user)
+    current_app.logger.info(
+        "Project %s, user %s, reserve config %s, exclude %s. reserve task category keys %s",
+        project_id, user_id, json.dumps(reserve_task_config), exclude_user, str(category_keys)
+    )
+    if not category_keys:
+        return sql_filters, category_keys
+
+    sql_filters, category_keys = reserve_task_sql_filters(project_id, category_keys, exclude_user)
+    return sql_filters, category_keys
+
+
 def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=False,
                     task_type='gold_last', filter_user_prefs=False,
-                    priority_sort=True):
+                    priority_sort=True, task_category_filters=""):
     '''
     `task_type` will affect the type of tasks return by the query and can be one
     one of the following values:
@@ -354,11 +498,13 @@ def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=Fals
            AND task.state !='completed'
            AND task.state !='enrich'
            {}
+           {}
            group by task.id
            ORDER BY {}
            LIMIT :limit;
-           '''.format(' '.join(filters),
+           '''.format(' '.join(filters), task_category_filters,
                       ','.join(order_by))
+    print(sql)
     return text(sql)
 
 
@@ -385,15 +531,15 @@ def select_task_for_gold_mode(project, user_id):
 
 @locked_scheduler
 def get_locked_task(project_id, user_id=None, limit=1, rand_within_priority=False,
-                    task_type='gold_last'):
+                    task_type='gold_last', task_category_filters=""):
     return locked_task_sql(project_id, user_id=user_id, limit=limit,
                            rand_within_priority=rand_within_priority, task_type=task_type,
-                           filter_user_prefs=False)
+                           filter_user_prefs=False, task_category_filters=task_category_filters)
 
 
 @locked_scheduler
 def get_user_pref_task(project_id, user_id=None, limit=1, rand_within_priority=False,
-                       task_type='gold_last', filter_user_prefs=True):
+                       task_type='gold_last', filter_user_prefs=True, task_category_filters=""):
     """ Select a new task based on user preference set under user profile.
 
     For each incomplete task, check if the number of users working on the task
@@ -404,7 +550,7 @@ def get_user_pref_task(project_id, user_id=None, limit=1, rand_within_priority=F
     """
     return locked_task_sql(project_id, user_id=user_id, limit=limit,
                            rand_within_priority=rand_within_priority, task_type=task_type,
-                           filter_user_prefs=True)
+                           filter_user_prefs=True, task_category_filters=task_category_filters)
 
 
 TASK_USERS_KEY_PREFIX = 'pybossa:project:task_requested:timestamps:{0}'
@@ -429,6 +575,61 @@ def acquire_lock(task_id, user_id, limit, timeout, pipeline=None, execute=True):
         lock_manager.acquire_lock(user_tasks_key, task_id, float('inf'), pipeline=pipeline)
         if execute:
             return all(not isinstance(r, Exception) for r in pipeline.execute())
+        return True
+    return False
+
+
+def release_reserve_task_lock_by_id(project_id, task_id, user_id, timeout, expiry=EXPIRE_RESERVE_TASK_LOCK_DELAY):
+    reserve_key = get_reserve_task_key(task_id)
+    if not reserve_key:
+        return
+
+    redis_conn = sentinel.master
+    pipeline = redis_conn.pipeline(transaction=True)
+    lock_manager = LockManager(redis_conn, timeout)
+    resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
+        project_id, reserve_key, user_id, task_id)
+    lock_manager.release_reserve_task_lock(resource_id, pipeline, expiry)
+    current_app.logger.info(
+        "Release reserve task lock. project %s, task %s, user %s, expiry %d",
+        project_id, task_id, user_id, expiry
+    )
+
+
+def release_reserve_task_lock_by_keys(resource_ids, timeout, pipeline=None, expiry=EXPIRE_RESERVE_TASK_LOCK_DELAY):
+    if not resource_ids:
+        return
+
+    redis_conn = sentinel.master
+    pipeline = redis_conn.pipeline(transaction=True)
+    lock_manager = LockManager(redis_conn, timeout)
+    for resource_id in resource_ids:
+        lock_manager.release_reserve_task_lock(resource_id, pipeline, expiry)
+        current_app.logger.info(
+        "Release reserve task lock. resource id %s, expiry %d", resource_id, expiry)
+
+
+def acquire_reserve_task_lock(project_id, task_id, user_id, timeout, pipeline=None, execute=True):
+    task = task_repo.get_task(task_id)
+    project = project_repo.get(project_id)
+    if not (task and project and project.info.get("sched", "default") in [Schedulers.task_queue]):
+        return False
+
+    reserve_task_config = project.info.get("reserve_tasks", {}).get("category", [])
+    category_exist = reserve_task_config and all(task.info.get(field, False) for field in reserve_task_config)
+    if not category_exist:
+        return False
+
+    category = ["{}:{}".format(field, task.info.get(field)) for field in reserve_task_config]
+    category = ":".join(category)
+    redis_conn = sentinel.master
+    pipeline = pipeline or redis_conn.pipeline(transaction=True)
+    lock_manager = LockManager(redis_conn, timeout)
+    if lock_manager.acquire_reserve_task_lock(project_id, task_id, user_id, category):
+        current_app.logger.info(
+            "Acquired reserve task lock. project %s, task %s, user %s, category %s",
+            project_id, task_id, user_id, category
+        )
         return True
     return False
 

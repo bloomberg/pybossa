@@ -25,10 +25,11 @@ from pybossa.cache import memoize, ONE_HOUR
 from pybossa.model.project_stats import ProjectStats
 from pybossa.cache import users as cached_users
 from pybossa.cache import task_browse_helpers as cached_task_browse_helpers
-from pybossa.sched import Schedulers
+from pybossa.sched import Schedulers, get_reserve_task_category_info
+from pybossa.contributions_guard import ContributionsGuard
 
 session = db.slave_session
-
+TIMEOUT = ContributionsGuard.STAMP_TTL
 def n_gold_tasks(project_id):
     """Return the number of gold tasks for a given project"""
     query = text('''SELECT COUNT(*) AS n_gold_tasks FROM task
@@ -181,7 +182,8 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     if user_id is None or user_id <= 0:
         return n_tasks
     assign_user = json.dumps({'assign_user': [cached_users.get_user_email(user_id)]}) if user_id else None
-    scheduler = project["info"].get('sched', 'default') if type(project) == dict else project.info.get('sched', 'default')
+    project_info = project["info"] if type(project) == dict else project.info
+    scheduler = project_info.get('sched', 'default')
     project_id = project['id'] if type(project) == dict else project.id
     if scheduler not in [Schedulers.user_pref, Schedulers.task_queue]:
         sql = '''
@@ -195,16 +197,20 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     else:
         user_pref_list = cached_users.get_user_preferences(user_id)
         user_filter_list = cached_users.get_user_filters(user_id)
+        reserve_task_config = project_info.get("reserve_tasks", {}).get("category", [])
+        timeout = project_info.get("timeout", TIMEOUT)
+        reserve_task_filter, _ = get_reserve_task_category_info(reserve_task_config, project_id, timeout, user_id, True)
         sql = '''
                SELECT task.id, worker_filter FROM task
                WHERE project_id=:project_id AND state !='completed'
                AND state !='enrich'
+               {}
                AND id NOT IN
                (SELECT task_id FROM task_run WHERE
                project_id=:project_id AND user_id=:user_id)
                AND ({})
                AND ({})
-               ;'''.format(user_pref_list, user_filter_list)
+               ;'''.format(reserve_task_filter, user_pref_list, user_filter_list)
     sqltext = text(sql)
     try:
         result = session.execute(sqltext, dict(project_id=project_id, user_id=user_id, assign_user=assign_user))
