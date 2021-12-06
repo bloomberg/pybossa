@@ -64,20 +64,15 @@ class TestProjectReport(web.Helper):
         assert res.status_code == 200, res.data
 
     @with_context
-    @patch.object(exporter.os, 'remove')
-    def test_project_report_cleanup_on_error(self, mock_os_remove):
-        def _new_get_csv(*args, **kwargs):
-            yield ''
-            raise Exception('test')
+    def test_project_report_cleanup_on_error(self):
         self.register()
         self.signin()
         user = user_repo.get(1)
         project = ProjectFactory.create(owner=user)
         prce = ProjectReportCsvExporter()
-        with patch.object(prce, '_get_csv', _new_get_csv):
+        with patch.object(prce, '_respond_csv', side_effect=Exception('a')):
             with assert_raises(Exception):
                 prce._make_zip(project, None)
-        assert mock_os_remove.called
 
     @with_context
     def test_project_report_date_range_data(self):

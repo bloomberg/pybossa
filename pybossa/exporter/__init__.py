@@ -20,21 +20,20 @@
 Exporter module for exporting tasks and tasks results out of PYBOSSA
 """
 
-from contextlib import closing, contextmanager
 import copy
 import os
+import tempfile
 import zipfile
-import tempfile
-import json
-from pybossa.core import uploader, task_repo, result_repo
-import tempfile
-from pybossa.uploader import local
-from unidecode import unidecode
-from flask import url_for, safe_join, send_file, redirect, current_app
-from werkzeug.utils import secure_filename
-from werkzeug.datastructures import FileStorage
+from contextlib import closing, contextmanager
+
+from flask import send_file, current_app
 from flatten_json import flatten
+from unidecode import unidecode
 from werkzeug.datastructures import FileStorage
+from werkzeug.utils import safe_join, secure_filename
+
+from pybossa.core import uploader, task_repo, result_repo
+from pybossa.uploader import local
 
 
 @contextmanager
@@ -179,7 +178,7 @@ class Exporter(object):
                 zip_result = dict(filepath=safe_join(filepath, filename),
                                   filename=filename)
             if zip_result:
-                res = send_file(filename_or_fp=zip_result['filepath'],
+                res = send_file(path_or_file=zip_result['filepath'],
                                 mimetype='application/octet-stream',
                                 as_attachment=True,
                                 attachment_filename=zip_result['filename'])
@@ -208,9 +207,11 @@ class Exporter(object):
         """
         name = self._project_name_latin_encoded(project)
         if obj_generator is not None:
-            with tempfile.NamedTemporaryFile() as datafile:
+            with tempfile.NamedTemporaryFile(mode='w+t') as datafile:
                 for line in obj_generator:
-                    datafile.write(str(line).encode())  # accepts only bytes
+                    if type(line) == bytes:
+                        line = line.decode()
+                    datafile.write(line)  # accepts only text
                 datafile.flush()
                 obj_generator.close()
 

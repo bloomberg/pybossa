@@ -16,41 +16,42 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Jobs module for running background tasks in PYBOSSA server."""
-from datetime import datetime
+import json
 import math
+import os
+from collections import OrderedDict
+from datetime import datetime
+from io import BytesIO
+from zipfile import ZipFile
+
+import pandas as pd
 import requests
 from flask import current_app, render_template
 from flask_mail import Message, Attachment
-import pybossa.cache.users as cached_users
-from pybossa.cache.helpers import n_available_tasks
-from pybossa.core import mail, project_repo, task_repo, importer, create_app
-from pybossa.model.webhook import Webhook
-from pybossa.util import with_cache_disabled, publish_channel, mail_with_enabled_users, UnicodeWriter
-import pybossa.dashboard.jobs as dashboard
-from pybossa.leaderboard.jobs import leaderboard
 from pbsonesignal import PybossaOneSignal
-import os
-from datetime import datetime
-from pybossa.core import user_repo, auditlog_repo
 from rq.timeouts import JobTimeoutException
+from sqlalchemy.sql import text
+
 import app_settings
+import pybossa.cache.users as cached_users
+import pybossa.dashboard.jobs as dashboard
 from pybossa.auditlogger import AuditLogger
-from pybossa.cache import sentinel, management_dashboard_stats
-from pybossa.cache import settings, site_stats
+from pybossa.cache import site_stats
+from pybossa.cache.helpers import n_available_tasks
 from pybossa.cache.users import get_users_for_report
 from pybossa.cloud_store_api.connection import create_connection
-from collections import OrderedDict
-import json
-from io import StringIO, BytesIO
-from sqlalchemy.sql import text
-from zipfile import ZipFile
+from pybossa.core import mail, task_repo, importer
+from pybossa.core import user_repo, auditlog_repo
+from pybossa.leaderboard.jobs import leaderboard
+from pybossa.model.webhook import Webhook
+from pybossa.util import with_cache_disabled, publish_channel, \
+    mail_with_enabled_users
 
 MINUTE = 60
 IMPORT_TASKS_TIMEOUT = (20 * MINUTE)
 TASK_DELETE_TIMEOUT = (60 * MINUTE)
 EXPORT_TASKS_TIMEOUT = (20 * MINUTE)
 MAX_RECIPIENTS = 50
-from pybossa.core import uploader
 from pybossa.exporter.json_export import JsonExporter
 
 auditlogger = AuditLogger(auditlog_repo, caller='web')
@@ -69,7 +70,7 @@ def schedule_job(function, scheduler):
                       function['kwargs']))
             return msg
     # If job was scheduled, it exists up here, else it continues
-    job = scheduler.schedule(
+    scheduler.schedule(
         scheduled_time=(function.get('scheduled_time') or datetime.utcnow()),
         func=function['name'],
         args=function['args'],
@@ -384,9 +385,7 @@ def get_autoimport_jobs(queue='low'):
 @with_cache_disabled
 def get_project_stats(_id, short_name):  # pragma: no cover
     """Get stats for project."""
-    import pybossa.cache.projects as cached_projects
     import pybossa.cache.project_stats as stats
-    from flask import current_app
 
     # cached_projects.get_project(short_name)
     stats.update_stats(_id)
@@ -546,7 +545,6 @@ def disable_users_job():
     from sqlalchemy.sql import text
     from pybossa.model.user import User
     from pybossa.core import db, user_repo
-    from pybossa.util import generate_manage_user_email
 
     # default user deactivation time
     user_interval = current_app.config.get('STALE_USERS_MONTHS') or 3
@@ -862,6 +860,9 @@ def export_tasks(current_user_email_addr, short_name,
             else:
                 msg = '<p>Your exported data is attached.</p>'
                 mail_dict['attachments'] = [Attachment(filename, "application/zip", content)]
+
+            current_app.logger.info(
+                'Tasks exported successfully - Project: {0}'.format(project.name))
         else:
             # Failure email
             mail_dict['subject'] = 'Data export failed for your project: {0}'.format(project.name)
@@ -875,6 +876,8 @@ def export_tasks(current_user_email_addr, short_name,
         mail_dict['html'] = body
         message = Message(**mail_dict)
         mail.send(message)
+        current_app.logger.info(
+            'Email sent successfully - Project: {0}'.format(project.name))
         job_response = '{0} {1} file was successfully exported for: {2}'
         return job_response.format(
                 ty.capitalize(), filetype.upper(), project.name)
@@ -1155,7 +1158,7 @@ def news():
 
 def check_failed():
     """Check the jobs that have failed and requeue them."""
-    from rq import Queue, requeue_job
+    from rq import requeue_job
     from rq.registry import FailedJobRegistry
     from pybossa.core import sentinel
 
@@ -1287,8 +1290,8 @@ def delete_account(user_id, admin_addr, **kwargs):
 
 
 def export_userdata(user_id, admin_addr, **kwargs):
-    from pybossa.core import (user_repo, uploader)
-    from flask import current_app, url_for
+    from pybossa.core import (user_repo)
+    from flask import current_app
     json_exporter = JsonExporter()
     user = user_repo.get(user_id)
     user_data = user.dictize()
@@ -1445,6 +1448,7 @@ def check_and_send_task_notifications(project_id, conn=None):
             # User is updating the task notification from the project settings.
             project_repo.save(project)
 
+
 def export_all_users(fmt, email_addr):
     exportable_attributes = ('id', 'name', 'fullname', 'email_addr', 'locale',
                              'created', 'admin', 'subadmin', 'enabled', 'languages',
@@ -1464,24 +1468,10 @@ def export_all_users(fmt, email_addr):
         return jdata
 
     def respond_csv():
-        out = StringIO()
-        writer = UnicodeWriter(out)
-        tmp = 'attachment; filename=all_users.csv'
-        return gen_csv(out, writer, write_user)
-
-    def gen_csv(out, writer, write_user):
-        add_headers(writer)
         users = get_users_for_report()
-        for user in users:
-            write_user(writer, user)
-        return out.getvalue()
-
-    def write_user(writer, user):
-        values = [user[attr] for attr in exportable_attributes]
-        writer.writerow(values)
-
-    def add_headers(writer):
-        writer.writerow(exportable_attributes)
+        df = pd.DataFrame.from_dict(users)
+        user_csv = df.to_csv(columns=exportable_attributes, index=False)
+        return user_csv
 
     recipients = email_addr if isinstance(email_addr, list) else [email_addr]
     current_app.logger.info('Scheduling export_all_users job send to {} admins/users'

@@ -16,44 +16,43 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Module with PyBossa utils."""
-from collections import OrderedDict
-from datetime import timedelta, datetime, date
-from yacryptopan import CryptoPAn
-from functools import update_wrapper
-from tempfile import NamedTemporaryFile
-from flask_wtf import FlaskForm as Form
-import csv
-import codecs
-import io
-import dateutil.tz
-from flask import abort, request, make_response, current_app, url_for
-from flask import redirect, render_template, jsonify, get_flashed_messages
-from flask_wtf.csrf import generate_csrf
-import dateutil.parser
-from functools import wraps
-from flask_login import current_user
-from sqlalchemy import text
-from sqlalchemy.exc import ProgrammingError
-from math import ceil
-import json
 import base64
+import codecs
+import csv
 import hashlib
 import hmac
-import random
-import simplejson
-import time
-from flask_babel import lazy_gettext
-import re
+import io
+import json
 import os
-from werkzeug.utils import secure_filename
-from flask import safe_join
-from pybossa.cloud_store_api.s3 import s3_upload_file_storage
-from pybossa.cloud_store_api.connection import create_connection
-from pybossa.uploader import local
-from pybossa.cloud_store_api.s3 import get_file_from_s3, delete_file_from_s3
+import random
+import re
+import time
+from collections import OrderedDict
+from datetime import timedelta, datetime, date
+from functools import update_wrapper
+from functools import wraps
+from math import ceil
+from tempfile import NamedTemporaryFile
 
+import dateutil.parser
+import dateutil.tz
+import simplejson
+from flask import abort, request, make_response, current_app, url_for
+from flask import redirect, render_template, jsonify, get_flashed_messages
+from flask_babel import lazy_gettext
+from flask_login import current_user
 # Markdown support
 from flask_misaka import Misaka
+from flask_wtf import FlaskForm as Form
+from flask_wtf.csrf import generate_csrf
+from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
+from yacryptopan import CryptoPAn
+
+from pybossa.cloud_store_api.connection import create_connection
+from pybossa.cloud_store_api.s3 import get_file_from_s3, delete_file_from_s3
+from pybossa.cloud_store_api.s3 import s3_upload_file_storage
+
 misaka = Misaka()
 
 def last_flashed_message():
@@ -88,7 +87,6 @@ def hash_last_flash_message():
 
 def handle_content_type(data):
     """Return HTML or JSON based on request type."""
-    from pybossa.model.project import Project
     if (request.headers.get('Content-Type') == 'application/json' or
         request.args.get('response_format') == 'json'):
         message_and_status = last_flashed_message()
@@ -1191,7 +1189,6 @@ def description_from_long_description(desc, long_desc):
 
 
 def generate_bsso_account_notification(user):
-    from pybossa.core import user_repo
     warning = False if user.get('metadata', {}).get('user_type') else True
     template_type = 'adminbssowarning' if warning else 'adminbssonotification'
     admins_email_list = current_app.config.get('ALERT_LIST',[])

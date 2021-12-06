@@ -34,7 +34,7 @@ from pybossa import util
 from pybossa.core import project_repo, user_repo, task_repo
 from pybossa.core import uploader
 from pybossa.uploader import local
-from flask import safe_join
+from werkzeug.utils import safe_join
 from flask_login import current_user
 import os
 import json
