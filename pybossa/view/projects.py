@@ -1705,13 +1705,9 @@ def bulk_update_assign_worker(short_name):
     from sqlalchemy.orm.attributes import flag_modified
 
 
-    print(request)
     response = {}
     project, owner, ps = project_by_shortname(short_name)
-    print(request.data)
     data = json.loads(request.data)
-
-    # assign_user_cadidates instead of assign_user
 
     if data.get("add") is None and data.get("remove") is None:
         # read data and return users
@@ -1732,14 +1728,10 @@ def bulk_update_assign_worker(short_name):
             response['assign_users'] = assign_users
         else:
             bulk_update = True
-            # if it's bulk update
-            # use filters tp read all tasks and gneerate assign_users list
-            print(json.loads(data.get('filters')))
             args = parse_tasks_browse_args(json.loads(data.get('filters', '')))
             tasks = task_repo.get_tasks_by_filters(project, args)
             task_ids = [t.id for t in tasks]
             assign_user_emails = set()
-            import pdb; pdb.set_trace()
 
             for task_id in task_ids:
                 t = task_repo.get_task_by(project_id=project.id,
@@ -1749,11 +1741,7 @@ def bulk_update_assign_worker(short_name):
             for user_email in assign_user_emails:
                 user = user_repo.search_by_email(user_email)
                 if not user:
-                    # use the email if the user is not found in the user repo
                     fullname = user_email + ' (user not found)'
-                    # these user emails were assigned via csv but are not found 
-                    #  you can remove these users from the assigned users list.. OR add them to the user repo
-                    # sanity check on the CSV import? fix the problem where it happens
                 else:
                     fullname = user.fullname 
                 assign_users.append({'fullname': fullname, 'email': user_email})
@@ -1774,13 +1762,9 @@ def bulk_update_assign_worker(short_name):
             user_data['fullname'] = user.fullname
             user_data['email'] = user.email_addr
             all_user_data.append(user_data)
-            print(user_data)
-        print(bulk_update)
         response["all_users"] = all_user_data
     else:
         # update tasks with assign worker values
-        print(request)
-
         assign_workers = data.get('add', [])
         remove_workers = data.get('remove', [])
 
