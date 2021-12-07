@@ -479,8 +479,6 @@ def get_announcements_cached(user, announcement_levels):
     level = announcement_levels['user']['level']
     if user.admin:
         level = announcement_levels['admin']['level']
-    elif published_projects_cached(user.id):
-        level = announcement_levels['owner']['level']
     elif user.subadmin:
         level = announcement_levels['subadmin']['level']
     return get_announcements_by_level_cached(level)
