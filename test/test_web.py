@@ -9233,6 +9233,61 @@ class TestWeb(web.Helper):
         assert res.status_code == 200, res.status_code
         assert len(task_repo.filter_tasks_by(project_id=project.id)) == 0
 
+    @with_context
+    def test_reserve_task_not_present(self):
+        """Reserve task to return first available task when reserve task category task not present"""
+        admin = UserFactory.create(admin=True)
+        admin.set_password('1234')
+        user_repo.save(admin)
+        self.signin(email=admin.email_addr, password='1234')
+
+        category_config = ["field_1", "field_2"]
+        project = ProjectFactory.create(
+            zip_download=True, owner=admin,
+            info=dict(
+                sched="task_queue_scheduler",
+                reserve_tasks=dict(
+                    category=category_config
+                )
+            )
+        )
+        task = TaskFactory.create_batch(3, project=project, info=dict(x=1, y=2))
+        res = self.app.get('api/project/%s/newtask' % project.id)
+        data = json.loads(res.data)
+        assert data["id"] == task[0].id, "First available task to be presented when no task exist with reserver category"
+
+    @with_context
+    @patch('pybossa.redis_lock.LockManager.get_task_category_lock')
+    def test_reserve_task_all_reserved_tasks_consumed(self, get_task_category_lock):
+        """Reserve task to return first available task when all reserve task category task were consumed"""
+
+        admin = UserFactory.create(admin=True)
+        admin.set_password('1234')
+        user_repo.save(admin)
+        self.signin(email=admin.email_addr, password='1234')
+
+        category_config = ["field_1", "field_2"]
+        project = ProjectFactory.create(
+            zip_download=True, owner=admin,
+            info=dict(
+                sched="task_queue_scheduler",
+                reserve_tasks=dict(
+                    category=category_config
+                )
+            )
+        )
+        get_task_category_lock.side_effect = [[
+            "reserve_task:project:{}:category:field_1:value1:field_2:value2:user:{}:task:454".format(project.id, admin.id)
+        ], []]
+
+        task = TaskFactory.create_batch(3, project=project, info=dict(x=1, y=2))
+        res = self.app.get('api/project/%s/newtask' % project.id)
+        data = json.loads(res.data)
+        assert data["id"] == task[0].id, "First available task to be presented when all tasks with reserver category are consumed"
+
+
+
+
 
 class TestWebUserMetadataUpdate(web.Helper):
 

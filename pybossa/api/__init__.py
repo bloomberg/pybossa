@@ -71,7 +71,8 @@ from completed_task_run import CompletedTaskRunAPI
 from pybossa.cache.helpers import (n_available_tasks, n_available_tasks_for_user,
     n_unexpired_gold_tasks)
 from pybossa.sched import (get_project_scheduler_and_timeout, get_scheduler_and_timeout,
-                           has_lock, release_lock, Schedulers, get_locks)
+                           has_lock, release_lock, Schedulers, get_locks,
+                           release_reserve_task_lock_by_id)
 from pybossa.jobs import send_mail
 from pybossa.api.project_by_name import ProjectByNameAPI
 from pybossa.api.pwd_manager import get_pwd_manager
@@ -84,6 +85,7 @@ from sqlalchemy.sql import text
 from pybossa.core import db
 from pybossa.cache.task_browse_helpers import get_searchable_columns
 from pybossa.view.projects import get_locked_tasks
+from pybossa.redis_lock import EXPIRE_LOCK_DELAY
 
 task_fields = [
     "id",
@@ -482,6 +484,8 @@ def cancel_task(task_id=None):
             current_app.logger.info(
                 'Project {} - user {} cancelled task {}'
                 .format(project.id, current_user.id, task_id))
+            release_reserve_task_lock_by_id(project.id, task_id, current_user.id, timeout, expiry=EXPIRE_LOCK_DELAY)
+
 
     return Response(json.dumps({'success': True}), 200, mimetype="application/json")
 
