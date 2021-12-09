@@ -18,10 +18,13 @@
 # Cache global variables for timeouts
 
 import json
-from flask import url_for, safe_join, send_file, redirect
+
+from flask import send_file
+from werkzeug.utils import safe_join
+
 from pybossa.core import uploader, task_repo
-from pybossa.uploader import local
 from pybossa.exporter.json_export import JsonExporter
+from pybossa.uploader import local
 from .export_helpers import browse_tasks_export, browse_tasks_export_count
 
 TASK_GOLD_FIELDS = [
@@ -165,7 +168,7 @@ class TaskJsonExporter(JsonExporter):
         self._make_zip(project, ty, expanded)
         if isinstance(uploader, local.LocalUploader):
             filepath = self._download_path(project)
-            res = send_file(filename_or_fp=safe_join(filepath, filename),
+            res = send_file(path_or_file=safe_join(filepath, filename),
                             mimetype='application/octet-stream',
                             as_attachment=True,
                             attachment_filename=filename)

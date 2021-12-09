@@ -17,15 +17,18 @@
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 # Cache global variables for timeouts
 
-import tempfile
 import json
-from flask import url_for, send_file, redirect
-from pybossa.uploader import local
+import tempfile
+
+from flask import send_file
+from werkzeug.utils import safe_join
+
+from pybossa.core import uploader
 from pybossa.exporter.csv_export import CsvExporter
-from pybossa.core import uploader, task_repo
+from pybossa.uploader import local
 from pybossa.util import UnicodeWriter
 from .export_helpers import browse_tasks_export
-from werkzeug.utils import safe_join
+
 
 class TaskCsvExporter(CsvExporter):
     """CSV Exporter for exporting ``Task``s and ``TaskRun``s

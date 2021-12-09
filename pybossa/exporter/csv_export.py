@@ -21,14 +21,13 @@ CSV Exporter module for exporting tasks and tasks results out of PYBOSSA
 """
 
 import tempfile
-from pybossa.exporter import Exporter
-from pybossa.core import uploader, task_repo
-from pybossa.model.task import Task
-from pybossa.model.task_run import TaskRun
-from pybossa.util import UnicodeWriter
+
+import pandas as pd
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
-import pandas as pd
+
+from pybossa.core import uploader
+from pybossa.exporter import Exporter
 
 
 class CsvExporter(Exporter):
