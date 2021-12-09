@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from io import StringIO
+from io import StringIO, BytesIO
 from unittest.mock import patch, MagicMock
 from test import Test, with_context
 from pybossa.cloud_store_api.s3 import *
@@ -79,7 +79,7 @@ class TestS3Uploader(Test):
     @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
     def test_upload_from_storage(self, set_contents):
         with patch.dict(self.flask_app.config, self.default_config):
-            stream = StringIO('Hello world!')
+            stream = BytesIO(b'Hello world!')
             fstore = FileStorage(stream=stream,
                                  filename='test.txt',
                                  name='fieldname')

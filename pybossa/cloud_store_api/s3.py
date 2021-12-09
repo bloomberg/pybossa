@@ -82,28 +82,17 @@ def s3_upload_file_storage(s3_bucket, source_file, headers=None, directory='',
                            conn_name=DEFAULT_CONN, with_encryption=False):
     """
     Upload a werzkeug FileStorage content to s3
-    The FileStorage content can be either a StringIO or BytesIO
+    The FileStorage content can only be BytesIO
     """
     filename = source_file.filename
     headers = headers or {}
     headers['Content-Type'] = source_file.content_type
 
-    # mode is depended on the mode in the stream
-    if isinstance(source_file.stream, io.BytesIO):
-        mode = 'w+b'
-    elif isinstance(source_file.stream, io.StringIO):
-        mode = 'w+t'
-    else:
-        mode = source_file.stream.mode
-
-    # tmp_file is opened in the mode depending on the
-    # source_file(FileStorage type)
-    tmp_file = NamedTemporaryFile(delete=False, mode=mode)
+    tmp_file = NamedTemporaryFile(delete=False)
 
     # When using the file name (tmp_file.name), save method in the FileStorage
-    # class can only open the file in binary mode. Using opened file object
-    # 'tmp_file' so that the open mode can be controlled outside of save method
-    source_file.save(tmp_file)
+    # class can only open the file in binary mode
+    source_file.save(tmp_file.name)
     tmp_file.flush()
 
     upload_root_dir = app.config.get('S3_UPLOAD_DIRECTORY')
@@ -196,6 +185,7 @@ def get_file_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN, decrypt=False):
     temp_file.seek(0)
     return temp_file
 
+
 def get_content_and_key_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN,
         decrypt=False, secret=None):
     _, key = get_s3_bucket_key(s3_bucket, path, conn_name)
@@ -209,8 +199,10 @@ def get_content_and_key_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN,
         content = content.decode()
     return content, key
 
+
 def get_content_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN, decrypt=False):
     return get_content_and_key_from_s3(s3_bucket, path, conn_name, decrypt)[0]
+
 
 def delete_file_from_s3(s3_bucket, s3_url, conn_name=DEFAULT_CONN):
     headers = {}

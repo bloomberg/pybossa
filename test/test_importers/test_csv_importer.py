@@ -52,6 +52,7 @@ class TestBulkTaskCSVImport(object):
 
         assert number_of_tasks is 1, number_of_tasks
 
+    @with_request_context
     def test_count_tasks_raises_exception_if_file_forbidden(self, request):
         forbidden_request = FakeResponse(text='Forbidden', status_code=403,
                                          headers={'content-type': 'text/csv'},
@@ -66,6 +67,7 @@ class TestBulkTaskCSVImport(object):
         # It has args attribute. It is subscriptable.
         assert context.exception.args[0] == msg, context.exception
 
+    @with_request_context
     def test_count_tasks_raises_exception_if_not_CSV_file(self, request):
         html_request = FakeResponse(text='Not a CSV', status_code=200,
                                     headers={'content-type': 'text/html'},
@@ -77,6 +79,7 @@ class TestBulkTaskCSVImport(object):
             self.importer.count_tasks()
         assert context.exception.args[0] == msg, context.exception
 
+    @with_request_context
     def test_count_tasks_raises_exception_if_dup_header(self, request):
         csv_file = FakeResponse(text='Foo,Bar,Foo\n1,2,3', status_code=200,
                                   headers={'content-type': 'text/plain'},
@@ -88,6 +91,7 @@ class TestBulkTaskCSVImport(object):
             self.importer.count_tasks()
         assert context.exception.args[0] == msg, context.exception
 
+    @with_request_context
     def test_tasks_raises_exception_if_file_forbidden(self, request):
         forbidden_request = FakeResponse(text='Forbidden', status_code=403,
                                          headers={'content-type': 'text/csv'},
@@ -99,6 +103,7 @@ class TestBulkTaskCSVImport(object):
             self.importer.tasks()
         assert context.exception.args[0] == msg, context.exception
 
+    @with_request_context
     def test_tasks_raises_exception_if_not_CSV_file(self, request):
         html_request = FakeResponse(text='Not a CSV', status_code=200,
                                     headers={'content-type': 'text/html'},
@@ -110,6 +115,7 @@ class TestBulkTaskCSVImport(object):
             self.importer.tasks()
         assert context.exception.args[0] == msg, context.exception
 
+    @with_request_context
     def test_tasks_raises_exception_if_dup_header(self, request):
         csv_file = FakeResponse(text='Foo,Bar,Foo\n1,2,3', status_code=200,
                                 headers={'content-type': 'text/plain'},
@@ -121,6 +127,7 @@ class TestBulkTaskCSVImport(object):
             next(self.importer.tasks())
         assert context.exception.args[0] == msg, context.exception
 
+    @with_request_context
     def test_tasks_raises_exception_if_empty_headers(self, request):
         csv_file = FakeResponse(text='Foo,Bar,\n1,2,3', status_code=200,
                                 headers={'content-type': 'text/plain'},

@@ -103,6 +103,7 @@ class TaskImportValidator(object):
         for error, validator in self.validations.items():
             if not validator(task, self._enrichment_output_fields):
                 self.errors[error] += 1
+                current_app.logger.info(f"importing task validation: {error}")
                 return False
         return True
 
@@ -196,7 +197,8 @@ class Importer(object):
 
         """Create tasks from a remote source using an importer object and
         avoiding the creation of repeated tasks"""
-        n = 0
+        # import pdb; pdb.set_trace()
+        num = 0
         importer = importer or self._create_importer_for(**form_data)
         tasks = importer.tasks()
         header_report = self._validate_headers(importer, project, **form_data)
@@ -207,7 +209,6 @@ class Importer(object):
         n_answers = project.get_default_n_answers()
         try:
             for task_data in tasks:
-
                 self.upload_private_data(task_data, project.id)
 
                 task = Task(project_id=project.id, n_answers=n_answers)
@@ -223,7 +224,7 @@ class Importer(object):
                 if not validator.validate(task):
                     continue
                 try:
-                    n += 1
+                    num += 1
                     task_repo.save(task, clean_project=False)
                 except Exception as e:
                     current_app.logger.exception(msg)
@@ -236,16 +237,16 @@ class Importer(object):
             delete_import_csv_file(csv_filename)
 
         metadata = importer.import_metadata()
-        if n==0:
+        if num == 0:
             msg = gettext('It looks like there were no new records to import. ')
-        elif n == 1:
-            msg = str(n) + " " + gettext('new task was imported successfully. ')
+        elif num == 1:
+            msg = str(num) + " " + gettext('new task was imported successfully. ')
         else:
-            msg = str(n) + " " + gettext('new tasks were imported successfully. ')
+            msg = str(num) + " " + gettext('new tasks were imported successfully. ')
         msg += str(validator)
         if data_access_levels and 'data_access' in importer.headers():
             msg += gettext('Task data_access column will not impact data classification. This is done at project level only.')
-        return ImportReport(message=msg, metadata=metadata, total=n)
+        return ImportReport(message=msg, metadata=metadata, total=num)
 
     def count_tasks_to_import(self, **form_data):
         """Count tasks to import."""

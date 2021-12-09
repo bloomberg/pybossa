@@ -195,7 +195,7 @@ class LockManager(object):
             self._redis.hdel(resource_id, *to_delete)
 
     def _release_expired_reserve_task_locks(self, resource_id, now):
-        expiration = self._redis.get(resource_id)
+        expiration = self._redis.get(resource_id) or 0
         if now > expiration:
             self._redis.delete(resource_id)
 
