@@ -118,4 +118,4 @@ software and other kinds of works, specifically designed to ensure
 cooperation with the community in the case of network server software.
 
 Documentation and media is under a Creative Commons Attribution License version
-3.
+3
