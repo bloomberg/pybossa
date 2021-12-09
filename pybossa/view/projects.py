@@ -94,9 +94,10 @@ from datetime import datetime
 from pybossa.data_access import (data_access_levels, subadmins_are_privileged,
     ensure_annotation_config_from_form, ensure_amp_config_applied_to_project)
 import app_settings
+import copy
 from copy import deepcopy
 from pybossa.cache import delete_memoized
-
+from sqlalchemy.orm.attributes import flag_modified
 
 cors_headers = ['Content-Type', 'Authorization']
 
@@ -1699,12 +1700,9 @@ def bulk_priority_update(short_name):
     except Exception as e:
         return ErrorStatus().format_exception(e, 'priorityupdate', 'POST')
 
-@blueprint.route('/<short_name>/tasks/assign-workersupdate', methods=['POST'])
+@blueprint.route('/<short_name>/tasks/assign-workersupdate', methods=['GET', 'POST'])
 def bulk_update_assign_worker(short_name):
-    import copy
-    from sqlalchemy.orm.attributes import flag_modified
-
-
+   
     response = {}
     project, owner, ps = project_by_shortname(short_name)
     data = json.loads(request.data)
@@ -1719,13 +1717,10 @@ def bulk_update_assign_worker(short_name):
             # use filters tp populate user list
             t = task_repo.get_task_by(project_id=project.id,
                                         id=int(task_id))
-            assign_users = []
-            if t.user_pref:
+            if not t.user_pref:
+                assign_user_email = []
+            else:
                 assign_user_emails = set(t.user_pref.get("assign_user", []))
-                for user_email in assign_user_emails:
-                    fullname = user_repo.search_by_email(user_email).fullname
-                    assign_users.append({'fullname': fullname, 'email': user_email})
-            response['assign_users'] = assign_users
         else:
             bulk_update = True
             args = parse_tasks_browse_args(json.loads(data.get('filters', '')))
@@ -1737,15 +1732,15 @@ def bulk_update_assign_worker(short_name):
                 t = task_repo.get_task_by(project_id=project.id,
                                         id=int(task_id))
                 assign_user_emails = assign_user_emails.union(set(t.user_pref.get("assign_user", [])))
-            assign_users = []
-            for user_email in assign_user_emails:
-                user = user_repo.search_by_email(user_email)
-                if not user:
-                    fullname = user_email + ' (user not found)'
-                else:
-                    fullname = user.fullname 
-                assign_users.append({'fullname': fullname, 'email': user_email})
-            response['assign_users'] = assign_users
+        assign_users = []
+        for user_email in assign_user_emails:
+            user = user_repo.search_by_email(user_email)
+            if not user:
+                fullname = user_email + ' (user not found)'
+            else:
+                fullname = user.fullname 
+            assign_users.append({'fullname': fullname, 'email': user_email})
+        response['assign_users'] = assign_users
 
         # get a list of all users can be assigned to task
         if bool(data_access_levels):
