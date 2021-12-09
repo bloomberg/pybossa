@@ -187,11 +187,10 @@ class TaskRepository(Repository):
     def update(self, element):
         self._validate_can_be(self.UPDATE_ACTION, element)
         try:
-            new_element = self.db.session.merge(element)
             self.db.session.commit()
             cached_projects.clean_project(element.project_id)
         except IntegrityError as e:
-            # self.db.session.rollback()
+            self.db.session.rollback()
             raise DBIntegrityError(e)
 
     def delete(self, element):
@@ -280,11 +279,8 @@ class TaskRepository(Repository):
         self._delete_zip_files_from_store(project)
 
     def get_tasks_by_filters(self, project, filters=None):
-        filters = filters or {}
+         filters = filters or {}
         conditions, params = get_task_filters(filters)
-        print(conditions)
-        print(params)
-
 
         sql = ''' SELECT task.id
                 from task LEFT OUTER JOIN
@@ -294,8 +290,6 @@ class TaskRepository(Repository):
                 ON task.id=log_counts.task_id
                 WHERE task.project_id=:project_id {}
         '''.format(conditions)
-
-        print(sql)
 
         rows = self.db.session.execute(sql, dict(project_id=project.id, **params))
         return [row for row in rows]
