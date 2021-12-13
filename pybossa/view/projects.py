@@ -1700,7 +1700,10 @@ def bulk_priority_update(short_name):
     except Exception as e:
         return ErrorStatus().format_exception(e, 'priorityupdate', 'POST')
 
+@crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/assign-workersupdate', methods=['GET', 'POST'])
+@login_required
+@admin_or_subadmin_required
 def bulk_update_assign_worker(short_name):
    
     response = {}
