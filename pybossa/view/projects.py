@@ -1721,7 +1721,7 @@ def bulk_update_assign_worker(short_name):
             t = task_repo.get_task_by(project_id=project.id,
                                         id=int(task_id))
             assign_user_email = []
-            if t.user_pref is not None and "assign_user" in t.user_pref:
+            if t.user_pref is not None and isinstance(t.user_pref, dict):
                 assign_user_emails = set(t.user_pref.get("assign_user", []))
         else:
             bulk_update = True
