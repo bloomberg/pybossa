@@ -232,13 +232,17 @@ class LockManager(object):
         if not category_keys:
             return []
 
+        # response returned as bytes in Python 3 that were str in Python 2
+        # per https://github.com/andymccurdy/redis-py
+        category_keys_str = [key.decode() for key in category_keys]
+
         # if key present but for different user, with redundancy = 1, return false
         # TODO: for redundancy > 1, check if additional task run
         # available for this user and if so, return category_key else ""
         if exclude_user:
             # exclude user_id from list of keys passed
             drop_user = ":user:{}:task:".format(user_id)
-            category_keys = [ key for key in category_keys if drop_user not in key ]
+            category_keys = [ key for key in category_keys_str if drop_user not in key ]
         return category_keys
 
 
