@@ -34,7 +34,7 @@ class TestAssignTaskWorker(web.Helper):
         project = ProjectFactory.create(published=True)
         user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
         task_user_pref = dict(assign_user=[user.email_addr])
-        task = TaskFactory.create(project=project, user_pref=json.dumps(task_user_pref))
+        task = TaskFactory.create(project=project, user_pref=task_user_pref)
 
         url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
         req_data = dict(taskId=str(task.id))
@@ -55,7 +55,7 @@ class TestAssignTaskWorker(web.Helper):
         user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
         invalid_email_addr = "invalid@email"
         task_user_pref = dict(assign_user=[user.email_addr, invalid_email_addr])
-        task = TaskFactory.create(project=project, user_pref=json.dumps(task_user_pref))
+        task = TaskFactory.create(project=project, user_pref=task_user_pref)
 
         url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
         req_data = dict(taskId=str(task.id))
