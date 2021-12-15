@@ -172,12 +172,11 @@ class TestReserveTaskCategory(sched.Helper):
         )
         assert expected_reserve_task_key.encode() in sentinel.master.keys(), "reserve task key must exist in redis cache"
 
-        # # release reserve task lock
-        # expiry = 1
-        # import pdb; pdb.set_trace()
-        # release_reserve_task_lock_by_keys([expected_reserve_task_key], timeout, expiry=expiry)
-        # time.sleep(expiry)
-        # assert expected_reserve_task_key.encode() not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
+        # release reserve task lock
+        expiry = 1
+        release_reserve_task_lock_by_keys([expected_reserve_task_key], timeout, expiry=expiry)
+        time.sleep(expiry)
+        assert expected_reserve_task_key.encode() not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
 
 
     @with_context
@@ -239,12 +238,12 @@ class TestReserveTaskCategory(sched.Helper):
             )]
         _, category_keys = get_reserve_task_category_info(reserve_task_config, 1, 1, user.id, exclude_user=True)
         assert category_keys == expected_category_keys, "reserve task category keys should exclude user {} reserve category key".format(user.id)
-#         # cleanup; release reserve task lock
-#         expiry = 1
-#         release_reserve_task_lock_by_id(project.id, tasks[0].id, user.id, 1, expiry=expiry)
-#         release_reserve_task_lock_by_id(project.id, tasks[1].id, non_excluded_user_id, 1, expiry=expiry)
-#
-#
+        # cleanup; release reserve task lock
+        expiry = 1
+        release_reserve_task_lock_by_id(project.id, tasks[0].id, user.id, 1, expiry=expiry)
+        release_reserve_task_lock_by_id(project.id, tasks[1].id, non_excluded_user_id, 1, expiry=expiry)
+
+
     @with_context
     def test_release_reserve_task_lock_by_id(self):
         timeout = 100
@@ -270,14 +269,14 @@ class TestReserveTaskCategory(sched.Helper):
             project.id, category_key, user.id, task.id
         )
         assert expected_reserve_task_key.encode() in sentinel.master.keys(), "reserve task key must exist in redis cache"
-#
-#         # release reserve task lock
-#         expiry = 1
-#         release_reserve_task_lock_by_id(project.id, task.id, user.id, timeout, expiry=expiry)
-#         time.sleep(expiry)
-#         assert expected_reserve_task_key not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
-#
-#
+
+        # release reserve task lock
+        expiry = 1
+        release_reserve_task_lock_by_id(project.id, task.id, user.id, timeout, expiry=expiry)
+        time.sleep(expiry)
+        assert expected_reserve_task_key not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
+
+
     @with_context
     def test_get_reserve_task_key(self):
         category_fields = ["field_1", "field_2"]

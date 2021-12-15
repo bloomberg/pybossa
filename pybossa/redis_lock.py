@@ -260,5 +260,6 @@ class LockManager(object):
 
 
     def release_reserve_task_lock(self, resource_id, pipeline, expiry):
-        cache = pipeline or self._redis
+        #cache = pipeline or self._redis # https://pythonrepo.com/repo/andymccurdy-redis-py-python-connecting-and-operating-databases#locks
+        cache = self._redis
         cache.expire(resource_id, expiry)
