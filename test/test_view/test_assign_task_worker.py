@@ -64,16 +64,27 @@ class TestAssignTaskWorker(web.Helper):
         res_data = json.loads(res.data)
         assert len(res_data['assign_users']) == 2, res_data['assign_users']
         assert res_data['assign_users'][0]['email'] == invalid_email_addr
-        print(res_data['assign_users'][0]['email'])
-        print(res_data['assign_users'])
-
-        assert res_data['assign_users'][0]['fullname'] == user.fullname
+        assert res_data['assign_users'][0]['fullname'] == invalid_email_addr + " (user not found)"
 
         all_user_emails = [u['email'] for u in res_data['all_users']]
         assert invalid_email_addr not in all_user_emails, "existing users should be excluded from user list"
 
 
+'''
+bulk_priority_update() with and without task_ids,
+ and one that calls bulk_update_assign_worker() for a specific task id and a bulk task id update
 
+ REST call 
+url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
+
+16:03:06 In fact, it looks like that test already calls bulk_update_assign_worker 
+through /<name>/tasks/assign-workersupdate but you may just need to ensure all conditions in that code are hit.
+
+16:04:33 Could also use a test to call get_tasks_by_filters()
+
+res = self.app.get(url)
+
+'''
 
 
     # @with_context
