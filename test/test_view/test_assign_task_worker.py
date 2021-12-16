@@ -63,7 +63,10 @@ class TestAssignTaskWorker(web.Helper):
                             data=json.dumps(req_data))
         res_data = json.loads(res.data)
         assert len(res_data['assign_users']) == 2, res_data['assign_users']
-        assert res_data['assign_users'][0]['email'] == user.email_addr
+        assert res_data['assign_users'][0]['email'] == invalid_email_addr
+        print(res_data['assign_users'][0]['email'])
+        print(res_data['assign_users'])
+
         assert res_data['assign_users'][0]['fullname'] == user.fullname
 
         all_user_emails = [u['email'] for u in res_data['all_users']]
