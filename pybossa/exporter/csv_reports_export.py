@@ -76,22 +76,24 @@ class ProjectReportCsvExporter(CsvExporter):
     def _make_zip(self, project, ty, **kwargs):
         name = self._project_name_latin_encoded(project)
         csv_task_str = self._respond_csv(ty, project.id, **kwargs)
-        if csv_task_str is not None:
-            with tempfile.NamedTemporaryFile() as datafile, \
-                 tempfile.NamedTemporaryFile(delete=False) as zipped_datafile:
-                datafile.write(csv_task_str.encode())
-                datafile.flush()
+        if not csv_task_str:
+            return {}
 
-                try:
-                    _zip = self._zip_factory(zipped_datafile.name)
-                    _zip.write(
-                        datafile.name,
-                        secure_filename('%s_%s.csv' % (name, ty)))
-                    _zip.close()
-                    return dict(filepath=zipped_datafile.name,
-                                filename=self.download_name(project, ty),
-                                delete=True)
-                except Exception:
-                    if os.path.exists(zipped_datafile.name):
-                        os.remove(zipped_datafile.name)
-                    raise
+        with tempfile.NamedTemporaryFile() as datafile, \
+             tempfile.NamedTemporaryFile(delete=False) as zipped_datafile:
+            datafile.write(csv_task_str.encode())
+            datafile.flush()
+
+            try:
+                _zip = self._zip_factory(zipped_datafile.name)
+                _zip.write(
+                    datafile.name,
+                    secure_filename('%s_%s.csv' % (name, ty)))
+                _zip.close()
+                return dict(filepath=zipped_datafile.name,
+                            filename=self.download_name(project, ty),
+                            delete=True)
+            except Exception:
+                if os.path.exists(zipped_datafile.name):
+                    os.remove(zipped_datafile.name)
+                raise
