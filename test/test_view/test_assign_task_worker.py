@@ -79,7 +79,7 @@ class TestAssignTaskWorker(web.Helper):
         task_repo.update(task2)
 
         url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
-        req_data = dict(taskId=None)
+        req_data = dict(taskId=0)
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
         res_data = json.loads(res.data)
@@ -92,7 +92,7 @@ class TestAssignTaskWorker(web.Helper):
         task = TaskFactory.create(project=project)
 
         url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
-        req_data = dict(taskId=None)
+        req_data = dict(taskId=0)
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
         res_data = json.loads(res.data)
