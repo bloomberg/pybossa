@@ -232,6 +232,10 @@ class LockManager(object):
         if not category_keys:
             return []
 
+        # response returned as bytes in Python 3 that were str in Python 2
+        # per https://github.com/andymccurdy/redis-py
+        category_keys = [key.decode() for key in category_keys]
+
         # if key present but for different user, with redundancy = 1, return false
         # TODO: for redundancy > 1, check if additional task run
         # available for this user and if so, return category_key else ""
@@ -255,6 +259,7 @@ class LockManager(object):
         return self._redis.set(resource_id, expiration)
 
 
-    def release_reserve_task_lock(self, resource_id, pipeline, expiry):
-        cache = pipeline or self._redis
+    def release_reserve_task_lock(self, resource_id, expiry):
+        #cache = pipeline or self._redis # https://pythonrepo.com/repo/andymccurdy-redis-py-python-connecting-and-operating-databases#locks
+        cache = self._redis
         cache.expire(resource_id, expiry)

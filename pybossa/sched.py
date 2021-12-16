@@ -585,11 +585,10 @@ def release_reserve_task_lock_by_id(project_id, task_id, user_id, timeout, expir
         return
 
     redis_conn = sentinel.master
-    pipeline = redis_conn.pipeline(transaction=True)
     lock_manager = LockManager(redis_conn, timeout)
     resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
         project_id, reserve_key, user_id, task_id)
-    lock_manager.release_reserve_task_lock(resource_id, pipeline, expiry)
+    lock_manager.release_reserve_task_lock(resource_id, expiry)
     current_app.logger.info(
         "Release reserve task lock. project %s, task %s, user %s, expiry %d",
         project_id, task_id, user_id, expiry
@@ -601,10 +600,9 @@ def release_reserve_task_lock_by_keys(resource_ids, timeout, pipeline=None, expi
         return
 
     redis_conn = sentinel.master
-    pipeline = redis_conn.pipeline(transaction=True)
     lock_manager = LockManager(redis_conn, timeout)
     for resource_id in resource_ids:
-        lock_manager.release_reserve_task_lock(resource_id, pipeline, expiry)
+        lock_manager.release_reserve_task_lock(resource_id, expiry)
         current_app.logger.info(
         "Release reserve task lock. resource id %s, expiry %d", resource_id, expiry)
 
