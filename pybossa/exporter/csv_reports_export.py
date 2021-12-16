@@ -16,15 +16,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 # Cache global variables for timeouts
+import os
 import tempfile
 
 import pandas as pd
-from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from pybossa.cache.projects import get_project_report_projectdata
 from pybossa.cache.users import get_project_report_userdata
-from pybossa.core import project_repo, uploader
+from pybossa.core import project_repo
 from pybossa.exporter.csv_export import CsvExporter
 
 
@@ -75,25 +75,25 @@ class ProjectReportCsvExporter(CsvExporter):
 
     def _make_zip(self, project, ty, **kwargs):
         name = self._project_name_latin_encoded(project)
-        csv_task_generator = self._respond_csv(ty, project.id)
-        if csv_task_generator is not None:
-            datafile = tempfile.NamedTemporaryFile()
+        csv_task_str = self._respond_csv(ty, project.id, **kwargs)
+        if not csv_task_str:
+            return {}
+
+        with tempfile.NamedTemporaryFile() as datafile, \
+             tempfile.NamedTemporaryFile(delete=False) as zipped_datafile:
+            datafile.write(csv_task_str.encode())
+            datafile.flush()
+
             try:
-                datafile.write(str(csv_task_generator).encode('utf-8'))
-                datafile.flush()
-                zipped_datafile = tempfile.NamedTemporaryFile()
-                try:
-                    _zip = self._zip_factory(zipped_datafile.name)
-                    _zip.write(
-                        datafile.name,
-                        secure_filename('%s_%s.csv' % (name, ty)))
-                    _zip.close()
-                    container = "user_%d" % project.owner_id
-                    _file = FileStorage(
-                        filename=self.download_name(project, ty),
-                        stream=zipped_datafile)
-                    uploader.upload_file(_file, container=container)
-                finally:
-                    zipped_datafile.close()
-            finally:
-                datafile.close()
+                _zip = self._zip_factory(zipped_datafile.name)
+                _zip.write(
+                    datafile.name,
+                    secure_filename('%s_%s.csv' % (name, ty)))
+                _zip.close()
+                return dict(filepath=zipped_datafile.name,
+                            filename=self.download_name(project, ty),
+                            delete=True)
+            except Exception:
+                if os.path.exists(zipped_datafile.name):
+                    os.remove(zipped_datafile.name)
+                raise
