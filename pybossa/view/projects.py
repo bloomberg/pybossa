@@ -3037,6 +3037,7 @@ def del_coowner(short_name, user_name=None):
         return redirect_content_type(url_for('.coowners', short_name=short_name))
     return abort(404)
 
+
 @blueprint.route('/<short_name>/projectreport/export', methods=['GET', 'POST'])
 @login_required
 @admin_or_subadmin_required
