@@ -1824,7 +1824,7 @@ def bulk_redundancy_update(short_name):
             })
 
         else:
-            args = parse_tasks_browse_args(json.loads(req_data.get('filters', '')))
+            args = parse_tasks_browse_args(req_data.get('filters', ''))
             tasks_not_updated = task_repo.update_tasks_redundancy(project, n_answers, args)
             notify_redundancy_updates(tasks_not_updated)
             if tasks_not_updated:
