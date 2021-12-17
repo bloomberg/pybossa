@@ -73,21 +73,14 @@ class TestAssignTaskWorker(web.Helper):
     def test_get_users_bulk_task_0(self):
         """Test a bulk task without assign_user."""
         project = ProjectFactory.create(published=True)
-        task1 = TaskFactory.create(project=project)
-        task2 = TaskFactory.create(project=project)
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+
+        task1_user_pref = dict(assign_user=[user.email_addr])
+
+        task1 = TaskFactory.create(project=project,  user_pref=task1_user_pref)
+        task2 = TaskFactory.create(project=project,  user_pref=task1_user_pref)
         task_repo.update(task1)
         task_repo.update(task2)
-
-        url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
-        req_data = dict(taskId='0')
-        res = self.app.post(url, content_type='application/json',
-                            data=json.dumps(req_data))
-
-    @with_context
-    def test_get_users_single_task_3(self):
-        """Test a single assign task wihtout taskID."""
-        project = ProjectFactory.create(published=True)
-        task = TaskFactory.create(project=project)
 
         url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
         req_data = dict(taskId='0')
