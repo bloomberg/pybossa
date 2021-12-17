@@ -83,6 +83,6 @@ class TestAssignTaskWorker(web.Helper):
         task_repo.update(task2)
 
         url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
-        req_data = dict(taskId='0')
+        req_data = dict(taskId=None)
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
