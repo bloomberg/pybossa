@@ -82,8 +82,6 @@ class TestAssignTaskWorker(web.Helper):
         req_data = dict(taskId=0)
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
-        res_data = json.loads(res.data)
-        assert len(res_data['all_users']) == len(user_repo.get_all())
 
     @with_context
     def test_get_users_single_task_3(self):
@@ -95,4 +93,3 @@ class TestAssignTaskWorker(web.Helper):
         req_data = dict(taskId=0)
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
-        res_data = json.loads(res.data)
