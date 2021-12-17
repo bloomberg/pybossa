@@ -1725,7 +1725,7 @@ def bulk_update_assign_worker(short_name):
                 assign_user_emails = set(t.user_pref.get("assign_user", []))
         else:
             bulk_update = True
-            args = parse_tasks_browse_args(json.loads(data.get('filters', 'null')))
+            args = parse_tasks_browse_args(json.loads(data.get('filters', '{"taskId": null}')))
             tasks = task_repo.get_tasks_by_filters(project, args)
             task_ids = [t.id for t in tasks]
             assign_user_emails = set()
