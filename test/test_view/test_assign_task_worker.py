@@ -2,15 +2,10 @@
 import json
 from mock import patch
 from test import with_context
-
-from default import db
 from factories import ProjectFactory, TaskFactory, UserFactory
 from helper import web
 from pybossa.repositories import ProjectRepository, TaskRepository, UserRepository
-
-project_repo = ProjectRepository(db)
-user_repo = UserRepository(db)
-task_repo = TaskRepository(db)
+from pybossa.core import user_repo, task_repo
 
 
 class TestAssignTaskWorker(web.Helper):
