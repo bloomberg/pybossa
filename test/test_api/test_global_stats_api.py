@@ -16,10 +16,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import with_context
-from test_api import TestAPI
-from factories import ProjectFactory
-
+from test import with_context
+from test.test_api import TestAPI
+from test.factories import ProjectFactory
 
 
 class TestGlobalStatsAPI(TestAPI):

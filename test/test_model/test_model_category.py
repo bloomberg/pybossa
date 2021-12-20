@@ -16,12 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, db, with_context
-from nose.tools import assert_raises
-from sqlalchemy.exc import IntegrityError
-from mock import patch
+from unittest.mock import patch
+
 from pybossa.model.category import Category
-from factories import CategoryFactory
+from test import Test, with_context
+from test.factories import CategoryFactory
 
 
 class TestModelCategory(Test):
@@ -30,7 +29,7 @@ class TestModelCategory(Test):
     def test_category_public_attributes(self):
         """Test CATEGORY public attributes works."""
         cat = CategoryFactory.create()
-        assert cat.public_attributes().sort() == cat.dictize().keys().sort()
+        assert cat.public_attributes().sort() == list(cat.dictize().keys()).sort()
 
     @with_context
     def test_blogpost_public_json(self):
@@ -40,6 +39,6 @@ class TestModelCategory(Test):
         err_msg = "There should be info keys"
         with patch.dict(self.flask_app.config, {'CATEGORY_INFO_PUBLIC_FIELDS': ['public']}):
             json = cat.to_public_json()
-            assert json['info'].keys().sort() == Category().public_info_keys().sort(), err_msg
+            assert list(json['info'].keys()).sort() == Category().public_info_keys().sort(), err_msg
             assert 'public' in json['info'].keys()
             assert 'secret' not in json['info'].keys()

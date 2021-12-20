@@ -25,7 +25,7 @@ class TestAes(object):
         assert aes.decrypt(encrypted) == original
 
     def test_aes_unicode(self):
-        text = u'∀ z ∈ ℂ, ζ(z) = 0 ⇒ ((z ∈ -2ℕ) ∨ (Re(z) = -½))'
+        text = '∀ z ∈ ℂ, ζ(z) = 0 ⇒ ((z ∈ -2ℕ) ∨ (Re(z) = -½))'
         encrypted = self.aes.encrypt(text.encode('utf-8'))
-        decrypted = self.aes.decrypt(encrypted).decode('utf-8')
+        decrypted = self.aes.decrypt(encrypted)  # decrypt() returns a unicode string
         assert text == decrypted

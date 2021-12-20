@@ -16,17 +16,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
+import json
 from datetime import timedelta
 from time import time
 
-from contributions_guard import ContributionsGuard
+from pybossa.contributions_guard import ContributionsGuard
 from pybossa.core import sentinel
+from werkzeug.exceptions import BadRequest
 
 TASK_USERS_KEY_PREFIX = 'pybossa:project:task_requested:timestamps:{0}'
 USER_TASKS_KEY_PREFIX = 'pybossa:user:task_acquired:timestamps:{0}'
 TASK_ID_PROJECT_ID_KEY_PREFIX = 'pybossa:task_id:project_id:{0}'
 ACTIVE_USER_KEY = 'pybossa:active_users_in_project:{}'
 EXPIRE_LOCK_DELAY = 5
+EXPIRE_RESERVE_TASK_LOCK_DELAY = 30*60
 
 
 def get_active_user_key(project_id):
@@ -44,7 +47,7 @@ def get_task_id_project_id_key(task_id):
 def get_active_user_count(project_id, conn):
     now = time()
     key = get_active_user_key(project_id)
-    to_delete = [user for user, expiration in conn.hgetall(key).iteritems()
+    to_delete = [user for user, expiration in conn.hgetall(key).items()
                  if float(expiration) < now]
     if to_delete:
         conn.hdel(key, *to_delete)
@@ -75,8 +78,12 @@ def get_locked_tasks_project(project_id):
     key = get_active_user_key(project_id)
 
     # Get the users for each locked task.
-    for user_key in redis_conn.hgetall(key).iteritems():
+    for user_key in redis_conn.hgetall(key).items():
         user_id = user_key[0]
+
+        # Redis client in Python returns bytes string
+        if type(user_id) == bytes:
+            user_id = user_id.decode()
 
         # Get locks by user.
         user_tasks_key = get_user_tasks_key(user_id)
@@ -170,18 +177,89 @@ class LockManager(object):
         Get all locks associated with a particular resource.
         :param resource_id: resource on which lock is being held
         """
-        return self._redis.hgetall(resource_id)
+        locks = self._redis.hgetall(resource_id)
+
+        # By default, all responses are returned as bytes in Python 3 and
+        # str in Python 2 - per https://github.com/andymccurdy/redis-py
+        decoded_locks = {k.decode(): v.decode() for k, v in locks.items()}
+        return decoded_locks
 
     def _release_expired_locks(self, resource_id, now):
         locks = self.get_locks(resource_id)
         to_delete = []
-        for key, expiration in locks.iteritems():
+        for key, expiration in locks.items():
             expiration = float(expiration)
             if now > expiration:
                 to_delete.append(key)
         if to_delete:
             self._redis.hdel(resource_id, *to_delete)
 
+    def _release_expired_reserve_task_locks(self, resource_id, now):
+        expiration = self._redis.get(resource_id) or 0
+        if now > expiration:
+            self._redis.delete(resource_id)
+
+
     @staticmethod
     def seconds_remaining(expiration):
         return float(expiration) - time()
+
+    def get_task_category_lock(self, project_id, user_id=None, category=None, exclude_user=False, task_id=None):
+        """
+        Returns True when task category for a given user
+        can be reserved or its already reserved, False otherwise.
+        To fetch task category for all users who've reserved the category, pass user_id = None
+        To fetch task category for all tasks reserved, pass task_id = None
+        To fetch task category other than user_id, pass exclude_user = True
+        """
+
+        if not project_id:
+            raise BadRequest('Missing required parameters')
+
+        # with exclude_user set to True, user_id is to be excluded from list of
+        # task category found for all users. raise error if user_id not passed
+        if exclude_user and not user_id:
+            raise BadRequest('Missing user id')
+
+        resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
+            project_id,
+            "*" if not category else category,
+            "*" if not user_id or exclude_user else user_id,
+            "*" if not task_id else task_id
+        )
+
+        category_keys = self._redis.keys(resource_id)
+        if not category_keys:
+            return []
+
+        # response returned as bytes in Python 3 that were str in Python 2
+        # per https://github.com/andymccurdy/redis-py
+        category_keys = [key.decode() for key in category_keys]
+
+        # if key present but for different user, with redundancy = 1, return false
+        # TODO: for redundancy > 1, check if additional task run
+        # available for this user and if so, return category_key else ""
+        if exclude_user:
+            # exclude user_id from list of keys passed
+            drop_user = ":user:{}:task:".format(user_id)
+            category_keys = [ key for key in category_keys if drop_user not in key ]
+        return category_keys
+
+
+    def acquire_reserve_task_lock(self, project_id, task_id, user_id, category):
+        if not(project_id and user_id and task_id and category):
+            raise BadRequest('Missing required parameters')
+
+        # check task category reserved by user
+        resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(project_id, category, user_id, task_id)
+
+        timestamp = time()
+        self._release_expired_reserve_task_locks(resource_id, timestamp)
+        expiration = timestamp + self._duration + EXPIRE_RESERVE_TASK_LOCK_DELAY
+        return self._redis.set(resource_id, expiration)
+
+
+    def release_reserve_task_lock(self, resource_id, expiry):
+        #cache = pipeline or self._redis # https://pythonrepo.com/repo/andymccurdy-redis-py-python-connecting-and-operating-databases#locks
+        cache = self._redis
+        cache.expire(resource_id, expiry)

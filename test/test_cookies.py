@@ -17,7 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 from pybossa.cookies import CookieHandler
-from mock import MagicMock
+from unittest.mock import MagicMock
 
 
 class TestCookieHandler(object):

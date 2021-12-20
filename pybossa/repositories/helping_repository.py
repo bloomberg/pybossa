@@ -26,6 +26,9 @@ from pybossa.exc import WrongObjectError, DBIntegrityError
 class HelpingMaterialRepository(Repository):
 
     def get(self, id):
+        # bytes to unicode string
+        if type(id) == bytes:
+            id = id.decode()
         return self.db.session.query(HelpingMaterial).get(id)
 
     def get_by(self, **attributes):

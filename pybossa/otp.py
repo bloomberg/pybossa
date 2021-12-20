@@ -58,7 +58,7 @@ def _create_url_token_key(token):
 
 
 def generate_url_token(user_email):
-    token = uuid.uuid4().get_hex()
+    token = uuid.uuid4().hex  # hex for Python3
     key = _create_url_token_key(token)
     conn.delete(token)
     conn.setex(key, OTP_TTL, user_email)
@@ -67,7 +67,10 @@ def generate_url_token(user_email):
 
 def retrieve_email_for_token(token):
     key = _create_url_token_key(token)
-    return conn.get(key)
+    email = conn.get(key)
+    if type(email) == bytes:
+        email = email.decode()  # return unicode string
+    return email
 
 
 def expire_token(token):

@@ -61,7 +61,7 @@ class JsonExporter(Exporter):
         return super(JsonExporter, self).download_name(project, ty, 'json')
 
     def pregenerate_zip_files(self, project):
-        print("%d (json)" % project.id)
+        print(("%d (json)" % project.id))
         self._make_zip(project, "task")
         self._make_zip(project, "task_run")
         self._make_zip(project, "result")
@@ -72,7 +72,8 @@ class JsonExporter(Exporter):
         try:
             datafile = tempfile.NamedTemporaryFile()
             try:
-                datafile.write(json.dumps(data))
+                # write() accepts bytes only
+                datafile.write(json.dumps(data).encode())
                 datafile.flush()
                 _zip.write(datafile.name,
                            secure_filename('%s_%s.%s' % (name, ty, ext)))

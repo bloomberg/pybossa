@@ -1,6 +1,6 @@
 
 from pybossa.wizard import Wizard
-from default import Test, with_context
+from test import Test, with_context
 from collections import OrderedDict
 
 

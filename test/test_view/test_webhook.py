@@ -17,14 +17,15 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from helper import web
-from default import with_context
-from factories import ProjectFactory, TaskFactory, AnonymousTaskRunFactory
+from test.helper import web
+from test import with_context
+from test.factories import ProjectFactory, TaskFactory, AnonymousTaskRunFactory
 from pybossa.core import user_repo, webhook_repo
 from pybossa.model import make_timestamp
 from pybossa.model.webhook import Webhook
 from pybossa.jobs import webhook
-from mock import patch, call
+from unittest.mock import patch, call
+
 
 class TestWebhookView(web.Helper):
 
@@ -41,7 +42,7 @@ class TestWebhookView(web.Helper):
         project = ProjectFactory.create()
         url = "/project/%s/webhook" % project.short_name
         res = self.app.get(url, follow_redirects=True)
-        assert "Sign in" in res.data, res.data
+        assert "Sign in" in str(res.data), res.data
 
     @with_context
     def test_webhook_handler_auth(self):
@@ -108,18 +109,18 @@ class TestWebhookView(web.Helper):
         url = "/project/%s/webhook" % project.short_name
         res = self.app.get(url)
         assert res.status_code == 200, res.status_code
-        assert "Created" in res.data
-        assert "Payload" in res.data
+        assert "Created" in str(res.data)
+        assert "Payload" in str(res.data)
         url = "/project/%s/webhook?failed=true" % project.short_name
         res = self.app.get(url)
         assert res.status_code == 200, res.status_code
-        assert "Created" in res.data
-        assert "Payload" in res.data
+        assert "Created" in str(res.data)
+        assert "Payload" in str(res.data)
         url = "/project/%s/webhook?all=true" % project.short_name
         res = self.app.get(url)
         assert res.status_code == 200, res.status_code
-        assert "Created" in res.data
-        assert "Payload" in res.data
+        assert "Created" in str(res.data)
+        assert "Payload" in str(res.data)
 
     @with_context
     def test_webhook_handler_admin(self):
@@ -139,18 +140,18 @@ class TestWebhookView(web.Helper):
         url = "/project/%s/webhook" % project.short_name
         res = self.app.get(url)
         assert res.status_code == 200, res.status_code
-        assert "Created" in res.data
-        assert "Payload" in res.data
+        assert "Created" in str(res.data)
+        assert "Payload" in str(res.data)
         url = "/project/%s/webhook?all=true" % project.short_name
         res = self.app.get(url)
         assert res.status_code == 200, res.status_code
-        assert "Created" in res.data
-        assert "Payload" in res.data
+        assert "Created" in str(res.data)
+        assert "Payload" in str(res.data)
         url = "/project/%s/webhook?failed=true" % project.short_name
         res = self.app.get(url)
         assert res.status_code == 200, res.status_code
-        assert "Created" in res.data
-        assert "Payload" in res.data
+        assert "Created" in str(res.data)
+        assert "Payload" in str(res.data)
 
     @with_context
     def test_webhook_handler_post_oid(self):

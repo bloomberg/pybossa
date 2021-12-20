@@ -17,14 +17,14 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from mock import patch
+from unittest.mock import patch
 
-from default import Test, db, Fixtures, with_context
+from test import Test, db, Fixtures, with_context
 from pybossa.model.category import Category
 from pybossa.model.task import Task
 from pybossa.model.task_run import TaskRun
 from werkzeug.http import parse_cookie
-from factories import UserFactory
+from test.factories import UserFactory
 
 
 class Helper(Test):
@@ -39,9 +39,9 @@ class Helper(Test):
             return "<title>PYBOSSA &middot; %s - PyBossa by Scifabric</title>" % title
 
     @patch('pybossa.view.account.signer')
-    def register(self, mock=None, fullname=u'John Doe', name=u'johndoe',
-                 password=u'p4ssw0rd', email=None, consent=False, subadmin=False,
-                 data_access=[u'L4'], admin=True):
+    def register(self, mock=None, fullname='John Doe', name='johndoe',
+                 password='p4ssw0rd', email=None, consent=False, subadmin=False,
+                 data_access=['L4'], admin=True):
 
         """Helper function to register and sign in a user"""
         if email is None:
@@ -57,7 +57,7 @@ class Helper(Test):
                             follow_redirects=True)
 
     def signin(self, method="POST", email="johndoe@example.com",
-               password="p4ssw0rd", next=None, data_access=[u'L4'],  
+               password="p4ssw0rd", next=None, data_access=['L4'],  
                content_type="multipart/form-data", follow_redirects=True, csrf=None):
         """Helper function to sign in current user"""
         url = '/account/signin'
@@ -116,7 +116,7 @@ class Helper(Test):
                                  follow_redirects=follow_redirects,
                                  headers=headers)
         else:
-            return self.app.get(url, data=data,
+            return self.app.get(url, data=json.dumps({}),
                                 content_type=content_type, headers=headers)
 
     def profile(self, name="johndoe"):
@@ -168,14 +168,14 @@ class Helper(Test):
         with self.flask_app.app_context():
             categories = db.session.query(Category).all()
             if len(categories) == 0:
-                print "Categories 0"
-                print "Creating default ones"
+                print("Categories 0")
+                print("Creating default ones")
                 self._create_categories()
 
 
     def new_project(self, method="POST", name="Sample Project",
                         short_name="sampleapp", description="Description",
-                        long_description=u'Long Description\n================', kpi=0.5,
+                        long_description='Long Description\n================', kpi=0.5,
                         input_data_class="L4 - public", output_data_class="L4 - public"):
         """Helper function to create a project"""
         if method == "POST":
@@ -300,7 +300,7 @@ class Helper(Test):
         # Checks for existence of a cookie and verifies the value of it
         cookies = response.headers.getlist('Set-Cookie')
         for cookie in cookies:
-            c_key, c_value = parse_cookie(cookie).items()[0]
+            c_key, c_value = list(parse_cookie(cookie).items())[0]
             if c_key == name:
                 return c_value
         # Cookie not found

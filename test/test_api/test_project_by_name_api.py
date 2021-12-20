@@ -16,19 +16,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from mock import patch, call, MagicMock
-from default import db, with_context
-from nose.tools import assert_equal, assert_raises
-from test_api import TestAPI
-from helper.gig_helper import make_subadmin
+from unittest.mock import patch, call
 
-from factories import (ProjectFactory, TaskFactory, TaskRunFactory, AnonymousTaskRunFactory, UserFactory,
-                       CategoryFactory)
+from nose.tools import assert_equal
 
-from pybossa.repositories import ProjectRepository
-from pybossa.repositories import TaskRepository
-from pybossa.repositories import ResultRepository
 from pybossa.model.project import Project
+from pybossa.repositories import ProjectRepository
+from pybossa.repositories import ResultRepository
+from pybossa.repositories import TaskRepository
+from test import db, with_context
+from test.factories import (ProjectFactory, TaskFactory, TaskRunFactory,
+                            UserFactory,
+                            CategoryFactory)
+from test.test_api import TestAPI
+
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)
 result_repo = ResultRepository(db)
@@ -202,7 +203,7 @@ class TestProjectAPI(TestAPI):
         user = UserFactory.create()
         CategoryFactory.create()
         project = ProjectFactory.create(owner=user)
-        name = u'XXXX Project'
+        name = 'XXXX Project'
         data = {'short_name': 'new'}
         datajson = json.dumps(data)
         res = self.app.put('/api/projectbyname/%s?api_key=%s' % (project.short_name, user.api_key),
@@ -269,7 +270,7 @@ class TestProjectAPI(TestAPI):
         url = '/api/projectbyname/%s?api_key=%s' % (project.short_name, user.api_key)
 
         res = self.app.put(url, data=data)
-        print res.data
+        print(res.data)
         assert res.status_code == 200, res.status_code
 
     @with_context

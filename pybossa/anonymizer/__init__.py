@@ -27,5 +27,6 @@ class Anonymizer(object):
             self.init_app(app)
 
     def init_app(self, app):
-        cp = CryptoPAn(app.config.get('CRYPTOPAN_KEY'))
+        # CryptoPAn constructor accepts bytes string only
+        cp = CryptoPAn(app.config.get('CRYPTOPAN_KEY').encode())
         self.ip = cp.anonymize

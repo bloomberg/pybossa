@@ -18,10 +18,10 @@
 
 
 from pybossa.jobs import mail_project_report
-from mock import patch
-from default import Fixtures, with_context
-from helper import web
-from helper.gig_helper import make_subadmin_by
+from unittest.mock import patch
+from test import Fixtures, with_context
+from test.helper import web
+from test.helper.gig_helper import make_subadmin_by
 from nose.tools import assert_raises
 
 
@@ -73,7 +73,7 @@ class TestAllProjectsReport(web.Helper):
         res = self.app.get('/project/export',
                            follow_redirects=True)
 
-        assert 'You will be emailed when your export has been completed' in res.data, res.data
+        assert 'You will be emailed when your export has been completed' in str(res.data), res.data
 
     @with_context
     def test_non_admin_request_report(self):

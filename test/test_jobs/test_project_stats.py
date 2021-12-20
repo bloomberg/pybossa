@@ -18,11 +18,11 @@
 
 from pybossa.jobs import get_project_jobs, create_dict_jobs, get_project_stats
 from pybossa.jobs import warm_cache
-from default import Test, with_context
-from factories import ProjectFactory
-from factories import UserFactory
-from factories import TaskRunFactory
-from factories import TaskFactory
+from test import Test, with_context, with_request_context
+from test.factories import ProjectFactory
+from test.factories import UserFactory
+from test.factories import TaskRunFactory
+from test.factories import TaskFactory
 
 
 class TestProjectsStats(Test):
@@ -84,12 +84,12 @@ class TestProjectsStats(Test):
         err_msg = "There should be only 1 jobs"
         assert len(jobs) == 1, err_msg
 
-    @with_context
+    @with_request_context
     def test_warm_project(self):
         """Test JOB warm_project works."""
         project = ProjectFactory.create()
         task = TaskFactory.create(n_answers=1)
-        for i in range(0,30):
+        for i in range(0, 30):
             TaskRunFactory.create(project=project, task=task)
         res = warm_cache()
         assert res, res

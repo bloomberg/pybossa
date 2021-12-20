@@ -18,9 +18,9 @@
 
 from pybossa.core import project_repo
 from pybossa.jobs import warn_old_project_owners, get_non_updated_projects
-from default import Test, with_context
-from factories import ProjectFactory, TaskFactory, UserFactory
-from mock import patch, MagicMock
+from test import Test, with_context
+from test.factories import ProjectFactory, TaskFactory, UserFactory
+from unittest.mock import patch, MagicMock
 
 
 class TestOldProjects(Test):

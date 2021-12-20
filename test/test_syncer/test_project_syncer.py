@@ -17,13 +17,13 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from mock import patch
+from unittest.mock import patch
 from nose.tools import assert_raises
 from requests import Response
 from pybossa.syncer import NotEnabled
 from pybossa.syncer.project_syncer import ProjectSyncer
-from default import db, Test, with_context
-from factories import ProjectFactory, UserFactory
+from test import db, Test, with_context
+from test.factories import ProjectFactory, UserFactory
 from pybossa.core import project_repo
 from pybossa.model.project import Project
 
@@ -61,7 +61,7 @@ class TestProjectSyncer(Test):
     @patch('pybossa.syncer.requests')
     def test_sync_create_new(self, fake_requests, mock_create, mock_cat, mock_get):
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
-        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer.syncer = user
 
         fake_requests.get.return_value = create_response(True, 200, json.dumps({'info': {'x':1}}))
@@ -78,7 +78,7 @@ class TestProjectSyncer(Test):
     @patch('pybossa.syncer.requests')
     def test_sync_update_existing(self, fake_requests, mock_update, mock_cache, mock_cat, mock_get):
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
-        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer.syncer = user
 
         mock_get.return_value = create_target()
@@ -96,7 +96,7 @@ class TestProjectSyncer(Test):
     @patch('pybossa.syncer.requests')
     def test_sync_update_not_enabled(self, fake_requests, mock_update, mock_cat, mock_get):
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
-        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer.syncer = user
 
         target = create_target()
@@ -109,7 +109,7 @@ class TestProjectSyncer(Test):
     @patch('pybossa.syncer.project_syncer.ProjectSyncer._sync')
     @patch('pybossa.syncer.requests')
     def test_undo_sync_with_cache(self, fake_requests, eock_update):
-        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
 
         project = ProjectFactory.build(short_name=self.target_id)
@@ -121,7 +121,7 @@ class TestProjectSyncer(Test):
     @patch('pybossa.syncer.project_syncer.ProjectSyncer._sync')
     @patch('pybossa.syncer.requests')
     def test_undo_sync_without_cache(self, fake_requests, mock_update):
-        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
 
         project = ProjectFactory.build(short_name=self.target_id)
@@ -133,7 +133,7 @@ class TestProjectSyncer(Test):
     @patch('pybossa.cache.users.get_user_email')
     @patch('pybossa.syncer.requests')
     def test_get_target_owners_if_project_not_exist_prod(self, fake_requests, mock_get_user_email, mock_get):
-        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
 
         mock_get.return_value = create_target()
@@ -146,7 +146,7 @@ class TestProjectSyncer(Test):
     @patch('pybossa.syncer.project_syncer.ProjectSyncer.get_target')
     @patch('pybossa.syncer.requests')
     def test_get_target_owners_if_project_exist_prod(self, fake_requests, mock_get, mock_get_target_user):
-        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
         mock_get_target_user.return_value = create_response(True, 200, json.dumps({'email_addr': 'user-prod@test.com'}))
         mock_get.return_value = create_target()
@@ -160,7 +160,7 @@ class TestProjectSyncer(Test):
     @patch('pybossa.syncer.category_syncer.CategorySyncer.get_target', return_value={'id': 1})
     def test_create_api_integration(self, mock_cat):
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
-        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer.syncer = user
 
         project = ProjectFactory.create()
@@ -180,7 +180,7 @@ class TestProjectSyncer(Test):
     @patch('pybossa.syncer.category_syncer.CategorySyncer.get_target', return_value={'id': 1})
     def test_sync_api_integration(self, mock_cat):
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
-        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer.syncer = user
         
         target = create_target()
@@ -201,7 +201,7 @@ class TestProjectSyncer(Test):
     @patch('pybossa.syncer.category_syncer.CategorySyncer.get_target', return_value={'id': 1})
     def test_sync_L2_without_target(self, mock_cat):
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
-        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer.syncer = user
         
         project = ProjectFactory.create()
@@ -223,7 +223,7 @@ class TestProjectSyncer(Test):
     @patch('pybossa.syncer.category_syncer.CategorySyncer.get_target', return_value={'id': 1})
     def test_sync_L3_without_target(self, mock_cat):
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
-        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer.syncer = user
 
         project = ProjectFactory.create()
@@ -251,7 +251,7 @@ class TestProjectSyncer(Test):
     @patch('pybossa.syncer.requests')
     def test_sync_update_existing(self, fake_requests, mock_update, mock_cache, mock_cat, mock_get):
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
-        user = UserFactory.create(admin=True, email_addr=u'user@test.com')
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer.syncer = user
         res = Response()
         res._ok=False

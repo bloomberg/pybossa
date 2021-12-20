@@ -1,10 +1,11 @@
 from subprocess import CalledProcessError
+from unittest.mock import patch, MagicMock
+
 from nose.tools import assert_raises
-from default import flask_app, sentinel, with_context, rebuild_db
-from factories import ProjectFactory, UserFactory
-from mock import patch, MagicMock
 
 from pybossa.hdfs.client import HDFSKerberos
+from test import with_context
+
 
 class TestHdfsAuth(object):
 

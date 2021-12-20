@@ -16,17 +16,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from mock import patch
-from helper import sched
-from default import with_context
+from unittest.mock import patch
+from test.helper import sched
+from test import with_context
 from pybossa.core import project_repo, task_repo, user_repo
 from pybossa.jobs import send_email_notifications
-from factories import TaskFactory, ProjectFactory, UserFactory, TaskRunFactory
+from test.factories import TaskFactory, ProjectFactory, UserFactory, TaskRunFactory
 from pybossa.sched import get_user_pref_task, Schedulers
 from pybossa.cache.helpers import n_available_tasks_for_user
 import datetime
-from helper.gig_helper import make_admin, make_subadmin
+from test.helper.gig_helper import make_admin, make_subadmin
 import json
+
 
 class TestSched(sched.Helper):
 

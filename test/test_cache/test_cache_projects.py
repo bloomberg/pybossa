@@ -16,23 +16,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, with_context
+from test import Test, with_context, with_request_context
 from pybossa.cache import projects as cached_projects
-from factories import UserFactory, ProjectFactory, TaskFactory, \
+from test.factories import UserFactory, ProjectFactory, TaskFactory, \
     TaskRunFactory, AnonymousTaskRunFactory
-from mock import patch
+from unittest.mock import patch
 import datetime
 import json
-from pybossa.core import result_repo, project_repo, task_repo, user_repo
+from pybossa.core import result_repo, task_repo
 from pybossa.model.project import Project
 from pybossa.cache.project_stats import update_stats
 from nose.tools import nottest, assert_raises
 from pybossa.cache.task_browse_helpers import get_task_filters, parse_tasks_browse_args
 
-from mock import patch
 
 class TestProjectsCache(Test):
-
 
     def create_project_with_tasks(self, completed_tasks, ongoing_tasks, gold_tasks=0):
         project = ProjectFactory.create()
@@ -70,7 +68,7 @@ class TestProjectsCache(Test):
 
         featured = cached_projects.get_featured()
 
-        assert len(featured) is 1, featured
+        assert len(featured) == 1, featured
 
 
     @with_context
@@ -87,7 +85,7 @@ class TestProjectsCache(Test):
         featured = cached_projects.get_featured()[0]
 
         for field in fields:
-            assert featured.has_key(field), "%s not in project info" % field
+            assert field in featured, "%s not in project info" % field
 
 
     @with_context
@@ -98,7 +96,7 @@ class TestProjectsCache(Test):
         ProjectFactory.create(category=project.category, published=False)
         projects = cached_projects.get(project.category.short_name)
 
-        assert len(projects) is 1, projects
+        assert len(projects) == 1, projects
 
 
     @nottest
@@ -110,7 +108,7 @@ class TestProjectsCache(Test):
         ProjectFactory.create(category=project.category, published=True)
         projects = cached_projects.get(project.category.short_name)
 
-        assert len(projects) is 1, projects
+        assert len(projects) == 1, projects
 
 
     @with_context
@@ -122,7 +120,7 @@ class TestProjectsCache(Test):
 
         projects = cached_projects.get(project.category.short_name)
 
-        assert len(projects) is 1, projects
+        assert len(projects) == 1, projects
 
 
     @with_context
@@ -139,7 +137,7 @@ class TestProjectsCache(Test):
         retrieved_project = cached_projects.get(project.category.short_name)[0]
 
         for field in fields:
-            assert retrieved_project.has_key(field), "%s not in project info" % field
+            assert field in retrieved_project, "%s not in project info" % field
 
 
     @with_context
@@ -150,7 +148,7 @@ class TestProjectsCache(Test):
 
         drafts = cached_projects.get_draft()
 
-        assert len(drafts) is 0, drafts
+        assert len(drafts) == 0, drafts
 
 
     @with_context
@@ -165,7 +163,7 @@ class TestProjectsCache(Test):
         draft = cached_projects.get_draft()[0]
 
         for field in fields:
-            assert draft.has_key(field), "%s not in project info" % field
+            assert field in draft, "%s not in project info" % field
             if field == 'info':
                 assert sorted(draft['info'].keys()) == sorted(Project().public_info_keys())
 
@@ -191,13 +189,10 @@ class TestProjectsCache(Test):
         ranked_3_project = self.create_project_with_contributors(8, 0, name='three')
         ranked_2_project = self.create_project_with_contributors(9, 0, name='two')
         ranked_1_project = self.create_project_with_contributors(10, 0, name='one')
-        print ranked_3_project
-        print ranked_2_project
-        print ranked_1_project
 
         top_projects = cached_projects.get_top(n=2)
 
-        assert len(top_projects) is 0, len(top_projects)
+        assert len(top_projects) == 0, len(top_projects)
 
 
     @with_context
@@ -210,7 +205,7 @@ class TestProjectsCache(Test):
 
         top_projects = cached_projects.get_top()
 
-        assert len(top_projects) is 0, len(top_projects)
+        assert len(top_projects) == 0, len(top_projects)
 
 
     @with_context
@@ -652,7 +647,7 @@ class TestProjectsCache(Test):
 
         pro_owned_projects = cached_projects.get_from_pro_user()
 
-        assert len(pro_owned_projects) is 1, len(pro_owned_projects)
+        assert len(pro_owned_projects) == 1, len(pro_owned_projects)
         assert pro_owned_projects[0]['short_name'] == pro_project.short_name
 
 
@@ -745,7 +740,7 @@ class TestProjectsCache(Test):
 
         assert average_time == 0, average_time
 
-    @with_context
+    @with_request_context
     def test_average_contribution_time_returns_average_contribution_time(self):
         project = ProjectFactory.create()
         task = TaskFactory.create(project=project)
@@ -787,8 +782,8 @@ class TestProjectsCache(Test):
             ftime_to='2018-01-24T19:49:21.799870',
             priority_from=0.0,
             priority_to=0.5, order_by_dict={},
-            display_columns=[u'task_id', u'priority'], display_info_columns=[u'co_id'],
-            filter_by_upref={u'languages': [u'English'], u'locations': [u'Fiji']})
+            display_columns=['task_id', 'priority'], display_info_columns=['co_id'],
+            filter_by_upref={'languages': ['English'], 'locations': ['Fiji']})
 
 
         pargs = parse_tasks_browse_args(args)
@@ -823,8 +818,8 @@ class TestProjectsCache(Test):
             ftime_to='2018-01-24T19:49:21.799870',
             priority_from=0.0,
             priority_to=0.5, order_by_dict={},
-            display_columns=[u'task_id', u'priority'], display_info_columns=[u'co_id'],
-            filter_by_upref={u'languages': [u'en'], u'locations': [u'us']})
+            display_columns=['task_id', 'priority'], display_info_columns=['co_id'],
+            filter_by_upref={'languages': ['en'], 'locations': ['us']})
 
         pargs = parse_tasks_browse_args(args)
         assert pargs == valid_args, pargs
@@ -835,7 +830,7 @@ class TestProjectsCache(Test):
             pcomplete_to='0.7', priority_from=0.0, priority_to=0.5,
             created_from='2018-01-01T00:00:00.0001', created_to='2018-12-12T00:00:00.0001',
             ftime_from='2018-01-01T00:00:00.0001', ftime_to='2018-12-12T00:00:00.0001',
-            order_by='task_id', filter_by_field=[(u'CompanyName', u'starts with', u'abc')],
+            order_by='task_id', filter_by_field=[('CompanyName', 'starts with', 'abc')],
             filter_by_upref=dict(languages=['en'], locations=['us']), state='ongoing')
         expected_filter_query = ''' AND task.id = :task_id AND task.state=\'ongoing\' AND (coalesce(ct, 0)/task.n_answers) >= :pcomplete_from AND LEAST(coalesce(ct, 0)/task.n_answers, 1.0) <= :pcomplete_to AND priority_0 >= :priority_from AND priority_0 <= :priority_to AND task.created >= :created_from AND task.created <= :created_to AND ft >= :ftime_from AND ft <= :ftime_to AND state = :state AND (COALESCE(task.info->>\'CompanyName\', \'\') ilike :filter_by_field_0 escape \'\\\') AND ( ( (task.user_pref-> \'locations\' IS NULL AND task.user_pref-> \'languages\' IS NULL) OR (task.user_pref @> \'{"languages": ["en"]}\' OR task.user_pref @> \'{"locations": ["us"]}\') ) )'''
         expected_params = {'task_id': 1, 'pcomplete_from': '0.5', 'pcomplete_to': '0.7', 'ftime_to': '2018-12-12T05:00:00.000100+00:00', 'created_from': '2018-01-01T05:00:00.000100+00:00', 'ftime_from': '2018-01-01T05:00:00.000100+00:00', 'state':'ongoing', 'priority_to': 0.5, 'priority_from': 0.0, 'filter_by_field_0': 'abc%', 'created_to': '2018-12-12T05:00:00.000100+00:00'}
@@ -860,19 +855,19 @@ class TestProjectsCache(Test):
 
         args = dict(task_id=12345, gold_task='1')
         valid_args = dict(task_id=12345, gold_task='1', order_by_dict={},
-            display_columns=[u'task_id', u'priority', u'pcomplete', u'created', u'finish_time', u'gold_task', u'actions', u'lock_status'])
+            display_columns=['task_id', 'priority', 'pcomplete', 'created', 'finish_time', 'gold_task', 'actions', 'lock_status'])
         pargs = parse_tasks_browse_args(args)
         assert pargs == valid_args, pargs
 
         args = dict(task_id=12345, gold_task='0')
         valid_args = dict(task_id=12345, gold_task='0', order_by_dict={},
-            display_columns=[u'task_id', u'priority', u'pcomplete', u'created', u'finish_time', u'gold_task', u'actions', u'lock_status'])
+            display_columns=['task_id', 'priority', 'pcomplete', 'created', 'finish_time', 'gold_task', 'actions', 'lock_status'])
         pargs = parse_tasks_browse_args(args)
         assert pargs == valid_args, pargs
 
         args = dict(task_id=12345, gold_task='All')
         valid_args = dict(task_id=12345, order_by_dict={},
-            display_columns=[u'task_id', u'priority', u'pcomplete', u'created', u'finish_time', u'gold_task', u'actions', u'lock_status'])
+            display_columns=['task_id', 'priority', 'pcomplete', 'created', 'finish_time', 'gold_task', 'actions', 'lock_status'])
         pargs = parse_tasks_browse_args(args)
         assert pargs == valid_args, pargs
 

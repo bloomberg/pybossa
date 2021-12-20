@@ -249,6 +249,9 @@ def _email_two_factor_auth(user, invalid_token=False):
 @blueprint.route('/<token>/otpvalidation', methods=['GET', 'POST'])
 def otpvalidation(token):
     email = otp.retrieve_email_for_token(token)
+    # bytes to unicode string
+    if type(email) == bytes:
+        email = email.decode()
     if not email:
         flash(gettext('Please sign in.'), 'error')
         return redirect_content_type(url_for('account.signin'))
@@ -258,6 +261,9 @@ def otpvalidation(token):
     current_app.logger.info('validating otp for user email: {}'.format(email))
     if request.method == 'POST' and form.validate():
         otp_code = otp.retrieve_user_otp_secret(email)
+        # bytes to unicode string
+        if type(otp_code) == bytes:
+            otp_code = otp_code.decode()
         if otp_code is not None:
             if otp_code == user_otp:
                 msg = gettext('OTP verified. You are logged in to the system')

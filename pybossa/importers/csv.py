@@ -16,29 +16,29 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
+import io
+import json
 import numbers
-import types
-import requests
-from StringIO import StringIO
-from flask_babel import gettext
-from pybossa.util import unicode_csv_reader, validate_required_fields
-from pybossa.util import unicode_csv_reader
-
-from .base import BulkTaskImport, BulkImportException
-from flask import request
-from werkzeug.datastructures import FileStorage
-import io, time, json
-from flask import current_app as app
-from pybossa.util import get_import_csv_file
 import re
+from io import StringIO
+
+import requests
+from flask import current_app as app
+from flask_babel import gettext
+from werkzeug.datastructures import FileStorage
+
 from pybossa.data_access import data_access_levels
+from pybossa.util import get_import_csv_file
+from pybossa.util import unicode_csv_reader, validate_required_fields
+from .base import BulkTaskImport, BulkImportException
 
 type_map = {
     # Python considers booleans to be numbers so we need an extra check for that.
     'number': lambda x: isinstance(x, numbers.Real) and type(x) is not bool,
     'bool': lambda x: isinstance(x, bool),
-    'null': lambda x: isinstance(x, types.NoneType)
+    'null': lambda x: isinstance(x, type(None))
 }
+
 
 def get_value(header, value_string, data_type):
     def error():
@@ -57,6 +57,7 @@ def get_value(header, value_string, data_type):
         error()
 
     return value
+
 
 class ReservedFieldProcessor(object):
     def __init__(self, header):
@@ -89,6 +90,7 @@ class ReservedFieldProcessor(object):
         elif cell:
             task_data[self.header] = cell
 
+
 class GoldFieldProcessor(object):
     def __init__(self, data_type, field_name, header):
         self.data_type = data_type
@@ -107,6 +109,7 @@ class GoldFieldProcessor(object):
         if not cell:
             return
         task_data.setdefault('gold_answers', {})[self.field_name] = get_value(self.header, cell, self.data_type)
+
 
 class PrivateFieldProcessor(object):
     def __init__(self, data_type, field_name, header):
@@ -131,6 +134,7 @@ class PrivateFieldProcessor(object):
         else:
             task_data["info"][self.field_name] = get_value(self.header, cell, self.data_type)
 
+
 class DataAccessFieldProcessor(object):
     def __init__(self):
         pass
@@ -148,6 +152,7 @@ class DataAccessFieldProcessor(object):
             return
 
         task_data["info"][self.field_name] = json.loads(cell.upper())
+
 
 class PublicFieldProcessor(object):
     def __init__(self, data_type, field_name, header):
@@ -168,6 +173,7 @@ class PublicFieldProcessor(object):
             return
 
         task_data["info"][self.field_name] = get_value(self.header, cell, self.data_type)
+
 
 # Abstract base class
 class BulkTaskCSVImportBase(BulkTaskImport):
@@ -286,6 +292,7 @@ class BulkTaskCSVImportBase(BulkTaskImport):
     def _get_csv_data(self):
         return self._import_csv_tasks(self._get_csv_reader())
 
+
 class BulkTaskCSVImport(BulkTaskCSVImportBase):
     importer_id = "csv"
 
@@ -300,7 +307,9 @@ class BulkTaskCSVImport(BulkTaskCSVImportBase):
 
     def _get_csv_reader(self):
         """Get CSV data from a request."""
-        r = requests.get(self._get_data_url())
+        url = self._get_data_url()
+
+        r = requests.get(url)
         if r.status_code == 403:
             msg = ("Oops! It looks like you don't have permission to access"
                    " that file")
@@ -309,10 +318,10 @@ class BulkTaskCSVImport(BulkTaskCSVImportBase):
                 ('text/csv' not in r.headers['content-type'])):
             msg = gettext("Oops! That file doesn't look like the right file.")
             raise BulkImportException(msg, 'error')
-
         r.encoding = 'utf-8'
-        csvcontent = StringIO(r.text)
+        csvcontent = StringIO(r.text.replace('\x00', ''))  # Get rid of NUL data
         return unicode_csv_reader(csvcontent)
+
 
 class BulkTaskGDImport(BulkTaskCSVImport):
 
@@ -357,9 +366,9 @@ class BulkTaskLocalCSVImport(BulkTaskCSVImportBase):
         if csv_file is None or csv_file.stream is None:
             msg = ("Unable to load csv file for import, file {0}".format(csv_filename))
             raise BulkImportException(gettext(msg), 'error')
-
         csv_file.stream.seek(0)
-        csvcontent = io.StringIO(csv_file.stream.read())
+        csv_file_data = csv_file.stream.read()
+        csvcontent = io.StringIO(csv_file_data)
         return unicode_csv_reader(csvcontent)
 
     def tasks(self):

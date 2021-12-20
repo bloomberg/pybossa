@@ -16,20 +16,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import db, Test, with_context
+from test import db, Test, with_context
 from collections import namedtuple
-from factories import ProjectFactory, TaskFactory, UserFactory, CategoryFactory
-from helper import web
+from test.factories import ProjectFactory, TaskFactory, UserFactory, CategoryFactory
+from test.helper import web
 
 from pybossa.repositories import UserRepository
 from pybossa.repositories import AuditlogRepository
-from mock import patch, MagicMock
+from unittest.mock import patch
 
 auditlog_repo = AuditlogRepository(db)
 user_repo = UserRepository(db)
 
 
 FakeRequest = namedtuple('FakeRequest', ['text', 'status_code', 'headers'])
+
 
 class TestAuditlogAPI(Test):
 
@@ -99,9 +100,9 @@ class TestAuditlogAPI(Test):
                 'description': 'new_description',
                 'long_description': 'new_long_description',
                 'allow_anonymous_contributors': False,
-                'info': {u'list': [1]}
+                'info': {'list': [1]}
                 }
-        attributes = data.keys()
+        attributes = list(data.keys())
         attributes.append('list')
         url = '/api/project/%s?api_key=%s' % (project.id, project.owner.api_key)
         self.app.put(url, data=json.dumps(data))
@@ -116,7 +117,7 @@ class TestAuditlogAPI(Test):
             assert log.attribute in attributes, (log.attribute, attributes)
             if log.attribute != 'list':
                 msg = "%s != %s" % (data[log.attribute], log.new_value)
-                assert unicode(data[log.attribute]) == log.new_value, msg
+                assert str(data[log.attribute]) == log.new_value, msg
             else:
                 msg = "%s != %s" % (data['info'][log.attribute], log.new_value)
                 assert data['info'][log.attribute] == json.loads(log.new_value), msg
@@ -133,7 +134,7 @@ class TestAuditlogAPI(Test):
                 'long_description': 'new_long_description',
                 'allow_anonymous_contributors': False,
                 }
-        attributes = data.keys()
+        attributes = list(data.keys())
         url = '/api/project/%s?api_key=%s' % (project.id, admin.api_key)
         self.app.put(url, data=json.dumps(data))
         logs = auditlog_repo.filter_by(project_id=project.id)
@@ -146,7 +147,7 @@ class TestAuditlogAPI(Test):
             assert log.caller == 'api', log.caller
             assert log.attribute in attributes, log.attribute
             msg = "%s != %s" % (data[log.attribute], log.new_value)
-            assert unicode(data[log.attribute]) == log.new_value, msg
+            assert str(data[log.attribute]) == log.new_value, msg
 
     @with_context
     def test_project_update_attributes_non_owner(self):
@@ -166,7 +167,6 @@ class TestAuditlogAPI(Test):
         logs = auditlog_repo.filter_by(project_id=project.id)
 
         assert len(logs) == 0, logs
-
 
     @with_context
     def test_project_update_task_presenter(self):
@@ -222,7 +222,7 @@ class TestAuditlogAPI(Test):
         owner_id = project.owner.id
         owner_name = project.owner.name
         data = {'info': {'sched': 'depth_first', 'task_presenter': 'new', 'data_classification': dict(input_data="L4 - public", output_data="L4 - public")}}
-        attributes = data['info'].keys()
+        attributes = list(data['info'].keys())
         url = '/api/project/%s?api_key=%s' % (project.id, project.owner.api_key)
         self.app.put(url, data=json.dumps(data))
         logs = auditlog_repo.filter_by(project_id=project.id)
@@ -376,7 +376,7 @@ class TestAuditlogWEB(web.Helper):
 
         logs = auditlog_repo.filter_by(project_short_name=short_name, offset=1)
         for log in logs:
-            print log
+            print(log)
         assert len(logs) == 1, logs
         for log in logs:
             assert log.attribute == attribute, log.attribute
@@ -676,13 +676,13 @@ class TestAuditlogWEB(web.Helper):
         short_name = 'sampleapp'
 
         url = "/project/%s/tasks/autoimporter" % short_name
-        data = {'form_name': 'localCSV', 'csv_filename': 'http://fakeurl.com'}
+        data = {'form_name': 'csv', 'csv_url': 'http://fakeurl.com'}
 
         self.app.post(url, data=data, follow_redirects=True)
 
         attribute = 'autoimporter'
 
-        new_value = '{"csv_filename": null, "type": "localCSV", "validate_tp": true}'
+        new_value = '{"type": "csv", "csv_url": "http://fakeurl.com"}'
 
         old_value = 'Nothing'
 
@@ -742,7 +742,7 @@ class TestAuditlogWEB(web.Helper):
         url = "/project/%s/auditlog" % short_name
 
         res = self.app.get(url, follow_redirects=True)
-        assert "Sign in" in res.data, res.data
+        assert "Sign in" in str(res.data), str(res.data)
 
     @with_context
     def test_project_auditlog_access_owner(self):

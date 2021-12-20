@@ -46,32 +46,33 @@ from pybossa.cache.projects import n_tasks, n_completed_tasks
 import pybossa.sched as sched
 from pybossa.util import sign_task
 from pybossa.error import ErrorStatus
-from global_stats import GlobalStatsAPI
-from task import TaskAPI
-from task_run import TaskRunAPI, preprocess_task_run
-from project import ProjectAPI
-from auditlog import AuditlogAPI
-from announcement import AnnouncementAPI
-from blogpost import BlogpostAPI
-from category import CategoryAPI
-from favorites import FavoritesAPI
+from .global_stats import GlobalStatsAPI
+from .task import TaskAPI
+from .task_run import TaskRunAPI, preprocess_task_run
+from .project import ProjectAPI
+from .auditlog import AuditlogAPI
+from .announcement import AnnouncementAPI
+from .blogpost import BlogpostAPI
+from .category import CategoryAPI
+from .favorites import FavoritesAPI
 from pybossa.api.performance_stats import PerformanceStatsAPI
-from user import UserAPI
-from token import TokenAPI
-from result import ResultAPI
+from .user import UserAPI
+from .token import TokenAPI
+from .result import ResultAPI
 from rq import Queue
-from project_stats import ProjectStatsAPI
-from helpingmaterial import HelpingMaterialAPI
+from .project_stats import ProjectStatsAPI
+from .helpingmaterial import HelpingMaterialAPI
 from pybossa.core import auditlog_repo, project_repo, task_repo, user_repo
 from pybossa.contributions_guard import ContributionsGuard
 from pybossa.auth import jwt_authorize_project
 from werkzeug.exceptions import MethodNotAllowed, Forbidden
-from completed_task import CompletedTaskAPI
-from completed_task_run import CompletedTaskRunAPI
+from .completed_task import CompletedTaskAPI
+from .completed_task_run import CompletedTaskRunAPI
 from pybossa.cache.helpers import (n_available_tasks, n_available_tasks_for_user,
     n_unexpired_gold_tasks)
 from pybossa.sched import (get_project_scheduler_and_timeout, get_scheduler_and_timeout,
-                           has_lock, release_lock, Schedulers, get_locks)
+                           has_lock, release_lock, Schedulers, get_locks,
+                           release_reserve_task_lock_by_id)
 from pybossa.jobs import send_mail
 from pybossa.api.project_by_name import ProjectByNameAPI
 from pybossa.api.pwd_manager import get_pwd_manager
@@ -84,6 +85,7 @@ from sqlalchemy.sql import text
 from pybossa.core import db
 from pybossa.cache.task_browse_helpers import get_searchable_columns
 from pybossa.view.projects import get_locked_tasks
+from pybossa.redis_lock import EXPIRE_LOCK_DELAY
 
 task_fields = [
     "id",
@@ -482,6 +484,8 @@ def cancel_task(task_id=None):
             current_app.logger.info(
                 'Project {} - user {} cancelled task {}'
                 .format(project.id, current_user.id, task_id))
+            release_reserve_task_lock_by_id(project.id, task_id, current_user.id, timeout, expiry=EXPIRE_LOCK_DELAY)
+
 
     return Response(json.dumps({'success': True}), 200, mimetype="application/json")
 
@@ -595,8 +599,8 @@ def get_service_request(task_id, service_name, major_version, minor_version):
 
 def _get_valid_service(task_id, service_name, payload, proxy_service_config):
     service_data = payload.get('data', None)
-    service_request = service_data.keys()[0] if isinstance(service_data, dict) and \
-        len(service_data.keys()) == 1 else None
+    service_request = list(service_data.keys())[0] if isinstance(service_data, dict) and \
+        len(list(service_data.keys())) == 1 else None
     service = proxy_service_config['services'].get(service_name, None)
 
     if service and service_request in service['requests']:

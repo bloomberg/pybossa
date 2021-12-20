@@ -23,18 +23,18 @@ from flask_wtf import FlaskForm as Form
 from flask_wtf.file import FileField, FileRequired, FileAllowed
 from werkzeug.utils import secure_filename
 from wtforms import IntegerField, DecimalField, TextField, BooleanField, HiddenField,\
-    SelectField, validators, TextAreaField, PasswordField, FieldList, SelectMultipleField
+    SelectField, validators, TextAreaField, PasswordField, FieldList
 from wtforms import SelectMultipleField
 from wtforms.fields.html5 import EmailField, URLField
 from wtforms.widgets import HiddenInput
 from flask_babel import lazy_gettext
 
-import validator as pb_validator
+from . import validator as pb_validator
 from pybossa import util
 from pybossa.core import project_repo, user_repo, task_repo
 from pybossa.core import uploader
 from pybossa.uploader import local
-from flask import safe_join
+from werkzeug.utils import safe_join
 from flask_login import current_user
 import os
 import json
@@ -43,7 +43,7 @@ from decimal import Decimal
 from pybossa.forms.fields.time_field import TimeField
 from pybossa.forms.fields.select_two import Select2Field
 from pybossa.sched import sched_variants
-from validator import TimeFieldsValidator
+from .validator import TimeFieldsValidator
 from pybossa.core import enable_strong_password
 from pybossa.util import get_file_path_for_import_csv
 from flask import flash
@@ -279,7 +279,7 @@ class TaskNotificationForm(Form):
 
 class TaskSchedulerForm(Form):
     _translate_names = lambda variant: (variant[0], lazy_gettext(variant[1]))
-    _choices = map(_translate_names, sched_variants())
+    _choices = list(map(_translate_names, sched_variants()))
     sched = SelectField(lazy_gettext('Task Scheduler'), choices=_choices)
     customized_columns = Select2Field(lazy_gettext('Customized columns'), choices=[], default="")
     rand_within_priority = BooleanField(lazy_gettext('Randomize Within Priority'))
@@ -300,7 +300,7 @@ class TaskSchedulerForm(Form):
     @classmethod
     def update_sched_options(cls, new_options):
         _translate_names = lambda variant: (variant[0], lazy_gettext(variant[1]))
-        _choices = map(_translate_names, new_options)
+        _choices = list(map(_translate_names, new_options))
         cls.sched.kwargs['choices'] = _choices
 
 
@@ -823,12 +823,14 @@ class UserPrefMetadataForm(Form):
         self._disabled = self._get_disabled_fields(can_update_info)
         self._hide_fields(can_update_info)
 
-    def _get_disabled_fields(self, (can_update, disabled_fields, hidden_fields)):
+    def _get_disabled_fields(self, can_update_info):
+        (can_update, disabled_fields, hidden_fields) = can_update_info
         if not can_update:
             return {field: 'Form is not updatable.' for field in self}
         return {getattr(self, name): reason for name, reason in six.iteritems(disabled_fields or {})}
 
-    def _hide_fields(self, (can_update, disabled_fields, hidden_fields)):
+    def _hide_fields(self, can_update_info):
+        (can_update, disabled_fields, hidden_fields) = can_update_info
         if not can_update:
             return {field: 'Form is not updatable.' for field in self}
         for name, _ in six.iteritems(hidden_fields or {}):

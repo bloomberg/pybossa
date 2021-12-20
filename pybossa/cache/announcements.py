@@ -1,7 +1,7 @@
 # -*- coding: utf8 -*-
 # This file is part of PYBOSSA.
 #
-# Copyright (C) 2015 Scifabric LTD.
+# Copyright (C) 2021 Scifabric LTD.
 #
 # PYBOSSA is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from .repository import WrongObjectError, DBIntegrityError
+from pybossa.cache import delete_memoized
+from pybossa.cache.users import get_announcements_by_level_cached
 
-assert WrongObjectError
-assert DBIntegrityError
+def reset():
+    """Clean the cache"""
+    delete_memoized(get_announcements_by_level_cached)

@@ -16,11 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from mock import patch
+from unittest.mock import patch
 from nose.tools import assert_raises
 from pybossa.importers import BulkImportException
 from pybossa.importers.csv import BulkTaskGDImport
-from default import FakeResponse, with_context
+from test import FakeResponse, with_context, with_request_context
 
 
 @patch('pybossa.importers.csv.requests.get')
@@ -39,7 +39,7 @@ class TestBulkTaskGDImport(object):
 
         number_of_tasks = self.importer.count_tasks()
 
-        assert number_of_tasks is 0, number_of_tasks
+        assert number_of_tasks == 0, number_of_tasks
 
     @with_context
     def test_count_tasks_returns_1_for_CSV_with_one_valid_row(self, request):
@@ -50,9 +50,9 @@ class TestBulkTaskGDImport(object):
 
         number_of_tasks = self.importer.count_tasks()
 
-        assert number_of_tasks is 1, number_of_tasks
+        assert number_of_tasks == 1, number_of_tasks
 
-    @with_context
+    @with_request_context
     def test_count_tasks_raises_exception_if_file_forbidden(self, request):
         forbidden_request = FakeResponse(text='Forbidden', status_code=403,
                                          headers={'content-type': 'text/plain'},
@@ -64,9 +64,9 @@ class TestBulkTaskGDImport(object):
         try:
             self.importer.count_tasks()
         except BulkImportException as e:
-            assert e[0] == msg, e
+            assert e.args[0] == msg, e  # e is an Exception type thus has args
 
-    @with_context
+    @with_request_context
     def test_count_tasks_raises_exception_if_not_CSV_file(self, request):
         html_request = FakeResponse(text='Not a CSV', status_code=200,
                                     headers={'content-type': 'text/html'},
@@ -78,9 +78,9 @@ class TestBulkTaskGDImport(object):
         try:
             self.importer.count_tasks()
         except BulkImportException as e:
-            assert e[0] == msg, e
+            assert e.args[0] == msg, e
 
-    @with_context
+    @with_request_context
     def test_count_tasks_raises_exception_if_dup_header(self, request):
         empty_file = FakeResponse(text='Foo,Bar,Foo\n1,2,3', status_code=200,
                                   headers={'content-type': 'text/plain'},
@@ -92,9 +92,9 @@ class TestBulkTaskGDImport(object):
         try:
             self.importer.count_tasks()
         except BulkImportException as e:
-            assert e[0] == msg, e
+            assert e.args[0] == msg, e
 
-    @with_context
+    @with_request_context
     def test_tasks_raises_exception_if_file_forbidden(self, request):
         forbidden_request = FakeResponse(text='Forbidden', status_code=403,
                                          headers={'content-type': 'text/plain'},
@@ -106,9 +106,9 @@ class TestBulkTaskGDImport(object):
         try:
             self.importer.tasks()
         except BulkImportException as e:
-            assert e[0] == msg, e
+            assert e.args[0] == msg, e
 
-    @with_context
+    @with_request_context
     def test_tasks_raises_exception_if_not_CSV_file(self, request):
         html_request = FakeResponse(text='Not a CSV', status_code=200,
                                     headers={'content-type': 'text/html'},
@@ -120,9 +120,9 @@ class TestBulkTaskGDImport(object):
         try:
             self.importer.tasks()
         except BulkImportException as e:
-            assert e[0] == msg, e
+            assert e.args[0] == msg, e
 
-    @with_context
+    @with_request_context
     def test_tasks_raises_exception_if_dup_header(self, request):
         csv_file = FakeResponse(text='Foo,Bar,Foo\n1,2,3', status_code=200,
                                 headers={'content-type': 'text/plain'},
@@ -132,9 +132,9 @@ class TestBulkTaskGDImport(object):
 
         raised = False
         try:
-            self.importer.tasks().next()
+            next(self.importer.tasks())
         except BulkImportException as e:
-            assert e[0] == msg, e
+            assert e.args[0] == msg, e
             raised = True
         finally:
             assert raised, "Exception not raised"
@@ -147,9 +147,9 @@ class TestBulkTaskGDImport(object):
         request.return_value = csv_file
 
         tasks = self.importer.tasks()
-        task = tasks.next()
+        task = next(tasks)
 
-        assert task == {"info": {u'Bar': u'2', u'Foo': u'1', u'Baz': u'3'}}, task
+        assert task == {"info": {'Bar': '2', 'Foo': '1', 'Baz': '3'}}, task
 
     @with_context
     def test_tasks_return_tasks_with_non_info_fields_too(self, request):
@@ -160,19 +160,19 @@ class TestBulkTaskGDImport(object):
         request.return_value = csv_file
 
         tasks = self.importer.tasks()
-        task = tasks.next()
+        task = next(tasks)
 
-        assert task == {'info': {u'Foo': u'1', u'Bar': u'2'},
-                        u'priority_0': u'3'}, task
+        assert task == {'info': {'Foo': '1', 'Bar': '2'},
+                        'priority_0': '3'}, task
 
     @with_context
     def test_tasks_works_with_encodings_other_than_utf8(self, request):
-        csv_file = FakeResponse(text=u'Foo\nM\xc3\xbcnchen', status_code=200,
+        csv_file = FakeResponse(text='Foo\nM\xc3\xbcnchen', status_code=200,
                                 headers={'content-type': 'text/plain'},
                                 encoding='ISO-8859-1')
         request.return_value = csv_file
 
         tasks = self.importer.tasks()
-        task = tasks.next()
+        task = next(tasks)
 
         assert csv_file.encoding == 'utf-8'

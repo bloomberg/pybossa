@@ -16,9 +16,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import with_context
+from test import with_context
 from pybossa.jobs import send_mail
-from mock import patch
+from unittest.mock import patch
 
 
 class TestSendMailJob(object):

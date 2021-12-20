@@ -16,14 +16,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from mock import patch
+from unittest.mock import patch
 
-from default import db, with_context
-from factories import ProjectFactory, TaskFactory, UserFactory, TaskRunFactory
-from helper import web
-from helper.gig_helper import make_subadmin, make_admin
+from test import db, with_context
+from test.factories import ProjectFactory, TaskFactory, UserFactory, TaskRunFactory
+from test.helper import web
+from test.helper.gig_helper import make_subadmin, make_admin
 from pybossa.repositories import UserRepository, ProjectRepository, TaskRepository, WebhookRepository, ResultRepository
-from pybossa.view.projects import render_template
 from pybossa.cache import projects as cached_projects
 
 
@@ -101,7 +100,7 @@ class TestProjectPublicationView(web.Helper):
 
         mock_webhook_repo.assert_called_with(project)
         mock_result_repo.assert_called_with(project)
-        assert 'Project published' in resp.data, resp.data
+        assert 'Project published' in str(resp.data), resp.data
 
 
     @with_context
@@ -164,7 +163,7 @@ class TestProjectPublicationView(web.Helper):
         res = self.app.get(url)
         assert res.status_code == 200, res.status_code
 
-        assert 'You are about to publish your project in' in res.data, \
+        assert 'You are about to publish your project in' in str(res.data), \
             'You are about to publish your project in message should be provided'
 
     @with_context
@@ -182,7 +181,7 @@ class TestProjectPublicationView(web.Helper):
         res = self.app.get(url)
         assert res.status_code == 200, res.status_code
 
-        assert 'You are about to unpublish your project.' in res.data, \
+        assert 'You are about to unpublish your project.' in str(res.data), \
             'You are about to unpublish your project. message should be provided'
 
         resp = self.app.post('/project/%s/publish' % project.short_name,

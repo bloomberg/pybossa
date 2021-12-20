@@ -17,10 +17,10 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
 
-from default import Test, db, with_context
-from factories import ProjectFactory, TaskFactory, UserFactory, BlogpostFactory
-from mock import patch
-from helper.web import Helper
+from test import db, with_context
+from test.factories import ProjectFactory, TaskFactory, UserFactory, BlogpostFactory
+from unittest.mock import patch
+from test.helper.web import Helper
 from nose.tools import nottest
 
 from pybossa.repositories import ProjectRepository
@@ -70,7 +70,7 @@ class TestProjectPassword(Helper):
             project.short_name, project.short_name, task.id)
 
         res = self.app.post(url, data={'password': 'bad_passwd'}, headers=headers)
-        assert 'Sorry, incorrect password' in res.data, "No error message shown"
+        assert 'Sorry, incorrect password' in str(res.data), "No error message shown"
 
     @with_context
     def test_password_view_func_no_project(self):
@@ -92,10 +92,10 @@ class TestProjectPassword(Helper):
         project_repo.update(project)
 
         res = self.app.get('/project/%s/newtask' % project.short_name, follow_redirects=True)
-        assert 'This feature requires being logged in' in res.data
+        assert 'This feature requires being logged in' in str(res.data)
 
         res = self.app.get('/project/%s/task/1' % project.short_name, follow_redirects=True)
-        assert 'This feature requires being logged in' in res.data
+        assert 'This feature requires being logged in' in str(res.data)
 
     @with_context
     def test_password_not_required_for_anonymous_contributors(self):
@@ -105,10 +105,10 @@ class TestProjectPassword(Helper):
         TaskFactory.create(project=project)
 
         res = self.app.get('/project/%s/newtask' % project.short_name, follow_redirects=True)
-        assert 'Enter the password to contribute' not in res.data
+        assert 'Enter the password to contribute' not in str(res.data)
 
         res = self.app.get('/project/%s/task/1' % project.short_name, follow_redirects=True)
-        assert 'Enter the password to contribute' not in res.data
+        assert 'Enter the password to contribute' not in str(res.data)
 
     @with_context
     @patch('pybossa.password_manager.current_user')
@@ -129,13 +129,13 @@ class TestProjectPassword(Helper):
         data = json.loads(res.data)
         next_url = data['next']
         res = self.app.get(next_url, headers=headers)
-        assert 'Enter the password to contribute' in res.data, res.data
+        assert 'Enter the password to contribute' in str(res.data), res.data
 
         res = self.app.get('/project/%s/task/1' % project.short_name, headers=headers_json)
         data = json.loads(res.data)
         next_url = data['next']
         res = self.app.get(next_url, headers=headers)
-        assert 'Enter the password to contribute' in res.data
+        assert 'Enter the password to contribute' in str(res.data)
 
     @with_context
     @patch('pybossa.password_manager.current_user')
@@ -148,10 +148,10 @@ class TestProjectPassword(Helper):
         configure_mock_current_user_from(user, mock_user)
 
         res = self.app.get('/project/%s/newtask' % project.short_name, follow_redirects=True)
-        assert 'Enter the password to contribute' not in res.data
+        assert 'Enter the password to contribute' not in str(res.data)
 
         res = self.app.get('/project/%s/task/1' % project.short_name, follow_redirects=True)
-        assert 'Enter the password to contribute' not in res.data
+        assert 'Enter the password to contribute' not in str(res.data)
 
     @with_context
     @patch('pybossa.password_manager.current_user')
@@ -167,10 +167,10 @@ class TestProjectPassword(Helper):
         project_repo.update(project)
 
         res = self.app.get('/project/%s/newtask' % project.short_name, follow_redirects=True)
-        assert 'Enter the password to contribute' not in res.data
+        assert 'Enter the password to contribute' not in str(res.data)
 
         res = self.app.get('/project/%s/task/1' % project.short_name, follow_redirects=True)
-        assert 'Enter the password to contribute' not in res.data
+        assert 'Enter the password to contribute' not in str(res.data)
 
     @with_context
     @patch('pybossa.password_manager.current_user')
@@ -187,10 +187,10 @@ class TestProjectPassword(Helper):
         project_repo.update(project)
 
         res = self.app.get('/project/%s/newtask' % project.short_name, follow_redirects=True)
-        assert 'Enter the password to contribute' not in res.data
+        assert 'Enter the password to contribute' not in str(res.data)
 
         res = self.app.get('/project/%s/task/1' % project.short_name, follow_redirects=True)
-        assert 'Enter the password to contribute' not in res.data
+        assert 'Enter the password to contribute' not in str(res.data)
 
 
     @nottest
@@ -210,7 +210,7 @@ class TestProjectPassword(Helper):
         for endpoint in endpoints_requiring_password:
             res = self.app.get('/project/%s%s' % (project.short_name, endpoint),
                                follow_redirects=True)
-            assert 'Enter the password to contribute' in res.data, endpoint
+            assert 'Enter the password to contribute' in str(res.data), endpoint
 
     @with_context
     @patch('pybossa.view.projects.ensure_authorized_to')
@@ -255,4 +255,4 @@ class TestProjectPassword(Helper):
         res = self.app.post(url, follow_redirects=True)
         assert res.status_code == 200, res.status_code
         err_msg = "User should be redirected to sign in."
-        assert "Sign in" in res.data, err_msg
+        assert "Sign in" in str(res.data), err_msg

@@ -48,13 +48,14 @@ from pybossa.cache import projects as cached_projects
 from pybossa.cache import categories as cached_cat
 from pybossa.cache import site_stats
 from pybossa.cache import task_browse_helpers as helper
+from pybossa.cache import announcements
 from pybossa.auth import ensure_authorized_to
 from pybossa.core import announcement_repo, project_repo, user_repo, sentinel
 from pybossa.feed import get_update_feed
 import pybossa.dashboard.data as dashb
 from pybossa.jobs import get_dashboard_jobs, export_all_users
 import json
-from StringIO import StringIO
+from io import StringIO
 
 
 from pybossa.forms.admin_view_forms import *
@@ -500,6 +501,8 @@ def delete_announcement(id):
 
     ensure_authorized_to('delete', announcement)
     announcement_repo.delete(announcement)
+    # Refresh announcements cache.
+    announcements.reset()
     msg_1 = gettext('Announcement deleted!')
     markup = Markup('<i class="icon-ok"></i> {}')
     flash(markup.format(msg_1), 'success')

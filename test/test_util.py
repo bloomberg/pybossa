@@ -15,22 +15,23 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-import pybossa.util as util
-from mock import MagicMock
-from mock import patch
-from default import with_context, db, Test
-from datetime import datetime, timedelta
-from flask_wtf import FlaskForm as Form
-from factories import UserFactory, ProjectFactory, TaskFactory
-import calendar
-import time
-import csv
-import tempfile
-import os
-import json
 import base64
+import calendar
+import csv
 import hashlib
-from nose.tools import nottest, assert_raises
+import json
+import os
+import tempfile
+import time
+from datetime import datetime, timedelta
+from unittest.mock import patch, MagicMock
+
+from flask_wtf import FlaskForm as Form
+from nose.tools import nottest
+
+import pybossa.util as util
+from test import with_context, Test, with_request_context
+from test.factories import UserFactory
 
 
 def myjsonify(data):
@@ -72,8 +73,9 @@ class TestPybossaUtil(Test):
 
         with patch.dict(self.flask_app.config, patch_dict):
             message, timestamp, sig, pub_key = util.get_disqus_sso_payload(user)
-            mock_b64encode.assert_called_with(data)
-            mock_hmac.assert_called_with(DISQUS_SECRET_KEY, '%s %s' % (data, timestamp),
+            mock_b64encode.assert_called_with(data.encode())
+            tmp = '{} {}'.format(data, timestamp)
+            mock_hmac.assert_called_with(DISQUS_SECRET_KEY.encode(), tmp.encode(),
                                          hashlib.sha1)
             assert timestamp
             assert sig
@@ -109,8 +111,9 @@ class TestPybossaUtil(Test):
 
         with patch.dict(self.flask_app.config, patch_dict):
             message, timestamp, sig, pub_key = util.get_disqus_sso_payload(None)
-            mock_b64encode.assert_called_with(data)
-            mock_hmac.assert_called_with(DISQUS_SECRET_KEY, '%s %s' % (data, timestamp),
+            mock_b64encode.assert_called_with(data.encode())
+            tmp = '{} {}'.format(data, timestamp)
+            mock_hmac.assert_called_with(DISQUS_SECRET_KEY.encode(), tmp.encode(),
                                          hashlib.sha1)
             assert timestamp
             assert sig
@@ -145,7 +148,7 @@ class TestPybossaUtil(Test):
         err_msg = "It should be None"
         assert msg is None, err_msg
 
-    @with_context
+    @with_request_context
     @patch('pybossa.util.request')
     @patch('pybossa.util.render_template')
     @patch('pybossa.util.jsonify')
@@ -153,9 +156,12 @@ class TestPybossaUtil(Test):
     def test_handle_content_type_json(self, mocklast, mockjsonify,
                                       mockrender, mockrequest):
         fake_d = {'Content-Type': 'application/json'}
-        mockrequest.headers.__getitem__.side_effect = fake_d.__getitem__
-        mockrequest.headers.get.side_effect = fake_d.get
-        mockrequest.headers.__iter__.side_effect = fake_d.__iter__
+
+        # mockrequest is AsyncMock; to avoid request.headers.get('Content-Type')
+        # to have "AsyncMockMixin._execute_mock_call' was never awaited"
+        # exception, just using the following line
+        mockrequest.headers = fake_d
+
         mockjsonify.side_effect = myjsonify
         res = util.handle_content_type(dict(template='example.html'))
         err_msg = "template key should exist"
@@ -163,7 +169,7 @@ class TestPybossaUtil(Test):
         err_msg = "jsonify should be called"
         assert mockjsonify.called, err_msg
 
-    @with_context
+    @with_request_context
     @patch('pybossa.util.request')
     @patch('pybossa.util.render_template')
     @patch('pybossa.util.jsonify')
@@ -171,9 +177,7 @@ class TestPybossaUtil(Test):
     def test_handle_content_type_json_error(self, mocklast, mockjsonify,
                                             mockrender, mockrequest):
         fake_d = {'Content-Type': 'application/json'}
-        mockrequest.headers.__getitem__.side_effect = fake_d.__getitem__
-        mockrequest.headers.get.side_effect = fake_d.get
-        mockrequest.headers.__iter__.side_effect = fake_d.__iter__
+        mockrequest.headers = fake_d
         mockjsonify.side_effect = myjsonify
         res, code = util.handle_content_type(
                                              dict(
@@ -190,7 +194,7 @@ class TestPybossaUtil(Test):
         err_msg = "Error description should exist"
         assert res.get('description') is not None, err_msg
 
-    @with_context
+    @with_request_context
     @patch('pybossa.util.request')
     @patch('pybossa.util.render_template')
     @patch('pybossa.util.jsonify')
@@ -200,9 +204,7 @@ class TestPybossaUtil(Test):
                                            mockjsonify, mockrender,
                                            mockrequest):
         fake_d = {'Content-Type': 'application/json'}
-        mockrequest.headers.__getitem__.side_effect = fake_d.__getitem__
-        mockrequest.headers.get.side_effect = fake_d.get
-        mockrequest.headers.__iter__.side_effect = fake_d.__iter__
+        mockrequest.headers = fake_d
         mockjsonify.side_effect = myjsonify
         mockcsrf.return_value = "yourcsrf"
         form = MagicMock(spec=Form, data=dict(foo=1), errors=None)
@@ -218,9 +220,9 @@ class TestPybossaUtil(Test):
         assert res.get('form').get('csrf') == 'yourcsrf', err_msg
         err_msg = "There should be the keys of the form"
         keys = ['foo', 'errors', 'csrf']
-        assert res.get('form').keys().sort() == keys.sort(), err_msg
+        assert list(res.get('form').keys()).sort() == keys.sort(), err_msg
 
-    @with_context
+    @with_request_context
     @patch('pybossa.util.request')
     @patch('pybossa.util.render_template')
     @patch('pybossa.util.jsonify')
@@ -228,9 +230,7 @@ class TestPybossaUtil(Test):
     def test_handle_content_type_json_pagination(self, mocklast, mockjsonify,
                                                  mockrender, mockrequest):
         fake_d = {'Content-Type': 'application/json'}
-        mockrequest.headers.__getitem__.side_effect = fake_d.__getitem__
-        mockrequest.headers.get.side_effect = fake_d.get
-        mockrequest.headers.__iter__.side_effect = fake_d.__iter__
+        mockrequest.headers = fake_d
         mockjsonify.side_effect = myjsonify
         pagination = util.Pagination(page=1, per_page=5, total_count=10)
         res = util.handle_content_type(dict(template='example.html',
@@ -243,16 +243,14 @@ class TestPybossaUtil(Test):
         assert res.get('pagination') is not None, err_msg
         assert res.get('pagination') == pagination.to_json(), err_msg
 
-    @with_context
+    @with_request_context
     @patch('pybossa.util.request')
     @patch('pybossa.util.render_template')
     @patch('pybossa.util.jsonify')
     def test_handle_content_type_html(self, mockjsonify,
                                       mockrender, mockrequest):
         fake_d = {'Content-Type': 'text/html'}
-        mockrequest.headers.__getitem__.side_effect = fake_d.__getitem__
-        mockrequest.headers.get.side_effect = fake_d.get
-        mockrequest.headers.__iter__.side_effect = fake_d.__iter__
+        mockrequest.headers = fake_d
         mockjsonify.side_effect = myjsonify
         mockrender.side_effect = myrender
         pagination = util.Pagination(page=1, per_page=5, total_count=10)
@@ -267,16 +265,14 @@ class TestPybossaUtil(Test):
         err_msg = "render_template should be called"
         assert mockrender.called is True, err_msg
 
-    @with_context
+    @with_request_context
     @patch('pybossa.util.request')
     @patch('pybossa.util.render_template')
     @patch('pybossa.util.jsonify')
     def test_handle_content_type_html_error(self, mockjsonify,
                                             mockrender, mockrequest):
         fake_d = {'Content-Type': 'text/html'}
-        mockrequest.headers.__getitem__.side_effect = fake_d.__getitem__
-        mockrequest.headers.get.side_effect = fake_d.get
-        mockrequest.headers.__iter__.side_effect = fake_d.__iter__
+        mockrequest.headers = fake_d
         mockjsonify.side_effect = myjsonify
         mockrender.side_effect = myrender
         template, code = util.handle_content_type(dict(template='example.html',
@@ -305,8 +301,10 @@ class TestPybossaUtil(Test):
         url = util.url_for('home.home', _external=True)
         assert util.is_own_url(url), url
         assert not util.is_own_url('https://google.com')
+        assert util.is_own_url(None)
+        assert util.is_own_url('')
 
-    @with_context
+    @with_request_context
     @patch('pybossa.util.request')
     @patch('pybossa.util.render_template')
     @patch('pybossa.util.jsonify')
@@ -318,17 +316,15 @@ class TestPybossaUtil(Test):
         mockrender,
      mockrequest):
         fake_d = {'Content-Type': 'application/json'}
-        mockrequest.headers.__getitem__.side_effect = fake_d.__getitem__
-        mockrequest.headers.get.side_effect = fake_d.get
-        mockrequest.headers.__iter__.side_effect = fake_d.__iter__
+        mockrequest.headers = fake_d
         mockjsonify.side_effect = myjsonify
         res = util.redirect_content_type('http://next.uri')
-        err_msg = "next URI is wrong in redirction"
+        err_msg = "next URI is wrong in redirection"
         assert res.get('next') == 'http://next.uri', err_msg
         err_msg = "jsonify should be called"
         assert mockjsonify.called, err_msg
 
-    @with_context
+    @with_request_context
     @patch('pybossa.util.request')
     @patch('pybossa.util.render_template')
     @patch('pybossa.util.jsonify')
@@ -337,9 +333,7 @@ class TestPybossaUtil(Test):
             self, mocklast, mockjsonify, mockrender, mockrequest):
         mocklast.return_value = None
         fake_d = {'Content-Type': 'application/json'}
-        mockrequest.headers.__getitem__.side_effect = fake_d.__getitem__
-        mockrequest.headers.get.side_effect = fake_d.get
-        mockrequest.headers.__iter__.side_effect = fake_d.__iter__
+        mockrequest.headers = fake_d
         mockjsonify.side_effect = myjsonify
         res = util.redirect_content_type('http://next.uri', status='hallo123')
         err_msg = "next URI is wrong in redirction"
@@ -349,16 +343,14 @@ class TestPybossaUtil(Test):
         err_msg = "status should exist"
         assert res.get('status') == 'hallo123', err_msg
 
-    @with_context
+    @with_request_context
     @patch('pybossa.util.request')
     @patch('pybossa.util.render_template')
     @patch('pybossa.util.jsonify')
     def test_redirect_content_type_json_html(
             self, mockjsonify, mockrender, mockrequest):
         fake_d = {'Content-Type': 'text/html'}
-        mockrequest.headers.__getitem__.side_effect = fake_d.__getitem__
-        mockrequest.headers.get.side_effect = fake_d.get
-        mockrequest.headers.__iter__.side_effect = fake_d.__iter__
+        mockrequest.headers = fake_d
         mockjsonify.side_effect = myjsonify
         res = util.redirect_content_type('/')
         err_msg = "redirect 302 should be the response"
@@ -418,10 +410,11 @@ class TestPybossaUtil(Test):
         """Test the last flash message is hashed."""
         message_and_status = [ 'foo', 'bar' ]
         last_flash.return_value = message_and_status
-        expected = base64.b64encode(json.dumps({
+        tmp = json.dumps({
             'flash': message_and_status[1],
             'status': message_and_status[0]
-        }))
+        })
+        expected = base64.b64encode(tmp.encode())
         hashed_flash = util.hash_last_flash_message()
         assert hashed_flash == expected
 
@@ -543,7 +536,7 @@ class TestPybossaUtil(Test):
         err_msg = "Each cell should be encoded as Unicode"
         for row in util.unicode_csv_reader(fake_csv):
             for item in row:
-                assert isinstance(item, unicode), err_msg
+                assert isinstance(item, str), err_msg
 
     def test_UnicodeWriter(self):
         """Test UnicodeWriter class works."""
@@ -556,7 +549,7 @@ class TestPybossaUtil(Test):
             uw.writerow(row)
         tmp.seek(0)
         err_msg = "It should be the same CSV content"
-        with open(tmp.name, 'rb') as f:
+        with open(tmp.name, 'rt') as f:
             reader = csv.reader(f)
             for row in reader:
                 for item in row:
@@ -708,9 +701,7 @@ class TestPybossaUtil(Test):
 
 
 class TestIsReservedName(object):
-    from flask import Flask
-    from pybossa.core import setup_blueprints, create_app
-    from default import flask_app as app
+    from test import flask_app as app
 
     def test_returns_true_for_reserved_name_for_app_blueprint(self):
         with self.app.app_context():
@@ -830,24 +821,24 @@ class TestUsernameFromFullnameFunction(object):
         assert obtained == expected_username, obtained
 
     def test_it_removes_whitespaces_unicode(self):
-        name = u"john benjamin toshack"
-        expected_username = u"johnbenjamintoshack"
+        name = "john benjamin toshack"
+        expected_username = "johnbenjamintoshack"
 
         obtained = util.username_from_full_name(name)
 
         assert obtained == expected_username, obtained
 
     def test_it_removes_capital_letters_unicode(self):
-        name = u"JOHN"
-        expected_username = u"john"
+        name = "JOHN"
+        expected_username = "john"
 
         obtained = util.username_from_full_name(name)
 
         assert obtained == expected_username, obtained
 
     def test_it_removes_non_ascii_chars_unicode(self):
-        name = u"ßetaÑapa"
-        expected_username = u"etaapa"
+        name = "ßetaÑapa"
+        expected_username = "etaapa"
 
         obtained = util.username_from_full_name(name)
 
@@ -859,10 +850,10 @@ class TestRankProjects(object):
     def test_it_gives_priority_to_projects_with_an_avatar(self):
         projects = [
             {'info': {},
-             'n_tasks': 4, 'short_name': 'noavatar', 'name': u'with avatar',
+             'n_tasks': 4, 'short_name': 'noavatar', 'name': 'with avatar',
              'overall_progress': 0, 'n_volunteers': 1},
-            {'info': {u'container': u'user_7', u'thumbnail': u'avatar.png'},
-             'n_tasks': 4, 'short_name': 'avatar', 'name': u'without avatar',
+            {'info': {'container': 'user_7', 'thumbnail': 'avatar.png'},
+             'n_tasks': 4, 'short_name': 'avatar', 'name': 'without avatar',
              'overall_progress': 100, 'n_volunteers': 1}]
         ranked = util.rank(projects)
 
@@ -873,13 +864,13 @@ class TestRankProjects(object):
         projects = [{'info': {},
                      'n_tasks': 4,
                      'short_name': 'uncompleted',
-                     'name': u'uncompleted',
+                     'name': 'uncompleted',
                      'overall_progress': 0,
                      'n_volunteers': 1},
                     {'info': {},
                      'n_tasks': 4,
                      'short_name': 'completed',
-                     'name': u'completed',
+                     'name': 'completed',
                      'overall_progress': 100,
                      'n_volunteers': 1}]
         ranked = util.rank(projects)
@@ -891,20 +882,20 @@ class TestRankProjects(object):
     def test_it_penalizes_projects_with_test_in_the_name_or_short_name(self):
         projects = [{'info': {},
                      'n_tasks': 4,
-                     'name': u'my test 123',
-                     'short_name': u'123',
+                     'name': 'my test 123',
+                     'short_name': '123',
                      'overall_progress': 0,
                      'n_volunteers': 1},
                     {'info': {},
                      'n_tasks': 246,
-                     'name': u'123',
-                     'short_name': u'mytest123',
+                     'name': '123',
+                     'short_name': 'mytest123',
                      'overall_progress': 0,
                      'n_volunteers': 1},
                     {'info': {},
                      'n_tasks': 246,
-                     'name': u'real',
-                     'short_name': u'real',
+                     'name': 'real',
+                     'short_name': 'real',
                      'overall_progress': 0,
                      'n_volunteers': 1}]
         ranked = util.rank(projects)
@@ -914,19 +905,19 @@ class TestRankProjects(object):
     def test_rank_by_number_of_tasks(self):
         projects = [
             {'info': {},
-             'n_tasks': 1, 'name': u'last', 'short_name': u'a',
+             'n_tasks': 1, 'name': 'last', 'short_name': 'a',
              'overall_progress': 0, 'n_volunteers': 1},
             {'info': {},
-             'n_tasks': 11, 'name': u'fourth', 'short_name': u'b',
+             'n_tasks': 11, 'name': 'fourth', 'short_name': 'b',
              'overall_progress': 0, 'n_volunteers': 1},
             {'info': {},
-             'n_tasks': 21, 'name': u'third', 'short_name': u'c',
+             'n_tasks': 21, 'name': 'third', 'short_name': 'c',
              'overall_progress': 0, 'n_volunteers': 1},
             {'info': {},
-             'n_tasks': 51, 'name': u'second', 'short_name': u'd',
+             'n_tasks': 51, 'name': 'second', 'short_name': 'd',
              'overall_progress': 0, 'n_volunteers': 1},
             {'info': {},
-             'n_tasks': 101, 'name': u'first', 'short_name': u'e',
+             'n_tasks': 101, 'name': 'first', 'short_name': 'e',
              'overall_progress': 0, 'n_volunteers': 1}]
         ranked = util.rank(projects)
 
@@ -939,22 +930,22 @@ class TestRankProjects(object):
     def test_rank_by_number_of_crafters(self):
         projects = [
             {'info': {},
-             'n_tasks': 1, 'name': u'last', 'short_name': u'a',
+             'n_tasks': 1, 'name': 'last', 'short_name': 'a',
              'overall_progress': 0, 'n_volunteers': 0},
             {'info': {},
-             'n_tasks': 1, 'name': u'fifth', 'short_name': u'b',
+             'n_tasks': 1, 'name': 'fifth', 'short_name': 'b',
              'overall_progress': 0, 'n_volunteers': 1},
             {'info': {},
-             'n_tasks': 1, 'name': u'fourth', 'short_name': u'b',
+             'n_tasks': 1, 'name': 'fourth', 'short_name': 'b',
              'overall_progress': 0, 'n_volunteers': 11},
             {'info': {},
-             'n_tasks': 1, 'name': u'third', 'short_name': u'c',
+             'n_tasks': 1, 'name': 'third', 'short_name': 'c',
              'overall_progress': 0, 'n_volunteers': 21},
             {'info': {},
-             'n_tasks': 1, 'name': u'second', 'short_name': u'd',
+             'n_tasks': 1, 'name': 'second', 'short_name': 'd',
              'overall_progress': 0, 'n_volunteers': 51},
             {'info': {},
-             'n_tasks': 1, 'name': u'first', 'short_name': u'e',
+             'n_tasks': 1, 'name': 'first', 'short_name': 'e',
              'overall_progress': 0, 'n_volunteers': 101}]
         ranked = util.rank(projects)
 
@@ -972,25 +963,25 @@ class TestRankProjects(object):
         three_days_ago = today - timedelta(3)
         four_days_ago = today - timedelta(4)
         projects = [{'info': {},
-                     'n_tasks': 1, 'name': u'last', 'short_name': u'a',
+                     'n_tasks': 1, 'name': 'last', 'short_name': 'a',
                      'overall_progress': 0, 'n_volunteers': 1,
                      'last_activity_raw': four_days_ago.strftime(
                          '%Y-%m-%dT%H:%M:%S.%f')},
                     {'info': {},
-                     'n_tasks': 1, 'name': u'fourth', 'short_name': u'c',
+                     'n_tasks': 1, 'name': 'fourth', 'short_name': 'c',
                      'overall_progress': 0, 'n_volunteers': 1,
                      'last_activity_raw': three_days_ago.strftime(
                          '%Y-%m-%dT%H:%M:%S')},
                     {'info': {},
-                     'n_tasks': 1, 'name': u'third', 'short_name': u'd',
+                     'n_tasks': 1, 'name': 'third', 'short_name': 'd',
                      'overall_progress': 0, 'n_volunteers': 1,
                      'updated': two_days_ago.strftime('%Y-%m-%dT%H:%M:%S.%f')},
                     {'info': {},
-                     'n_tasks': 1, 'name': u'second', 'short_name': u'e',
+                     'n_tasks': 1, 'name': 'second', 'short_name': 'e',
                      'overall_progress': 0, 'n_volunteers': 1,
                      'updated': yesterday.strftime('%Y-%m-%dT%H:%M:%S')},
                     {'info': {},
-                     'n_tasks': 1, 'name': u'first', 'short_name': u'e',
+                     'n_tasks': 1, 'name': 'first', 'short_name': 'e',
                      'overall_progress': 0, 'n_volunteers': 1,
                      'updated': today.strftime('%Y-%m-%dT%H:%M:%S.%f')}]
         ranked = util.rank(projects)
@@ -1004,19 +995,19 @@ class TestRankProjects(object):
     def test_rank_by_chosen_attribute(self):
         projects = [
             {'info': {},
-             'n_tasks': 1, 'name': u'last', 'short_name': u'a',
+             'n_tasks': 1, 'name': 'last', 'short_name': 'a',
              'overall_progress': 0, 'n_volunteers': 10},
             {'info': {},
-             'n_tasks': 11, 'name': u'fourth', 'short_name': u'b',
+             'n_tasks': 11, 'name': 'fourth', 'short_name': 'b',
              'overall_progress': 0, 'n_volunteers': 25},
             {'info': {},
-             'n_tasks': 21, 'name': u'third', 'short_name': u'c',
+             'n_tasks': 21, 'name': 'third', 'short_name': 'c',
              'overall_progress': 0, 'n_volunteers': 15},
             {'info': {},
-             'n_tasks': 51, 'name': u'second', 'short_name': u'd',
+             'n_tasks': 51, 'name': 'second', 'short_name': 'd',
              'overall_progress': 0, 'n_volunteers': 1},
             {'info': {},
-             'n_tasks': 101, 'name': u'first', 'short_name': u'e',
+             'n_tasks': 101, 'name': 'first', 'short_name': 'e',
              'overall_progress': 0, 'n_volunteers': 5}]
         ranked = util.rank(projects, order_by='n_volunteers')
 
@@ -1029,19 +1020,19 @@ class TestRankProjects(object):
     def test_rank_by_chosen_attribute_reversed(self):
         projects = [
             {'info': {},
-             'n_tasks': 1, 'name': u'last', 'short_name': u'a',
+             'n_tasks': 1, 'name': 'last', 'short_name': 'a',
              'overall_progress': 0, 'n_volunteers': 1},
             {'info': {},
-             'n_tasks': 11, 'name': u'fourth', 'short_name': u'b',
+             'n_tasks': 11, 'name': 'fourth', 'short_name': 'b',
              'overall_progress': 0, 'n_volunteers': 5},
             {'info': {},
-             'n_tasks': 21, 'name': u'third', 'short_name': u'c',
+             'n_tasks': 21, 'name': 'third', 'short_name': 'c',
              'overall_progress': 0, 'n_volunteers': 10},
             {'info': {},
-             'n_tasks': 51, 'name': u'second', 'short_name': u'd',
+             'n_tasks': 51, 'name': 'second', 'short_name': 'd',
              'overall_progress': 0, 'n_volunteers': 20},
             {'info': {},
-             'n_tasks': 101, 'name': u'first', 'short_name': u'e',
+             'n_tasks': 101, 'name': 'first', 'short_name': 'e',
              'overall_progress': 0, 'n_volunteers': 30}]
         ranked = util.rank(projects, order_by='n_volunteers', desc=True)
 
@@ -1055,9 +1046,6 @@ class TestRankProjects(object):
     @patch('pybossa.util.url_for')
     def test_get_avatar_url(self, mock_url_for):
         """Test get_avatar_url works."""
-        util.get_avatar_url('rackspace', '1.png', '1', True)
-        mock_url_for.assert_called_with('rackspace', container='1', filename='1.png')
-
         util.get_avatar_url('local', '1.png', '1', True)
         mock_url_for.assert_called_with('uploads.uploaded_file',
                                         _external=True,
@@ -1121,6 +1109,7 @@ class TestStrongPassword(object):
         password = 'AaBbCD12345!'
         valid, _ = util.check_password_strength(password=password)
         assert valid
+
 
 class TestAccessControl(Test):
 

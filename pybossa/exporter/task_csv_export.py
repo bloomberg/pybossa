@@ -17,14 +17,18 @@
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 # Cache global variables for timeouts
 
-import tempfile
 import json
-from flask import url_for, safe_join, send_file, redirect
-from pybossa.uploader import local
+import tempfile
+
+from flask import send_file
+from werkzeug.utils import safe_join
+
+from pybossa.core import uploader
 from pybossa.exporter.csv_export import CsvExporter
-from pybossa.core import uploader, task_repo
+from pybossa.uploader import local
 from pybossa.util import UnicodeWriter
-from export_helpers import browse_tasks_export
+from .export_helpers import browse_tasks_export
+
 
 class TaskCsvExporter(CsvExporter):
     """CSV Exporter for exporting ``Task``s and ``TaskRun``s
@@ -108,7 +112,7 @@ class TaskCsvExporter(CsvExporter):
             row[keys[-1]] = value
 
         new_row = {}
-        for k, v in row.iteritems():
+        for k, v in row.items():
             key_split = k.split('__', 1)
             if len(key_split) > 1 and key_split[0] in ('task', 'user'):
                 set_nested_value(new_row, key_split, v)
@@ -126,7 +130,7 @@ class TaskCsvExporter(CsvExporter):
         for k, v in key_value_pairs:
             key = k if not key_prefix else '{}__{}'.format(key_prefix, k)
             if isinstance(v, dict):
-                iterator = TaskCsvExporter.flatten(v.iteritems(), key, return_value)
+                iterator = TaskCsvExporter.flatten(iter(v.items()), key, return_value)
             elif isinstance(v, list):
                 iterator = TaskCsvExporter.flatten(enumerate(v), key, return_value)
             else:
@@ -196,7 +200,7 @@ class TaskCsvExporter(CsvExporter):
         self._make_zip(project, ty, expanded)
         if isinstance(uploader, local.LocalUploader):
             filepath = self._download_path(project)
-            res = send_file(filename_or_fp=safe_join(filepath, filename),
+            res = send_file(path_or_file=safe_join(filepath, filename),
                             mimetype='application/octet-stream',
                             as_attachment=True,
                             attachment_filename=filename)
@@ -205,10 +209,6 @@ class TaskCsvExporter(CsvExporter):
             # http://greenbytes.de/tech/tc2231/#encoding-2231-char
             # res.headers['Content-Disposition'] = 'attachment; filename*=%s' % filename
             return res
-        else:
-            return redirect(url_for('rackspace', filename=filename,
-                                    container=self._container(project),
-                                    _external=True))
 
     def make_zip(self, project, obj, expanded=False, filters=None, disclose_gold=False):
         file_format = 'csv'

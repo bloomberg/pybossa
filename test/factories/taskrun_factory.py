@@ -21,7 +21,7 @@ from pybossa.model.task_run import TaskRun
 from . import BaseFactory, factory, task_repo
 import settings_test
 
-cp = CryptoPAn(settings_test.CRYPTOPAN_KEY)
+cp = CryptoPAn(settings_test.CRYPTOPAN_KEY.encode())
 
 class TaskRunFactory(BaseFactory):
     class Meta:
@@ -34,11 +34,11 @@ class TaskRunFactory(BaseFactory):
         return taskrun
 
     id = factory.Sequence(lambda n: n)
-    task = factory.SubFactory('factories.TaskFactory')
+    task = factory.SubFactory('test.factories.TaskFactory')
     task_id = factory.LazyAttribute(lambda task_run: task_run.task.id)
     project = factory.SelfAttribute('task.project')
     project_id = factory.LazyAttribute(lambda task_run: task_run.project.id)
-    user = factory.SubFactory('factories.UserFactory')
+    user = factory.SubFactory('test.factories.UserFactory')
     user_id = factory.LazyAttribute(lambda task_run: task_run.user.id)
     info = dict(answer='yes')
 

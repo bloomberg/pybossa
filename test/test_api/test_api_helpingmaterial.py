@@ -17,11 +17,11 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
 import io
-from default import db, with_context
-from test_api import TestAPI
-from factories import UserFactory, HelpingMaterialFactory, ProjectFactory
+from test import db, with_context
+from test.test_api import TestAPI
+from test.factories import UserFactory, HelpingMaterialFactory, ProjectFactory
 from pybossa.repositories import HelpingMaterialRepository
-from mock import patch
+from unittest.mock import patch
 
 helping_repo = HelpingMaterialRepository(db)
 

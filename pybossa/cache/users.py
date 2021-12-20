@@ -373,8 +373,9 @@ def get_user_profile_metadata(user_id):
     info = user.info or {} if user else {}
     return info.get("metadata", {}).get('profile')
 
+
 def get_user_email(user_id):
-    user= get_user_by_id(user_id)
+    user = get_user_by_id(user_id)
     return user.email_addr if user else None
 
 
@@ -479,8 +480,6 @@ def get_announcements_cached(user, announcement_levels):
     level = announcement_levels['user']['level']
     if user.admin:
         level = announcement_levels['admin']['level']
-    elif published_projects_cached(user.id):
-        level = announcement_levels['owner']['level']
     elif user.subadmin:
         level = announcement_levels['subadmin']['level']
     return get_announcements_by_level_cached(level)

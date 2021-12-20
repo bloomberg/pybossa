@@ -16,11 +16,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, db, with_context
-from nose.tools import assert_raises
-from sqlalchemy.exc import IntegrityError
-from pybossa.model.helpingmaterial import HelpingMaterial
-from factories import HelpingMaterialFactory
+from test import Test, with_context
+from test.factories import HelpingMaterialFactory
 
 
 class TestModelHelpingMaterial(Test):
@@ -29,4 +26,4 @@ class TestModelHelpingMaterial(Test):
     def test_helpingmaterial_public_attributes(self):
         """Test public attributes works."""
         hm = HelpingMaterialFactory.create()
-        assert hm.public_attributes().sort() == hm.dictize().keys().sort()
+        assert hm.public_attributes().sort() == list(hm.dictize().keys()).sort()

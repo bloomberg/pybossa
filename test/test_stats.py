@@ -18,9 +18,8 @@
 
 import datetime
 import time
-from factories import ProjectFactory, TaskFactory, TaskRunFactory, AnonymousTaskRunFactory
-from default import Test, with_context
-from pybossa.model.task_run import TaskRun
+from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, AnonymousTaskRunFactory
+from test import Test, with_context, with_request_context
 import pybossa.cache.project_stats as stats
 from pybossa.core import user_repo
 
@@ -37,9 +36,9 @@ class TestStats(Test):
     def test_stats_dates_no_completed_tasks_on_different_days(self):
         """Test STATS stats_dates with no completed tasks"""
         self.prepare_data()
-        today = unicode(datetime.date.today())
+        today = str(datetime.date.today())
         dates, dates_anon, dates_auth = stats.stats_dates(self.project.id)
-        assert len(dates.keys()) == 15, "There should be 15 days."
+        assert len(list(dates.keys())) == 15, "There should be 15 days."
         for d in dates.keys():
             if d == today:
                 assert dates[d] == 4, "There should be 4 completed tasks."
@@ -58,7 +57,7 @@ class TestStats(Test):
     def test_stats_dates_completed_tasks(self):
         """Test STATS stats_dates with tasks completed tasks"""
         self.prepare_data()
-        today = unicode(datetime.date.today())
+        today = str(datetime.date.today())
         TaskRunFactory.create(task=self.project.tasks[1])
         dates, dates_anon, dates_auth = stats.stats_dates(self.project.id)
         assert dates[today] == 4, dates
@@ -69,10 +68,10 @@ class TestStats(Test):
     def test_02_stats_hours(self):
         """Test STATS hours method works"""
         self.prepare_data()
-        hour = unicode(datetime.datetime.utcnow().strftime('%H'))
+        hour = str(datetime.datetime.utcnow().strftime('%H'))
         hours, hours_anon, hours_auth, max_hours,\
             max_hours_anon, max_hours_auth = stats.stats_hours(self.project.id)
-        print hours
+        print(hours)
         for i in range(0, 24):
             # There should be only 8 answers at current hour
             if str(i).zfill(2) == hour:
@@ -96,11 +95,11 @@ class TestStats(Test):
         assert max_hours == 8, err_msg
         assert (max_hours_anon + max_hours_auth) == 8, err_msg
 
-    @with_context
+    @with_request_context
     def test_03_stats(self):
         """Test STATS stats method works"""
         self.prepare_data()
-        today = unicode(datetime.date.today())
+        today = str(datetime.date.today())
         hour = int(datetime.datetime.utcnow().strftime('%H'))
         date_ms = time.mktime(time.strptime(today, "%Y-%m-%d")) * 1000
         anon = 0
@@ -136,7 +135,7 @@ class TestStats(Test):
         for item in hours_stats:
             if item['label'] == 'Anon + Auth':
                 max_hours = item['max']
-                print item
+                print(item)
                 assert item['max'] == 10, item['max']
                 assert item['max'] == 10, "Max hours value should be 10"
                 for i in item['values']:
