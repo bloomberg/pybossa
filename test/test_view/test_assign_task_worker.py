@@ -1,8 +1,9 @@
 # -*- coding: utf8 -*-
 import json
 from mock import patch
+from test import with_context
 
-from default import db, with_context
+from default import db
 from factories import ProjectFactory, TaskFactory, UserFactory
 from helper import web
 from pybossa.repositories import ProjectRepository, TaskRepository, UserRepository
