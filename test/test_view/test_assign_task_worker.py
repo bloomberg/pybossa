@@ -2,7 +2,7 @@
 import json
 from mock import patch
 from test import with_context
-from factories import ProjectFactory, TaskFactory, UserFactory
+from test.factories import ProjectFactory, TaskFactory, UserFactory
 from helper import web
 from pybossa.repositories import ProjectRepository, TaskRepository, UserRepository
 from pybossa.core import user_repo, task_repo
