@@ -80,3 +80,22 @@ class TestAssignTaskWorker(web.Helper):
         req_data = dict(taskId=None)
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
+
+
+    @with_context
+    def test_bulk_priority_update(self):
+        """Test bulk priority update."""
+        project = ProjectFactory.create(published=True)
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+
+        task1_user_pref = dict(assign_user=[user.email_addr])
+
+        task1 = TaskFactory.create(project=project,  user_pref=task1_user_pref)
+        task_repo.update(task1)
+        req_data = dict(taskIds=str(task1.id), task_priority_0=0.5)
+
+
+        url = '/project/%s/tasks/priorityupdate?api_key=%s' % (project.short_name, project.owner.api_key)
+        req_data = dict(taskId=None)
+        res = self.app.post(url, content_type='application/json',
+                            data=json.dumps(req_data))
