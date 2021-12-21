@@ -99,3 +99,25 @@ class TestAssignTaskWorker(web.Helper):
         req_data = dict(taskId=None)
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
+
+
+
+    @with_context
+    def test_update_assign_workers(self):
+        """Test update assign worker."""
+        project = ProjectFactory.create(published=True)
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+
+        task1_user_pref = dict(assign_user=[user.email_addr])
+
+        task1 = TaskFactory.create(project=project,  user_pref=task1_user_pref)
+        task_repo.update(task1)
+        req_data = dict(taskIds=str(task1.id), add=user)
+
+
+        url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
+        req_data = dict(taskId=None)
+        res = self.app.post(url, content_type='application/json',
+                            data=json.dumps(req_data))
+        res_data = json.loads(res.data)
+        assert res_data['assign_users'][0]['fullname'] == user.fullname
