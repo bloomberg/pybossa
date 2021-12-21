@@ -94,9 +94,10 @@ from datetime import datetime
 from pybossa.data_access import (data_access_levels, subadmins_are_privileged,
     ensure_annotation_config_from_form, ensure_amp_config_applied_to_project)
 import app_settings
+import copy
 from copy import deepcopy
 from pybossa.cache import delete_memoized
-
+from sqlalchemy.orm.attributes import flag_modified
 
 cors_headers = ['Content-Type', 'Authorization']
 
@@ -1580,6 +1581,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         location_options = valid_user_preferences.get('locations')
         rdancy_upd_exp = current_app.config.get('REDUNDANCY_UPDATE_EXPIRATION', 30)
         data = dict(template='/projects/tasks_browse.html',
+                    users=[],
                     project=project_sanitized,
                     owner=owner_sanitized,
                     tasks=page_tasks,
@@ -1702,6 +1704,106 @@ def bulk_priority_update(short_name):
     except Exception as e:
         return ErrorStatus().format_exception(e, 'priorityupdate', 'POST')
 
+@crossdomain(origin='*', headers=cors_headers)
+@blueprint.route('/<short_name>/tasks/assign-workersupdate', methods=['GET', 'POST'])
+@login_required
+@admin_or_subadmin_required
+def bulk_update_assign_worker(short_name):
+   
+    response = {}
+    project, owner, ps = project_by_shortname(short_name)
+    data = json.loads(request.data)
+
+    if data.get("add") is None and data.get("remove") is None:
+        # read data and return users
+
+        task_id = data.get("taskId")
+        bulk_update = False
+        assign_user_emails = []
+        if task_id:
+            # use filters tp populate user list
+            t = task_repo.get_task_by(project_id=project.id,
+                                        id=int(task_id))
+            assign_user_email = []
+            if t.user_pref is not None and isinstance(t.user_pref, dict):
+                assign_user_emails = set(t.user_pref.get("assign_user", []))
+        else:
+            bulk_update = True
+            args = parse_tasks_browse_args(json.loads(data.get('filters', '{"taskId": null}')))
+            tasks = task_repo.get_tasks_by_filters(project, args)
+            task_ids = [t.id for t in tasks]
+            assign_user_emails = set()
+
+            for task_id in task_ids:
+                t = task_repo.get_task_by(project_id=project.id,
+                                        id=int(task_id))
+                assign_user_emails = assign_user_emails.union(set(t.user_pref.get("assign_user", [])))
+        assign_users = []
+        for user_email in assign_user_emails:
+            user = user_repo.search_by_email(user_email)
+            if not user:
+                fullname = user_email + ' (user not found)'
+            else:
+                fullname = user.fullname 
+            assign_users.append({'fullname': fullname, 'email': user_email})
+        response['assign_users'] = assign_users
+
+        # get a list of all users can be assigned to task
+        if bool(data_access_levels):
+            all_users = user_repo.get_users(project.get_project_users())
+        else:
+            all_users = user_repo.get_all()
+        all_user_data = []
+        for user in all_users:
+
+            # Exclude currently assigned users in the candidate list ONLY for single task update
+            if user.email_addr in assign_user_emails and not bulk_update:
+                continue
+            user_data = dict()
+            user_data['fullname'] = user.fullname
+            user_data['email'] = user.email_addr
+            all_user_data.append(user_data)
+        response["all_users"] = all_user_data
+    else:
+        # update tasks with assign worker values
+        assign_workers = data.get('add', [])
+        remove_workers = data.get('remove', [])
+
+        assign_worker_emails = [w["email"] for w in assign_workers]
+        remove_worker_emails = [w["email"] for w in remove_workers]
+
+        task_id = data.get("taskId")
+
+        if not task_id:
+            # get task_ids from db
+            args = parse_tasks_browse_args(json.loads(data.get('filters', '')))
+            tasks = task_repo.get_tasks_by_filters(project, args)
+            task_ids = [t.id for t in tasks]
+        else:
+            task_ids = [task_id]
+        for task_id in task_ids:
+            if task_id is not None:
+                t = task_repo.get_task_by(project_id=project.id,
+                                        id=int(task_id))
+                # add new users 
+                user_pref = t.user_pref or {}
+                assign_user = user_pref.get("assign_user", [])
+                assign_user.extend(assign_worker_emails)
+                # remove all duplicates
+                assign_user = list(set(assign_user))
+
+                # remove users 
+                for remove_user_email in remove_worker_emails:
+                    if remove_user_email in assign_user:
+                        assign_user.remove(remove_user_email)
+
+                user_pref["assign_user"] = assign_user
+
+                t.user_pref = user_pref
+                flag_modified(t, "user_pref")
+
+                task_repo.update(t)
+    return Response(json.dumps(response), 200, mimetype='application/json')
 
 @crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/redundancyupdate', methods=['POST'])
@@ -1726,7 +1828,7 @@ def bulk_redundancy_update(short_name):
             })
 
         else:
-            args = parse_tasks_browse_args(request.json.get('filters'))
+            args = parse_tasks_browse_args(req_data.get('filters', ''))
             tasks_not_updated = task_repo.update_tasks_redundancy(project, n_answers, args)
             notify_redundancy_updates(tasks_not_updated)
             if tasks_not_updated:

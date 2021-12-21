@@ -194,7 +194,6 @@ class TaskRepository(Repository):
             self.db.session.commit()
             cached_projects.clean_project(element.project_id)
         except IntegrityError as e:
-            self.db.session.rollback()
             raise DBIntegrityError(e)
 
     def delete(self, element):
@@ -281,6 +280,22 @@ class TaskRepository(Repository):
         self.db.session.commit()
         cached_projects.clean_project(project.id)
         self._delete_zip_files_from_store(project)
+
+    def get_tasks_by_filters(self, project, filters=None):
+        filters = filters or {}
+        conditions, params = get_task_filters(filters)
+
+        sql = ''' SELECT task.id
+                from task LEFT OUTER JOIN
+                (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
+                MAX(finish_time) as ft FROM task_run
+                WHERE project_id=:project_id GROUP BY task_id) AS log_counts
+                ON task.id=log_counts.task_id
+                WHERE task.project_id=:project_id {}
+        '''.format(conditions)
+
+        rows = self.db.session.execute(sql, dict(project_id=project.id, **params))
+        return [row for row in rows]
 
     def update_tasks_redundancy(self, project, n_answers, filters=None):
         """
