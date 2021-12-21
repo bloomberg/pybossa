@@ -94,7 +94,6 @@ from datetime import datetime
 from pybossa.data_access import (data_access_levels, subadmins_are_privileged,
     ensure_annotation_config_from_form, ensure_amp_config_applied_to_project)
 import app_settings
-import copy
 from copy import deepcopy
 from pybossa.cache import delete_memoized
 from sqlalchemy.orm.attributes import flag_modified
