@@ -83,16 +83,15 @@ class TestAssignTaskWorker(web.Helper):
         """Test bulk priority update."""
         project = ProjectFactory.create(published=True)
         user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
-        task1_user_pref = dict(assign_user=[user.email_addr], task_priority_0=.5)
+        task1_user_pref = dict(assign_user=[user.email_addr], priority_0=1)
         task1 = TaskFactory.create(project=project,  user_pref=task1_user_pref)
         task_repo.update(task1)
-        req_data = dict(taskIds=str(task1.id), task_priority_0=0.5)
+        req_data = dict(taskIds=str(task1.id), priority_0=0.5)
         url = '/project/%s/tasks/priorityupdate?api_key=%s' % (project.short_name, project.owner.api_key)
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
         res_data = json.loads(res.data)
-        print(task1)
-        assert task1.task_priority_0 == .5
+        assert task1.priority_0 == .5, task1.priority_0
 
 
     @with_context
