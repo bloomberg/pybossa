@@ -91,7 +91,8 @@ class TestAssignTaskWorker(web.Helper):
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
         res_data = json.loads(res.data)
-        assert task1.get('task_priority_0') == .5
+        print(task1)
+        assert task1.task_priority_0 == .5
 
 
     @with_context
