@@ -98,7 +98,6 @@ class TestAssignTaskWorker(web.Helper):
         req_data = dict(taskIds=str(task1.id), priority_0=0.5)
 
         url = '/project/%s/tasks/priorityupdate?api_key=%s' % (project.short_name, project.owner.api_key)
-        req_data = dict(taskId=None)
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
         res_data = json.loads(res.data)
