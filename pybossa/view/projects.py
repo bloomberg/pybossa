@@ -94,7 +94,6 @@ from datetime import datetime
 from pybossa.data_access import (data_access_levels, subadmins_are_privileged,
     ensure_annotation_config_from_form, ensure_amp_config_applied_to_project)
 import app_settings
-import copy
 from copy import deepcopy
 from pybossa.cache import delete_memoized
 from sqlalchemy.orm.attributes import flag_modified
@@ -1705,7 +1704,7 @@ def bulk_priority_update(short_name):
         return ErrorStatus().format_exception(e, 'priorityupdate', 'POST')
 
 @crossdomain(origin='*', headers=cors_headers)
-@blueprint.route('/<short_name>/tasks/assign-workersupdate', methods=['GET', 'POST'])
+@blueprint.route('/<short_name>/tasks/assign-workersupdate', methods=['POST'])
 @login_required
 @admin_or_subadmin_required
 def bulk_update_assign_worker(short_name):
