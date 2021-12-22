@@ -72,6 +72,7 @@ class TestAssignTaskWorker(web.Helper):
         req_data = dict(taskId=None)
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
+        res_data = json.loads(res.data)
         assert res_data['assign_users'][0]['fullname'] == user.fullname
         assert res_data['assign_users'][0]['email'] == user.email_addr
 
@@ -90,9 +91,7 @@ class TestAssignTaskWorker(web.Helper):
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
         res_data = json.loads(res.data)
-        print(res_data)
-        assert res_data['task_priority_0'][0]== .5
-
+        assert task1.task_priority_0 == .5
 
 
     @with_context
