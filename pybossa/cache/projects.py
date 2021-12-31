@@ -60,9 +60,9 @@ def get_top(n=4):
     return top_projects
 
 
-@memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
-                    cache_group_keys=[[0]])
-@static_vars(allowed_fields=allowed_fields)
+# @memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
+#                     cache_group_keys=[[0]])
+# @static_vars(allowed_fields=allowed_fields)
 def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwargs):
     """Cache browse tasks view for a project."""
 
@@ -99,6 +99,8 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
     args['user_id'] = user_id
     filters, filter_params = get_task_filters(args)
+    filters += args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
+    print(filters)
 
     sql = """
             SELECT task.id,
@@ -196,7 +198,7 @@ def select_available_tasks(task_rank_info, locked_tasks, project_id, user_id, nu
             # does not show completed tasks to users
             continue
         locked_users = locked_tasks.get(t["id"], [])
-        if user_id in locked_users or len(locked_users) < remaining:
+        if str(user_id) in locked_users or len(locked_users) < remaining:
             tasks.append((t, score))
 
     return tasks
