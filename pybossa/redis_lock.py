@@ -185,10 +185,12 @@ class LockManager(object):
         return decoded_locks
 
     def get_reservation_keys(self, resource_id):
+        """
+        Get all reservation key/resource_id associated with partial resource information.
+        :param resource_id: resource on project/task/user
+        """
         reservations = self._redis.keys(resource_id) or []
         decoded_reservation_keys = [k.decode() for k in reservations]
-
-        # decoded_reservations = [key.decode() for key in reservations]
         return decoded_reservation_keys
 
     def _release_expired_locks(self, resource_id, now):
