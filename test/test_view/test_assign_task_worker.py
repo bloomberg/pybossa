@@ -95,13 +95,13 @@ class TestAssignTaskWorker(web.Helper):
 
         task1 = TaskFactory.create(project=project,  user_pref=task1_user_pref)
         task_repo.update(task1)
-        req_data = dict(taskIds=str(task1.id), priority_0=0.5)
+        req_data = dict(taskIds=str(task1.id), priority_0=0.0)
 
         url = '/project/%s/tasks/priorityupdate?api_key=%s' % (project.short_name, project.owner.api_key)
         res = self.app.post(url, content_type='application/json',
                             data=json.dumps(req_data))
         res_data = json.loads(res.data)
-        assert task1.priority_0 == .5, task1.priority_0
+        assert task1.priority_0 == 0.0, task1.priority_0
 
 
 
