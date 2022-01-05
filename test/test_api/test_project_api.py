@@ -75,6 +75,11 @@ class TestProjectAPI(TestAPI):
     @with_context
     def test_project_query(self):
         """ Test API project query"""
+        from datetime import datetime, timedelta
+
+        t = datetime.now() + timedelta(days=1)
+        t_string = t.strftime("%Y-%m-%dT%H:%M:%S")
+
         project1 = ProjectFactory.create(
             updated='2015-01-01T14:37:30.642119',
             info={
@@ -90,7 +95,7 @@ class TestProjectAPI(TestAPI):
             })
 
         project2 = ProjectFactory.create(
-            updated='2022-01-01T14:37:30.642119',
+            updated=t_string,
             info={
                 'total': 150,
                 'task_presenter': 'foo',
@@ -711,7 +716,7 @@ class TestProjectAPI(TestAPI):
         make_subadmin(users[1])
         non_owner = UserFactory.create()
         cat1 = CategoryFactory.create()
-        
+
         # create project
         headers = [('Authorization', users[1].api_key)]
         name='project'
@@ -837,9 +842,9 @@ class TestProjectAPI(TestAPI):
         assert_equal(out.owner.name, 'user2')
         assert_equal(out.owners_ids, [subadmin.id])
         assert_equal(out.info, {
-            'data_classification': {'input_data': 'L4 - public', 'output_data': 'L4 - public'}, 
-            'data_access': ['L4'], 
-            'passwd_hash': 'hashedpwd', 
+            'data_classification': {'input_data': 'L4 - public', 'output_data': 'L4 - public'},
+            'data_access': ['L4'],
+            'passwd_hash': 'hashedpwd',
             'kpi': 0.5,
             'product': 'abc',
             'subproduct': 'def',
@@ -883,10 +888,10 @@ class TestProjectAPI(TestAPI):
         assert_equal(out.owner.name, 'user1')
         assert_equal(out.owners_ids, [1])
         assert_equal(out.info, {
-            'kpi': 0.5, 
-            'task_presenter': 'taskpresenter', 
-            'passwd_hash': 'hashedpwd', 
-            'data_classification': {'input_data': 'L4 - public', 'output_data': 'L4 - public'}, 
+            'kpi': 0.5,
+            'task_presenter': 'taskpresenter',
+            'passwd_hash': 'hashedpwd',
+            'data_classification': {'input_data': 'L4 - public', 'output_data': 'L4 - public'},
             'data_access': ['L4'],
             'product': 'abc',
             'subproduct': 'def',
@@ -906,10 +911,10 @@ class TestProjectAPI(TestAPI):
         assert_equal(out.owner.name, 'user1')
         assert_equal(out.owners_ids, [1])
         assert_equal(out.info, {
-            'kpi': 0.5, 
-            'task_presenter': 'new-taskpresenter', 
-            'data_classification': {'input_data': 'L4 - public', 'output_data': 'L4 - public'}, 
-            'data_access': ['L4'], 
+            'kpi': 0.5,
+            'task_presenter': 'new-taskpresenter',
+            'data_classification': {'input_data': 'L4 - public', 'output_data': 'L4 - public'},
+            'data_access': ['L4'],
             'passwd_hash': 'hashedpwd',
             'product': 'abc',
             'subproduct': 'def',
@@ -1161,7 +1166,7 @@ class TestProjectAPI(TestAPI):
         tasks = TaskFactory.create_batch(3, project=project)
         headers = [('Authorization', user.api_key)]
         category = CategoryFactory.create()
-    
+
         taskruns = []
         for task in tasks:
             taskruns.extend(AnonymousTaskRunFactory.create_batch(2, task=task))
@@ -1169,11 +1174,11 @@ class TestProjectAPI(TestAPI):
 
         # leave one task null for testing
         tasks[0].info = {}
-        # check basic query without constraints to filter tasks  
+        # check basic query without constraints to filter tasks
         res = self.app.get('/api/project?all=1&category_id=%s' % category.id, headers=headers, follow_redirects=True)
         assert res.status_code == 200
 
-        # check 404 response when the project doesn't exist   
+        # check 404 response when the project doesn't exist
         res = self.app.get('/api/project//taskprogress', follow_redirects=True, headers=headers)
         error_msg = "A valid project must be used"
         assert res.status_code == 404, error_msg
@@ -1731,7 +1736,7 @@ class TestProjectAPI(TestAPI):
             long_description='my project\nlong description',
             password='hello',
             info=dict(
-                data_access=project_levels, 
+                data_access=project_levels,
                 project_users=project_users,
                 product="abc",
                 subproduct="def",

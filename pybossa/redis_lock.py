@@ -184,6 +184,15 @@ class LockManager(object):
         decoded_locks = {k.decode(): v.decode() for k, v in locks.items()}
         return decoded_locks
 
+    def get_reservation_keys(self, resource_id):
+        """
+        Get all reservation key/resource_id associated with partial resource information.
+        :param resource_id: resource on project/task/user
+        """
+        reservations = self._redis.keys(resource_id) or []
+        decoded_reservation_keys = [k.decode() for k in reservations]
+        return decoded_reservation_keys
+
     def _release_expired_locks(self, resource_id, now):
         locks = self.get_locks(resource_id)
         to_delete = []
@@ -194,9 +203,17 @@ class LockManager(object):
         if to_delete:
             self._redis.hdel(resource_id, *to_delete)
 
+    def _release_expired_reserve_for_project(self, project_id):
+        resource_id = "reserve_task:project:{}:category:*:user:*:task:*".format(project_id)
+        timestamp = time()
+
+        reservation_keys = self.get_reservation_keys(resource_id)
+        for k in reservation_keys:
+            self._release_expired_reserve_task_locks(k, timestamp)
+
     def _release_expired_reserve_task_locks(self, resource_id, now):
         expiration = self._redis.get(resource_id) or 0
-        if now > expiration:
+        if now > float(expiration):
             self._redis.delete(resource_id)
 
 
@@ -221,6 +238,9 @@ class LockManager(object):
         if exclude_user and not user_id:
             raise BadRequest('Missing user id')
 
+        # release expired task reservations
+        self._release_expired_reserve_for_project(project_id)
+
         resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
             project_id,
             "*" if not category else category,
@@ -228,13 +248,7 @@ class LockManager(object):
             "*" if not task_id else task_id
         )
 
-        category_keys = self._redis.keys(resource_id)
-        if not category_keys:
-            return []
-
-        # response returned as bytes in Python 3 that were str in Python 2
-        # per https://github.com/andymccurdy/redis-py
-        category_keys = [key.decode() for key in category_keys]
+        category_keys = self.get_reservation_keys(resource_id)
 
         # if key present but for different user, with redundancy = 1, return false
         # TODO: for redundancy > 1, check if additional task run
