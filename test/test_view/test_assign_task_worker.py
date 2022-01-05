@@ -1,11 +1,10 @@
 # -*- coding: utf8 -*-
 import json
-from mock import patch
+
+from pybossa.core import user_repo, task_repo
 from test import with_context
 from test.factories import ProjectFactory, TaskFactory, UserFactory
 from test.helper import web
-from pybossa.repositories import ProjectRepository, TaskRepository, UserRepository
-from pybossa.core import user_repo, task_repo
 
 
 class TestAssignTaskWorker(web.Helper):
