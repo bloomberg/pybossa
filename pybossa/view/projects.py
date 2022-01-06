@@ -1489,9 +1489,16 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             user_email = user.email_addr if user else None
             user_profile = cached_users.get_user_profile_metadata(current_user.id)
             user_profile = json.loads(user_profile) if user_profile else {}
+            # get task bundling sql filters
+            reserve_task_config = project.info.get("reserve_tasks", {}).get("category", [])
+            reserve_task_filter, _ = sched.get_reserve_task_category_info(reserve_task_config, project.id,
+                                                                        project.info.get("timeout"),
+                                                                        current_user.id,
+                                                                        True)
             args["filter_by_wfilter_upref"] = dict(current_user_pref=user_pref,
                                                 current_user_email=user_email,
-                                                current_user_profile=user_profile)
+                                                current_user_profile=user_profile,
+                                                reserve_filter=reserve_task_filter)
             args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
             args["display_columns"] = ['task_id', 'priority', 'created']
             args["display_info_columns"] = project.info.get('tasklist_columns', [])

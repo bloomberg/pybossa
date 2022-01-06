@@ -432,6 +432,7 @@ def get_reserve_task_key(task_id):
 
 def get_reserve_task_category_info(reserve_task_config, project_id, timeout, user_id, exclude_user=False):
     """Get reserved category info for a given user under a given project"""
+    timeout = timeout or TIMEOUT
     sql_filters, category_keys = "", []
 
     if not reserve_task_config:
