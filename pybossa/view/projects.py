@@ -1279,6 +1279,8 @@ def presenter(short_name):
         return resp
 
     project, owner, ps = project_by_shortname(short_name)
+    project.timeout = project.info.get('timeout') or DEFAULT_TASK_TIMEOUT
+
     ensure_authorized_to('read', project)
 
     if project.needs_password():
