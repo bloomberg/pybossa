@@ -247,8 +247,11 @@ def parse_tasks_browse_args(args):
         parsed_args['priority_from'] = float(args['priority_from'])
     if args.get('priority_to') is not None:
         parsed_args['priority_to'] = float(args['priority_to'])
-    if args.get('display_columns'):
+    if args.get('display_columns') and type(args.get('display_columns')) == list:
+        parsed_args['display_columns'] = args['display_columns']
+    elif args.get('display_columns') and type(args.get('display_columns')) != list:
         parsed_args['display_columns'] = json.loads(args['display_columns'])
+
 
     if not isinstance(parsed_args.get('display_columns'), list):
         parsed_args['display_columns'] = ['task_id', 'priority', 'pcomplete',
