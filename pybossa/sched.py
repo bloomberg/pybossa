@@ -659,6 +659,8 @@ def lock_task_for_user(task_id, project_id, user_id):
         timeout = timeout or TIMEOUT
         remaining = float('inf') if calibration else n_answers - taskcount
         if acquire_lock(task_id, user_id, remaining, timeout):
+            # reserve tasks
+            acquire_reserve_task_lock(project_id, task_id, user_id, timeout)
             return _lock_task_for_user(task_id, project_id, user_id, timeout, calibration)
 
 

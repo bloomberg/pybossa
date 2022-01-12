@@ -389,7 +389,7 @@ def n_expected_task_runs(project_id):
 def overall_progress(project_id):
     """Return the percentage of completed tasks out of non gold tasks for a project."""
     total_tasks = n_tasks_not_gold(project_id)
-    return ((n_completed_tasks(project_id) * 100) / total_tasks) if total_tasks != 0 else 0
+    return ((n_completed_tasks(project_id) * 100) // total_tasks) if total_tasks != 0 else 0
 
 
 @memoize(timeout=timeouts.get('APP_TIMEOUT'), cache_group_keys=[[0]])
