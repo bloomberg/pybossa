@@ -1261,13 +1261,22 @@ def task_presenter(short_name, task_id):
                                timeout=project.info.get('timeout'))
     guard.stamp(task, get_user_id_or_ip())
 
-    if not guard.check_task_presented_timestamp(task, get_user_id_or_ip()):
-        guard.stamp_presented_time(task, get_user_id_or_ip())
+    # Verify the worker has a lock on the task (prevents case of page reload where task will fail to submit).
+    locks = _get_locks(project.id, task_id)
+    if not locks and mode != 'read_only':
+        flash(gettext("Unable to lock task (due to page reload). Please cancel and begin a new task."), "error")
+        return respond('/projects/presenter.html')
+    else:
+        if mode != 'read_only':
+            template_args['project']['timeout'] = project.info.get('timeout', DEFAULT_TASK_TIMEOUT)
 
-    if has_no_presenter(project):
-        flash(gettext("Sorry, but this project is still a draft and does "
-                      "not have a task presenter."), "error")
-    return respond('/projects/presenter.html')
+        if not guard.check_task_presented_timestamp(task, get_user_id_or_ip()):
+            guard.stamp_presented_time(task, get_user_id_or_ip())
+
+        if has_no_presenter(project):
+            flash(gettext("Sorry, but this project is still a draft and does "
+                          "not have a task presenter."), "error")
+        return respond('/projects/presenter.html')
 
 
 @blueprint.route('/<short_name>/presenter')
@@ -1283,7 +1292,7 @@ def presenter(short_name):
         return resp
 
     project, owner, ps = project_by_shortname(short_name)
-    project.timeout = project.info.get('timeout') or DEFAULT_TASK_TIMEOUT
+    project.timeout = project.info.get('timeout', DEFAULT_TASK_TIMEOUT)
 
     ensure_authorized_to('read', project)
 
@@ -2513,7 +2522,7 @@ def task_timeout(short_name):
     ensure_authorized_to('update', project)
     pro = pro_features()
     if request.method == 'GET':
-        timeout = project.info.get('timeout') or DEFAULT_TASK_TIMEOUT
+        timeout = project.info.get('timeout', DEFAULT_TASK_TIMEOUT)
         form.minutes.data, form.seconds.data = divmod(timeout, 60)
         return handle_content_type(dict(template='/projects/task_timeout.html',
                                title=title,
