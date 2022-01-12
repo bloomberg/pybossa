@@ -17,13 +17,11 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 from pybossa.jobs import get_inactive_users_jobs, get_non_contributors_users_jobs
-from default import Test, with_context
-from factories import TaskRunFactory, UserFactory
+from test import Test, with_context
+from test.factories import TaskRunFactory, UserFactory
 from pybossa.core import user_repo
 import datetime
 from dateutil.relativedelta import relativedelta
-import calendar
-# from mock import patch, MagicMock
 
 
 class TestEngageUsers(Test):
@@ -64,17 +62,17 @@ class TestEngageUsers(Test):
         user_recent = UserFactory.create()
         # 1 month old contribution
         tr = TaskRunFactory.create(finish_time=date_str)
-        print tr.user_id, tr.finish_time
+        print(tr.user_id, tr.finish_time)
         # 1 year old contribution
         tr_year = TaskRunFactory.create(finish_time=one_year_str)
-        print tr_year.user_id, tr_year.finish_time
+        print(tr_year.user_id, tr_year.finish_time)
         # User with a contribution from a long time ago
         tr2 = TaskRunFactory.create(finish_time="2010-08-08T18:23:45.714110",
                                     user=user)
         # User with a recent contribution
         tr3 = TaskRunFactory.create(user=user)
-        print tr2.user_id, tr2.finish_time
-        print tr3.user_id, tr3.finish_time
+        print(tr2.user_id, tr2.finish_time)
+        print(tr3.user_id, tr3.finish_time)
         user = user_repo.get(tr.user_id)
 
         jobs_generator = get_inactive_users_jobs()
@@ -152,7 +150,7 @@ class TestNonContributors(Test):
             jobs.append(job)
 
         msg = "There should be one job."
-        print jobs
+        print(jobs)
         assert len(jobs) == 1,  msg
         job = jobs[0]
         args = job['args'][0]

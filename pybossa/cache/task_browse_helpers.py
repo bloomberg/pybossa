@@ -10,6 +10,7 @@ from pybossa.util import (convert_est_to_utc,
     get_user_pref_db_clause, get_user_filter_db_clause)
 from flask import current_app
 import app_settings
+from functools import reduce
 
 comparator_func = {
     "less_than": operator.lt,
@@ -141,7 +142,7 @@ def _get_task_info_filters(filter_args):
     grouped_filters = _reduce_filters(filter_args)
     ix = 0
     and_pieces = []
-    for field_name, ops in grouped_filters.iteritems():
+    for field_name, ops in grouped_filters.items():
         or_pieces = []
         for operator, field_value in ops:
             query, p_name, p_val = _get_or_piece(field_name, operator,
@@ -246,7 +247,9 @@ def parse_tasks_browse_args(args):
         parsed_args['priority_from'] = float(args['priority_from'])
     if args.get('priority_to') is not None:
         parsed_args['priority_to'] = float(args['priority_to'])
-    if args.get('display_columns'):
+    if args.get('display_columns') and type(args.get('display_columns')) == list:
+        parsed_args['display_columns'] = args['display_columns']
+    elif args.get('display_columns') and type(args.get('display_columns')) != list:
         parsed_args['display_columns'] = json.loads(args['display_columns'])
     if not isinstance(parsed_args.get('display_columns'), list):
         parsed_args['display_columns'] = ['task_id', 'priority', 'pcomplete',
@@ -270,7 +273,7 @@ def parse_tasks_browse_args(args):
                                  .format(args['order_by']))
             parsed_args["order_by_dict"][order_by_field[0]] = order_by_field[1]
 
-        for key, value in allowed_fields.iteritems():
+        for key, value in allowed_fields.items():
             parsed_args["order_by"] = parsed_args["order_by"].replace(key, value)
 
     if args.get('filter_by_field'):
@@ -297,7 +300,7 @@ def parse_tasks_browse_args(args):
 
 def validate_user_preferences(user_pref):
     if not isinstance(user_pref, dict) or \
-        not all(x in ['languages', 'locations'] for x in user_pref.iterkeys()):
+        not all(x in ['languages', 'locations'] for x in user_pref.keys()):
             raise ValueError('invalid user preference keys')
 
     valid_user_preferences = app_settings.upref_mdata.get_valid_user_preferences() \
@@ -325,7 +328,7 @@ def _get_field_filters(filter_string):
 
 
 def user_meet_task_requirement(task_id, user_filter, user_profile):
-    for field, filters in user_filter.iteritems():
+    for field, filters in user_filter.items():
         if not user_profile.get(field):
             # if user profile does not have attribute, user does not qualify for the task
             return False
@@ -346,7 +349,7 @@ def user_meet_task_requirement(task_id, user_filter, user_profile):
 
 def get_task_preference_score(task_pref, user_profile):
     score = 0
-    for key, value in task_pref.iteritems():
+    for key, value in task_pref.items():
         user_data = user_profile.get(key) or 0
         try:
             user_data = float(user_data)

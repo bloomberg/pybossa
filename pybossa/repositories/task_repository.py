@@ -43,6 +43,9 @@ class TaskRepository(Repository):
 
     # Methods for queries on Task objects
     def get_task(self, id):
+        # bytes to unicode string
+        if type(id) == bytes:
+            id = id.decode()
         return self.db.session.query(Task).get(id)
 
     def get_task_by(self, **attributes):
@@ -63,12 +66,12 @@ class TaskRepository(Repository):
         filters.pop('state', None) # exclude state param
         if exp is not None:
             query = self.db.session.query(Task).\
-                filter(or_(Task.state == u'completed', Task.calibration == 1)).\
+                filter(or_(Task.state == 'completed', Task.calibration == 1)).\
                 filter(Task.exported == exp).\
                 filter_by(**filters)
         else:
             query = self.db.session.query(Task).\
-                filter(or_(Task.state == u'completed', Task.calibration == 1)).\
+                filter(or_(Task.state == 'completed', Task.calibration == 1)).\
                 filter_by(**filters)
 
         results = self._filter_query(query, Task, limit, offset, last_id, yielded, desc)
@@ -89,7 +92,7 @@ class TaskRepository(Repository):
 
         query = self.db.session.query(TaskRun).join(Task).\
             filter(TaskRun.task_id == Task.id).\
-            filter(or_(Task.state == u'completed', Task.calibration == 1)).\
+            filter(or_(Task.state == 'completed', Task.calibration == 1)).\
             filter(*conditions).\
             filter_by(**filters)
 
@@ -191,7 +194,6 @@ class TaskRepository(Repository):
             self.db.session.commit()
             cached_projects.clean_project(element.project_id)
         except IntegrityError as e:
-            self.db.session.rollback()
             raise DBIntegrityError(e)
 
     def delete(self, element):
@@ -278,6 +280,22 @@ class TaskRepository(Repository):
         self.db.session.commit()
         cached_projects.clean_project(project.id)
         self._delete_zip_files_from_store(project)
+
+    def get_tasks_by_filters(self, project, filters=None):
+        filters = filters or {}
+        conditions, params = get_task_filters(filters)
+
+        sql = ''' SELECT task.id
+                from task LEFT OUTER JOIN
+                (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
+                MAX(finish_time) as ft FROM task_run
+                WHERE project_id=:project_id GROUP BY task_id) AS log_counts
+                ON task.id=log_counts.task_id
+                WHERE task.project_id=:project_id {}
+        '''.format(conditions)
+
+        rows = self.db.session.execute(sql, dict(project_id=project.id, **params))
+        return [row for row in rows]
 
     def update_tasks_redundancy(self, project, n_answers, filters=None):
         """

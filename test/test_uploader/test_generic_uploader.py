@@ -17,10 +17,10 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """This module tests the Uploader class."""
 
-from default import Test, with_context
+from test import Test, with_context
 from pybossa.uploader import Uploader
 from werkzeug.datastructures import FileStorage
-from mock import patch
+from unittest.mock import patch
 from PIL import Image
 import tempfile
 import os

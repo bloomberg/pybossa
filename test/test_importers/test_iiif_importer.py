@@ -17,12 +17,13 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from mock import patch
+from unittest.mock import patch
 from nose.tools import *
 from pybossa.importers import BulkImportException
 from pybossa.importers.iiif import BulkTaskIIIFImporter
-from default import FakeResponse, with_context
+from test import FakeResponse, with_context
 from collections import OrderedDict
+
 
 @patch('pybossa.importers.iiif.requests')
 class TestBulkTaskIIIFImport(object):

@@ -16,8 +16,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import assert_not_raises
-from mock import Mock, patch, PropertyMock
+from test import assert_not_raises
+from unittest.mock import Mock, patch, PropertyMock
 from pybossa.auth import ensure_authorized_to, is_authorized
 from nose.tools import assert_raises
 from werkzeug.exceptions import Forbidden, Unauthorized

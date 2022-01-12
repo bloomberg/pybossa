@@ -16,15 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-import json
-import requests
-from default import Test, with_context
-from factories import performance_repo
-from factories import (ProjectFactory, TaskFactory, TaskRunFactory,
-    UserFactory, PerformanceStatsFactory)
-
-
 from pybossa.api.task_run import update_gold_stats
+from test import Test, with_context
+from test.factories import (ProjectFactory, TaskFactory, TaskRunFactory,
+                            PerformanceStatsFactory)
+from test.factories import performance_repo
 
 
 class TestUpdateGoldStats(Test):

@@ -20,9 +20,9 @@ from pybossa.leaderboard.jobs import leaderboard
 from pybossa.leaderboard.data import get_leaderboard
 from pybossa.core import db
 from pybossa.jobs import get_leaderboard_jobs
-from factories import UserFactory, TaskRunFactory
-from default import Test, with_context
-from mock import patch, MagicMock
+from test.factories import UserFactory, TaskRunFactory
+from test import Test, with_context
+from unittest.mock import patch, MagicMock
 from sqlalchemy.exc import ProgrammingError
 
 

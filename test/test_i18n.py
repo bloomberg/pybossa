@@ -16,8 +16,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from helper import web
-from default import db
+from test.helper import web
+from test import db
 from nose.tools import nottest
 
 from pybossa.repositories import UserRepository

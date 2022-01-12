@@ -70,13 +70,16 @@ def set_gold_answers(task, gold_answers):
     task.gold_answers = gold_answers
     task.calibration = 1
     task.exported = True
-    if task.state == u'completed':
-        task.state = u'ongoing'
+    if task.state == 'completed':
+        task.state = 'ongoing'
 
 
 def upload_files_priv(task, project_id, data, file_name):
     bucket = bucket_name()
-    task_hash = hashlib.md5(str(task)).hexdigest()
+
+    # hashlib.md5() accepts bytes only
+    task_hash = hashlib.md5(str(task).encode()).hexdigest()
+
     path = "{}/{}".format(project_id, task_hash)
     values = dict(
         store=s3_conn_type(),
@@ -93,7 +96,7 @@ def upload_files_priv(task, project_id, data, file_name):
         encryption=True,
         conn_name='S3_TASK_REQUEST'
     )
-    return { 'externalUrl': file_url, 'internalUrl': internal_url }
+    return {'externalUrl': file_url, 'internalUrl': internal_url}
 
 
 def get_gold_answers(task):

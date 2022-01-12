@@ -16,44 +16,43 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Module with PyBossa utils."""
-from collections import OrderedDict
-from datetime import timedelta, datetime, date
-from yacryptopan import CryptoPAn
-from functools import update_wrapper
-from tempfile import NamedTemporaryFile
-from flask_wtf import FlaskForm as Form
-import csv
-import codecs
-import cStringIO
-import dateutil.tz
-from flask import abort, request, make_response, current_app, url_for
-from flask import redirect, render_template, jsonify, get_flashed_messages
-from flask_wtf.csrf import generate_csrf
-import dateutil.parser
-from functools import wraps
-from flask_login import current_user
-from sqlalchemy import text
-from sqlalchemy.exc import ProgrammingError
-from math import ceil
-import json
 import base64
+import codecs
+import csv
 import hashlib
 import hmac
-import random
-import simplejson
-import time
-from flask_babel import lazy_gettext
-import re
+import io
+import json
 import os
-from werkzeug.utils import secure_filename
-from flask import safe_join
-from pybossa.cloud_store_api.s3 import s3_upload_file_storage
-from pybossa.cloud_store_api.connection import create_connection
-from pybossa.uploader import local
-from pybossa.cloud_store_api.s3 import get_file_from_s3, delete_file_from_s3
+import random
+import re
+import time
+from collections import OrderedDict
+from datetime import timedelta, datetime, date
+from functools import update_wrapper
+from functools import wraps
+from math import ceil
+from tempfile import NamedTemporaryFile
 
+import dateutil.parser
+import dateutil.tz
+import simplejson
+from flask import abort, request, make_response, current_app, url_for
+from flask import redirect, render_template, jsonify, get_flashed_messages
+from flask_babel import lazy_gettext
+from flask_login import current_user
 # Markdown support
 from flask_misaka import Misaka
+from flask_wtf import FlaskForm as Form
+from flask_wtf.csrf import generate_csrf
+from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
+from yacryptopan import CryptoPAn
+
+from pybossa.cloud_store_api.connection import create_connection
+from pybossa.cloud_store_api.s3 import get_file_from_s3, delete_file_from_s3
+from pybossa.cloud_store_api.s3 import s3_upload_file_storage
+
 misaka = Misaka()
 
 def last_flashed_message():
@@ -84,11 +83,10 @@ def hash_last_flash_message():
         data['flash'] = message_and_status[1]
         data['status'] = message_and_status[0]
     json_data = json.dumps(data)
-    return base64.b64encode(json_data)
+    return base64.b64encode(json_data.encode())  # b64encode accepts bytes only
 
 def handle_content_type(data):
     """Return HTML or JSON based on request type."""
-    from pybossa.model.project import Project
     if (request.headers.get('Content-Type') == 'application/json' or
         request.args.get('response_format') == 'json'):
         message_and_status = last_flashed_message()
@@ -139,9 +137,7 @@ def handle_content_type(data):
             return render_template(template, **data)
 
 def is_own_url(url):
-    from urlparse import urlparse
-    if not url:
-        return True
+    from urllib.parse import urlparse
     domain = urlparse(url).netloc
     return (not domain) or domain.startswith(current_app.config.get('SERVER_NAME', '-'))
 
@@ -220,9 +216,9 @@ def crossdomain(origin=None, methods=None, headers=None,
     """Crossdomain decorator."""
     if methods is not None:  # pragma: no cover
         methods = ', '.join(sorted(x.upper() for x in methods))
-    if headers is not None and not isinstance(headers, basestring):
+    if headers is not None and not isinstance(headers, str):
         headers = ', '.join(x.upper() for x in headers)
-    if not isinstance(origin, basestring):  # pragma: no cover
+    if not isinstance(origin, str):  # pragma: no cover
         origin = ', '.join(origin)
     if isinstance(max_age, timedelta):  # pragma: no cover
         max_age = max_age.total_seconds()
@@ -297,7 +293,7 @@ def pretty_date(time=False):
     'just now', etc.
     """
     now = datetime.now()
-    if type(time) is str or type(time) is unicode:
+    if type(time) is str or type(time) is str:
         time = dateutil.parser.parse(time)
     if type(time) is int:
         diff = now - datetime.fromtimestamp(time)
@@ -321,24 +317,24 @@ def pretty_date(time=False):
         if second_diff < 120:
             return "a minute ago"
         if second_diff < 3600:
-            return ' '.join([str(second_diff / 60), "minutes ago"])
+            return ' '.join([str(second_diff // 60), "minutes ago"])
         if second_diff < 7200:
             return "an hour ago"
         if second_diff < 86400:
-            return ' '.join([str(second_diff / 3600), "hours ago"])
+            return ' '.join([str(second_diff // 3600), "hours ago"])
     if day_diff == 1:
         return "Yesterday"
     if day_diff < 7:
         return ' '.join([str(day_diff), "days ago"])
     if day_diff < 31:
-        return ' '.join([str(day_diff / 7), "weeks ago"])
+        return ' '.join([str(day_diff // 7), "weeks ago"])
     if day_diff < 60:
-        return ' '.join([str(day_diff / 30), "month ago"])
+        return ' '.join([str(day_diff // 30), "month ago"])
     if day_diff < 365:
-        return ' '.join([str(day_diff / 30), "months ago"])
+        return ' '.join([str(day_diff // 30), "months ago"])
     if day_diff < (365 * 2):
-        return ' '.join([str(day_diff / 365), "year ago"])
-    return ' '.join([str(day_diff / 365), "years ago"])
+        return ' '.join([str(day_diff // 365), "year ago"])
+    return ' '.join([str(day_diff // 365), "years ago"])
 
 
 def datetime_filter(source, fmt):
@@ -387,7 +383,7 @@ class Pagination(object):
                    right_edge=0):
         """Iterate over pages."""
         last = 0
-        for num in xrange(1, self.pages + 1):
+        for num in range(1, self.pages + 1):
             if (num <= left_edge or
                     (num > self.page - left_current - 1 and
                      num < self.page + right_current) or
@@ -416,32 +412,24 @@ class Pagination(object):
         else:
             return 0
 
+
 def unicode_csv_reader(unicode_csv_data, dialect=csv.excel, **kwargs):
     """Unicode CSV reader."""
-    # This code is taken from http://docs.python.org/library/csv.html#examples
-    # csv.py doesn't do Unicode; encode temporarily as UTF-8:
-    csv_reader = csv.reader(utf_8_encoder(unicode_csv_data),
+    # TODO - consider using pandas to read csv in the future
+
+    csv_reader = csv.reader(unicode_csv_data,
                             dialect=dialect, **kwargs)
-    for row in csv_reader:
-        # decode UTF-8 back to Unicode, cell by cell:
-        yield [unicode(cell, 'utf-8') for cell in row]
-
-
-def utf_8_encoder(unicode_csv_data):
-    """UTF8 encoder for CSV data."""
-    # This code is taken from http://docs.python.org/library/csv.html#examples
-    for line in unicode_csv_data:
-        yield line.encode('utf-8')
+    return csv_reader
 
 
 class UnicodeWriter:
 
     """A CSV writer which will write rows to CSV file "f"."""
-
+    # TODO - this class should be replaced by pandas library in the future
     def __init__(self, f, dialect=csv.excel, encoding="utf-8", **kwds):
         """Init method."""
         # Redirect output to a queue
-        self.queue = cStringIO.StringIO()
+        self.queue = io.StringIO()
         self.writer = csv.writer(self.queue, dialect=dialect, **kwds)
         self.stream = f
         self.encoder = codecs.getincrementalencoder(encoding)()
@@ -450,18 +438,26 @@ class UnicodeWriter:
         """Write row."""
         line = []
         for s in row:
-            if (type(s) == dict):
+            if type(s) == dict:
                 line.append(json.dumps(s))
             else:
-                line.append(unicode(s).encode("utf-8"))
+                line.append(str(s))  # should be unicode string
         self.writer.writerow(line)
-        # Fetch UTF-8 output from the queue ...
-        data = self.queue.getvalue()
-        data = data.decode("utf-8")
+        # Fetch string output from the queue ...
+        data = self.queue.getvalue()  # getvalue() returns str type
+
         # ... and reencode it into the target encoding
-        data = self.encoder.encode(data)
+        # data = self.encoder.encode(data)
+
+        # if stream is a bytes stream, data will be encoded
+        # TODO: revisit this logic
+        if type(self.stream) != io.StringIO:
+            if type(self.stream) == io.BytesIO or 'b' in self.stream.mode:
+                data = data.encode()
+
         # write to the target stream
-        self.stream.write(data)
+        self.stream.write(data)  # write expects unicode string
+
         # empty queue
         self.queue.truncate(0)
 
@@ -473,7 +469,7 @@ class UnicodeWriter:
 
 def get_user_signup_method(user):
     """Return which OAuth sign up method the user used."""
-    msg = u'Sorry, there is already an account with the same e-mail.'
+    msg = 'Sorry, there is already an account with the same e-mail.'
     if user.info:
         # Google
         if user.info.get('google_token'):
@@ -515,7 +511,7 @@ def get_user_id_or_ip():
     """Return the id of the current user if is authenticated.
     Otherwise returns its IP address (defaults to 127.0.0.1).
     """
-    cp = CryptoPAn(current_app.config.get('CRYPTOPAN_KEY'))
+    cp = CryptoPAn(current_app.config.get('CRYPTOPAN_KEY').encode())
     user_id = current_user.id if current_user.is_authenticated else None
     user_ip = cp.anonymize(request.remote_addr or "127.0.0.1") \
         if current_user.is_anonymous else None
@@ -532,7 +528,7 @@ def with_cache_disabled(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         env_cache_disabled = os.environ.get('PYBOSSA_REDIS_CACHE_DISABLED')
-        if env_cache_disabled is None or env_cache_disabled is '0':
+        if env_cache_disabled is None or env_cache_disabled == '0':
             os.environ['PYBOSSA_REDIS_CACHE_DISABLED'] = '1'
         return_value = f(*args, **kwargs)
         if env_cache_disabled is None:
@@ -555,10 +551,10 @@ def is_reserved_name(blueprint, name):
 
 def username_from_full_name(username):
     """Takes a username that may contain several words with capital letters and
-    returns a single word username, no spaces, all lowercases."""
-    if type(username) == str:
-        return username.decode('ascii', 'ignore').lower().replace(' ', '')
-    return username.encode('ascii', 'ignore').decode('utf-8').lower().replace(' ', '')
+    returns a single word username (string type), no spaces, all lowercases."""
+    username = username.replace(' ', '').lower()
+    username = username.encode('ascii', 'ignore').decode()
+    return username
 
 
 def rank(projects, order_by=None, desc=False):
@@ -569,7 +565,7 @@ def rank(projects, order_by=None, desc=False):
     """
     def earned_points(project):
         points = 0
-        if project['overall_progress'] != 100L:
+        if project['overall_progress'] != 100:
             points += 1000
         points += _points_by_interval(project['n_tasks'], weight=1)
         points += _points_by_interval(project['n_volunteers'], weight=2)
@@ -650,7 +646,7 @@ def fuzzyboolean(value):
 def get_avatar_url(upload_method, avatar, container, external):
     """Return absolute URL for avatar."""
     upload_method = upload_method.lower()
-    if upload_method in ['rackspace', 'cloud']:
+    if upload_method in ['cloud']:
         return url_for(upload_method,
                        filename=avatar,
                        container=container)
@@ -693,11 +689,14 @@ def get_disqus_sso_payload(user):
         else:
             data = simplejson.dumps({})
         # encode the data to base64
-        message = base64.b64encode(data)
+        message = base64.b64encode(data.encode())  # b64encode accepts bytes only
         # generate a timestamp for signing the message
         timestamp = int(time.time())
         # generate our hmac signature
-        sig = hmac.HMAC(DISQUS_SECRET_KEY, '%s %s' % (message, timestamp),
+
+        # HMAC constructor accepts bytes parameters
+        tmp = '{} {}'.format(message, timestamp).encode()
+        sig = hmac.HMAC(DISQUS_SECRET_KEY.encode(), tmp,
                         hashlib.sha1).hexdigest()
 
         return message, timestamp, sig, DISQUS_PUBLIC_KEY
@@ -888,12 +887,12 @@ def check_password_strength(
     pwd_len = len(password)
     if min_len and pwd_len < min_len:
         return False, lazy_gettext(
-            u'Password must have a minimum of {} characters'.format(min_len)
+            'Password must have a minimum of {} characters'.format(min_len)
         )
 
     if max_len and pwd_len > max_len:
         return False, lazy_gettext(
-            u'Password must not exceed {} characters'.format(max_len)
+            'Password must not exceed {} characters'.format(max_len)
         )
 
     valid = all(re.search(ch, password) for ch in required_chars)
@@ -911,7 +910,7 @@ def sample(population, at_least, at_most):
 
 def generate_password():
     used = []
-    chars = range(ord('a'), ord('z') + 1)
+    chars = list(range(ord('a'), ord('z') + 1))
     lowers = [chr(x) for x in chars]
     uppers = [x.upper() for x in lowers]
     digits = [str(x) for x in range(0, 10)]
@@ -946,8 +945,8 @@ def valid_or_no_s3_bucket(task_data):
     if allowed_s3_buckets is None:
         return True
 
-    for v in task_data.itervalues():
-        if isinstance(v, basestring):
+    for v in task_data.values():
+        if isinstance(v, str):
             bucket = get_s3_bucket_name(v)
             if bucket is not None and bucket not in allowed_s3_buckets:
                 return False
@@ -1020,7 +1019,7 @@ def can_have_super_user_access(user):
         not any(re.search(wl, user.email_addr, re.IGNORECASE)
             for wl in wlist_admins)):
         user.admin = user.subadmin = False
-        current_app.logger.info(u'User {} {} cannot have admin/subadmin access'.
+        current_app.logger.info('User {} {} cannot have admin/subadmin access'.
             format(user.fullname, user.email_addr))
         return False
     return True
@@ -1048,7 +1047,7 @@ def s3_get_file_contents(s3_bucket, s3_path,
 def get_unique_user_preferences(user_prefs):
     duser_prefs = set()
     for user_pref in user_prefs:
-        for k, values in user_pref.iteritems():
+        for k, values in user_pref.items():
             if isinstance(values, list):
                 for v in values:
                     pref = '\'{}\''.format(json.dumps({k: [v]}))
@@ -1060,7 +1059,7 @@ def get_user_pref_db_clause(user_pref, user_email=None):
     # expand user preferences as per sql format for jsonb datatype
     # single user preference with multiple value or
     # multiple user preferences with single/multiple values
-    _valid = ((k, v) for k, v in user_pref.iteritems() if isinstance(v, list))
+    _valid = ((k, v) for k, v in user_pref.items() if isinstance(v, list))
     user_prefs = [{k: [item]} for k, pref_list in _valid
                   for item in pref_list]
     assign_key = 'assign_user'
@@ -1105,7 +1104,7 @@ def is_int(s):
 def validate_required_fields(data):
     invalid_fields = []
     required_fields = current_app.config.get("TASK_REQUIRED_FIELDS", {})
-    for field_name, field_info in required_fields.iteritems():
+    for field_name, field_info in required_fields.items():
         field_val = field_info.get('val')
         check_val = field_info.get('check_val')
         int_val = field_info.get('require_int')
@@ -1118,8 +1117,6 @@ def validate_required_fields(data):
 
 
 def get_file_path_for_import_csv(csv_file):
-    from pybossa.core import uploader
-
     s3_bucket = current_app.config.get('S3_IMPORT_BUCKET')
     container = 'user_{}'.format(current_user.id) if current_user else 'user'
     if s3_bucket:
@@ -1192,7 +1189,6 @@ def description_from_long_description(desc, long_desc):
 
 
 def generate_bsso_account_notification(user):
-    from pybossa.core import user_repo
     warning = False if user.get('metadata', {}).get('user_type') else True
     template_type = 'adminbssowarning' if warning else 'adminbssonotification'
     admins_email_list = current_app.config.get('ALERT_LIST',[])

@@ -17,10 +17,10 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """This module tests the Uploader class."""
 
-from default import Test, with_context
+from test import Test, with_context
 from pybossa.uploader.cloud_store import CloudStoreUploader
 from pybossa.uploader.cloud_proxy import CloudProxyUploader
-from mock import patch, PropertyMock, call, MagicMock
+from unittest.mock import patch, MagicMock
 from werkzeug.datastructures import FileStorage
 from io import StringIO
 
@@ -43,7 +43,7 @@ class TestCloudUploader(Test):
 
         create_connection.return_value = mock_conn
         u = CloudStoreUploader()
-        fs = FileStorage(stream=StringIO(u'hello world'),
+        fs = FileStorage(stream=StringIO('hello world'),
                          filename='the_file.jpg')
 
         with patch.dict(self.flask_app.config, {
@@ -67,7 +67,7 @@ class TestCloudUploader(Test):
 
         create_connection.return_value = mock_conn
         u = CloudStoreUploader()
-        fs = FileStorage(stream=StringIO(u'hello world'),
+        fs = FileStorage(stream=StringIO('hello world'),
                          filename='the_file.jpg')
 
         mock_key.set_contents_from_string.side_effect = Exception
@@ -178,7 +178,7 @@ class TestCloudProxyUploader(Test):
             }):
             response = u.send_file('test.png')
             assert response.status_code == 200
-            assert response.data == 'hello world'
+            assert response.data == b'hello world'
 
     @with_context
     @patch('pybossa.uploader.cloud_store.create_connection')

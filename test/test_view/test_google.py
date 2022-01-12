@@ -15,10 +15,10 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from default import Test, with_context
+from test import Test, with_context
 from pybossa.view.google import manage_user, manage_user_login, google
-from mock import patch
-from factories import UserFactory
+from unittest.mock import patch
+from test.factories import UserFactory
 
 
 class TestGoogle(Test):

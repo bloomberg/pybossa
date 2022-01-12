@@ -17,14 +17,13 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import hashlib
-from mock import patch
+from unittest.mock import patch
 from pybossa.cache import (get_key_to_hash, get_hash_key, cache, memoize,
                            delete_cached, delete_memoized, memoize_essentials,
                            delete_memoized_essential, delete_cache_group,
                            get_cache_group_key)
 from pybossa.sentinel import Sentinel
 import settings_test
-
 
 
 class TestCacheHashFunctions(object):
@@ -56,7 +55,7 @@ class TestCacheHashFunctions(object):
     def test_03_get_hash_key(self):
         """Test CACHE get_hash_key works."""
         prefix = 'prefix'
-        key_to_hash = get_key_to_hash(1, vowel=u'ñ')
+        key_to_hash = get_key_to_hash(1, vowel='ñ')
         tmp = key_to_hash.encode('utf-8')
         expected = prefix + ":" + hashlib.md5(tmp).hexdigest()
         key = get_hash_key(prefix, key_to_hash)
@@ -112,7 +111,8 @@ class TestCacheMemoizeFunctions(object):
         my_func()
         key = "%s::%s" % (settings_test.REDIS_KEYPREFIX, 'my_cached_func')
 
-        assert test_sentinel.master.keys() == [key], test_sentinel.master.keys()
+        # in redis-py, all responses are returned as bytes in Python 3
+        assert list(test_sentinel.master.keys()) == [key.encode()], list(test_sentinel.master.keys())
 
 
     def test_cache_gets_function_from_cache_after_first_call(self):
@@ -229,11 +229,11 @@ class TestCacheMemoizeFunctions(object):
             return 'my_func was called'
         key = "%s::%s" % (settings_test.REDIS_KEYPREFIX, 'my_cached_func')
         my_func()
-        assert test_sentinel.master.keys() == [key]
+        assert list(test_sentinel.master.keys()) == [key.encode()]
 
         delete_succedeed = delete_cached('my_cached_func')
         assert delete_succedeed is True, delete_succedeed
-        assert test_sentinel.master.keys() == [], 'Key was not deleted!'
+        assert list(test_sentinel.master.keys()) == [], 'Key was not deleted!'
 
 
     def test_delete_cached_returns_false_when_delete_fails(self):
@@ -243,7 +243,7 @@ class TestCacheMemoizeFunctions(object):
         def my_func():
             return 'my_func was called'
         key = "%s::%s" % (settings_test.REDIS_KEYPREFIX, 'my_cached_func')
-        assert test_sentinel.master.keys() == []
+        assert list(test_sentinel.master.keys()) == []
 
         delete_succedeed = delete_cached('my_cached_func')
         assert delete_succedeed is False, delete_succedeed
@@ -257,11 +257,11 @@ class TestCacheMemoizeFunctions(object):
         def my_func(*args, **kwargs):
             return [args, kwargs]
         my_func('arg', kwarg='kwarg')
-        assert len(test_sentinel.master.keys()) == 1
+        assert len(list(test_sentinel.master.keys())) == 1
 
         delete_succedeed = delete_memoized(my_func, 'arg', kwarg='kwarg')
         assert delete_succedeed is True, delete_succedeed
-        assert test_sentinel.master.keys() == [], 'Key was not deleted!'
+        assert list(test_sentinel.master.keys()) == [], 'Key was not deleted!'
 
 
     def test_delete_memoized_returns_false_when_delete_fails(self):
@@ -271,11 +271,11 @@ class TestCacheMemoizeFunctions(object):
         def my_func(*args, **kwargs):
             return [args, kwargs]
         my_func('arg', kwarg='kwarg')
-        assert len(test_sentinel.master.keys()) == 1
+        assert len(list(test_sentinel.master.keys())) == 1
 
         delete_succedeed = delete_memoized(my_func, 'badarg', kwarg='barkwarg')
         assert delete_succedeed is False, delete_succedeed
-        assert len(test_sentinel.master.keys()) == 1, 'Key was unexpectedly deleted'
+        assert len(list(test_sentinel.master.keys())) == 1, 'Key was unexpectedly deleted'
 
 
     def test_delete_memoized_deletes_only_requested(self):
@@ -287,11 +287,11 @@ class TestCacheMemoizeFunctions(object):
             return [args, kwargs]
         my_func('arg', kwarg='kwarg')
         my_func('other', kwarg='other')
-        assert len(test_sentinel.master.keys()) == 2
+        assert len(list(test_sentinel.master.keys())) == 2
 
         delete_succedeed = delete_memoized(my_func, 'arg', kwarg='kwarg')
         assert delete_succedeed is True, delete_succedeed
-        assert len(test_sentinel.master.keys()) == 1, 'Everything was deleted!'
+        assert len(list(test_sentinel.master.keys())) == 1, 'Everything was deleted!'
 
 
     def test_delete_memoized_deletes_all_function_calls(self):
@@ -307,11 +307,11 @@ class TestCacheMemoizeFunctions(object):
         my_func('arg', kwarg='kwarg')
         my_func('other', kwarg='other')
         my_other_func('arg', kwarg='kwarg')
-        assert len(test_sentinel.master.keys()) == 3
+        assert len(list(test_sentinel.master.keys())) == 3
 
         delete_succedeed = delete_memoized(my_func)
         assert delete_succedeed is True, delete_succedeed
-        assert len(test_sentinel.master.keys()) == 1
+        assert len(list(test_sentinel.master.keys())) == 1
 
 
     def test_delete_memoized_essentials(self):
@@ -324,11 +324,11 @@ class TestCacheMemoizeFunctions(object):
 
         my_func('arg', kwarg='kwarg')
         my_func('other', kwarg='kwother')
-        assert len(test_sentinel.master.keys()) == 2
+        assert len(list(test_sentinel.master.keys())) == 2
 
         delete_succedeed = delete_memoized_essential(my_func, 'other')
         assert delete_succedeed is True, delete_succedeed
-        assert len(test_sentinel.master.keys()) == 1
+        assert len(list(test_sentinel.master.keys())) == 1
 
 
     def test_delete_memoized_essentials_no_key(self):
@@ -343,17 +343,17 @@ class TestCacheMemoizeFunctions(object):
 
         my_func('arg', kwarg='kwarg')
         my_func('other', kwarg='kwother')
-        assert len(test_sentinel.master.keys()) == 2
+        assert len(list(test_sentinel.master.keys())) == 2
 
         delete_succedeed = delete_memoized_essential(my_other_func, 'other')
         assert delete_succedeed is False, delete_succedeed
-        assert len(test_sentinel.master.keys()) == 2
+        assert len(list(test_sentinel.master.keys())) == 2
 
 
     def test_delete_cache_group_no_group(self):
-        assert not test_sentinel.master.keys()
+        assert not list(test_sentinel.master.keys())
         delete_cache_group('key')
-        assert not test_sentinel.master.keys()
+        assert not list(test_sentinel.master.keys())
 
 
     def test_cache_group_key_one_group(self):
@@ -365,11 +365,11 @@ class TestCacheMemoizeFunctions(object):
             return None
         my_func('key')
         my_func2('key')
-        keys = test_sentinel.master.keys()
+        keys = list(test_sentinel.master.keys())
         assert len(keys) == 3
-        assert get_cache_group_key('key') in keys
+        assert get_cache_group_key('key').encode() in keys  # keys is a list of bytes string
         delete_cache_group('key')
-        assert not test_sentinel.master.keys()
+        assert not list(test_sentinel.master.keys())
 
 
     def test_cache_group_key_two_groups(self):
@@ -381,17 +381,17 @@ class TestCacheMemoizeFunctions(object):
             return None
         my_func('key1')
         my_func2('key2')
-        keys = test_sentinel.master.keys()
+        keys = list(test_sentinel.master.keys())
         assert len(keys) == 4
-        assert get_cache_group_key('key1') in keys
-        assert get_cache_group_key('key2') in keys
+        assert get_cache_group_key('key1').encode() in keys
+        assert get_cache_group_key('key2').encode() in keys
         delete_cache_group('key1')
-        keys = test_sentinel.master.keys()
+        keys = list(test_sentinel.master.keys())
         assert len(keys) == 2
-        assert get_cache_group_key('key1') not in keys
-        assert get_cache_group_key('key2') in keys
+        assert get_cache_group_key('key1').encode() not in keys
+        assert get_cache_group_key('key2').encode() in keys
         delete_cache_group('key2')
-        assert not test_sentinel.master.keys()
+        assert not list(test_sentinel.master.keys())
 
 
     def test_cache_group_key_two_groups_one_key(self):
@@ -399,17 +399,17 @@ class TestCacheMemoizeFunctions(object):
         def my_func(*args, **kwargs):
             return None
         my_func('key1', 'key2')
-        keys = test_sentinel.master.keys()
+        keys = list(test_sentinel.master.keys())
         assert len(keys) == 3
-        assert get_cache_group_key('key1') in keys
-        assert get_cache_group_key('key2') in keys
+        assert get_cache_group_key('key1').encode() in keys
+        assert get_cache_group_key('key2').encode() in keys
         delete_cache_group('key1')
-        keys = test_sentinel.master.keys()
+        keys = list(test_sentinel.master.keys())
         assert len(keys) == 1
-        assert get_cache_group_key('key1') not in keys
-        assert get_cache_group_key('key2') in keys
+        assert get_cache_group_key('key1').encode() not in keys
+        assert get_cache_group_key('key2').encode() in keys
         delete_cache_group('key2')
-        assert not test_sentinel.master.keys()
+        assert not list(test_sentinel.master.keys())
 
     def test_cache_group_key_callable(self):
         def cache_group_key_fn(*args, **kwargs):
@@ -418,7 +418,7 @@ class TestCacheMemoizeFunctions(object):
         def my_func(*args, **kwargs):
             return None
         my_func('a')
-        assert get_cache_group_key('a') in test_sentinel.master.keys()
+        assert get_cache_group_key('a').encode() in test_sentinel.master.keys()
 
     def test_cache_group_key_invalid(self):
         @memoize(cache_group_keys=(0,))

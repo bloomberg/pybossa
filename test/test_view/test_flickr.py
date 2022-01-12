@@ -15,17 +15,18 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from mock import patch, MagicMock
+from unittest.mock import patch, MagicMock
 import json
 from flask import Response, session
-from default import flask_app, with_context
+from test import flask_app, with_context
+
 
 class TestFlickrOauth(object):
 
     @with_context
     @patch('pybossa.view.flickr.flickr.oauth')
     def test_flickr_login_specifies_callback_and_read_permissions(self, oauth):
-        oauth.authorize.return_value = Response(302)
+        oauth.authorize.return_value = Response(status=302)
         flask_app.test_client().get('/flickr/')
         oauth.authorize.assert_called_with(
             callback='/flickr/oauth-authorized', perms='read')
@@ -50,7 +51,8 @@ class TestFlickrOauth(object):
     @with_context
     @patch('pybossa.view.flickr.redirect')
     def test_logout_redirects_to_url_specified_by_next_param(self, redirect):
-        redirect.return_value = Response(302)
+        # Resolves TypeError: 'int' object is not iterable by using status=302
+        redirect.return_value = Response(status=302)
         flask_app.test_client().get('/flickr/revoke-access?next=http://mynext_url')
 
         redirect.assert_called_with('http://mynext_url')
@@ -59,17 +61,17 @@ class TestFlickrOauth(object):
     @with_context
     @patch('pybossa.view.flickr.flickr.oauth')
     def test_oauth_authorized_saves_token_and_user_to_session(self, oauth):
-        fake_resp = {'oauth_token_secret': u'secret',
-                     'username': u'palotespaco',
-                     'fullname': u'paco palotes',
-                     'oauth_token':u'token',
-                     'user_nsid': u'user'}
+        fake_resp = {'oauth_token_secret': 'secret',
+                     'username': 'palotespaco',
+                     'fullname': 'paco palotes',
+                     'oauth_token':'token',
+                     'user_nsid': 'user'}
         oauth.authorized_response.return_value = fake_resp
         expected_token = {
-            'oauth_token_secret': u'secret',
-            'oauth_token': u'token'
+            'oauth_token_secret': 'secret',
+            'oauth_token': 'token'
         }
-        expected_user = {'username': u'palotespaco', 'user_nsid': u'user'}
+        expected_user = {'username': 'palotespaco', 'user_nsid': 'user'}
 
         with flask_app.test_client() as c:
             c.get('/flickr/oauth-authorized')
@@ -79,29 +81,29 @@ class TestFlickrOauth(object):
 
 
     @with_context
-    @patch('pybossa.view.flickr.flickr')
+    @patch('pybossa.view.flickr.flickr.oauth')
     @patch('pybossa.view.flickr.redirect')
     def test_oauth_authorized_redirects_to_url_next_param_on_authorization(
-            self, redirect, flickr):
-        fake_resp = {'oauth_token_secret': u'secret',
-                     'username': u'palotespaco',
-                     'fullname': u'paco palotes',
-                     'oauth_token':u'token',
-                     'user_nsid': u'user'}
-        flickr.authorized_response.return_value = fake_resp
-        redirect.return_value = Response(302)
+            self, redirect, oauth):
+        fake_resp = {'oauth_token_secret': 'secret',
+                     'username': 'palotespaco',
+                     'fullname': 'paco palotes',
+                     'oauth_token':'token',
+                     'user_nsid': 'user'}
+        oauth.authorized_response.return_value = fake_resp
+        redirect.return_value = Response(status=302)
         flask_app.test_client().get('/flickr/oauth-authorized?next=http://next')
 
         redirect.assert_called_with('http://next')
 
 
     @with_context
-    @patch('pybossa.view.flickr.flickr')
+    @patch('pybossa.view.flickr.flickr.oauth')
     @patch('pybossa.view.flickr.redirect')
     def test_oauth_authorized_redirects_to_url_next_param_on_user_no_authorizing(
-            self, redirect, flickr):
-        flickr.authorized_response.return_value = None
-        redirect.return_value = Response(302)
+            self, redirect, oauth):
+        oauth.authorized_response.return_value = None
+        redirect.return_value = Response(status=302)
         flask_app.test_client().get('/flickr/oauth-authorized?next=http://next')
 
         redirect.assert_called_with('http://next')
@@ -118,4 +120,4 @@ class TestFlickrAPI(object):
         client_instance.get_user_albums.return_value = albums
         resp = flask_app.test_client().get('/flickr/albums')
 
-        assert resp.data == json.dumps(albums), resp.data
+        assert resp.data.decode() == json.dumps(albums), resp.data

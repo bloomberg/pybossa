@@ -16,11 +16,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import db, Fixtures, with_context, with_context_settings, \
-    FakeResponse, mock_contributions_guard
-from helper import web
 from pybossa.core import user_repo
-from helper.gig_helper import make_subadmin_by
+from test import with_context
+from test.helper import web
+from test.helper.gig_helper import make_subadmin_by
 
 
 class TestWeb(web.Helper):
@@ -35,13 +34,13 @@ class TestWeb(web.Helper):
         self.app.get('/admin/users/disable_user/{}'.format(user.id))
         self.signout()
         res = self.signin(email='tyrion@example.com')
-        assert 'Your account is disabled. ' in res.data, res.data
+        assert b'Your account is disabled. ' in res.data, res.data
 
         self.signin()
         self.app.get('/admin/users/enable_user/{}'.format(user.id))
         self.signout()
         res = self.signin(email='tyrion@example.com')
-        assert 'Welcome back ' in res.data, res.data
+        assert b'Welcome back ' in res.data, res.data
 
     @with_context
     def test_disable_user_does_not_exist(self):

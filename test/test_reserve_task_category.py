@@ -16,10 +16,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from mock import patch
-from default import with_context
-from helper import sched
-from factories import TaskFactory, ProjectFactory, UserFactory
+from unittest.mock import patch
+from test import with_context
+from test.helper import sched
+from test.factories import TaskFactory, ProjectFactory, UserFactory
 from pybossa.core import project_repo, sentinel
 from pybossa.sched import (
     Schedulers,
@@ -51,25 +51,33 @@ class TestReserveTaskCategory(sched.Helper):
 
         # task category key exists, returns sql filter and its associated category_keys
         project_id, exclude = "202", False
+        task_info = dict(name1="value1", name2="value2")
+        expected_sql_filter = " AND ({}) ".format(" AND ".join(["task.info->>'{}' IN ('{}')".format(field, task_info[field]) for field in sorted(task_info)]))
         reserve_task_keys = ["reserve_task:project:{}:category:name1:value1:name2:value2:user:1008:task:454".format(project_id)]
         filters, category_keys = reserve_task_sql_filters(project_id, reserve_task_keys, exclude)
-        assert filters == " AND (task.info->>'name2' IN ('value2') AND task.info->>'name1' IN ('value1')) " and \
-            category_keys == ["reserve_task:project:202:category:name1:value1:name2:value2:user:1008:task:454"], "filters, category must be []"
+        assert filters == expected_sql_filter and \
+            category_keys == reserve_task_keys, "filters, category must be non empty"
 
         # test exlude=True, multiple task category keys
         # negated sql filter with "NOT IN" clause
         # list of category_keys associated with sql filter
         project_id, exclude = "202", True
+        task_info_2 = dict(x=1, y=2, z=3)
+        expected_key = ":".join(["{}:{}".format(field, task_info[field]) for field in sorted(task_info)])
+        expected_key_2 = ":".join(["{}:{}".format(field, task_info_2[field]) for field in sorted(task_info_2)])
         reserve_task_keys = [
-            "reserve_task:project:{}:category:name1:value1:name2:value2:user:1008:task:454".format(project_id),
-            "reserve_task:project:{}:category:x:1:y:2:z:3:user:1008:task:454".format(project_id)
+            "reserve_task:project:{}:category:{}:user:1008:task:454".format(project_id, expected_key),
+            "reserve_task:project:{}:category:{}:user:1008:task:454".format(project_id, expected_key_2)
         ]
         filters, category_keys = reserve_task_sql_filters(project_id, reserve_task_keys, exclude)
-        assert filters == " AND (task.info->>'y' IN ('2') AND task.info->>'x' IN ('1') AND task.info->>'z' IN ('3') AND task.info->>'name2' IN ('value2') AND task.info->>'name1' IN ('value1')) IS NOT TRUE" and \
+        expected_sql_filter = ["task.info->>'{}' IN ('{}')".format(field, task_info[field]) for field in sorted(task_info)]
+        expected_sql_filter += ["task.info->>'{}' IN ('{}')".format(field, task_info_2[field]) for field in sorted(task_info_2)]
+        expected_sql_filter = " AND ({}) IS NOT TRUE".format(" AND ".join(expected_sql_filter))
+        assert filters == expected_sql_filter and \
             category_keys == [
                 "reserve_task:project:202:category:name1:value1:name2:value2:user:1008:task:454",
                 "reserve_task:project:202:category:x:1:y:2:z:3:user:1008:task:454"
-            ], "filters, category must be as per keys passed and include negate clause"
+            ], "filters, category must be as per keys passed and include negate, NOT IN clause"
 
 
     @with_context
@@ -119,13 +127,20 @@ class TestReserveTaskCategory(sched.Helper):
             "category": reserve_task_config
         }
         project_repo.save(project)
+        task_info = dict(name1="value1", name2="value2")
+        task_info_2 = dict(x=1, y=2, z=3)
+        expected_key = ":".join(["{}:{}".format(field, task_info[field]) for field in sorted(task_info)])
+        expected_key_2 = ":".join(["{}:{}".format(field, task_info_2[field]) for field in sorted(task_info_2)])
         expected_category_keys = [
-            "reserve_task:project:{}:category:name1:value1:name2:value2:user:1008:task:454".format(project.id),
-            "reserve_task:project:{}:category:x:1:y:2:z:3:user:1008:task:2344".format(project.id)
+            "reserve_task:project:{}:category:{}:user:1008:task:454".format(project.id, expected_key),
+            "reserve_task:project:{}:category:{}:user:1008:task:2344".format(project.id, expected_key_2)
         ]
         get_task_category_lock.return_value = expected_category_keys
         sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project.id, timeout, owner.id)
-        assert sql_filters == " AND (task.info->>'y' IN ('2') AND task.info->>'x' IN ('1') AND task.info->>'z' IN ('3') AND task.info->>'name2' IN ('value2') AND task.info->>'name1' IN ('value1')) " and \
+        expected_sql_filter = ["task.info->>'{}' IN ('{}')".format(field, task_info[field]) for field in sorted(task_info)]
+        expected_sql_filter += ["task.info->>'{}' IN ('{}')".format(field, task_info_2[field]) for field in sorted(task_info_2)]
+        expected_sql_filter = " AND ({}) ".format(" AND ".join(expected_sql_filter))
+        assert sql_filters == expected_sql_filter and \
             category_keys == expected_category_keys, "sql_filters, category_keys must be non empty"
 
     @with_context
@@ -139,12 +154,12 @@ class TestReserveTaskCategory(sched.Helper):
         task = TaskFactory.create_batch(1, project=project, n_answers=1, info=task_info)[0]
         timeout = 100
 
-        assert acquire_reserve_task_lock(project.id, task.id, user.id, timeout) == False, "reserve task cannot be acquired due to missing required config"
+        assert not acquire_reserve_task_lock(project.id, task.id, user.id, timeout), "reserve task cannot be acquired due to missing required config"
         project.info['reserve_tasks'] = {
             "category": ["some_field"]
         }
         project_repo.save(project)
-        assert acquire_reserve_task_lock(project.id, task.id, user.id, timeout) == False, "task not having reserve tasks config fields"
+        assert not acquire_reserve_task_lock(project.id, task.id, user.id, timeout), "task not having reserve tasks config fields"
 
         project.info['reserve_tasks'] = {
             "category": category_fields
@@ -155,13 +170,13 @@ class TestReserveTaskCategory(sched.Helper):
         expected_reserve_task_key = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
             project.id, category_key, user.id, task.id
         )
-        assert expected_reserve_task_key in sentinel.master.keys(), "reserve task key must exist in redis cache"
+        assert expected_reserve_task_key.encode() in sentinel.master.keys(), "reserve task key must exist in redis cache"
 
         # release reserve task lock
         expiry = 1
         release_reserve_task_lock_by_keys([expected_reserve_task_key], timeout, expiry=expiry)
         time.sleep(expiry)
-        assert expected_reserve_task_key not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
+        assert expected_reserve_task_key.encode() not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
 
 
     @with_context
@@ -253,7 +268,7 @@ class TestReserveTaskCategory(sched.Helper):
         expected_reserve_task_key = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
             project.id, category_key, user.id, task.id
         )
-        assert expected_reserve_task_key in sentinel.master.keys(), "reserve task key must exist in redis cache"
+        assert expected_reserve_task_key.encode() in sentinel.master.keys(), "reserve task key must exist in redis cache"
 
         # release reserve task lock
         expiry = 1

@@ -17,8 +17,8 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 # Cache global variables for timeouts
 
-from default import Test, db, with_context
-from factories import ProjectFactory, UserFactory, TaskFactory
+from test import Test, db, with_context, with_request_context
+from test.factories import ProjectFactory, TaskFactory
 from pybossa.repositories import ProjectStatsRepository
 import pybossa.cache.project_stats as stats
 
@@ -41,14 +41,14 @@ class TestProjectStatsRepository(Test):
         ps = self.projectstats_repo.get(2)
         assert ps is None, ps
 
-    @with_context
+    @with_request_context
     def test_get_returns_stats(self):
         """Test get method returns project stats if they exist"""
         ps = self.prepare_stats()
         retrieved_ps = self.projectstats_repo.get(ps.id)
         assert ps == retrieved_ps, retrieved_ps
 
-    @with_context
+    @with_request_context
     def test_filter_by_no_matches(self):
         """Test filter_by returns an empty list if no stats match the query"""
         ps = self.prepare_stats()
@@ -56,8 +56,7 @@ class TestProjectStatsRepository(Test):
         assert isinstance(retrieved_ps, list)
         assert len(retrieved_ps) == 0, retrieved_ps
 
-
-    @with_context
+    @with_request_context
     def test_filter_by_one_condition(self):
         """Test filter_by returns a list of logs that meet the filtering
         condition"""
@@ -69,8 +68,7 @@ class TestProjectStatsRepository(Test):
         assert len(retrieved_ps) == 2, retrieved_ps
         assert should_be_missing not in retrieved_ps, retrieved_ps
 
-
-    @with_context
+    @with_request_context
     def test_filter_by_multiple_conditions(self):
         """Test filter_by supports multiple-condition queries"""
         ps1 = self.prepare_stats(3)

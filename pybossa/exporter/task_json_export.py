@@ -18,11 +18,14 @@
 # Cache global variables for timeouts
 
 import json
-from flask import url_for, safe_join, send_file, redirect
+
+from flask import send_file
+from werkzeug.utils import safe_join
+
 from pybossa.core import uploader, task_repo
-from pybossa.uploader import local
 from pybossa.exporter.json_export import JsonExporter
-from export_helpers import browse_tasks_export, browse_tasks_export_count
+from pybossa.uploader import local
+from .export_helpers import browse_tasks_export, browse_tasks_export_count
 
 TASK_GOLD_FIELDS = [
     'calibration',
@@ -72,7 +75,7 @@ class TaskJsonExporter(JsonExporter):
             user['user_type'] = user.get('info', {}).get('metadata', {}).get('user_type')
             allowed_attributes = ['name', 'fullname', 'user_type', 'created',
                                   'email_addr', 'admin', 'subadmin']
-            user = {k: v for (k, v) in user.iteritems() if k in allowed_attributes}
+            user = {k: v for (k, v) in user.items() if k in allowed_attributes}
             obj_dict['user'] = user
         except:
             pass
@@ -91,7 +94,7 @@ class TaskJsonExporter(JsonExporter):
             row[keys[-1]] = value
 
         new_row = {}
-        for k, v in row.iteritems():
+        for k, v in row.items():
             key_split = k.split('__', 1)
             if len(key_split) > 1 and key_split[0] in ('task', 'user'):
                 set_nested_value(new_row, key_split, v)
@@ -165,7 +168,7 @@ class TaskJsonExporter(JsonExporter):
         self._make_zip(project, ty, expanded)
         if isinstance(uploader, local.LocalUploader):
             filepath = self._download_path(project)
-            res = send_file(filename_or_fp=safe_join(filepath, filename),
+            res = send_file(path_or_file=safe_join(filepath, filename),
                             mimetype='application/octet-stream',
                             as_attachment=True,
                             attachment_filename=filename)
@@ -174,10 +177,6 @@ class TaskJsonExporter(JsonExporter):
             # http://greenbytes.de/tech/tc2231/#encoding-2231-char
             # res.headers['Content-Disposition'] = 'attachment; filename*=%s' % filename
             return res
-        else:
-            return redirect(url_for('rackspace', filename=filename,
-                                    container=self._container(project),
-                                    _external=True))
 
     def make_zip(self, project, obj, expanded=False, filters=None, disclose_gold=False):
         file_format = 'json'

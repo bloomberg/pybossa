@@ -17,16 +17,15 @@
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 """This module tests the TaskCsvExporter class."""
 
-from default import Test, with_context
-from pybossa.exporter.task_csv_export import TaskCsvExporter
-from mock import patch
-from codecs import encode
+from unittest.mock import patch
+
 from pybossa.exporter.csv_export import CsvExporter
 from pybossa.exporter.json_export import JsonExporter
-from factories import ProjectFactory, UserFactory, TaskFactory, TaskRunFactory
-from werkzeug.datastructures import FileStorage
-from pybossa.uploader.local import LocalUploader
-import unittest
+from pybossa.exporter.task_csv_export import TaskCsvExporter
+from test import Test, with_context
+from test.factories import ProjectFactory, UserFactory, TaskFactory, \
+    TaskRunFactory
+
 
 class TestTaskCsvExporter(Test):
 
@@ -74,20 +73,20 @@ class TestTaskCsvExporter(Test):
 
         assert value == 'www.example.com'
 
-        unicode_text = {'german': u'Straße auslösen zerstören',
-                        'french': u'français américaine épais',
-                        'chinese': u'中國的 英語 美國人',
-                        'smart_quotes': u'“Hello”'}
+        unicode_text = {'german': 'Straße auslösen zerstören',
+                        'french': 'français américaine épais',
+                        'chinese': '中國的 英語 美國人',
+                        'smart_quotes': '“Hello”'}
 
         german_value = exporter.get_value(unicode_text, 'german')
         french_value = exporter.get_value(unicode_text, 'french')
         chinese_value = exporter.get_value(unicode_text, 'chinese')
         smart_quotes_value = exporter.get_value(unicode_text, 'smart_quotes')
 
-        assert german_value == u'Stra\u00DFe ausl\u00F6sen zerst\u00F6ren'
-        assert french_value == u'fran\u00E7ais am\u00E9ricaine \u00E9pais'
-        assert chinese_value == u'\u4E2D\u570B\u7684 \u82F1\u8A9E \u7F8E\u570B\u4EBA'
-        assert smart_quotes_value == u'\u201CHello\u201D'
+        assert german_value == 'Stra\u00DFe ausl\u00F6sen zerst\u00F6ren'
+        assert french_value == 'fran\u00E7ais am\u00E9ricaine \u00E9pais'
+        assert chinese_value == '\u4E2D\u570B\u7684 \u82F1\u8A9E \u7F8E\u570B\u4EBA'
+        assert smart_quotes_value == '\u201CHello\u201D'
 
     @with_context
     def test_task_csv_exporter_flatten(self):
@@ -101,7 +100,7 @@ class TestTaskCsvExporter(Test):
                    'nested_z': True},
                'd': [{'nested_z': 'X'}]}
 
-        keys = sorted(dict(exporter.flatten(row.iteritems(), key_prefix='', return_value=None)).keys())
+        keys = sorted(dict(exporter.flatten(iter(row.items()), key_prefix='', return_value=None)).keys())
 
         expected_keys = ['a__nested_x',
                          'b',
@@ -156,7 +155,7 @@ class TestExporters(Test):
         expected_headers = ['info', 'fav_user_ids', 'user_pref', 'n_answers', 'quorum', 'calibration',
             'created', 'state', 'gold_answers_best_job', 'gold_answers_best_boss', 'exported',
             'project_id', 'id', 'priority_0', 'expiration', 'worker_pref', 'worker_filter']
-        obj_keys = task1_data.keys()
+        obj_keys = list(task1_data.keys())
 
         self._compare_object_keys(obj_keys, expected_headers)
         assert task1_data['gold_answers_best_job'] == expected_gold_answer['best_job']
@@ -165,7 +164,7 @@ class TestExporters(Test):
         expected_headers = ['info', 'fav_user_ids', 'user_pref', 'n_answers', 'quorum', 'calibration',
             'created', 'state', 'gold_answers', 'exported', 'project_id', 'id', 'priority_0', 'expiration',
             'worker_pref', 'worker_filter']
-        obj_keys = task2_data.keys()
+        obj_keys = list(task2_data.keys())
 
         self._compare_object_keys(obj_keys, expected_headers)
         assert task2_data['gold_answers'] == None

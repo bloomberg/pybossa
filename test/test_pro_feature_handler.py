@@ -17,7 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 from pybossa.pro_features import ProFeatureHandler
-from mock import Mock, patch, PropertyMock
+from unittest.mock import Mock, PropertyMock
 from pybossa.model.user import User
 
 
@@ -65,137 +65,137 @@ class TestContributionsGuard(object):
     def test_auditlog_enabled_for_admin_always_returns_True(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.auditlog_enabled_for(self.admin) is True
+        assert pro_enabled_handler.auditlog_enabled_for(self.admin)
 
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.auditlog_enabled_for(self.admin) is True
+        assert pro_disabled_handler.auditlog_enabled_for(self.admin)
 
     def test_auditlog_enabled_for_pro_always_returns_True(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.auditlog_enabled_for(self.pro) is True
+        assert pro_enabled_handler.auditlog_enabled_for(self.pro)
 
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.auditlog_enabled_for(self.pro) is True
+        assert pro_disabled_handler.auditlog_enabled_for(self.pro)
 
     def test_auditlog_enabled_for_non_pro_returns_False_if_enabled(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.auditlog_enabled_for(self.no_pro) is False
+        assert not pro_enabled_handler.auditlog_enabled_for(self.no_pro)
 
     def test_auditlog_enabled_for_non_pro_returns_True_if_disabled(self):
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.auditlog_enabled_for(self.no_pro) is True
+        assert pro_disabled_handler.auditlog_enabled_for(self.no_pro)
 
 
     def test_webhooks_enabled_for_admin_always_returns_True(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.webhooks_enabled_for(self.admin) is True
+        assert pro_enabled_handler.webhooks_enabled_for(self.admin)
 
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.webhooks_enabled_for(self.admin) is True
+        assert pro_disabled_handler.webhooks_enabled_for(self.admin)
 
     def test_webhooks_enabled_for_pro_always_returns_True(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.webhooks_enabled_for(self.pro) is True
+        assert pro_enabled_handler.webhooks_enabled_for(self.pro)
 
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.webhooks_enabled_for(self.pro) is True
+        assert pro_disabled_handler.webhooks_enabled_for(self.pro)
 
     def test_webhooks_enabled_for_non_pro_returns_False_if_enabled(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.webhooks_enabled_for(self.no_pro) is False
+        assert not pro_enabled_handler.webhooks_enabled_for(self.no_pro)
 
     def test_webhooks_enabled_for_non_pro_returns_True_if_disabled(self):
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.webhooks_enabled_for(self.no_pro) is True
+        assert pro_disabled_handler.webhooks_enabled_for(self.no_pro)
 
 
     def test_autoimporter_enabled_for_admin_always_returns_True(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.autoimporter_enabled_for(self.admin) is True
+        assert pro_enabled_handler.autoimporter_enabled_for(self.admin)
 
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.autoimporter_enabled_for(self.admin) is True
+        assert pro_disabled_handler.autoimporter_enabled_for(self.admin)
 
     def test_autoimporter_enabled_for_pro_always_returns_True(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.autoimporter_enabled_for(self.pro) is True
+        assert pro_enabled_handler.autoimporter_enabled_for(self.pro)
 
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.autoimporter_enabled_for(self.pro) is True
+        assert pro_disabled_handler.autoimporter_enabled_for(self.pro)
 
     def test_autoimporter_enabled_for_non_pro_returns_False_if_enabled(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.autoimporter_enabled_for(self.no_pro) is False
+        assert not pro_enabled_handler.autoimporter_enabled_for(self.no_pro)
 
     def test_autoimporter_enabled_for_non_pro_returns_True_if_disabled(self):
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.autoimporter_enabled_for(self.no_pro) is True
+        assert pro_disabled_handler.autoimporter_enabled_for(self.no_pro)
 
 
     def test_better_stats_enabled_for_admin_user_always_returns_True(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.better_stats_enabled_for(self.admin, self.no_pro) is True
+        assert pro_enabled_handler.better_stats_enabled_for(self.admin, self.no_pro)
 
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.better_stats_enabled_for(self.admin, self.no_pro) is True
+        assert pro_disabled_handler.better_stats_enabled_for(self.admin, self.no_pro)
 
     def test_better_stats_enabled_for_pro_owner_always_returns_True(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.better_stats_enabled_for(self.no_pro, self.pro) is True
-        assert pro_enabled_handler.better_stats_enabled_for(self.anonymous, self.pro) is True
+        assert pro_enabled_handler.better_stats_enabled_for(self.no_pro, self.pro)
+        assert pro_enabled_handler.better_stats_enabled_for(self.anonymous, self.pro)
 
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.better_stats_enabled_for(self.no_pro, self.pro) is True
-        assert pro_disabled_handler.better_stats_enabled_for(self.anonymous, self.pro) is True
+        assert pro_disabled_handler.better_stats_enabled_for(self.no_pro, self.pro)
+        assert pro_disabled_handler.better_stats_enabled_for(self.anonymous, self.pro)
 
     def test_better_stats_enabled_for_non_pro_owner_and_non_pro_user_returns_False_if_enabled(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.better_stats_enabled_for(self.no_pro, self.no_pro) is False
+        assert not pro_enabled_handler.better_stats_enabled_for(self.no_pro, self.no_pro)
 
     def test_better_stats_enabled_for_non_pro_owner_and_non_pro_user_returns_True_if_disabled(self):
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.better_stats_enabled_for(self.no_pro, self.no_pro) is True
+        assert pro_disabled_handler.better_stats_enabled_for(self.no_pro, self.no_pro)
 
     def test_better_stats_enabled_for_non_pro_owner_and_anonym_user_returns_False_if_enabled(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.better_stats_enabled_for(self.anonymous, self.no_pro) is False
+        assert not pro_enabled_handler.better_stats_enabled_for(self.anonymous, self.no_pro)
 
     def test_better_stats_enabled_for_non_pro_owner_and_anonym_user_returns_True_if_disabled(self):
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.better_stats_enabled_for(self.anonymous, self.no_pro) is True
+        assert pro_disabled_handler.better_stats_enabled_for(self.anonymous, self.no_pro)
 
 
     def test_only_for_pro_returns_True_if_feature_is_only_for_pro(self):
         pro_enabled_handler = ProFeatureHandler(self.config_enabled)
 
-        assert pro_enabled_handler.only_for_pro('auditlog') is True
+        assert pro_enabled_handler.only_for_pro('auditlog')
 
     def test_only_for_pro_returns_False_if_feature_is_for_everyone(self):
         pro_disabled_handler = ProFeatureHandler(self.config_disabled)
 
-        assert pro_disabled_handler.only_for_pro('auditlog') is False
+        assert not pro_disabled_handler.only_for_pro('auditlog')

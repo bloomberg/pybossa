@@ -16,18 +16,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, with_context
-from factories import TaskFactory, TaskRunFactory
-from mock import patch, MagicMock
-from pybossa.core import db, task_repo, result_repo
-from pybossa.model.counter import Counter
-from pybossa.model.event_listeners import *
-from pybossa.jobs import notify_blog_users
+from unittest.mock import patch, MagicMock
+
 from sqlalchemy import func
 
+from pybossa.model.event_listeners import *
+from test import Test, with_context
+from test.factories import TaskFactory, TaskRunFactory
 
 """Tests for model event listeners."""
-
 
 
 class TestModelEventListeners(Test):

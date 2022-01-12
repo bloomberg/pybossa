@@ -41,7 +41,7 @@ class Task(db.Model, DomainObject):
     #: Project.ID that this task is associated with.
     project_id = Column(Integer, ForeignKey('project.id', ondelete='CASCADE'), nullable=False)
     #: Task.state: ongoing or completed.
-    state = Column(UnicodeText, default=u'ongoing')
+    state = Column(UnicodeText, default='ongoing')
     quorum = Column(Integer, default=0)
     #: If the task is a calibration task
     calibration = Column(Integer, default=0)
@@ -78,8 +78,10 @@ class Task(db.Model, DomainObject):
     __table_args__ = (
         Index('task_info_idx', sqlalchemy.text('md5(info::text)')),
     )
-    __mapper_args__ = {
-        "order_by": id
-    }
+
+    # Removed per https://github.com/sqlalchemy/sqlalchemy/issues/5870
+    # __mapper_args__ = {
+    #     "order_by": id
+    # }
 
 Index('task_project_id_idx', Task.project_id)

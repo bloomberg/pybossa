@@ -1,10 +1,12 @@
 
 import json
-from helper import web
-from default import with_context
-from factories import TaskFactory, ProjectFactory, TaskRunFactory, UserFactory
-from pybossa.core import user_repo
+
 from nose.tools import assert_raises
+
+from test import with_context
+from test.factories import TaskFactory, ProjectFactory, UserFactory
+from test.helper import web
+
 
 class QuizTest(web.Helper):
 
@@ -12,9 +14,9 @@ class QuizTest(web.Helper):
         admin = UserFactory.create()
         user = UserFactory.create()
         project_quiz = {
-            'enabled':True,
-            'questions':10,
-            'passing':7,
+            'enabled': True,
+            'questions': 10,
+            'passing': 7,
             'completion_mode': completion_mode,
             'short_circuit': (completion_mode == 'short_circuit')
         }

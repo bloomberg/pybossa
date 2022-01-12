@@ -17,8 +17,8 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 # Cache global variables for timeouts
 
-from default import Test, db, with_context
-from factories import TaskFactory, TaskRunFactory, ProjectFactory
+from test import Test, db, with_context
+from test.factories import TaskFactory, TaskRunFactory, ProjectFactory
 from pybossa.repositories import ResultRepository
 from pybossa.core import task_repo, result_repo
 from nose.tools import assert_raises

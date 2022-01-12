@@ -16,16 +16,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from default import Test, db, with_context
+from test import Test, db, with_context
 from pybossa.auth import ensure_authorized_to
 from nose.tools import assert_raises
 from werkzeug.exceptions import Forbidden, Unauthorized
-from mock import patch
-from test_authorization import mock_current_user
-from factories import ProjectFactory, TaskFactory, TaskRunFactory
+from unittest.mock import patch
+from test.test_authorization import mock_current_user
+from test.factories import TaskFactory, TaskRunFactory
 from pybossa.model.result import Result
 from pybossa.repositories import ResultRepository
-
 
 
 class TestResultAuthorization(Test):

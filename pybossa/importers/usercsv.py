@@ -17,7 +17,7 @@ import json
 import os
 
 import requests
-from StringIO import StringIO
+from io import StringIO
 from flask_babel import gettext
 from pybossa.util import unicode_csv_reader
 
@@ -55,7 +55,11 @@ class BulkUserCSVImport(BulkUserImport):
 
         csv_file = FileStorage(io.open(csv_filename, encoding='utf-8-sig'))    #utf-8-sig to ignore BOM
 
-        csvcontent = io.StringIO(csv_file.stream.read().decode("UTF8"))
+        data = csv_file.stream.read()
+        if type(data) == bytes:
+            data = data.decode()
+
+        csvcontent = io.StringIO(data.replace('\x00', ''))  # Get rid of NUL data
         csvreader = unicode_csv_reader(csvcontent)
         return self._import_csv_users(csvreader)
 

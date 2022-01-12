@@ -15,11 +15,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from default import Test, with_context, flask_app, db
-from factories import ProjectFactory, UserFactory, TaskFactory, TaskRunFactory
+from test import Test, with_context, flask_app, db
+from test.factories import ProjectFactory, UserFactory, TaskFactory
 from pybossa.jobs import delete_bulk_tasks
 from pybossa.repositories import TaskRepository
-from mock import patch, MagicMock
+from unittest.mock import patch
 
 task_repo = TaskRepository(db)
 

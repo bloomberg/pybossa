@@ -22,7 +22,7 @@ import json
 import os
 import math
 import requests
-from StringIO import StringIO
+from io import StringIO
 import six
 from pybossa.cache.helpers import n_unexpired_gold_tasks, n_priority_x_tasks
 from flask import Blueprint, request, url_for, flash, redirect, abort, Response, current_app
@@ -31,7 +31,7 @@ from flask import Markup, jsonify
 from flask_login import login_required, current_user
 from flask_babel import gettext
 from flask_wtf.csrf import generate_csrf
-import urlparse
+import urllib.parse
 from rq import Queue
 from werkzeug.datastructures import MultiDict
 
@@ -96,7 +96,7 @@ from pybossa.data_access import (data_access_levels, subadmins_are_privileged,
 import app_settings
 from copy import deepcopy
 from pybossa.cache import delete_memoized
-
+from sqlalchemy.orm.attributes import flag_modified
 
 cors_headers = ['Content-Type', 'Authorization']
 
@@ -583,7 +583,7 @@ def task_presenter_editor(short_name):
                                                                         ps)
             if not project_sanitized['info'].get('task_presenter') and not request.args.get('clear_template'):
                  wrap = lambda i: "projects/presenters/%s.html" % i
-                 pres_tmpls = map(wrap, current_app.config.get('PRESENTERS'))
+                 pres_tmpls = list(map(wrap, current_app.config.get('PRESENTERS')))
                  response = dict(template='projects/task_presenter_options.html',
                             title=title,
                             project=project_sanitized,
@@ -623,7 +623,7 @@ def task_presenter_editor(short_name):
             flash(Markup(msg), 'info')
 
             wrap = lambda i: "projects/presenters/%s.html" % i
-            pres_tmpls = map(wrap, current_app.config.get('PRESENTERS'))
+            pres_tmpls = list(map(wrap, current_app.config.get('PRESENTERS')))
 
             project_sanitized, owner_sanitized = sanitize_project_owner(project,
                                                                         owner,
@@ -1013,12 +1013,12 @@ def import_task(short_name):
             try:
                 return _import_tasks(project, **form.get_import_data())
             except BulkImportException as e:
-                flash(gettext(unicode(e)), 'error')
-                current_app.logger.exception(u'project: {} {}'.format(project.short_name, e))
+                flash(gettext(str(e)), 'error')
+                current_app.logger.exception('project: {} {}'.format(project.short_name, e))
             except Exception as e:
-                msg = u'Oops! Looks like there was an error! {}'.format(e)
+                msg = 'Oops! Looks like there was an error! {}'.format(e)
                 flash(gettext(msg), 'error')
-                current_app.logger.exception(u'project: {} {}'.format(project.short_name, e))
+                current_app.logger.exception('project: {} {}'.format(project.short_name, e))
         template_args['template'] = '/projects/importers/%s.html' % importer_type
         return handle_content_type(template_args)
 
@@ -1030,10 +1030,10 @@ def import_task(short_name):
                                                      short_name=short_name,
                                                      type=all_importers[0]))
             template_wrap = lambda i: "projects/tasks/gdocs-%s.html" % i
-            task_tmpls = map(template_wrap, template_tasks)
+            task_tmpls = list(map(template_wrap, template_tasks))
             template_args['task_tmpls'] = task_tmpls
             importer_wrap = lambda i: "projects/tasks/%s.html" % i
-            template_args['available_importers'] = map(importer_wrap, all_importers)
+            template_args['available_importers'] = list(map(importer_wrap, all_importers))
             template_args['template'] = '/projects/task_import_options.html'
             return handle_content_type(template_args)
         if importer_type == 'gdocs' and request.args.get('template'):  # pragma: no cover
@@ -1114,7 +1114,7 @@ def setup_autoimporter(short_name):
     if request.method == 'GET':
         if importer_type is None:
             wrap = lambda i: "projects/tasks/%s.html" % i
-            template_args['available_importers'] = map(wrap, all_importers)
+            template_args['available_importers'] = list(map(wrap, all_importers))
             return render_template('projects/task_autoimport_options.html',
                                    **template_args)
     return render_template('/projects/importers/%s.html' % importer_type,
@@ -1148,7 +1148,11 @@ def password_required(short_name):
     project, owner, ps = project_by_shortname(short_name)
     ensure_authorized_to('read', project)
     form = PasswordForm(request.form)
-    next_url = is_own_url_or_else(request.args.get('next'), url_for('home.home'))
+
+    # if is_own_url_or_else returns None, use the default url.
+    # This avoids exception of redirect(next_url)
+    next_url = is_own_url_or_else(request.args.get('next'), url_for('home.home')) or url_for('home.home')
+
     if request.method == 'POST' and form.validate():
         password = request.form.get('password')
         cookie_exp = current_app.config.get('PASSWD_COOKIE_TIMEOUT')
@@ -1388,7 +1392,7 @@ def export_statuses(short_name, task_id):
     locks = _get_locks(project.id, task_id)
     users_completed = [tr.user_id for tr in task.task_runs]
     users = user_repo.get_users(
-            set(users_completed + locks.keys()))
+            set(users_completed + list(locks.keys())))
     user_details = [dict(user_id=user.id,
                          lock_ttl=locks.get(user.id),
                          user_email=user.email_addr)
@@ -1412,7 +1416,7 @@ def _get_locks(project_id, task_id):
     locks = sched.get_locks(task_id, timeout)
     now = time.time()
     lock_ttls = {int(k): float(v) - now
-                 for k, v in locks.iteritems()}
+                 for k, v in locks.items()}
     return lock_ttls
 
 
@@ -1487,9 +1491,16 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             user_email = user.email_addr if user else None
             user_profile = cached_users.get_user_profile_metadata(current_user.id)
             user_profile = json.loads(user_profile) if user_profile else {}
+            # get task bundling sql filters
+            reserve_task_config = project.info.get("reserve_tasks", {}).get("category", [])
+            reserve_task_filter, _ = sched.get_reserve_task_category_info(reserve_task_config, project.id,
+                                                                        project.info.get("timeout"),
+                                                                        current_user.id,
+                                                                        True)
             args["filter_by_wfilter_upref"] = dict(current_user_pref=user_pref,
                                                 current_user_email=user_email,
-                                                current_user_profile=user_profile)
+                                                current_user_profile=user_profile,
+                                                reserve_filter=reserve_task_filter)
             args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
             args["display_columns"] = ['task_id', 'priority', 'created']
             args["display_info_columns"] = project.info.get('tasklist_columns', [])
@@ -1578,6 +1589,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         location_options = valid_user_preferences.get('locations')
         rdancy_upd_exp = current_app.config.get('REDUNDANCY_UPDATE_EXPIRATION', 30)
         data = dict(template='/projects/tasks_browse.html',
+                    users=[],
                     project=project_sanitized,
                     owner=owner_sanitized,
                     tasks=page_tasks,
@@ -1700,6 +1712,106 @@ def bulk_priority_update(short_name):
     except Exception as e:
         return ErrorStatus().format_exception(e, 'priorityupdate', 'POST')
 
+@crossdomain(origin='*', headers=cors_headers)
+@blueprint.route('/<short_name>/tasks/assign-workersupdate', methods=['POST'])
+@login_required
+@admin_or_subadmin_required
+def bulk_update_assign_worker(short_name):
+   
+    response = {}
+    project, owner, ps = project_by_shortname(short_name)
+    data = json.loads(request.data)
+
+    if data.get("add") is None and data.get("remove") is None:
+        # read data and return users
+
+        task_id = data.get("taskId")
+        bulk_update = False
+        assign_user_emails = []
+        if task_id:
+            # use filters tp populate user list
+            t = task_repo.get_task_by(project_id=project.id,
+                                        id=int(task_id))
+            assign_user_email = []
+            if t.user_pref is not None and isinstance(t.user_pref, dict):
+                assign_user_emails = set(t.user_pref.get("assign_user", []))
+        else:
+            bulk_update = True
+            args = parse_tasks_browse_args(json.loads(data.get('filters', '{"taskId": null}')))
+            tasks = task_repo.get_tasks_by_filters(project, args)
+            task_ids = [t.id for t in tasks]
+            assign_user_emails = set()
+
+            for task_id in task_ids:
+                t = task_repo.get_task_by(project_id=project.id,
+                                        id=int(task_id))
+                assign_user_emails = assign_user_emails.union(set(t.user_pref.get("assign_user", [])))
+        assign_users = []
+        for user_email in assign_user_emails:
+            user = user_repo.search_by_email(user_email)
+            if not user:
+                fullname = user_email + ' (user not found)'
+            else:
+                fullname = user.fullname 
+            assign_users.append({'fullname': fullname, 'email': user_email})
+        response['assign_users'] = assign_users
+
+        # get a list of all users can be assigned to task
+        if bool(data_access_levels):
+            all_users = user_repo.get_users(project.get_project_users())
+        else:
+            all_users = user_repo.get_all()
+        all_user_data = []
+        for user in all_users:
+
+            # Exclude currently assigned users in the candidate list ONLY for single task update
+            if user.email_addr in assign_user_emails and not bulk_update:
+                continue
+            user_data = dict()
+            user_data['fullname'] = user.fullname
+            user_data['email'] = user.email_addr
+            all_user_data.append(user_data)
+        response["all_users"] = all_user_data
+    else:
+        # update tasks with assign worker values
+        assign_workers = data.get('add', [])
+        remove_workers = data.get('remove', [])
+
+        assign_worker_emails = [w["email"] for w in assign_workers]
+        remove_worker_emails = [w["email"] for w in remove_workers]
+
+        task_id = data.get("taskId")
+
+        if not task_id:
+            # get task_ids from db
+            args = parse_tasks_browse_args(json.loads(data.get('filters', '')))
+            tasks = task_repo.get_tasks_by_filters(project, args)
+            task_ids = [t.id for t in tasks]
+        else:
+            task_ids = [task_id]
+        for task_id in task_ids:
+            if task_id is not None:
+                t = task_repo.get_task_by(project_id=project.id,
+                                        id=int(task_id))
+                # add new users 
+                user_pref = t.user_pref or {}
+                assign_user = user_pref.get("assign_user", [])
+                assign_user.extend(assign_worker_emails)
+                # remove all duplicates
+                assign_user = list(set(assign_user))
+
+                # remove users 
+                for remove_user_email in remove_worker_emails:
+                    if remove_user_email in assign_user:
+                        assign_user.remove(remove_user_email)
+
+                user_pref["assign_user"] = assign_user
+
+                t.user_pref = user_pref
+                flag_modified(t, "user_pref")
+
+                task_repo.update(t)
+    return Response(json.dumps(response), 200, mimetype='application/json')
 
 @crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/redundancyupdate', methods=['POST'])
@@ -1724,7 +1836,7 @@ def bulk_redundancy_update(short_name):
             })
 
         else:
-            args = parse_tasks_browse_args(request.json.get('filters'))
+            args = parse_tasks_browse_args(req_data.get('filters', ''))
             tasks_not_updated = task_repo.update_tasks_redundancy(project, n_answers, args)
             notify_redundancy_updates(tasks_not_updated)
             if tasks_not_updated:
@@ -1795,12 +1907,12 @@ def delete_selected_tasks(short_name):
             new_value = json.dumps({
                 'task_ids': task_ids,
             })
-            async = False
+            is_async = False
         else:
             args = parse_tasks_browse_args(request.json.get('filters'))
             count = cached_projects.task_count(project.id, args)
-            async = count > MAX_NUM_SYNCHRONOUS_TASKS_DELETE
-            if async:
+            is_async = count > MAX_NUM_SYNCHRONOUS_TASKS_DELETE
+            if is_async:
                 owners = user_repo.get_users(project.owners_ids)
                 data = {
                     'project_id': project.id, 'project_name': project.name,
@@ -1818,7 +1930,7 @@ def delete_selected_tasks(short_name):
 
         auditlogger.log_event(project, current_user, 'delete tasks',
                               'task', 'N/A', new_value)
-        return Response(json.dumps(dict(enqueued=async)), 200,
+        return Response(json.dumps(dict(enqueued=is_async)), 200,
                         mimetype='application/json')
     except Exception as e:
         return ErrorStatus().format_exception(e, 'deleteselected', 'POST')
@@ -2475,7 +2587,7 @@ def task_notification(short_name):
                                 pro_features=pro))
     webhook = form.webhook.data
     if webhook:
-        scheme, netloc, _, _, _, _ = urlparse.urlparse(webhook)
+        scheme, netloc, _, _, _, _ = urllib.parse.urlparse(webhook)
         if scheme not in ['http', 'https', 'ftp'] or not '.' in netloc:
             flash(gettext('Invalid webhook URL'), 'error')
             return handle_content_type(dict(template='/projects/task_notification.html',
@@ -3035,6 +3147,7 @@ def del_coowner(short_name, user_name=None):
         return redirect_content_type(url_for('.coowners', short_name=short_name))
     return abort(404)
 
+
 @blueprint.route('/<short_name>/projectreport/export', methods=['GET', 'POST'])
 @login_required
 @admin_or_subadmin_required
@@ -3310,9 +3423,9 @@ def ext_config(short_name):
     forms = current_app.config.get('EXTERNAL_CONFIGURATIONS', {})
 
     form_classes = []
-    for form_name, form_config in forms.iteritems():
+    for form_name, form_config in forms.items():
         display = form_config['display']
-        form = form_builder(form_name, form_config['fields'].iteritems())
+        form = form_builder(form_name, iter(form_config['fields'].items()))
         form_classes.append((form_name, display, form))
 
     if request.method == 'POST':
@@ -3395,7 +3508,7 @@ def assign_users(short_name):
         project_sanitized, owner_sanitized = sanitize_project_owner(
             project, owner, current_user, ps)
         project_users = project.get_project_users()
-        project_users = map(str, project_users)
+        project_users = list(map(str, project_users))
 
         response = dict(
             template='/projects/assign_users.html',
@@ -3408,7 +3521,7 @@ def assign_users(short_name):
         )
         return handle_content_type(response)
 
-    project_users = map(int, project_users)
+    project_users = list(map(int, project_users))
     project.set_project_users(project_users)
     project_repo.save(project)
     auditlogger.log_event(project, current_user, 'update', 'project.assign_users',
@@ -3714,20 +3827,20 @@ def contact(short_name):
     body_header = current_app.config.get('CONTACT_BODY', 'A GIGwork support request has been sent for the project: {project_name}.')
 
     success_body = body_header + '\n\n' + (
-        u'    User: {fullname} ({user_name}, {user_id})\n'
-        u'    Email: {email}\n'
-        u'    Message: {message}\n\n'
-        u'    Project Name: {project_name}\n'
-        u'    Project Short Name: {project_short_name} ({project_id})\n'
-        u'    Referring Url: {referrer}\n'
-        u'    Is Admin: {user_admin}\n'
-        u'    Is Subadmin: {user_subadmin}\n'
-        u'    Project Owner: {owner}\n'
-        u'    Total Tasks: {total_tasks}\n'
-        u'    Total Task Runs: {total_task_runs}\n'
-        u'    Available Task Runs: {remaining_task_runs}\n'
-        u'    Tasks Available to User: {tasks_available_user}\n'
-        u'    Tasks Completed by User: {tasks_completed_user}\n'
+        '    User: {fullname} ({user_name}, {user_id})\n'
+        '    Email: {email}\n'
+        '    Message: {message}\n\n'
+        '    Project Name: {project_name}\n'
+        '    Project Short Name: {project_short_name} ({project_id})\n'
+        '    Referring Url: {referrer}\n'
+        '    Is Admin: {user_admin}\n'
+        '    Is Subadmin: {user_subadmin}\n'
+        '    Project Owner: {owner}\n'
+        '    Total Tasks: {total_tasks}\n'
+        '    Total Task Runs: {total_task_runs}\n'
+        '    Available Task Runs: {remaining_task_runs}\n'
+        '    Tasks Available to User: {tasks_available_user}\n'
+        '    Tasks Completed by User: {tasks_completed_user}\n'
     )
 
     body = success_body.format(

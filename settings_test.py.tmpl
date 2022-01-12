@@ -38,7 +38,7 @@ ANNOUNCEMENT_LEVELS = {
     'user': {'display': 'User', 'level': 30}
 }
 ANNOUNCEMENT_LEVEL_OPTIONS = [
-    {'text': v['display'], 'value': v['level']} for k, v in ANNOUNCEMENT_LEVELS.iteritems()
+    {'text': v['display'], 'value': v['level']} for k, v in ANNOUNCEMENT_LEVELS.items()
 ]
 LOCALES = [('en', 'English'), ('es', u'Español'),
            ('it', 'Italiano'), ('fr', u'Français'),
@@ -63,9 +63,6 @@ MAIL_DEFAULT_SENDER = 'PYBOSSA Support <info@pybossa.com>'
 ALLOWED_EXTENSIONS = ['js', 'css', 'png', 'jpg', 'jpeg', 'gif', 'zip']
 UPLOAD_FOLDER = '/tmp/'
 UPLOAD_METHOD = 'local'
-RACKSPACE_USERNAME = 'username'
-RACKSPACE_API_KEY = 'apikey'
-RACKSPACE_REGION = 'ORD'
 FLICKR_API_KEY = 'apikey'
 FLICKR_SHARED_SECRET = "secret"
 DROPBOX_APP_KEY = 'key'
@@ -230,4 +227,10 @@ FIRM_TO_TYPE = {
     905877: "Test firm id 3"
 }
 
+CONTACT_ENABLE = ''
 
+# Send emails weekly update every
+WEEKLY_UPDATE_STATS = 'Sunday'
+
+# Send emails weekly to admin
+WEEKLY_ADMIN_REPORTS = 'Monday'

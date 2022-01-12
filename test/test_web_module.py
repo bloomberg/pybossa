@@ -15,10 +15,10 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from default import Test, flask_app, with_context
+from test import Test, flask_app, with_context
 from pybossa.util import get_port
 from pybossa.core import url_for_other_page
-from mock import patch
+from unittest.mock import patch
 
 
 class TestWebModule(Test):

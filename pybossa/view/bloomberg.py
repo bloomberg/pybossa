@@ -20,7 +20,7 @@ from flask import Blueprint, request, flash, url_for, redirect, current_app, abo
 from flask_babel import gettext
 from pybossa.core import user_repo, csrf
 from pybossa.view.account import _sign_in_user, create_account
-from urlparse import urlparse
+from urllib.parse import urlparse
 from pybossa.util import generate_bsso_account_notification
 from pybossa.util import is_own_url_or_else, generate_password
 from pybossa.jobs import send_mail
@@ -78,7 +78,7 @@ def handle_bloomberg_response():
     elif auth.is_authenticated:
         # User is authenticated on BSSO, load user from GIGwork API.
         attributes = auth.get_attributes()
-        user = user_repo.get_by(email_addr=unicode(attributes['emailAddress'][0]).lower())
+        user = user_repo.get_by(email_addr=str(attributes['emailAddress'][0]).lower())
         if user is not None:
             # User is authenticated on BSSO and already has a GIGwork account.
             return _sign_in_user(user, next_url=request.form.get('RelayState'))
@@ -101,7 +101,7 @@ def handle_bloomberg_response():
                 create_account(user_data, auto_create=True)
                 current_app.logger.info('Account created using BSSO info: %s', str(user_data))
                 flash('A new account has been created for you using BSSO.')
-                user = user_repo.get_by(email_addr=unicode(user_data['email_addr'].lower()))
+                user = user_repo.get_by(email_addr=str(user_data['email_addr'].lower()))
                 return _sign_in_user(user, next_url=request.form.get('RelayState'))
             except Exception as error:
                 brand = current_app.config['BRAND']

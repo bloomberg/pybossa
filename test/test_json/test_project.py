@@ -16,14 +16,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from default import with_context
-from helper import web
-from mock import patch
-from factories import CategoryFactory
+from test import with_context
+from test.helper import web
+from unittest.mock import patch
+from test.factories import CategoryFactory
 from pybossa.messages import *
 from pybossa.core import project_repo
 from pybossa.api.user import data_access
-from pybossa.forms.forms import ProjectForm
 
 
 class TestJsonProject(web.Helper):
@@ -37,9 +36,9 @@ class TestJsonProject(web.Helper):
         """Test JSON PROJECT (GET/POST) New works."""
         url = '/project/new'
         res = self.app_get_json(url, follow_redirects=True)
-        assert "Sign in" in res.data, res.data
+        assert b"Sign in" in res.data, res.data
         res = self.app_post_json(url, follow_redirects=True)
-        assert "Sign in" in res.data, res.data
+        assert b"Sign in" in res.data, res.data
 
     @with_context
     def test_project_new_auth(self):
@@ -62,7 +61,7 @@ class TestJsonProject(web.Helper):
 
             # With errors and CSRF
             csrf = self.get_csrf(url)
-            print csrf
+            print(csrf)
             res = self.app_post_json(url, headers={'X-CSRFToken': csrf})
             data = json.loads(res.data)
             assert data.get('errors'), data
@@ -75,7 +74,7 @@ class TestJsonProject(web.Helper):
                            password='TestPwd1', product='abc', subproduct='def', kpi=0.5,
                            input_data_class='L4 - public', output_data_class='L4 - public')
             csrf = self.get_csrf(url)
-            print csrf
+            print(csrf)
             res = self.app_post_json(url, headers={'X-CSRFToken': csrf}, data=project)
             data = json.loads(res.data)
             assert data.get('status') == SUCCESS, data

@@ -128,6 +128,6 @@ def get_upref_mdata_choices():
 def get_valid_user_preferences():
     if not valid_user_preferences:
         upref_mdata_choices = get_upref_mdata_choices()
-        for user_pref, values in upref_mdata_choices.iteritems():
+        for user_pref, values in upref_mdata_choices.items():
             valid_user_preferences[user_pref] = [v[0] for v in values]
     return valid_user_preferences

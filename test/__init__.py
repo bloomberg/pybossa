@@ -16,22 +16,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
+import random
+from functools import wraps
+from unittest.mock import MagicMock
+
 from sqlalchemy import text
-from pybossa.core import db
+
 from pybossa.core import create_app, sentinel, signer
-from pybossa.cookies import CookieHandler
-from pybossa.model.project import Project
+from pybossa.core import db
+from pybossa.leaderboard.jobs import leaderboard
 from pybossa.model.category import Category
+from pybossa.model.project import Project
 from pybossa.model.task import Task
 from pybossa.model.task_run import TaskRun
 from pybossa.model.user import User
-from pybossa.leaderboard.jobs import leaderboard
-import pybossa.model as model
-from functools import wraps
-from factories import reset_all_pk_sequences
-import random
-from mock import MagicMock
-
+from test.factories import reset_all_pk_sequences
 
 flask_app = create_app(run_as_server=False)
 
@@ -40,6 +39,19 @@ def with_context(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         with flask_app.app_context():
+            return f(*args, **kwargs)
+    return decorated_function
+
+
+def with_request_context(f):
+    """
+    If the test code uses a request context, using with_context decorator
+    results "RuntimeError: Working outside of request context." exception.
+    Using this decorator resolves the issue.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        with flask_app.test_request_context():
             return f(*args, **kwargs)
     return decorated_function
 
@@ -126,20 +138,20 @@ class Test(object):
             self.redis_flushall()
             reset_all_pk_sequences()
 
-    fullname = u'T Tester'
-    fullname2 = u'T Tester 2'
-    email_addr = u'tester@tester.com'
-    email_addr2 = u'tester-2@tester.com'
-    root_addr = u'root@root.com'
-    name = u'tester'
-    name2 = u'tester-2'
-    root_name = u'root'
+    fullname = 'T Tester'
+    fullname2 = 'T Tester 2'
+    email_addr = 'tester@tester.com'
+    email_addr2 = 'tester-2@tester.com'
+    root_addr = 'root@root.com'
+    name = 'tester'
+    name2 = 'tester-2'
+    root_name = 'root'
     api_key = 'tester'
     api_key_2 = 'tester-2'
     root_api_key = 'root'
-    project_name = u'My New Project'
-    project_short_name = u'test-app'
-    password = u'tester'
+    project_name = 'My New Project'
+    project_short_name = 'test-app'
+    password = 'tester'
     root_password = password + 'root'
     cat_1 = 'thinking'
     cat_2 = 'sensing'
@@ -175,7 +187,7 @@ class Test(object):
             'url': 'my url'
             }
         task_run_info = {
-            'answer': u'annakarenina'
+            'answer': 'annakarenina'
             }
 
         # Create the task and taskruns for the first project
@@ -205,7 +217,7 @@ class Test(object):
             'url': 'my url'
             }
         task_run_info = {
-            'answer': u'annakarenina'
+            'answer': 'annakarenina'
             }
 
         # Create the task and taskruns for the first project
@@ -255,7 +267,7 @@ class Test(object):
             project = Project(
                     name=self.project_name,
                     short_name=self.project_short_name,
-                    description=u'description',
+                    description='description',
                     category_id=category.id,
                     published=True,
                     info=info
@@ -314,20 +326,20 @@ def get_user_id_or_ip(user):
 
 
 class Fixtures:
-    fullname = u'T Tester'
-    fullname2 = u'T Tester 2'
-    email_addr = u'tester@tester.com'
-    email_addr2 = u'tester-2@tester.com'
-    root_addr = u'root@root.com'
-    name = u'tester'
-    name2 = u'tester-2'
-    root_name = u'root'
+    fullname = 'T Tester'
+    fullname2 = 'T Tester 2'
+    email_addr = 'tester@tester.com'
+    email_addr2 = 'tester-2@tester.com'
+    root_addr = 'root@root.com'
+    name = 'tester'
+    name2 = 'tester-2'
+    root_name = 'root'
     api_key = 'tester'
     api_key_2 = 'tester-2'
     root_api_key = 'root'
-    project_name = u'My New Project'
-    project_short_name = u'test-app'
-    password = u'tester'
+    project_name = 'My New Project'
+    project_short_name = 'test-app'
+    password = 'tester'
     root_password = password + 'root'
     cat_1 = 'thinking'
     cat_2 = 'sensing'
@@ -360,7 +372,7 @@ class Fixtures:
             'url': 'my url'
             }
         task_run_info = {
-            'answer': u'annakarenina'
+            'answer': 'annakarenina'
             }
 
         # Create the task and taskruns for the first project
@@ -391,7 +403,7 @@ class Fixtures:
             'url': 'my url'
             }
         task_run_info = {
-            'answer': u'annakarenina'
+            'answer': 'annakarenina'
             }
 
         # Create the task and taskruns for the first project
@@ -441,7 +453,7 @@ class Fixtures:
         project = Project(
                 name=cls.project_name,
                 short_name=cls.project_short_name,
-                description=u'description',
+                description='description',
                 category_id=category.id,
                 published=True,
                 info=info

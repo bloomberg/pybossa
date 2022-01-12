@@ -16,13 +16,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import timedelta
-from pybossa.cookies import CookieHandler
+from unittest.mock import patch, MagicMock
+
 from pybossa.password_manager import ProjectPasswdManager
-from itsdangerous import SignatureExpired
-
-from mock import patch, MagicMock
-
 
 
 class TestProjectPasswdManager(object):
