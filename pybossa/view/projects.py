@@ -1264,7 +1264,7 @@ def task_presenter(short_name, task_id):
     # Verify the worker has a lock on the task. Otherwise, task will fail to submit.
     locks = _get_locks(project.id, task_id)
     if not locks and mode != 'read_only':
-        flash(gettext("Unable to lock task. Please cancel and begin a new task."), "error")
+        flash(gettext("Unable to lock task or task expired. Please cancel and begin a new task."), "error")
         return respond('/projects/presenter.html')
     else:
         if mode != 'read_only':
