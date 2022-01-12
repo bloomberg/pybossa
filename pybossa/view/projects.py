@@ -1424,7 +1424,7 @@ def _get_locks(project_id, task_id):
             project_id)
     locks = sched.get_locks(task_id, timeout)
     now = time.time()
-    lock_ttls = {int(k): float(v) - now
+    lock_ttls = {int(k.replace('.', '')): float(v) - now
                  for k, v in locks.items()}
     return lock_ttls
 
