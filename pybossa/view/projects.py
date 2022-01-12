@@ -1265,7 +1265,6 @@ def task_presenter(short_name, task_id):
     locks = _get_locks(project.id, task_id)
     if not locks and mode != 'read_only':
         flash(gettext("Unable to lock task or task expired. Please cancel and begin a new task."), "error")
-        return respond('/projects/presenter.html')
     else:
         if mode != 'read_only':
             template_args['project']['timeout'] = project.info.get('timeout', DEFAULT_TASK_TIMEOUT)
@@ -1276,7 +1275,8 @@ def task_presenter(short_name, task_id):
         if has_no_presenter(project):
             flash(gettext("Sorry, but this project is still a draft and does "
                           "not have a task presenter."), "error")
-        return respond('/projects/presenter.html')
+
+    return respond('/projects/presenter.html')
 
 
 @blueprint.route('/<short_name>/presenter')
