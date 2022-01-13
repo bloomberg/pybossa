@@ -3213,7 +3213,7 @@ class TestWeb(web.Helper):
         assert fake_guard_instance.stamp.called
 
     @with_context
-    @patch('pybossa.view.projects._get_locks')
+    @patch('pybossa.view.projects._get_locks', return_value={})
     def test_get_specific_task_no_lock_flash_message(self, _get_locks):
         self.create()
         self.delete_task_runs()
@@ -3226,12 +3226,28 @@ class TestWeb(web.Helper):
                  .first()
 
         # Simulate no lock on the task (expired lock).
-        _get_locks.return_value = {}
-
         res = self.app_get_json('project/%s/task/%s' % (project.short_name, task.id))
 
         msg = "Unable to lock task or task expired. Please cancel and begin a new task."
         assert msg in str(res.data), 'Flash message not found: "{}"'.format(msg)
+
+    @with_context
+    @patch('pybossa.view.projects._get_locks', return_value={1: 10})
+    def test_get_specific_task_with_lock_seconds_remaining(self, _get_locks):
+        self.create()
+        self.delete_task_runs()
+        self.register()
+        make_subadmin_by(email_addr='johndoe@example.com')
+        self.signin()
+        project = db.session.query(Project).first()
+        task = db.session.query(Task)\
+                 .filter(Project.id == project.id)\
+                 .first()
+
+        # Simulate lock on task (valid lock).
+        res = self.app_get_json('project/%s/task/%s' % (project.short_name, task.id))
+
+        assert res.status_code == 200, res
 
     @with_context
     @patch('pybossa.view.projects.has_no_presenter')
