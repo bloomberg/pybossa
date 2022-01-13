@@ -3232,7 +3232,7 @@ class TestWeb(web.Helper):
         assert msg in str(res.data), 'Flash message not found: "{}"'.format(msg)
 
     @with_context
-    @patch('pybossa.view.projects._get_locks', return_value={1: 10})
+    @patch('pybossa.view.projects._get_locks', return_value={4: 10})
     def test_get_specific_task_with_lock_seconds_remaining(self, _get_locks):
         self.create()
         self.delete_task_runs()
@@ -3248,6 +3248,8 @@ class TestWeb(web.Helper):
         res = self.app_get_json('project/%s/task/%s' % (project.short_name, task.id))
 
         assert res.status_code == 200, res
+        assert '"original_timeout":3600' in str(res.data), "Incorrect value for original_timeout"
+        assert '"timeout":10' in str(res.data), "Incorrect value for timeout"
 
     @with_context
     @patch('pybossa.view.projects.has_no_presenter')
