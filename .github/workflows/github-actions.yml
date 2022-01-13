@@ -23,6 +23,9 @@ jobs:
           # Maps tcp port 5432 on service container to the host
           - 5432:5432
     steps:
+      - run: |
+          echo "::remove-matcher owner=python::"
+
       - name: Checkout repository and submodules recursively
         uses: actions/checkout@v2
         with:
@@ -36,7 +39,7 @@ jobs:
       - name: Pre installation
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y libxml2-dev libxmlsec1-dev libsasl2-dev libldap2-dev libssl-dev libkrb5-dev redis-server redis-tools postgresql-client
+          sudo apt-get install -y libxml2-dev libxmlsec1-dev libsasl2-dev libldap2-dev libssl-dev libkrb5-dev libpq-dev redis-server redis-tools postgresql-client
           redis-server --version
           redis-server contrib/redis/sentinel.conf --sentinel
           cd pybossa && ln -s themes/default/translations && cd ..

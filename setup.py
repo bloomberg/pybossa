@@ -103,7 +103,7 @@ requirements = [
     "Pillow==8.3.2",
     "prettytable==2.2.1",
     "protobuf==3.18.0",
-    "psycopg2-binary==2.9.1",
+    "psycopg2==2.8.6",
     "pyasn1==0.4.8",
     "pyasn1-modules==0.2.8",
     "pybossa-onesignal==1.1",
