@@ -1261,9 +1261,10 @@ def task_presenter(short_name, task_id):
                                timeout=project.info.get('timeout'))
     guard.stamp(task, get_user_id_or_ip())
 
-    # Verify the worker has a lock on the task. Otherwise, task will fail to submit.
+    # Verify the worker has an unexpired lock on the task. Otherwise, task will fail to submit.
     locks = _get_locks(project.id, task_id)
-    if not locks and mode != 'read_only':
+    valid_locks = {key:seconds for key, seconds in locks.items() if seconds > 0}
+    if not valid_locks and mode != 'read_only':
         flash(gettext("Unable to lock task or task expired. Please cancel and begin a new task."), "error")
     else:
         if mode != 'read_only':
