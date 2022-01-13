@@ -23,9 +23,6 @@ jobs:
           # Maps tcp port 5432 on service container to the host
           - 5432:5432
     steps:
-      - run: |
-          echo "::remove-matcher owner=python::"
-
       - name: Checkout repository and submodules recursively
         uses: actions/checkout@v2
         with:
@@ -68,6 +65,7 @@ jobs:
 
       - name: Run unit test
         run: |
+          echo "::remove-matcher owner=python::"
           ./run_tests
 
       - name: Run code coverage
