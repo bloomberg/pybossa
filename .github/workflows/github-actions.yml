@@ -36,7 +36,7 @@ jobs:
       - name: Pre installation
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y libxml2-dev libxmlsec1-dev libsasl2-dev libldap2-dev libssl-dev libkrb5-dev redis-server redis-tools postgresql-client
+          sudo apt-get install -y libxml2-dev libxmlsec1-dev libsasl2-dev libldap2-dev libssl-dev libkrb5-dev libpq-dev redis-server redis-tools postgresql-client
           redis-server --version
           redis-server contrib/redis/sentinel.conf --sentinel
           cd pybossa && ln -s themes/default/translations && cd ..
@@ -65,6 +65,7 @@ jobs:
 
       - name: Run unit test
         run: |
+          echo "::remove-matcher owner=python::"
           ./run_tests
 
       - name: Run code coverage
