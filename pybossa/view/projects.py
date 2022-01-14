@@ -1261,12 +1261,33 @@ def task_presenter(short_name, task_id):
                                timeout=project.info.get('timeout'))
     guard.stamp(task, get_user_id_or_ip())
 
-    if not guard.check_task_presented_timestamp(task, get_user_id_or_ip()):
-        guard.stamp_presented_time(task, get_user_id_or_ip())
+    # Verify the worker has an unexpired lock on the task. Otherwise, task will fail to submit.
+    locks = _get_locks(project.id, task_id)
+    valid_locks = {key:seconds for key, seconds in locks.items() if seconds > 0}
+    if not valid_locks and mode != 'read_only':
+        flash(gettext("Unable to lock task or task expired. Please cancel and begin a new task."), "error")
+    else:
+        if mode != 'read_only':
+            # The user already has a valid lock (page reload).
+            # Set the original timeout seconds to display in the message.
+            seconds = project.info.get('timeout', DEFAULT_TASK_TIMEOUT)
+            template_args['project']['original_timeout'] = seconds
 
-    if has_no_presenter(project):
-        flash(gettext("Sorry, but this project is still a draft and does "
-                      "not have a task presenter."), "error")
+            # Find the seconds remaining on this task.
+            lock = {key:seconds for key, seconds in locks.items() if key == current_user.id and seconds > 0}
+            if lock:
+                seconds = lock[current_user.id]
+
+            # Set the seconds remaining to display in the message.
+            template_args['project']['timeout'] = seconds
+
+        if not guard.check_task_presented_timestamp(task, get_user_id_or_ip()):
+            guard.stamp_presented_time(task, get_user_id_or_ip())
+
+        if has_no_presenter(project):
+            flash(gettext("Sorry, but this project is still a draft and does "
+                          "not have a task presenter."), "error")
+
     return respond('/projects/presenter.html')
 
 
@@ -1283,6 +1304,8 @@ def presenter(short_name):
         return resp
 
     project, owner, ps = project_by_shortname(short_name)
+    project.timeout = project.info.get('timeout', DEFAULT_TASK_TIMEOUT)
+
     ensure_authorized_to('read', project)
 
     if project.needs_password():
@@ -1413,7 +1436,7 @@ def _get_locks(project_id, task_id):
             project_id)
     locks = sched.get_locks(task_id, timeout)
     now = time.time()
-    lock_ttls = {int(k): float(v) - now
+    lock_ttls = {int(k.replace('.', '')): float(v) - now
                  for k, v in locks.items()}
     return lock_ttls
 
@@ -2511,7 +2534,7 @@ def task_timeout(short_name):
     ensure_authorized_to('update', project)
     pro = pro_features()
     if request.method == 'GET':
-        timeout = project.info.get('timeout') or DEFAULT_TASK_TIMEOUT
+        timeout = project.info.get('timeout', DEFAULT_TASK_TIMEOUT)
         form.minutes.data, form.seconds.data = divmod(timeout, 60)
         return handle_content_type(dict(template='/projects/task_timeout.html',
                                title=title,

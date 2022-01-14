@@ -3213,6 +3213,66 @@ class TestWeb(web.Helper):
         assert fake_guard_instance.stamp.called
 
     @with_context
+    @patch('pybossa.view.projects._get_locks', return_value={})
+    def test_get_specific_task_no_lock_flash_message(self, _get_locks):
+        self.create()
+        self.delete_task_runs()
+        self.register()
+        make_subadmin_by(email_addr='johndoe@example.com')
+        self.signin()
+        project = db.session.query(Project).first()
+        task = db.session.query(Task)\
+                 .filter(Project.id == project.id)\
+                 .first()
+
+        # Simulate no lock on the task (expired lock).
+        res = self.app_get_json('project/%s/task/%s' % (project.short_name, task.id))
+
+        msg = "Unable to lock task or task expired. Please cancel and begin a new task."
+        assert msg in str(res.data), 'Flash message not found: "{}"'.format(msg)
+
+    @with_context
+    @patch('pybossa.view.projects._get_locks', return_value={4: 10})
+    def test_get_specific_task_with_lock_seconds_remaining(self, _get_locks):
+        self.create()
+        self.delete_task_runs()
+        self.register()
+        make_subadmin_by(email_addr='johndoe@example.com')
+        self.signin()
+        project = db.session.query(Project).first()
+        task = db.session.query(Task)\
+                 .filter(Project.id == project.id)\
+                 .first()
+
+        # Simulate lock on task (valid lock).
+        res = self.app_get_json('project/%s/task/%s' % (project.short_name, task.id))
+
+        assert res.status_code == 200, res
+        assert '"original_timeout":3600' in str(res.data), "Incorrect value for original_timeout"
+        assert '"timeout":10' in str(res.data), "Incorrect value for timeout"
+
+    @with_context
+    @patch('pybossa.view.projects.has_no_presenter')
+    def test_get_specific_task_no_presenter_flash_message(self, has_no_presenter):
+        self.create()
+        self.delete_task_runs()
+        self.register()
+        make_subadmin_by(email_addr='johndoe@example.com')
+        self.signin()
+        project = db.session.query(Project).first()
+        task = db.session.query(Task)\
+                 .filter(Project.id == project.id)\
+                 .first()
+
+        # Simulate no presenter.
+        has_no_presenter.return_value = True
+
+        res = self.app_get_json('project/%s/task/%s' % (project.short_name, task.id))
+
+        msg = "this project is still a draft"
+        assert msg in str(res.data), 'Flash message not found: "{}"'.format(msg)
+
+    @with_context
     @patch('pybossa.view.projects.ContributionsGuard')
     def test_get_specific_ongoing_task_marks_task_as_requested_json(self, guard):
         fake_guard_instance = mock_contributions_guard()
