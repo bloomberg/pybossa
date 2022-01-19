@@ -538,23 +538,6 @@ class TestPybossaUtil(Test):
             for item in row:
                 assert isinstance(item, str), err_msg
 
-    def test_UnicodeWriter(self):
-        """Test UnicodeWriter class works."""
-        tmp = tempfile.NamedTemporaryFile()
-        uw = util.UnicodeWriter(tmp)
-        fake_csv = ['one, two, three, {"i": 1}']
-        for row in csv.reader(fake_csv):
-            # change it for a dict
-            row[3] = dict(i=1)
-            uw.writerow(row)
-        tmp.seek(0)
-        err_msg = "It should be the same CSV content"
-        with open(tmp.name, 'rt') as f:
-            reader = csv.reader(f)
-            for row in reader:
-                for item in row:
-                    assert item in fake_csv[0], err_msg
-
     @with_context
     def csv_validate_required_fields(self, config, callback):
         """Test validate_required_fields against csv data

@@ -19,14 +19,17 @@
 
 import json
 import tempfile
+from contextlib import closing
+
+import pandas as pd
 
 from flask import send_file
-from werkzeug.utils import safe_join
+from werkzeug.datastructures import FileStorage
+from werkzeug.utils import safe_join, secure_filename
 
 from pybossa.core import uploader
 from pybossa.exporter.csv_export import CsvExporter
 from pybossa.uploader import local
-from pybossa.util import UnicodeWriter
 from .export_helpers import browse_tasks_export
 
 
@@ -138,27 +141,6 @@ class TaskCsvExporter(CsvExporter):
             for kk, vv, in iterator:
                 yield kk, vv
 
-    def _get_csv_with_filters(self, out, writer, table, project_id,
-                              expanded, filters, disclose_gold):
-        objs = browse_tasks_export(table, project_id, expanded, filters, disclose_gold)
-        rows = [obj for obj in objs]
-        # for row in rows:
-        #     if row['info']:
-        #         info = dict(TaskCsvExporter.flatten(row['info'].iteritems()))
-        #         row['info'].update(info)
-
-        headers = self._get_all_headers(objs=rows,
-                                        expanded=expanded,
-                                        table=table)
-        writer.writerow(headers)
-
-        for row in rows:
-            row = self.process_filtered_row(dict(row))
-            writer.writerow(self._format_csv_row(row, headers))
-
-        out.seek(0)
-        yield out.read()
-
     def _get_all_headers(self, objs, expanded, table=None):
         """Construct headers to **guarantee** that all headers
         for all tasks are included, regardless of whether
@@ -182,11 +164,19 @@ class TaskCsvExporter(CsvExporter):
         return headers
 
     def _respond_csv(self, ty, project_id, expanded=False, filters=None, disclose_gold=False):
-        out = tempfile.TemporaryFile()
-        writer = UnicodeWriter(out)
+        objs = browse_tasks_export(ty, project_id, expanded, filters, disclose_gold)
+        rows = [obj for obj in objs]
+        headers = self._get_all_headers(objs=rows, expanded=expanded, table=ty)
 
-        return self._get_csv_with_filters(
-                    out, writer, ty, project_id, expanded, filters, disclose_gold)
+        formatted_rows = []
+        for row in rows:
+            row = self.process_filtered_row(dict(row))
+            formatted_row = self._format_csv_row(row, headers)
+            formatted_rows.append(formatted_row)
+
+        df = pd.DataFrame(formatted_rows, columns=headers)
+
+        return df
 
     def response_zip(self, project, ty, expanded=False):
         return self.get_zip(project, ty, expanded)
@@ -211,10 +201,25 @@ class TaskCsvExporter(CsvExporter):
             return res
 
     def make_zip(self, project, obj, expanded=False, filters=None, disclose_gold=False):
-        file_format = 'csv'
-        obj_generator = self._respond_csv(obj, project.id, expanded, filters, disclose_gold)
-        return self._make_zipfile(
-                project, obj, file_format, obj_generator, expanded)
+        dataframe = self._respond_csv(obj, project.id, expanded, filters, disclose_gold)
+
+        if dataframe is None:
+            return
+
+        name = self._project_name_latin_encoded(project)
+        with tempfile.NamedTemporaryFile(mode='w+t') as datafile:
+            dataframe.to_csv(datafile, index=False, encoding='utf-8')
+            datafile.flush()
+
+            zipped_datafile = tempfile.NamedTemporaryFile()
+
+            with self._zip_factory(zipped_datafile.name) as _zip:
+                _zip.write(datafile.name, secure_filename(f'{name}_{obj}.csv'))
+                _zip.content_type = 'application/zip'
+
+        filename = self.download_name(project, obj)
+        fs = FileStorage(filename=filename, stream=zipped_datafile)
+        return closing(fs)
 
     def _make_zip(self, project, obj, expanded=False, filters=None):
         self.make_zip(self, project, obj, expanded, filters)

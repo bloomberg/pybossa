@@ -115,3 +115,12 @@ class TestExport(Test):
 
         task_csv_exporter.make_zip.assert_called_once_with(project, 'task', False, None, False)
         task_json_exporter.make_zip.assert_called_once_with(project, 'task', False, None, False)
+
+    @with_context
+    @patch('pybossa.core.task_csv_exporter')
+    def test_response_zip(self, task_csv_exporter):
+        """Test response_zip"""
+        project = ProjectFactory.create(name='test_project')
+        ty = "task"
+        task_csv_exporter.response_zip(project, ty)
+        task_csv_exporter.response_zip.assert_called()
