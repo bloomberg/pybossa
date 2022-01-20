@@ -260,13 +260,16 @@ def parse_tasks_browse_args(args):
         if not isinstance(display_info_columns, list):
             display_info_columns = []
         parsed_args['display_info_columns'] = display_info_columns
-
+        print('\n\n\n\n')
+        print(parsed_args['display_info_columns'])
+        allowed_fields.update({col.lower():col for col in display_info_columns})
     parsed_args['order_by_dict'] = dict()
     if args.get('order_by'):
         parsed_args['order_by'] = args['order_by'].strip().lower()
         for clause in parsed_args['order_by'].split(','):
             order_by_field = clause.split(' ')
             if len(order_by_field) != 2 or order_by_field[0] not in allowed_fields:
+                print(len(order_by_field), order_by_field[0], allowed_fields)
                 raise ValueError('order_by value sent by the user is invalid: %s'.format(args['order_by']))
             if order_by_field[0] in parsed_args["order_by_dict"]:
                 raise ValueError('order_by field is duplicated: %s'
