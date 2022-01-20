@@ -262,7 +262,7 @@ def parse_tasks_browse_args(args):
         parsed_args['display_info_columns'] = display_info_columns
         print('\n\n\n\n')
         print(parsed_args['display_info_columns'])
-        allowed_fields.update({col.lower():col for col in display_info_columns})
+        allowed_fields.update({col.lower(): " task.info->>'{}'".format(col) for col in display_info_columns})
     parsed_args['order_by_dict'] = dict()
     if args.get('order_by'):
         parsed_args['order_by'] = args['order_by'].strip().lower()
