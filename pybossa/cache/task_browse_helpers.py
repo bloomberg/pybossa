@@ -260,6 +260,7 @@ def parse_tasks_browse_args(args):
         if not isinstance(display_info_columns, list):
             display_info_columns = []
         parsed_args['display_info_columns'] = display_info_columns
+        # allowing custom user added task.info columns to be sortable
         allowed_fields.update({col.lower(): " task.info->>'{}'".format(col) for col in display_info_columns})
     parsed_args['order_by_dict'] = dict()
     if args.get('order_by'):
