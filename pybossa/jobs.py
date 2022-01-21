@@ -823,8 +823,8 @@ def export_tasks(current_user_email_addr, short_name,
     from pybossa.core import (task_csv_exporter, task_json_exporter,
                               project_repo)
     import pybossa.exporter.consensus_exporter as export_consensus
-
     project = project_repo.get_by_shortname(short_name)
+    current_app.logger.info(f"exporting tasks for project {project.id}")
 
     try:
         # Export data and upload .zip file locally
@@ -850,12 +850,16 @@ def export_tasks(current_user_email_addr, short_name,
             max_size = current_app.config.get('EXPORT_MAX_SIZE', float('Inf'))
 
             if len(content) > max_size and bucket_name:
-                conn = create_connection(**current_app.config.get('S3_EXPORT_CONN', {}))
+                current_app.logger.info(f"uploading exporting tasks to s3 for project {project.id}")
+                conn_kwargs = current_app.config.get('S3_EXPORT_CONN', {})
+                conn = create_connection(**conn_kwargs)
                 bucket = conn.get_bucket(bucket_name, validate=False)
                 timestamp = datetime.utcnow().isoformat()
                 key = bucket.new_key('{}-{}'.format(timestamp, filename))
                 key.set_contents_from_string(content)
-                url = key.generate_url(current_app.config.get('EXPORT_EXPIRY', 12 * 3600))
+                expires_in = current_app.config.get('EXPORT_EXPIRY', 12 * 3600)
+                url = key.generate_url(expires_in)
+                current_app.logger.info(f"uploading to s3 done for project {project.id}")
                 msg = '<p>You can download your file <a href="{}">here</a>.</p>'.format(url)
             else:
                 msg = '<p>Your exported data is attached.</p>'
@@ -881,10 +885,10 @@ def export_tasks(current_user_email_addr, short_name,
         job_response = '{0} {1} file was successfully exported for: {2}'
         return job_response.format(
                 ty.capitalize(), filetype.upper(), project.name)
-    except:
+    except Exception as e:
         current_app.logger.exception(
-                'Export email failed - Project: {0}'
-                .format(project.name))
+                'Export email failed - Project: {0}, exception: {1}'
+                .format(project.name, str(e)))
         subject = 'Email delivery failed for your project: {0}'.format(project.name)
         msg = 'There was an error when attempting to deliver your data export via email.'
         body = 'Hello,\n\n' + msg + '\n\nThe {0} team.'
@@ -1165,7 +1169,7 @@ def check_failed():
     # Per https://github.com/rq/rq/blob/master/CHANGES.md
     # get_failed_queue has been removed
     fq = FailedJobRegistry()
-    job_ids = fq.job_ids
+    job_ids = fq.get_job_ids()
     count = len(job_ids)
     FAILED_JOBS_RETRIES = current_app.config.get('FAILED_JOBS_RETRIES')
     for job_id in job_ids:

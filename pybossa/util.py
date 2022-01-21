@@ -422,51 +422,6 @@ def unicode_csv_reader(unicode_csv_data, dialect=csv.excel, **kwargs):
     return csv_reader
 
 
-class UnicodeWriter:
-
-    """A CSV writer which will write rows to CSV file "f"."""
-    # TODO - this class should be replaced by pandas library in the future
-    def __init__(self, f, dialect=csv.excel, encoding="utf-8", **kwds):
-        """Init method."""
-        # Redirect output to a queue
-        self.queue = io.StringIO()
-        self.writer = csv.writer(self.queue, dialect=dialect, **kwds)
-        self.stream = f
-        self.encoder = codecs.getincrementalencoder(encoding)()
-
-    def writerow(self, row):
-        """Write row."""
-        line = []
-        for s in row:
-            if type(s) == dict:
-                line.append(json.dumps(s))
-            else:
-                line.append(str(s))  # should be unicode string
-        self.writer.writerow(line)
-        # Fetch string output from the queue ...
-        data = self.queue.getvalue()  # getvalue() returns str type
-
-        # ... and reencode it into the target encoding
-        # data = self.encoder.encode(data)
-
-        # if stream is a bytes stream, data will be encoded
-        # TODO: revisit this logic
-        if type(self.stream) != io.StringIO:
-            if type(self.stream) == io.BytesIO or 'b' in self.stream.mode:
-                data = data.encode()
-
-        # write to the target stream
-        self.stream.write(data)  # write expects unicode string
-
-        # empty queue
-        self.queue.truncate(0)
-
-    def writerows(self, rows):  # pragma: no cover
-        """Write rows."""
-        for row in rows:
-            self.writerow(row)
-
-
 def get_user_signup_method(user):
     """Return which OAuth sign up method the user used."""
     msg = 'Sorry, there is already an account with the same e-mail.'

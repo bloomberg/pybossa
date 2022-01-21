@@ -44,7 +44,7 @@ class TestMaintenance(Test):
     def test_check_failed_variant(self, mock_failed_queue, mock_requeue_job, mock_send_mail):
         """Test JOB check failed works when no failed jobs."""
         fq = MagicMock
-        fq.job_ids = []
+        fq.get_job_ids = MagicMock()
         job = MagicMock()
         fq.fetch_job = job
         mock_failed_queue.return_value = fq
@@ -59,7 +59,8 @@ class TestMaintenance(Test):
     def test_check_failed(self, mock_failed_queue, mock_requeue_job, mock_send_mail):
         """Test JOB check failed works."""
         fq = MagicMock
-        fq.job_ids = ['1']
+        fq.get_job_ids = MagicMock()
+        fq.get_job_ids.return_value = ['1']
         job = MagicMock()
         fq.fetch_job = job
         mock_failed_queue.return_value = fq
