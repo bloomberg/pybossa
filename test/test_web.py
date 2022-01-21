@@ -805,7 +805,7 @@ class TestWeb(web.Helper):
         """Test WEB register post JSON creates and sends the confirmation email if
         account validation is enabled"""
         from flask import current_app
-        import app_settings
+        import pybossa.app_settings as app_settings
         current_app.config['ACCOUNT_CONFIRMATION_DISABLED'] = False
         app_settings.upref_mdata = False
         with patch.dict(self.flask_app.config, {'WTF_CSRF_ENABLED': True}):

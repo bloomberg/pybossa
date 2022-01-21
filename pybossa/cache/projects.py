@@ -24,7 +24,7 @@ from pybossa.util import pretty_date, static_vars, convert_utc_to_est
 from pybossa.cache import memoize, cache, delete_memoized, delete_cached, \
     memoize_essentials, delete_memoized_essential, delete_cache_group
 from pybossa.cache.task_browse_helpers import get_task_filters, allowed_fields, user_meet_task_requirement, get_task_preference_score
-import app_settings
+import pybossa.app_settings as app_settings
 from pybossa.redis_lock import get_locked_tasks_project
 from pybossa.util import get_taskrun_date_range_sql_clause_params
 

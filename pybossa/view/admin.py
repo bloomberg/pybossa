@@ -64,7 +64,7 @@ from pybossa.jobs import send_mail
 from pybossa.core import userimporter
 from pybossa.importers import BulkImportException
 from collections import OrderedDict
-import app_settings
+import pybossa.app_settings as app_settings
 from datetime import datetime
 from pybossa.jobs import get_management_dashboard_stats
 

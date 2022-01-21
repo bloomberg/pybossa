@@ -48,7 +48,7 @@ from pybossa.core import enable_strong_password
 from pybossa.util import get_file_path_for_import_csv
 from flask import flash
 import pybossa.data_access as data_access
-import app_settings
+import pybossa.app_settings as app_settings
 import six
 from iiif_prezi.loader import ManifestReader
 from wtforms.validators import NumberRange

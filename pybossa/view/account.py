@@ -65,7 +65,7 @@ import time
 from pybossa.sched import release_user_locks
 from pybossa.data_access import (data_access_levels, ensure_user_data_access_assignment_from_form,
     copy_user_data_access_levels)
-import app_settings
+import pybossa.app_settings as app_settings
 from flask import make_response
 import six
 import re

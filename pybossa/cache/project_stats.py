@@ -28,7 +28,7 @@ import operator
 import time
 import datetime
 import os
-import app_settings
+import pybossa.app_settings as app_settings
 
 
 session = db.slave_session
@@ -316,7 +316,7 @@ def stats_hours(project_id, period='2 week'):
         max_hours = row.max
 
     # with anonymous access disabled, auth users and aggr users counts would be same.
-    # reuse aggr user counts for auth users.  
+    # reuse aggr user counts for auth users.
     if app_settings.config.get('DISABLE_ANONYMOUS_ACCESS'):
         hours_auth, max_hours_auth = hours.copy(), max_hours
         return hours, hours_anon, hours_auth, max_hours, max_hours_anon, \
