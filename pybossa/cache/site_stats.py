@@ -22,7 +22,7 @@ from flask import current_app
 
 from pybossa.core import db
 from pybossa.cache import cache, memoize, ONE_DAY, ONE_WEEK
-import app_settings
+import pybossa.app_settings as app_settings
 from pybossa.cache import sentinel, management_dashboard_stats
 from pybossa.cache import get_cache_group_key, delete_cache_group
 

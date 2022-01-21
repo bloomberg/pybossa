@@ -20,7 +20,7 @@ from functools import wraps
 from werkzeug.exceptions import BadRequest
 import six
 
-import app_settings
+import pybossa.app_settings as app_settings
 
 
 data_access_levels = {}

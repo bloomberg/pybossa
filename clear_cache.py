@@ -1,6 +1,6 @@
 from redis.sentinel import Sentinel
-from settings_local import REDIS_SENTINEL as RS
-import settings_local as settings
+from pybossa.settings_local import REDIS_SENTINEL as RS
+import pybossa.settings_local as settings
 from redis import StrictRedis
 
 db = getattr(settings, 'REDIS_DB', 0)

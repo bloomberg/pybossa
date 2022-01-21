@@ -4,7 +4,7 @@ from redis import StrictRedis
 from redis.sentinel import Sentinel
 from rq_scheduler.scheduler import Scheduler
 from time import sleep
-import app_settings
+import pybossa.app_settings as app_settings
 
 
 logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)

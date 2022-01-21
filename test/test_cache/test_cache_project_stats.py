@@ -23,7 +23,7 @@ from test.factories import ProjectFactory, TaskFactory, \
 import pytz
 from datetime import date, datetime, timedelta
 from unittest.mock import patch
-import app_settings
+import pybossa.app_settings as app_settings
 
 
 class TestProjectsStatsCache(Test):
