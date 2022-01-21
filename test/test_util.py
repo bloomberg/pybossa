@@ -27,7 +27,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
 from flask_wtf import FlaskForm as Form
-from nose.tools import nottest
+from nose.tools import nottest, assert_raises
 
 import pybossa.util as util
 from test import with_context, Test, with_request_context
@@ -417,6 +417,19 @@ class TestPybossaUtil(Test):
         expected = base64.b64encode(tmp.encode())
         hashed_flash = util.hash_last_flash_message()
         assert hashed_flash == expected
+
+    def test_parse_date_string(self):
+        """Test parse_date_string works. """
+        source = "not a date"
+        assert util.parse_date_string(source) == source
+
+    def test_fuzzyboolean(self):
+        """Test fuzzyboolean works. """
+        value = None
+        assert_raises(ValueError, util.fuzzyboolean, value)
+
+        value = '6'
+        assert_raises(ValueError, util.fuzzyboolean, value)
 
     def test_pretty_date(self):
         """Test pretty_date works."""
@@ -1092,6 +1105,11 @@ class TestStrongPassword(object):
         password = 'AaBbCD12345!'
         valid, _ = util.check_password_strength(password=password)
         assert valid
+
+    def test_strong_password_max_length(self):
+        password = 'abcdefghijklmnopqrstuvwxyz'
+        valid, _ = util.check_password_strength(password=password)
+        assert not valid
 
 
 class TestAccessControl(Test):
