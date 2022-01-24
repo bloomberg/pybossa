@@ -455,7 +455,7 @@ def update_user_preferences(user_name=None):
 
     payload = json.loads(request.form['request_json']) if 'request_json' in request.form else request.json
     if not payload:
-        return abort(404)
+        return abort(400)
 
     user = user_repo.get_by_name(user_name)
 
@@ -464,10 +464,9 @@ def update_user_preferences(user_name=None):
         abort(403)
 
     user_preferences = None
-    user_updated = None
     if user:
         # Update user preferences value.
-        profile = user.info.get('metadata', {})['profile'] = json.dumps(payload)
+        user.info.get('metadata', {})['profile'] = json.dumps(payload)
 
         # Set dirty flag on user.info['metadata']['profile']
         flag_modified(user, 'info')
@@ -478,11 +477,11 @@ def update_user_preferences(user_name=None):
         # Clear user in cache.
         cached_users.delete_user_pref_metadata(user)
 
-        # Return user data.
-        user_preferences = get_user_pref_metadata(user_name)
+        # Return updated metadata and user preferences.
+        user_preferences = user.info.get('metadata', {})
 
     if not (user or user_preferences):
-        return abort(404)
+        return abort(403)
 
     return Response(json.dumps(user_preferences), mimetype="application/json")
 
