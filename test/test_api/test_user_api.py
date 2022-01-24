@@ -591,7 +591,7 @@ class TestUserAPI(Test):
         url = 'api/preferences/none'
 
         res = self.app.get(url + '?api_key=%s' % admin.api_key)
-        assert res.status_code == 404, res.status_code
+        assert res.status_code == 400, res.status_code
 
     @with_context
     def test_user_get_preferences_missing_user(self):
@@ -601,7 +601,7 @@ class TestUserAPI(Test):
         url = 'api/preferences/'
 
         res = self.app.get(url + '?api_key=%s' % admin.api_key)
-        assert res.status_code == 400, res.status_code
+        assert res.status_code == 404, res.status_code
 
     @with_context
     @patch('pybossa.api.get_user_pref_metadata', return_value=None)
