@@ -432,10 +432,14 @@ def get_user_preferences(user_name=None):
     if not user_name:
         return abort(404)
 
-    user_preferences = get_user_pref_metadata(user_name)
+    try:
+        user_preferences = get_user_pref_metadata(user_name)
+    except Exception as e:
+        # Invalid user_name.
+        return abort(400)
 
-    if not user_preferences:
-        return abort(404)
+    if not user_preferences and user_preferences != {}:
+        return abort(403)
 
     return Response(json.dumps(user_preferences), mimetype="application/json")
 

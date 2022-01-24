@@ -555,3 +555,71 @@ class TestUserAPI(Test):
             data = json.loads(res.data)
             assert res.status_code == 200, res.status_code
             assert data['info']['data_access'] == user_levels, data
+
+    @with_context
+    def test_user_get_preferences_valid_user(self):
+        admin = UserFactory.create()
+        user = UserFactory.create()
+
+        url = 'api/preferences/%s' % user.name
+
+        res = self.app.get(url + '?api_key=%s' % admin.api_key)
+        data = json.loads(res.data)
+
+        assert res.status_code == 200, res.status_code
+        assert data == {}, "Expected {}"
+
+    @with_context
+    @patch('pybossa.api.get_user_pref_metadata', return_value={"test": 1})
+    def test_user_get_preferences_valid_user_data(self, get_user_pref_metadata):
+        admin = UserFactory.create()
+        user = UserFactory.create()
+
+        url = 'api/preferences/%s' % user.name
+
+        res = self.app.get(url + '?api_key=%s' % admin.api_key)
+        assert res.status_code == 200, res.status_code
+
+        data = json.loads(res.data)
+        assert data == {"test": 1}, "Expected {\"test\": 1}"
+
+    @with_context
+    def test_user_get_preferences_invalid_user(self):
+        admin = UserFactory.create()
+        user = UserFactory.create()
+
+        url = 'api/preferences/none'
+
+        res = self.app.get(url + '?api_key=%s' % admin.api_key)
+        assert res.status_code == 404, res.status_code
+
+    @with_context
+    def test_user_get_preferences_missing_user(self):
+        admin = UserFactory.create()
+        user = UserFactory.create()
+
+        url = 'api/preferences/'
+
+        res = self.app.get(url + '?api_key=%s' % admin.api_key)
+        assert res.status_code == 400, res.status_code
+
+    @with_context
+    @patch('pybossa.api.get_user_pref_metadata', return_value=None)
+    def test_user_get_preferences_missing_metadata(self, get_user_pref_metadata):
+        admin = UserFactory.create()
+        user = UserFactory.create()
+
+        url = 'api/preferences/%s' % user.name
+
+        res = self.app.get(url + '?api_key=%s' % admin.api_key)
+        assert res.status_code == 403, res.status_code
+
+    @with_context
+    def test_user_get_preferences_anonymous_user(self):
+        admin = UserFactory.create()
+        restricted = UserFactory.create(restrict=True)
+
+        url = 'api/preferences/%s' % restricted.name
+
+        res = self.app.get(url)
+        assert res.status_code == 401, res.status_code
