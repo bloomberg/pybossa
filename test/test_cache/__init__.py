@@ -23,7 +23,7 @@ from pybossa.cache import (get_key_to_hash, get_hash_key, cache, memoize,
                            delete_memoized_essential, delete_cache_group,
                            get_cache_group_key)
 from pybossa.sentinel import Sentinel
-import settings_test
+import pybossa.settings_test as settings_test
 
 
 class TestCacheHashFunctions(object):

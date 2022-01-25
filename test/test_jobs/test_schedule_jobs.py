@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-import settings_test
+import pybossa.settings_test as settings_test
 from pybossa.jobs import schedule_job
 from rq_scheduler import Scheduler
 from redis.sentinel import Sentinel

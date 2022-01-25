@@ -19,7 +19,7 @@
 from yacryptopan import CryptoPAn
 from pybossa.model.task_run import TaskRun
 from . import BaseFactory, factory, task_repo
-import settings_test
+import pybossa.settings_test as settings_test
 
 cp = CryptoPAn(settings_test.CRYPTOPAN_KEY.encode())
 
