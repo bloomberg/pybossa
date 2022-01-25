@@ -623,3 +623,63 @@ class TestUserAPI(Test):
 
         res = self.app.get(url)
         assert res.status_code == 401, res.status_code
+
+    @with_context
+    def test_user_set_preferences_anonymous_user(self):
+        admin = UserFactory.create()
+        restricted = UserFactory.create(restrict=True)
+
+        url = 'api/preferences/%s' % restricted.name
+
+        res = self.app.post(url)
+        assert res.status_code == 401, res.status_code
+
+    @with_context
+    def test_user_set_preferences_missing_user(self):
+        admin = UserFactory.create()
+        user = UserFactory.create()
+
+        url = 'api/preferences/'
+
+        res = self.app.post(url + '?api_key=%s' % admin.api_key)
+        assert res.status_code == 404, res.status_code
+
+    @with_context
+    def test_user_set_preferences_missing_payload(self):
+        admin = UserFactory.create()
+        user = UserFactory.create()
+
+        url = 'api/preferences/%s' % user.name
+
+        res = self.app.post(url + '?api_key=%s' % admin.api_key)
+        assert res.status_code == 400, res.status_code
+
+    @with_context
+    def test_user_set_preferences_cannot_update_user(self):
+        admin = UserFactory.create()
+        user = UserFactory.create()
+        user2 = UserFactory.create()
+
+        # Attempt to update another user without permission.
+        url = 'api/preferences/%s' % user2.name
+
+        res = self.app.post(url + '?api_key=%s' % user.api_key, data=json.dumps({"test": 1}), content_type='application/json')
+
+        assert res.status_code == 403, res.status_code
+        assert res.mimetype == 'application/json', res
+
+    @with_context
+    def test_user_set_preferences_update_user(self):
+        admin = UserFactory.create()
+        user = UserFactory.create()
+
+        url = 'api/preferences/%s' % user.name
+        payload = json.dumps({"test": 1})
+
+        res = self.app.post(url + '?api_key=%s' % admin.api_key, data=payload, content_type='application/json')
+
+        assert res.status_code == 200, res.status_code
+        assert res.mimetype == 'application/json', res
+
+        data = json.loads(res.data)
+        assert data['profile'] == payload, "Invalid json response returned.";

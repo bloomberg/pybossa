@@ -469,6 +469,10 @@ def update_user_preferences(user_name=None):
 
     user_preferences = None
     if user:
+        # Add a metadata section if not found.
+        if 'metadata' not in user.info:
+            user.info['metadata'] = {}
+
         # Update user preferences value.
         user.info.get('metadata', {})['profile'] = json.dumps(payload)
 
