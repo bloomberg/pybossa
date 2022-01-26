@@ -433,16 +433,20 @@ def get_user_preferences(user_name=None):
 
     user = user_repo.get_by_name(user_name)
     if not user:
-        return abort(400)
+        return abort(404)
 
-    (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
+    try:
+        (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
+    except Exception:
+        return abort(404)
+
     if not can_update:
-        abort(403)
+        return abort(403)
 
     user_preferences = get_user_pref_metadata(user_name)
 
     if not user_preferences and user_preferences != {}:
-        return abort(403)
+        return abort(500)
 
     return Response(json.dumps(user_preferences), mimetype="application/json")
 
@@ -459,17 +463,21 @@ def update_user_preferences(user_name=None):
     if not user_name:
         return abort(404)
 
+    user = user_repo.get_by_name(user_name)
+    if not user:
+        return abort(404)
+
+    try:
+        (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
+    except Exception:
+        return abort(404)
+
+    if not can_update:
+        abort(403)
+
     payload = json.loads(request.form['request_json']) if 'request_json' in request.form else request.json
     if not payload:
         return abort(400)
-
-    user = user_repo.get_by_name(user_name)
-    if not user:
-        return abort(400)
-
-    (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
-    if not can_update:
-        abort(403)
 
     user_preferences = None
     if user:
@@ -492,8 +500,8 @@ def update_user_preferences(user_name=None):
         # Return updated metadata and user preferences.
         user_preferences = user.info.get('metadata', {})
 
-    if not (user or user_preferences):
-        return abort(403)
+    if not user_preferences and user_preferences != {}:
+        return abort(500)
 
     return Response(json.dumps(user_preferences), mimetype="application/json")
 

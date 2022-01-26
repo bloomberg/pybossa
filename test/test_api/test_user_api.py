@@ -556,6 +556,8 @@ class TestUserAPI(Test):
             assert res.status_code == 200, res.status_code
             assert data['info']['data_access'] == user_levels, data
 
+class TestUserTaskPreferenceAPI(Test):
+
     @with_context
     def test_user_get_preferences_valid_user(self):
         admin = UserFactory.create()
@@ -591,7 +593,7 @@ class TestUserAPI(Test):
         url = 'api/preferences/none'
 
         res = self.app.get(url + '?api_key=%s' % admin.api_key)
-        assert res.status_code == 400, res.status_code
+        assert res.status_code == 404, res.status_code
 
     @with_context
     def test_user_get_preferences_missing_user(self):
@@ -612,7 +614,7 @@ class TestUserAPI(Test):
         url = 'api/preferences/%s' % user.name
 
         res = self.app.get(url + '?api_key=%s' % admin.api_key)
-        assert res.status_code == 403, res.status_code
+        assert res.status_code == 500, res.status_code
 
     @with_context
     def test_user_get_preferences_anonymous_user(self):
@@ -622,7 +624,7 @@ class TestUserAPI(Test):
         url = 'api/preferences/%s' % restricted.name
 
         res = self.app.get(url)
-        assert res.status_code == 401, res.status_code
+        assert res.status_code == 404, res.status_code
 
     @with_context
     def test_user_set_preferences_anonymous_user(self):
@@ -632,7 +634,7 @@ class TestUserAPI(Test):
         url = 'api/preferences/%s' % restricted.name
 
         res = self.app.post(url)
-        assert res.status_code == 401, res.status_code
+        assert res.status_code == 404, res.status_code
 
     @with_context
     def test_user_set_preferences_missing_user(self):
@@ -676,7 +678,7 @@ class TestUserAPI(Test):
         url = 'api/preferences/none'
 
         res = self.app.post(url + '?api_key=%s' % admin.api_key)
-        assert res.status_code == 400, res.status_code
+        assert res.status_code == 404, res.status_code
 
     @with_context
     def test_user_set_preferences_update_user(self):
