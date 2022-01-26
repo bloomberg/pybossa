@@ -1213,6 +1213,16 @@ class TestProjectAPI(TestAPI):
         assert res.data == b'''{"task_count": 2}'''
 
     @with_context
+    def test_task_progress_no_project(self):
+        user = UserFactory.create(admin=True)
+
+        url = 'api/project/%d/taskprogress/9999'
+
+        res = self.app.get(url + '?api_key=%s' % user.api_key)
+
+        assert res.status_code == 404, res.status_code
+
+    @with_context
     def test_delete_project_cascade(self):
         """Test API delete project deletes associated tasks and taskruns"""
         project = ProjectFactory.create()
