@@ -364,7 +364,7 @@ def n_remaining_task_runs(project_id):
     sql = text('''SELECT SUM(task.n_answers - COALESCE(t.actual_answers, 0))
                   FROM task
                   LEFT JOIN (SELECT task_id, COUNT(id) AS actual_answers
-                             FROM task_run
+                             FROM task_run WHERE project_id=:project_id
                              GROUP BY task_id) AS t
                   ON task.id = t.task_id
                   WHERE task.project_id=:project_id
