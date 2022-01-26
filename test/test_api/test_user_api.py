@@ -669,6 +669,16 @@ class TestUserAPI(Test):
         assert res.mimetype == 'application/json', res
 
     @with_context
+    def test_user_set_preferences_invalid_user(self):
+        admin = UserFactory.create()
+        user = UserFactory.create()
+
+        url = 'api/preferences/none'
+
+        res = self.app.post(url + '?api_key=%s' % admin.api_key)
+        assert res.status_code == 400, res.status_code
+
+    @with_context
     def test_user_set_preferences_update_user(self):
         admin = UserFactory.create()
         user = UserFactory.create()

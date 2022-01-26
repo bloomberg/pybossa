@@ -421,22 +421,25 @@ def task_progress(project_id=None, short_name=None):
 
 
 @jsonpify
+@login_required
 @blueprint.route('/preferences/<user_name>', methods=['GET'])
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def get_user_preferences(user_name=None):
     """API endpoint for loading account user preferences.
     Returns a JSON object containing the user account preferences.
     """
-    if current_user.is_anonymous:
-        return abort(401)
     if not user_name:
         return abort(404)
 
-    try:
-        user_preferences = get_user_pref_metadata(user_name)
-    except Exception as e:
-        # Invalid user_name.
+    user = user_repo.get_by_name(user_name)
+    if not user:
         return abort(400)
+
+    (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
+    if not can_update:
+        abort(403)
+
+    user_preferences = get_user_pref_metadata(user_name)
 
     if not user_preferences and user_preferences != {}:
         return abort(403)
@@ -445,6 +448,7 @@ def get_user_preferences(user_name=None):
 
 
 @jsonpify
+@login_required
 @csrf.exempt
 @blueprint.route('/preferences/<user_name>', methods=['POST'])
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
@@ -452,8 +456,6 @@ def update_user_preferences(user_name=None):
     """API endpoint for updating account user preferences.
     Returns a JSON object containing the updated user account preferences.
     """
-    if current_user.is_anonymous:
-        return abort(401)
     if not user_name:
         return abort(404)
 
@@ -462,6 +464,8 @@ def update_user_preferences(user_name=None):
         return abort(400)
 
     user = user_repo.get_by_name(user_name)
+    if not user:
+        return abort(400)
 
     (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
     if not can_update:
