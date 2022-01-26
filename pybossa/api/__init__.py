@@ -442,9 +442,6 @@ def get_user_preferences(user_name):
 
     user_preferences = get_user_pref_metadata(user_name)
 
-    if not user_preferences and user_preferences != {}:
-        return abort(500)
-
     return Response(json.dumps(user_preferences), mimetype="application/json")
 
 

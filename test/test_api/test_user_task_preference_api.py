@@ -78,7 +78,10 @@ class TestUserTaskPreferenceAPI(Test):
         url = 'api/preferences/%s' % user.name
 
         res = self.app.get(url + '?api_key=%s' % admin.api_key)
-        assert res.status_code == 500, res.status_code
+        assert res.status_code == 200, res.status_code
+
+        data = json.loads(res.data)
+        assert data == None, "Expected None ('null')"
 
     @with_context
     def test_user_get_preferences_anonymous_user(self):
