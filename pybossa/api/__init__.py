@@ -476,7 +476,7 @@ def update_user_preferences(user_name=None):
         abort(403)
 
     payload = json.loads(request.form['request_json']) if 'request_json' in request.form else request.json
-    if not payload:
+    if not payload and payload != {}:
         return abort(400)
 
     user_preferences = None
