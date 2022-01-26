@@ -494,9 +494,6 @@ def update_user_preferences(user_name):
         # Return updated metadata and user preferences.
         user_preferences = user.info.get('metadata', {})
 
-    if not user_preferences and user_preferences != {}:
-        return abort(500)
-
     return Response(json.dumps(user_preferences), mimetype="application/json")
 
 
