@@ -385,10 +385,11 @@ def get_autoimport_jobs(queue='low'):
 @with_cache_disabled
 def get_project_stats(_id, short_name):  # pragma: no cover
     """Get stats for project."""
-    import pybossa.cache.project_stats as stats
+    with current_app.request_context():
+        import pybossa.cache.project_stats as stats
 
-    # cached_projects.get_project(short_name)
-    stats.update_stats(_id)
+        # cached_projects.get_project(short_name)
+        stats.update_stats(_id)
 
 
 @with_cache_disabled
@@ -425,7 +426,7 @@ def warm_cache():  # pragma: no cover
     app = create_app(run_as_server=False)
     projects_cached = []
 
-    with app.app_context():
+    with app.request_context():
         import pybossa.cache.projects as cached_projects
         import pybossa.cache.categories as cached_cat
         import pybossa.cache.project_stats as stats
