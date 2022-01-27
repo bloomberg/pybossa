@@ -56,6 +56,8 @@ from pybossa.exporter.json_export import JsonExporter
 
 auditlogger = AuditLogger(auditlog_repo, caller='web')
 
+DUMMY_ENVIRON = {'wsgi.url_scheme': "", 'SERVER_PORT': "", 'SERVER_NAME': "", 'REQUEST_METHOD': ""}
+
 
 def schedule_job(function, scheduler):
     """Schedule a job and return a log message."""
@@ -385,7 +387,7 @@ def get_autoimport_jobs(queue='low'):
 @with_cache_disabled
 def get_project_stats(_id, short_name):  # pragma: no cover
     """Get stats for project."""
-    with current_app.request_context():
+    with current_app.request_context(DUMMY_ENVIRON):
         import pybossa.cache.project_stats as stats
 
         # cached_projects.get_project(short_name)
@@ -426,7 +428,7 @@ def warm_cache():  # pragma: no cover
     app = create_app(run_as_server=False)
     projects_cached = []
 
-    with app.request_context():
+    with app.request_context(DUMMY_ENVIRON):
         import pybossa.cache.projects as cached_projects
         import pybossa.cache.categories as cached_cat
         import pybossa.cache.project_stats as stats
