@@ -56,6 +56,8 @@ from pybossa.exporter.json_export import JsonExporter
 
 auditlogger = AuditLogger(auditlog_repo, caller='web')
 
+DUMMY_ENVIRON = {'wsgi.url_scheme': "", 'SERVER_PORT': "", 'SERVER_NAME': "", 'REQUEST_METHOD': ""}
+
 
 def schedule_job(function, scheduler):
     """Schedule a job and return a log message."""
@@ -385,10 +387,11 @@ def get_autoimport_jobs(queue='low'):
 @with_cache_disabled
 def get_project_stats(_id, short_name):  # pragma: no cover
     """Get stats for project."""
-    import pybossa.cache.project_stats as stats
+    with current_app.request_context(DUMMY_ENVIRON):
+        import pybossa.cache.project_stats as stats
 
-    # cached_projects.get_project(short_name)
-    stats.update_stats(_id)
+        # cached_projects.get_project(short_name)
+        stats.update_stats(_id)
 
 
 @with_cache_disabled
@@ -424,66 +427,68 @@ def warm_cache():  # pragma: no cover
     from pybossa.core import create_app
     app = create_app(run_as_server=False)
     projects_cached = []
-    import pybossa.cache.projects as cached_projects
-    import pybossa.cache.categories as cached_cat
-    import pybossa.cache.project_stats as stats
-    from pybossa.util import rank
-    from pybossa.core import user_repo
 
-    def warm_project(_id, short_name, featured=False):
-        if _id not in projects_cached:
-            #cached_projects.get_project(short_name)
-            #cached_projects.n_tasks(_id)
-            #n_task_runs = cached_projects.n_task_runs(_id)
-            #cached_projects.overall_progress(_id)
-            #cached_projects.last_activity(_id)
-            #cached_projects.n_completed_tasks(_id)
-            #cached_projects.n_volunteers(_id)
-            #cached_projects.browse_tasks(_id)
-            #if n_task_runs >= 1000 or featured:
-            #    # print ("Getting stats for %s as it has %s task runs" %
-            #    #        (short_name, n_task_runs))
-            stats.update_stats(_id)
-            projects_cached.append(_id)
+    with app.request_context(DUMMY_ENVIRON):
+        import pybossa.cache.projects as cached_projects
+        import pybossa.cache.categories as cached_cat
+        import pybossa.cache.project_stats as stats
+        from pybossa.util import rank
+        from pybossa.core import user_repo
 
-    # Cache top projects
-    projects = cached_projects.get_top()
-    for p in projects:
-        current_app.logger.info('warm_project - top projects. id {} short_name{}'
-            .format(p['id'], p['short_name']))
-        warm_project(p['id'], p['short_name'])
+        def warm_project(_id, short_name, featured=False):
+            if _id not in projects_cached:
+                #cached_projects.get_project(short_name)
+                #cached_projects.n_tasks(_id)
+                #n_task_runs = cached_projects.n_task_runs(_id)
+                #cached_projects.overall_progress(_id)
+                #cached_projects.last_activity(_id)
+                #cached_projects.n_completed_tasks(_id)
+                #cached_projects.n_volunteers(_id)
+                #cached_projects.browse_tasks(_id)
+                #if n_task_runs >= 1000 or featured:
+                #    # print ("Getting stats for %s as it has %s task runs" %
+                #    #        (short_name, n_task_runs))
+                stats.update_stats(_id)
+                projects_cached.append(_id)
 
-    # Cache 3 pages
-    to_cache = 3 * app.config['APPS_PER_PAGE']
-    projects = rank(cached_projects.get_all_featured('featured'))[:to_cache]
-    for p in projects:
-        current_app.logger.info('warm_project - ranked project. id {} short_name{}'
-            .format(p['id'], p['short_name']))
-        warm_project(p['id'], p['short_name'], featured=True)
-
-    # Categories
-    categories = cached_cat.get_used()
-    for c in categories:
-        projects = rank(cached_projects.get_all(c['short_name']))[:to_cache]
+        # Cache top projects
+        projects = cached_projects.get_top()
         for p in projects:
-            current_app.logger.info('warm_project - categories->rank project. id {} short_name{}'
+            current_app.logger.info('warm_project - top projects. id {} short_name{}'
                 .format(p['id'], p['short_name']))
             warm_project(p['id'], p['short_name'])
-    # Users
-    current_app.logger.info('warm_project - get_leaderboard')
-    users = cached_users.get_leaderboard(app.config['LEADERBOARD'])
-    for user in users:
-        u = user_repo.get_by_name(user['name'])
-        current_app.logger.info('warm_project - user get_user_summary: name {}'.format(user['name']))
-        cached_users.get_user_summary(user['name'])
-        current_app.logger.info('warm_project - user projects_contributed_cached: id {}'.format(u.id))
-        cached_users.projects_contributed_cached(u.id)
-        current_app.logger.info('warm_project - user published_projects_cached: id {}'.format(u.id))
-        cached_users.published_projects_cached(u.id)
-        current_app.logger.info('warm_project - user draft_projects_cached: id {}'.format(u.id))
-        cached_users.draft_projects_cached(u.id)
 
-    return True
+        # Cache 3 pages
+        to_cache = 3 * app.config['APPS_PER_PAGE']
+        projects = rank(cached_projects.get_all_featured('featured'))[:to_cache]
+        for p in projects:
+            current_app.logger.info('warm_project - ranked project. id {} short_name{}'
+                .format(p['id'], p['short_name']))
+            warm_project(p['id'], p['short_name'], featured=True)
+
+        # Categories
+        categories = cached_cat.get_used()
+        for c in categories:
+            projects = rank(cached_projects.get_all(c['short_name']))[:to_cache]
+            for p in projects:
+                current_app.logger.info('warm_project - categories->rank project. id {} short_name{}'
+                    .format(p['id'], p['short_name']))
+                warm_project(p['id'], p['short_name'])
+        # Users
+        current_app.logger.info('warm_project - get_leaderboard')
+        users = cached_users.get_leaderboard(app.config['LEADERBOARD'])
+        for user in users:
+            u = user_repo.get_by_name(user['name'])
+            current_app.logger.info('warm_project - user get_user_summary: name {}'.format(user['name']))
+            cached_users.get_user_summary(user['name'])
+            current_app.logger.info('warm_project - user projects_contributed_cached: id {}'.format(u.id))
+            cached_users.projects_contributed_cached(u.id)
+            current_app.logger.info('warm_project - user published_projects_cached: id {}'.format(u.id))
+            cached_users.published_projects_cached(u.id)
+            current_app.logger.info('warm_project - user draft_projects_cached: id {}'.format(u.id))
+            cached_users.draft_projects_cached(u.id)
+
+        return True
 
 
 def get_non_updated_projects():
