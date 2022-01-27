@@ -467,6 +467,8 @@ def update_user_preferences(user_name):
         return abort(403)
 
     payload = json.loads(request.form['request_json']) if 'request_json' in request.form else request.json
+
+    # User must post a payload or empty json object {}.
     if not payload and payload != {}:
         return abort(400)
 
@@ -477,7 +479,7 @@ def update_user_preferences(user_name):
             user.info['metadata'] = {}
 
         # Update user preferences value.
-        user.info.get('metadata', {})['profile'] = json.dumps(payload)
+        user.info.get('metadata', {})['profile'] = json.dumps(payload) if payload else ''
 
         # Set dirty flag on user.info['metadata']['profile']
         flag_modified(user, 'info')

@@ -183,6 +183,8 @@ class TestUserTaskPreferenceAPI(Test):
         user = UserFactory.create()
 
         url = 'api/preferences/%s' % user.name
+
+        # Clear task preference value.
         payload = json.dumps({})
 
         res = self.app.post(url + '?api_key=%s' % admin.api_key, data=payload, content_type='application/json')
@@ -191,4 +193,4 @@ class TestUserTaskPreferenceAPI(Test):
         assert res.mimetype == 'application/json', res
 
         data = json.loads(res.data)
-        assert data['profile'] == payload, "Invalid json response returned.";
+        assert data['profile'] == '', "Invalid json response returned.";
