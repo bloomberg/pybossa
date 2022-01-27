@@ -46,7 +46,7 @@ class TestProjectStatsRepository(Test):
         """Test get method returns project stats if they exist"""
         ps = self.prepare_stats()
         retrieved_ps = self.projectstats_repo.get(ps.id)
-        assert ps == retrieved_ps, retrieved_ps
+        assert ps.dictize() == retrieved_ps.dictize(), retrieved_ps
 
     @with_request_context
     def test_filter_by_no_matches(self):
@@ -76,4 +76,4 @@ class TestProjectStatsRepository(Test):
         retrieved_ps = self.projectstats_repo.filter_by(project_id=ps1.project_id,
                                                         n_tasks=3)
         assert len(retrieved_ps) == 1, retrieved_ps
-        assert ps1 in retrieved_ps, retrieved_ps
+        assert ps1.dictize() == retrieved_ps[0].dictize(), retrieved_ps

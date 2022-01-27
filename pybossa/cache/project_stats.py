@@ -602,7 +602,7 @@ def get_stats(project_id, period='2 week', full=False):
     if not ps:
         update_stats(project_id, period)
         ps = session.query(ProjectStats).filter_by(project_id=project_id).first()
-
+    # remove object from current session to prevent update
     session.expunge(ps)
     # stuff we want real-time
     ps.overall_progress = cached_projects.overall_progress(project_id)
