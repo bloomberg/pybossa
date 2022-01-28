@@ -93,7 +93,7 @@ from pybossa.exporter.csv_reports_export import ProjectReportCsvExporter
 from datetime import datetime
 from pybossa.data_access import (data_access_levels, subadmins_are_privileged,
     ensure_annotation_config_from_form, ensure_amp_config_applied_to_project)
-import app_settings
+import pybossa.app_settings as app_settings
 from copy import deepcopy
 from pybossa.cache import delete_memoized
 from sqlalchemy.orm.attributes import flag_modified
@@ -1738,7 +1738,7 @@ def bulk_priority_update(short_name):
 @login_required
 @admin_or_subadmin_required
 def bulk_update_assign_worker(short_name):
-   
+
     response = {}
     project, owner, ps = project_by_shortname(short_name)
     data = json.loads(request.data)
@@ -1773,7 +1773,7 @@ def bulk_update_assign_worker(short_name):
             if not user:
                 fullname = user_email + ' (user not found)'
             else:
-                fullname = user.fullname 
+                fullname = user.fullname
             assign_users.append({'fullname': fullname, 'email': user_email})
         response['assign_users'] = assign_users
 
@@ -1814,14 +1814,14 @@ def bulk_update_assign_worker(short_name):
             if task_id is not None:
                 t = task_repo.get_task_by(project_id=project.id,
                                         id=int(task_id))
-                # add new users 
+                # add new users
                 user_pref = t.user_pref or {}
                 assign_user = user_pref.get("assign_user", [])
                 assign_user.extend(assign_worker_emails)
                 # remove all duplicates
                 assign_user = list(set(assign_user))
 
-                # remove users 
+                # remove users
                 for remove_user_email in remove_worker_emails:
                     if remove_user_email in assign_user:
                         assign_user.remove(remove_user_email)

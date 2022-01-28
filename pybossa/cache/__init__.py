@@ -37,7 +37,7 @@ except ImportError:  # pragma: no cover
     import pickle
 
 try:
-    from app_settings import config as settings
+    from pybossa.app_settings import config as settings
     REDIS_KEYPREFIX = settings['REDIS_KEYPREFIX']
 except ImportError:  # pragma: no cover
     import pybossa.default_settings as settings

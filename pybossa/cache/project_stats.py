@@ -28,7 +28,7 @@ import operator
 import time
 import datetime
 import os
-import app_settings
+import pybossa.app_settings as app_settings
 
 
 session = db.slave_session

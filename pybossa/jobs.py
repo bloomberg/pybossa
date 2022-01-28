@@ -32,7 +32,7 @@ from pbsonesignal import PybossaOneSignal
 from rq.timeouts import JobTimeoutException
 from sqlalchemy.sql import text
 
-import app_settings
+import pybossa.app_settings as app_settings
 import pybossa.cache.users as cached_users
 import pybossa.dashboard.jobs as dashboard
 from pybossa.auditlogger import AuditLogger

@@ -21,7 +21,7 @@ import json
 from flask import Blueprint, Response, current_app
 
 from pybossa.core import sentinel, db, talisman
-from pybossa.hdfs.client import HDFSKerberos
+from pybossa.pybhdfs.client import HDFSKerberos
 
 
 

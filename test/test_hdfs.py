@@ -3,13 +3,13 @@ from unittest.mock import patch, MagicMock
 
 from nose.tools import assert_raises
 
-from pybossa.hdfs.client import HDFSKerberos
+from pybossa.pybhdfs.client import HDFSKerberos
 from test import with_context
 
 
 class TestHdfsAuth(object):
 
-    @patch('pybossa.hdfs.client.check_call')
+    @patch('pybossa.pybhdfs.client.check_call')
     def test_init_not_needed(self, subprocess):
         client = HDFSKerberos('testurl', 'testuser')
         client.get_ticket()
@@ -17,7 +17,7 @@ class TestHdfsAuth(object):
         assert subprocess.call_count == 1
 
     @with_context
-    @patch('pybossa.hdfs.client.check_call')
+    @patch('pybossa.pybhdfs.client.check_call')
     def test_init_needed(self, subprocess):
         client = HDFSKerberos('testurl', 'testuser')
         subprocess.side_effect = [CalledProcessError('', ''), 0]
@@ -25,14 +25,14 @@ class TestHdfsAuth(object):
         assert subprocess.call_count == 2
 
     @with_context
-    @patch('pybossa.hdfs.client.check_call')
+    @patch('pybossa.pybhdfs.client.check_call')
     def test_kinit_error(self, subprocess):
         client = HDFSKerberos('testurl', 'testuser')
         subprocess.side_effect = [CalledProcessError('', ''), CalledProcessError('', '')]
         assert_raises(CalledProcessError, client.get_ticket)
 
     @with_context
-    @patch('pybossa.hdfs.client.check_call')
+    @patch('pybossa.pybhdfs.client.check_call')
     def test_get(self, subprocess):
         reader = MagicMock()
         reader.read.return_value = 'abc'
@@ -44,7 +44,7 @@ class TestHdfsAuth(object):
             assert client.get('test') == 'abc'
 
     @with_context
-    @patch('pybossa.hdfs.client.check_call')
+    @patch('pybossa.pybhdfs.client.check_call')
     def test_put(self, subprocess):
         client = HDFSKerberos('testurl', 'testuser')
         writer = MagicMock()

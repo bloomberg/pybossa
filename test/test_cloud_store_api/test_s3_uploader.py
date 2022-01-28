@@ -45,7 +45,7 @@ class TestS3Uploader(Test):
             check_type(fp.name)
 
     def test_check_invalid_type(self):
-        assert_raises(BadRequest, check_type, 'run.py')
+        assert_raises(BadRequest, check_type, 'pybossa/run.py')
 
     def test_valid_directory(self):
         validate_directory('test_directory')
