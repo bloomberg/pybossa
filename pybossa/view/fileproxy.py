@@ -31,7 +31,7 @@ from boto.exception import S3ResponseError
 from pybossa.contributions_guard import ContributionsGuard
 from pybossa.core import task_repo, signer
 from pybossa.encryption import AESWithGCM
-from pybossa.hdfs.client import HDFSKerberos
+from pybossa.pybhdfs.client import HDFSKerberos
 from pybossa.sched import has_lock
 from pybossa.cloud_store_api.s3 import get_content_and_key_from_s3
 

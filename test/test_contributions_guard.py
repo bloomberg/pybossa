@@ -20,7 +20,7 @@ from pybossa.sentinel import Sentinel
 from pybossa.contributions_guard import ContributionsGuard
 from pybossa.model.task import Task
 from unittest.mock import patch
-import settings_test
+import pybossa.settings_test as settings_test
 
 
 class FakeApp(object):

@@ -9,7 +9,7 @@ from pybossa.core import db
 from pybossa.util import (convert_est_to_utc,
     get_user_pref_db_clause, get_user_filter_db_clause)
 from flask import current_app
-import app_settings
+import pybossa.app_settings as app_settings
 from functools import reduce
 
 comparator_func = {

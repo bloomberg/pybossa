@@ -36,7 +36,7 @@ from pybossa.util import datetime_filter, grant_access_with_api_key
 from pybossa.news import FEED_KEY as NEWS_FEED_KEY
 from pybossa.news import get_news
 from pybossa.messages import *
-import app_settings
+import pybossa.app_settings as app_settings
 import json
 from pybossa.wizard import Wizard
 
