@@ -77,18 +77,23 @@ class TestProjectsStatsCache(Test):
     @with_context
     def test_stats_dates(self):
         """Test CACHE PROJECT STATS date works."""
-        pr = ProjectFactory.create()
-        task = TaskFactory.create(project=pr, n_answers=1)
+        pr = ProjectFactory.create()  # project_id = 1
+        task = TaskFactory.create(project=pr, n_answers=1)  # task.id = 1, task.project_id = 1
         today = datetime.now(pytz.utc)
-        TaskFactory.create()
-        TaskRunFactory.create(project=pr, task=task)
-        AnonymousTaskRunFactory.create(project=pr)
+        task2 = TaskFactory.create(project=pr)  # task2.id = 2, task2.project_id = 1
+        task3 = TaskFactory.create(project=pr, n_answers=2)  # task3.id = 3, task.project_id = 1
+
+        task_run1 = TaskRunFactory.create(project=pr, task=task)
+        task_run2 = AnonymousTaskRunFactory.create(project=pr, task=task2)
+        task_run3 = AnonymousTaskRunFactory.create(project=pr, task=task3)
         dates, dates_anon, dates_auth = stats_dates(pr.id)
         assert len(dates) == 15, len(dates)
         assert len(dates_anon) == 15, len(dates_anon)
         assert len(dates_auth) == 15, len(dates_auth)
-        assert dates[today.strftime('%Y-%m-%d')] == 1
-        assert dates_anon[today.strftime('%Y-%m-%d')] == 1
+
+        # This is debatable whether it has to be 2 or 3. The original logic returns 3
+        assert dates[today.strftime('%Y-%m-%d')] == 3
+        assert dates_anon[today.strftime('%Y-%m-%d')] == 2
         assert dates_auth[today.strftime('%Y-%m-%d')] == 1
 
     @with_context
