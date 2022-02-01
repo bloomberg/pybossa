@@ -175,33 +175,20 @@ def stats_dates(project_id, period='15 day'):
 
     params = dict(project_id=project_id, period=period)
 
-    # Get all completed tasks
+    # Get all tasks with at least 1 task run and its last finish time
     sql = text('''
-               WITH myquery AS (
-               SELECT task.id, coalesce(ct, 0) as n_task_runs, task.n_answers
-               FROM task LEFT OUTER JOIN
-               (SELECT task_id, COUNT(id) AS ct FROM task_run
+               SELECT task_id as id, MAX(task_run.finish_time) AS day
+               FROM task_run
                WHERE project_id=:project_id AND
                TO_DATE(task_run.finish_time, 'YYYY-MM-DD\THH24:MI:SS.US')
                >= NOW() - :period :: INTERVAL
-               GROUP BY task_id) AS log_counts
-               ON task.id=log_counts.task_id
-               WHERE task.project_id=:project_id ORDER BY id ASC)
-               select myquery.id, max(task_run.finish_time) as day
-               from task_run, myquery where task_run.task_id=myquery.id
-               and
-               TO_DATE(task_run.finish_time, 'YYYY-MM-DD\THH24:MI:SS.US')
-               >= NOW() - :period :: INTERVAL
-               group by myquery.id order by day;
+               GROUP BY task_id;
                ''').execution_options(stream=True)
 
     results = session.execute(sql, params)
     for row in results:
         day = row.day[:10]
-        if day in dates.keys():
-            dates[day] += 1
-        else:
-            dates[day] = 1
+        dates[day] = dates.get(day, 0) + 1
 
     # No completed tasks in the last period
     def _fill_empty_days(days, obj):
