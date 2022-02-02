@@ -85,7 +85,7 @@ class TestProjectsStatsCache(Test):
 
         task_run1 = TaskRunFactory.create(project=pr, task=task)
         task_run2 = AnonymousTaskRunFactory.create(project=pr, task=task2)
-        task_run3 = AnonymousTaskRunFactory.create(project=pr, task=task3)
+        task_run3 = AnonymousTaskRunFactory.create(project=pr, task=task3)  # task3 is "ongoing" as n_answers = 2
         dates, dates_anon, dates_auth = stats_dates(pr.id)
         assert len(dates) == 15, len(dates)
         assert len(dates_anon) == 15, len(dates_anon)
