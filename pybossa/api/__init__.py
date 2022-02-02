@@ -437,7 +437,7 @@ def get_user_preferences(user_name):
     except Exception:
         return abort(404)
 
-    if not can_update:
+    if not can_update or hidden_fields:
         return abort(403)
 
     user_preferences = get_user_pref_metadata(user_name)
@@ -463,7 +463,7 @@ def update_user_preferences(user_name):
     except Exception:
         return abort(404)
 
-    if not can_update:
+    if not can_update or disabled_fields:
         return abort(403)
 
     payload = json.loads(request.form['request_json']) if 'request_json' in request.form else request.json

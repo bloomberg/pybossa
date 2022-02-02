@@ -108,6 +108,19 @@ class TestUserTaskPreferenceAPI(Test):
         assert res.mimetype == 'application/json', res
 
     @with_context
+    def test_user_get_preferences_cannot_update_self_non_admin(self):
+        admin = UserFactory.create()
+        user = UserFactory.create()
+
+        # Attempt to get another user without permission.
+        url = 'api/preferences/%s' % user.name
+
+        res = self.app.get(url + '?api_key=%s' % user.api_key)
+
+        assert res.status_code == 403, res.status_code
+        assert res.mimetype == 'application/json', res
+
+    @with_context
     def test_user_set_preferences_anonymous_user(self):
         admin = UserFactory.create()
         restricted = UserFactory.create(restrict=True)
@@ -145,6 +158,19 @@ class TestUserTaskPreferenceAPI(Test):
 
         # Attempt to update another user without permission.
         url = 'api/preferences/%s' % user2.name
+
+        res = self.app.post(url + '?api_key=%s' % user.api_key, data=json.dumps({"test": 1}), content_type='application/json')
+
+        assert res.status_code == 403, res.status_code
+        assert res.mimetype == 'application/json', res
+
+    @with_context
+    def test_user_set_preferences_cannot_update_self_non_admin(self):
+        admin = UserFactory.create()
+        user = UserFactory.create()
+
+        # Attempt to update another user without permission.
+        url = 'api/preferences/%s' % user.name
 
         res = self.app.post(url + '?api_key=%s' % user.api_key, data=json.dumps({"test": 1}), content_type='application/json')
 
