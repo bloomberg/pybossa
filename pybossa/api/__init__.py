@@ -44,7 +44,7 @@ from pybossa.core import csrf, ratelimits, sentinel, anonymizer
 from pybossa.ratelimit import ratelimit
 from pybossa.cache.projects import n_tasks, n_completed_tasks
 import pybossa.sched as sched
-from pybossa.util import sign_task
+from pybossa.util import sign_task, can_update_user_info
 from pybossa.error import ErrorStatus
 from .global_stats import GlobalStatsAPI
 from .task import TaskAPI
@@ -82,8 +82,11 @@ from pybossa.auth.task import TaskAuth
 from pybossa.service_validators import ServiceValidators
 import requests
 from sqlalchemy.sql import text
+from sqlalchemy.orm.attributes import flag_modified
 from pybossa.core import db
+from pybossa.cache import users as cached_users
 from pybossa.cache.task_browse_helpers import get_searchable_columns
+from pybossa.cache.users import get_user_pref_metadata
 from pybossa.view.projects import get_locked_tasks
 from pybossa.redis_lock import EXPIRE_LOCK_DELAY
 
@@ -415,6 +418,82 @@ def task_progress(project_id=None, short_name=None):
     num_tasks = results.first()[0]
     task_count_dict = dict(task_count=num_tasks)
     return Response(json.dumps(task_count_dict), mimetype="application/json")
+
+
+@jsonpify
+@login_required
+@blueprint.route('/preferences/<user_name>', methods=['GET'])
+@ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+def get_user_preferences(user_name):
+    """API endpoint for loading account user preferences.
+    Returns a JSON object containing the user account preferences.
+    """
+    user = user_repo.get_by_name(user_name)
+    if not user:
+        return abort(404)
+
+    try:
+        (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
+    except Exception:
+        return abort(404)
+
+    if not can_update or hidden_fields:
+        return abort(403)
+
+    user_preferences = get_user_pref_metadata(user_name)
+
+    return Response(json.dumps(user_preferences), mimetype="application/json")
+
+
+@jsonpify
+@login_required
+@csrf.exempt
+@blueprint.route('/preferences/<user_name>', methods=['POST'])
+@ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+def update_user_preferences(user_name):
+    """API endpoint for updating account user preferences.
+    Returns a JSON object containing the updated user account preferences.
+    """
+    user = user_repo.get_by_name(user_name)
+    if not user:
+        return abort(404)
+
+    try:
+        (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
+    except Exception:
+        return abort(404)
+
+    if not can_update or disabled_fields:
+        return abort(403)
+
+    payload = json.loads(request.form['request_json']) if 'request_json' in request.form else request.json
+
+    # User must post a payload or empty json object {}.
+    if not payload and payload != {}:
+        return abort(400)
+
+    user_preferences = None
+    if user:
+        # Add a metadata section if not found.
+        if 'metadata' not in user.info:
+            user.info['metadata'] = {}
+
+        # Update user preferences value.
+        user.info.get('metadata', {})['profile'] = json.dumps(payload) if payload else ''
+
+        # Set dirty flag on user.info['metadata']['profile']
+        flag_modified(user, 'info')
+
+        # Save user preferences.
+        user_repo.update(user)
+
+        # Clear user in cache.
+        cached_users.delete_user_pref_metadata(user)
+
+        # Return updated metadata and user preferences.
+        user_preferences = user.info.get('metadata', {})
+
+    return Response(json.dumps(user_preferences), mimetype="application/json")
 
 
 @jsonpify
