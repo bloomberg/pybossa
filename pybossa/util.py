@@ -805,22 +805,6 @@ def generate_manage_user_email(user, operation):
     return msg
 
 
-class AttrDict(OrderedDict):
-    def __getattr__(self, name):
-        if not name.startswith('_'):
-            return self[name]
-        return super(AttrDict, self).__getattr__(name)
-
-    def __setattr__(self, name, value):
-        if not name.startswith('_'):
-            self[name] = value
-        else:
-            super(AttrDict, self).__setattr__(name, value)
-
-    def dictize(self):
-        return self
-
-
 def check_password_strength(
         password, min_len=8, max_len=15,
         uppercase=True, lowercase=True,
