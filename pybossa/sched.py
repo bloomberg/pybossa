@@ -769,6 +769,8 @@ def get_locked_tasks_project(project_id):
         results = get_task_ids_project_id(user_task_ids)
         # For each locked task, check if the lock is still active.
         for task_id, task_project_id in zip(user_task_ids, results):
+            if not task_project_id:
+                task_project_id = task_repo.get_task(task_id).project_id
             # Match the requested project id.
             if int(task_project_id) == project_id:
                 # Calculate seconds remaining.
