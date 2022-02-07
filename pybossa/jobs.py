@@ -222,7 +222,7 @@ def get_project_jobs(queue):
     if queue == 'super':
         projects = cached_projects.get_from_pro_user()
     elif queue == 'high':
-        projects = (p.dictize() for p in project_repo.get_all())
+        projects = (p.dictize() for p in cached_projects.get_recently_updated_projects())
     else:
         projects = []
     for project in projects:
