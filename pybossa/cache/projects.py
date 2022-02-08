@@ -22,7 +22,7 @@ from pybossa.core import db, sentinel, timeouts
 from pybossa.model.project import Project
 from pybossa.util import pretty_date, static_vars, convert_utc_to_est
 from pybossa.cache import memoize, cache, delete_memoized, delete_cached, \
-    memoize_essentials, delete_memoized_essential, delete_cache_group
+    memoize_essentials, delete_memoized_essential, delete_cache_group, ONE_DAY
 from pybossa.cache.task_browse_helpers import get_task_filters, allowed_fields, user_meet_task_requirement, get_task_preference_score
 import pybossa.app_settings as app_settings
 from pybossa.redis_lock import get_locked_tasks_project
@@ -630,13 +630,15 @@ def get_from_pro_user():
         projects.append(project)
     return projects
 
+@memoize(timeout=ONE_DAY)
 def get_recently_updated_projects():
     """Return the list of published projects that has task creations in last 3 months."""
 
-    sql = text('''SELECT t.project_id, p.short_name FROM task t, project p
+    sql = text('''SELECT t.project_id, p.short_name
+               FROM task t INNER JOIN project p
+               ON t.project_id = p.id
                GROUP BY t.project_id, p.short_name, p.id
-               HAVING t.project_id = p.id
-               AND p.published = true
+               HAVING p.published = true
                AND TO_DATE(max(t.created), 'YYYY-MM-DD"T"HH24:MI:SS.US') >= NOW() - '3 months' :: INTERVAL;''')
     results = db.slave_session.execute(sql)
     projects = []
