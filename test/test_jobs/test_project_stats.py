@@ -75,7 +75,12 @@ class TestProjectsStats(Test):
     def test_get_project_jobs_for_non_pro_users(self):
         """Test JOB get project jobs works for non pro users."""
         owner = UserFactory.create(pro=False)
-        ProjectFactory.create(owner=owner)
+        oldproject = ProjectFactory.create(owner=owner)
+        created = "2019-10-11T10:00:00"
+        TaskFactory.create(project=oldproject, created=created)
+
+        project = ProjectFactory.create(owner=owner)
+        TaskFactory.create(project=project)
         jobs_generator = get_project_jobs('high')
         jobs = []
         for job in jobs_generator:
