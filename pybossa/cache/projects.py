@@ -101,6 +101,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     filters, filter_params = get_task_filters(args)
     filters += args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
     filters = filters.replace("task.", "mytable.").replace("coalesce(ct, 0)", "n_task_runs")
+    sql_order = args.get('order_by', 'id ASC').replace("task.", "mytable.").replace("coalesce(ct, 0)", "n_task_runs")
 
     sql = """
             SELECT id, n_task_runs, n_answers, ft, priority_0, created, calibration, user_pref, worker_filter, worker_pref
@@ -120,7 +121,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                 AND NOT task.id IN (SELECT task_id FROM task_run WHERE project_id=:project_id GROUP BY task_id)
             )) AS mytable
             WHERE 1=1 """ + filters + \
-            " ORDER BY %s" % (args.get('order_by', 'id ASC').replace("task.", "mytable."))
+            " ORDER BY %s" % sql_order
 
     params = dict(project_id=project_id, **filter_params)
     limit = args.get('records_per_page') or 10
