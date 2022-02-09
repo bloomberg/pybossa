@@ -635,8 +635,8 @@ def get_recently_updated_projects():
     """Return the list of published projects that has task creations in last 3 months."""
 
     sql = text('''SELECT p.id, p.short_name
-               FROM task t INNER JOIN project p
-               ON t.project_id = p.id
+               FROM project p INNER JOIN task t
+               ON p.id = t.project_id
                GROUP BY p.id, p.short_name
                HAVING p.published = true
                AND TO_DATE(max(t.created), 'YYYY-MM-DD"T"HH24:MI:SS.US') >= NOW() - '3 months' :: INTERVAL;''')
