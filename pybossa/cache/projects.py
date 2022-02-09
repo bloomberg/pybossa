@@ -634,16 +634,16 @@ def get_from_pro_user():
 def get_recently_updated_projects():
     """Return the list of published projects that has task creations in last 3 months."""
 
-    sql = text('''SELECT t.project_id, p.short_name
+    sql = text('''SELECT p.id, p.short_name
                FROM task t INNER JOIN project p
                ON t.project_id = p.id
-               GROUP BY t.project_id, p.short_name, p.id
+               GROUP BY p.id, p.short_name
                HAVING p.published = true
                AND TO_DATE(max(t.created), 'YYYY-MM-DD"T"HH24:MI:SS.US') >= NOW() - '3 months' :: INTERVAL;''')
     results = db.slave_session.execute(sql)
     projects = []
     for row in results:
-        project = dict(id=row.project_id, short_name=row.short_name)
+        project = dict(id=row.id, short_name=row.short_name)
         projects.append(project)
     return projects
 
