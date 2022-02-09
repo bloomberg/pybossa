@@ -100,19 +100,27 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     args['user_id'] = user_id
     filters, filter_params = get_task_filters(args)
     filters += args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
+    filters = filters.replace("task.", "mytable.").replace("coalesce(ct, 0)", "n_task_runs")
 
     sql = """
-            SELECT task.id,
-            coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
-            priority_0, task.created, task.calibration,
-            task.user_pref, task.worker_filter, task.worker_pref
-            FROM task LEFT OUTER JOIN
-            (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
-            MAX(finish_time) as ft FROM task_run
-            WHERE project_id=:project_id GROUP BY task_id) AS log_counts
-            ON task.id=log_counts.task_id
-            WHERE task.project_id=:project_id""" + filters + \
-            " ORDER BY %s" % (args.get('order_by') or 'id ASC')
+            SELECT id, n_task_runs, n_answers, ft, priority_0, created, calibration, user_pref, worker_filter, worker_pref
+            FROM ((
+                SELECT task.id, info, ct as n_task_runs, task.n_answers, ft, priority_0, task.created, task.state,
+                task.calibration, task.user_pref, task.worker_filter, task.worker_pref
+                FROM task JOIN (
+                    SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct, MAX(finish_time) as ft
+                    FROM task_run
+                    WHERE project_id=:project_id GROUP BY task_id) AS log_counts
+                ON task.id=log_counts.task_id
+            ) UNION (
+                SELECT task.id, info, 0 as n_task_runs, task.n_answers, NULL as ft, priority_0, task.created, task.state,
+                task.calibration, task.user_pref, task.worker_filter, task.worker_pref
+                FROM task
+                WHERE project_id=:project_id
+                AND NOT task.id IN (SELECT task_id FROM task_run WHERE project_id=:project_id GROUP BY task_id)
+            )) AS mytable
+            WHERE 1=1 """ + filters + \
+            " ORDER BY %s" % (args.get('order_by', 'id ASC').replace("task.", "mytable."))
 
     params = dict(project_id=project_id, **filter_params)
     limit = args.get('records_per_page') or 10
