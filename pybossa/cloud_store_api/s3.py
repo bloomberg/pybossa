@@ -195,6 +195,10 @@ def get_content_and_key_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN,
             secret = app.config.get('FILE_ENCRYPTION_KEY')
         cipher = AESWithGCM(secret)
         content = cipher.decrypt(content)
+    try:
+        content = content.decode()
+    except (UnicodeDecodeError, AttributeError):
+        pass
     return content, key
 
 
