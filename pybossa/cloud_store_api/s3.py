@@ -195,8 +195,16 @@ def get_content_and_key_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN,
             secret = app.config.get('FILE_ENCRYPTION_KEY')
         cipher = AESWithGCM(secret)
         content = cipher.decrypt(content)
-    if type(content) == bytes:
-        content = content.decode()
+    app.logger.info(f"get_content_and_key_from_s3. bucket {s3_bucket}, path {path}, content type {type(content)}")
+    try:
+        if type(content) == bytes:
+            content = content.decode()
+            app.logger.info("get_content_and_key_from_s3. contents decoded")
+        else:
+            app.logger.info("get_content_and_key_from_s3. contents not decoded")
+    except (UnicodeDecodeError, AttributeError) as e:
+        app.logger.info(f"get_content_and_key_from_s3. exception {str(e)}")
+        pass
     return content, key
 
 
