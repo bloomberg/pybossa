@@ -85,4 +85,8 @@ class AESWithGCM(object):
         iv, ciphertext, tag = self._split_ciphertext(decoded)
         decryptor = self.get_cipher(iv, tag).decryptor()
         decrypted = decryptor.update(ciphertext) + decryptor.finalize()
-        return decrypted.decode()
+        try:
+            decrypted = decrypted.decode()
+        except (UnicodeDecodeError, AttributeError) as e:
+            pass
+        return decrypted
