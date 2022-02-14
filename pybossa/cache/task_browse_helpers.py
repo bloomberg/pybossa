@@ -77,7 +77,7 @@ def get_task_filters(args):
         filters += " AND task.calibration = :calibration"
 
     if args.get('order_by'):
-        args["order_by"] = args['order_by'].replace('lock_status', 'id')
+        args["order_by"] = args['order_by'].replace('lock_status', '(coalesce(ct, 0)/task.n_answers)')
     if args.get('filter_by_field'):
         filter_query, filter_params = _get_task_info_filters(
             args['filter_by_field'])
