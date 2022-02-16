@@ -241,8 +241,16 @@ def _pct_status(n_task_runs, n_answers):
 @memoize(timeout=timeouts.get('APP_TIMEOUT'))
 def first_task_id(project_id):
     """Return the oldest task id of a project"""
-    sql = text('''SELECT MIN(task.id) AS first_task_id FROM task
-                WHERE task.project_id=:project_id;
+
+    # limit 20 is on purpose so that it uses top-N heapsort.
+    # Compared to limit 1 or select min(id) from task where project_id=:xxx
+    # the following SQL is way faster (10ms vs 8000ms)
+    # This kind of trick/optimization should be done by SQL planner/optimizer,
+    # not programmers. We might need to consider upgrading postgresql engine
+    sql = text('''
+        SELECT MIN(id) AS first_task_id FROM 
+        (SELECT id FROM task WHERE project_id=:project_id ORDER BY id limit 20) 
+        AS ids;
                 ''')
 
     return session.scalar(sql, dict(project_id=project_id)) or 0
