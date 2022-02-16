@@ -102,6 +102,10 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     filters, filter_params = get_task_filters(args)
     filters += args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
 
+    # avoid sql planer doing indexscan when searching through table,
+    # the settings is LOCAL and only applies to current transaction,
+    # This optimization is aiming to resolve Task Browse Page slowness for those take >2s to complete.
+    # TODO: investigate cache to further improve performance of Task List page
     sql = """
             SELECT task.id,
             coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
@@ -122,10 +126,13 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     if filter_user_prefs:
         # construct task list for worker view
         params["assign_user"] = args["sql_params"]["assign_user"]
-        results = session.execute(text(sql), params)
         task_rank_info = []
-
         user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
+
+        session.execute("SET LOCAL enable_indexscan = OFF;")
+        results = session.execute(text(sql), params)
+        session.execute("RESET enable_indexscan")
+
         for row in results:
             score = 0
             w_pref = row.worker_pref or {}
@@ -151,12 +158,14 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     else:
         # construct task browse page for owners/admins
         if not "lock_status" in order_by:
-            sql += " LIMIT :limit OFFSET :offset"
+            sql += " LIMIT :limit OFFSET :offset;"
             params["limit"] = limit
             params["offset"] = offset
 
-        results = session.execute(text(sql), params)
         task_rank_info = []
+        session.execute("SET LOCAL enable_indexscan = OFF;")
+        results = session.execute(text(sql), params)
+        session.execute("RESET enable_indexscan")
 
         for row in results:
             task = format_task(row, locked_tasks_in_project.get(row.id, []))
