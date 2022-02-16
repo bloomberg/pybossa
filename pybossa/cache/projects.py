@@ -131,6 +131,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         with session.begin_nested():
             session.execute("SET LOCAL enable_indexscan = OFF;")
             results = session.execute(text(sql), params)
+            session.close()
 
         for row in results:
             score = 0
@@ -166,6 +167,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         with session.begin_nested():
             session.execute("SET LOCAL enable_indexscan = OFF;")
             results = session.execute(text(sql), params)
+            session.close()
 
         for row in results:
             task = format_task(row, locked_tasks_in_project.get(row.id, []))
