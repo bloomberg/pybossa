@@ -238,7 +238,7 @@ def _pct_status(n_task_runs, n_answers):
     return float(0)
 
 
-@memoize(timeout=timeouts.get('APP_TIMEOUT'))
+@memoize(timeout=timeouts.get('APP_TIMEOUT')*4)
 def first_task_id(project_id):
     """Return the oldest task id of a project"""
 
