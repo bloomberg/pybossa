@@ -22,7 +22,8 @@ from pybossa.core import db, sentinel, timeouts
 from pybossa.model.project import Project
 from pybossa.util import pretty_date, static_vars, convert_utc_to_est
 from pybossa.cache import memoize, cache, delete_memoized, delete_cached, \
-    memoize_essentials, delete_memoized_essential, delete_cache_group, ONE_DAY
+    memoize_essentials, delete_memoized_essential, delete_cache_group, ONE_DAY, \
+    ONE_HOUR
 from pybossa.cache.task_browse_helpers import get_task_filters, allowed_fields, user_meet_task_requirement, get_task_preference_score
 import pybossa.app_settings as app_settings
 from pybossa.redis_lock import get_locked_tasks_project
@@ -238,11 +239,19 @@ def _pct_status(n_task_runs, n_answers):
     return float(0)
 
 
-@memoize(timeout=timeouts.get('APP_TIMEOUT'))
+@memoize(timeout=ONE_HOUR)
 def first_task_id(project_id):
     """Return the oldest task id of a project"""
-    sql = text('''SELECT MIN(task.id) AS first_task_id FROM task
-                WHERE task.project_id=:project_id;
+
+    # limit 20 is on purpose so that it uses top-N heapsort.
+    # Compared to limit 1 or select min(id) from task where project_id=:xxx
+    # the following SQL is way faster (10ms vs 8000ms)
+    # This kind of trick/optimization should be done by SQL planner/optimizer,
+    # not programmers. We might need to consider upgrading postgresql engine
+    sql = text('''
+        SELECT MIN(id) AS first_task_id FROM 
+        (SELECT id FROM task WHERE project_id=:project_id ORDER BY id limit 20) 
+        AS ids;
                 ''')
 
     return session.scalar(sql, dict(project_id=project_id)) or 0
