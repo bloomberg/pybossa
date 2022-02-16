@@ -372,3 +372,21 @@ class TestUserRepository(Test):
         assert len(set(fake_ips)) == 3
         user = self.user_repo.get_by(id=user_id)
         assert user is None
+
+    @with_context
+    def test_get_enbled_users_by_email(self):
+        """Get list of user emails who are enabled."""
+        tyrion = UserFactory.create(email_addr='tyrion@got.com', enabled=True)
+        theon = UserFactory.create(email_addr='reek@got.com', enabled=False)
+        robb = UserFactory.create(email_addr='robb@got.com', enabled=True)
+        ned = UserFactory.create(email_addr='ned@got.com', enabled=True)
+
+        # exclude ned stark from list of emails to filter though its enabled user
+        emails = [tyrion.email_addr, theon.email_addr, robb.email_addr]
+        enabled_users = self.user_repo.get_enbled_users_by_email(emails)
+        enabled_emails = [user.email_addr for user in enabled_users]
+
+        # confirm disabled user(theon) and excluded enabled user(ned) not in list
+        assert theon.email_addr not in enabled_emails and ned.email_addr not in enabled_emails
+        # confirm enabled users part of filter(tyrion, robb) are present
+        assert tyrion.email_addr in enabled_emails and robb.email_addr in enabled_emails

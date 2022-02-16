@@ -695,6 +695,33 @@ class TestPybossaUtil(Test):
         msg = dict(type='foobar', data=data)
         master.publish.assert_called_with(channel, json.dumps(msg))
 
+    @with_context
+    def test_mail_with_enabled_users_returns_false(self):
+        message = {}
+        response = util.mail_with_enabled_users(message)
+        assert not response, "Empty recipient, bcc list. No user should be present."
+
+        message = {"junk": "xyz"}
+        response = util.mail_with_enabled_users(message)
+        assert not response, "Message without recipients, bcc to not return user."
+
+    @with_context
+    def test_mail_with_enabled_users_returns_true(self):
+        tyrion = UserFactory.create(email_addr='tyrion@got.com', enabled=True)
+        theon = UserFactory.create(email_addr='reek@got.com', enabled=False)
+        robb = UserFactory.create(email_addr='robb@got.com', enabled=True)
+        ned = UserFactory.create(email_addr='ned@got.com', enabled=True)
+        message = {
+            "recipients": [tyrion.email_addr, theon.email_addr],
+            "bcc": [ned.email_addr]
+        }
+        response = util.mail_with_enabled_users(message)
+        assert response, "recipent & bcc enabled users list to return True."
+        # theon being disabled should be dropped from recipients list
+        assert theon.email_addr not in message["recipients"], "Disabled users should be removed from email list"
+        assert ned.email_addr in message["bcc"] and robb.email_addr not in message["bcc"], "Filtered enabled users not to be part of email list"
+        assert tyrion.email_addr in message["recipients"], "Enabled user to be part of recipients list"
+
 
 class TestIsReservedName(object):
     from test import flask_app as app

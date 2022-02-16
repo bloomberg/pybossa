@@ -54,6 +54,9 @@ class UserRepository(Repository):
     def get_all(self):
         return self.db.session.query(User).filter_by(restrict=False).all()
 
+    def get_enbled_users_by_email(self, emails):
+        return self.db.session.query(User).filter_by(enabled=True).filter(User.email_addr.in_(emails)).all()
+
     def filter_by(self, limit=None, offset=0, yielded=False, last_id=None,
                   fulltextsearch=None, desc=False, **filters):
         if filters.get('owner_id'):
