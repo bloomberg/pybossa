@@ -591,6 +591,7 @@ def disable_users_job():
 
 def send_mail(message_dict, mail_all=False):
     """Send email."""
+
     if mail_all or mail_with_enabled_users(message_dict):
         message = Message(**message_dict)
         spam = False

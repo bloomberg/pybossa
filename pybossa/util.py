@@ -908,23 +908,22 @@ def can_update_user_info(current_user, user_to_update):
     return False, None, None
 
 
-def get_enabled_users(user_emails):
+def mail_with_enabled_users(message):
     from pybossa.core import user_repo
 
-    enabled_users = []
-    for ue in user_emails:
-        user = user_repo.get_by(email_addr=ue)
-        if user and user.enabled:
-            enabled_users.append(ue)
-    return enabled_users
+    if not message:
+        return False
 
-
-def mail_with_enabled_users(message):
     recipients = message.get('recipients', [])
     bcc = message.get('bcc', [])
+    if not recipients and not bcc:
+        return False
 
-    recipients = get_enabled_users(user_emails=recipients)
-    bcc = get_enabled_users(user_emails=bcc)
+    emails = recipients + bcc
+    enabled_users = user_repo.get_enbled_users_by_email(emails)
+    enabled_emails = [user.email_addr for user in enabled_users]
+    recipients = [email for email in recipients if email in enabled_emails]
+    bcc = [email for email in bcc if email in enabled_emails]
     if not recipients and not bcc:
         return False
 
