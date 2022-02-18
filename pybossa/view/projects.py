@@ -1502,11 +1502,11 @@ def tasks_browse(short_name, page=1, records_per_page=None):
     try:
         args = parse_tasks_browse_args(request.args)
         view_type = request.args.get('view')
-        task_browse_default_page_size = 10
-        task_list_default_page_size = 30
+        task_browse_default_records_per_page = 10
+        task_list_default_records_per_page = 30
         if view_type != 'tasklist' and (current_user.subadmin or current_user.admin or current_user.id in project.owners_ids):
             # owners and (sub)admin have full access, default size page for owner view is 10
-            per_page = records_per_page if records_per_page in allowed_records_per_page else task_browse_default_page_size
+            per_page = records_per_page if records_per_page in allowed_records_per_page else task_browse_default_records_per_page
         elif scheduler == Schedulers.task_queue:
             # worker can access limited tasks only when task_queue_scheduler is selected
             user = cached_users.get_user_by_id(current_user.id)
@@ -1530,7 +1530,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             args["view"] = view_type
             columns = args["display_info_columns"]
             # default page size for worker view is 100
-            per_page = records_per_page if records_per_page in allowed_records_per_page else task_list_default_page_size
+            per_page = records_per_page if records_per_page in allowed_records_per_page else task_list_default_records_per_page
         else:
             abort(403)
     except (ValueError, TypeError) as err:
