@@ -23,7 +23,7 @@ from pybossa.model.project import Project
 from pybossa.util import pretty_date, static_vars, convert_utc_to_est
 from pybossa.cache import memoize, cache, delete_memoized, delete_cached, \
     memoize_essentials, delete_memoized_essential, delete_cache_group, ONE_DAY, \
-    ONE_HOUR
+    ONE_HOUR, memoize_with_l2_cache, delete_memoize_with_l2_cache
 from pybossa.cache.task_browse_helpers import get_task_filters, allowed_fields, user_meet_task_requirement, get_task_preference_score
 import pybossa.app_settings as app_settings
 from pybossa.redis_lock import get_locked_tasks_project
@@ -248,7 +248,7 @@ def _pct_status(n_task_runs, n_answers):
     return float(0)
 
 
-@memoize(timeout=ONE_HOUR)
+@memoize_with_l2_cache(timeout=ONE_HOUR)
 def first_task_id(project_id):
     """Return the oldest task id of a project"""
 
@@ -636,7 +636,7 @@ def get(category, page=1, per_page=5):
     return get_all(category)[offset:offset + per_page]
 
 
-# TODO: find a convenient cache timeout and cache, if needed
+@memoize_with_l2_cache(timeout=timeouts.get('APP_TIMEOUT'))
 def get_from_pro_user():
     """Return the list of published projects belonging to 'pro' users."""
     sql = text('''SELECT project.id, project.short_name FROM project, "user"
@@ -647,6 +647,7 @@ def get_from_pro_user():
         project = dict(id=row.id, short_name=row.short_name)
         projects.append(project)
     return projects
+
 
 @memoize(timeout=ONE_DAY)
 def get_recently_updated_projects():
@@ -768,6 +769,8 @@ def reset():
     delete_memoized(n_total_tasks)
     delete_memoized(n_count)
     delete_memoized(get_all)
+    delete_memoize_with_l2_cache(first_task_id)
+    delete_memoize_with_l2_cache(get_from_pro_user)
 
 
 def delete_browse_tasks(project_id):
