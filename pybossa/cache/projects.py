@@ -105,7 +105,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     # avoid sql planer doing indexscan when searching through table,
     # the settings is LOCAL and only applies to current transaction,
     # This optimization is aiming to resolve Task Browse Page slowness for those take >2s to complete.
-    # TODO: investigate cache to further improve performance of Task List page
+    # TODO: upgrade PostgreSQL from v10 to v12 to check if SQL planner does a better job on Task Browse
     sql = """
             SELECT task.id,
             coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
@@ -125,13 +125,32 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
     if filter_user_prefs:
         # construct task list for worker view
+
+        # TODO: may need to refactor code once Task Browse page optimization is settled
+        sql = """ SELECT task.id,
+                (
+                    SELECT CAST(COUNT(id) AS FLOAT) as ct FROM task_run
+                    WHERE task_id = task.id
+                ) as n_task_runs,
+                task.n_answers,
+                (
+                    SELECT MAX(finish_time) as ft FROM task_run
+                    WHERE task_id = task.id
+                ) as ft,
+                priority_0,
+                task.created,
+                task.calibration,
+                task.user_pref,
+                task.worker_filter,
+                task.worker_pref
+                FROM task
+                WHERE task.project_id =:project_id""" + filters
+
         params["assign_user"] = args["sql_params"]["assign_user"]
         task_rank_info = []
         user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
 
-        session.execute("SET LOCAL enable_indexscan = OFF;")
         results = session.execute(text(sql), params)
-        session.execute("RESET enable_indexscan")
 
         for row in results:
             score = 0
@@ -258,8 +277,8 @@ def first_task_id(project_id):
     # This kind of trick/optimization should be done by SQL planner/optimizer,
     # not programmers. We might need to consider upgrading postgresql engine
     sql = text('''
-        SELECT MIN(id) AS first_task_id FROM 
-        (SELECT id FROM task WHERE project_id=:project_id ORDER BY id limit 20) 
+        SELECT MIN(id) AS first_task_id FROM
+        (SELECT id FROM task WHERE project_id=:project_id ORDER BY id limit 20)
         AS ids;
                 ''')
 
