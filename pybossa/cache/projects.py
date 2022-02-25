@@ -129,7 +129,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         # TODO: may need to refactor code once Task Browse page optimization is settled
         sql = """ SELECT task.id,
                 (
-                    SELECT CAST(COUNT(id) AS FLOAT) as ct FROM task_run
+                    SELECT COUNT(id) as ct FROM task_run
                     WHERE task_id = task.id
                 ) as n_task_runs,
                 task.n_answers,
