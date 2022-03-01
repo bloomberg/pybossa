@@ -14,12 +14,14 @@ from alembic import op
 
 
 def upgrade():
+    op.execute('COMMIT')
     op.create_index('task_state_calibration_exported_idx', 'task',
                     ['id', 'created', 'project_id', 'state', 'quorum',
                      'calibration', 'priority_0', 'info', 'n_answers',
                      'fav_user_ids', 'exported', 'user_pref', 'worker_pref',
                      'worker_filter', 'gold_answers', 'expiration'],
-                    postgresql_where="(state = 'completed'::text OR calibration = 1) AND exported = false"
+                    postgresql_where="(state = 'completed'::text OR calibration = 1) AND exported = false",
+                    postgresql_concurrently=True
                     )
 
 
