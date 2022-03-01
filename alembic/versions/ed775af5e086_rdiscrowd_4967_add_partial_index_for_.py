@@ -14,7 +14,9 @@ from alembic import op
 
 
 def upgrade():
+    # Workaround of "CREATE INDEX CONCURRENTLY cannot run inside a transaction block" exception
     op.execute('COMMIT')
+
     op.create_index('task_state_calibration_exported_idx', 'task',
                     ['id', 'created', 'project_id', 'state', 'quorum',
                      'calibration', 'priority_0', 'info', 'n_answers',
