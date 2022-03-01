@@ -17,6 +17,8 @@ def upgrade():
     # Workaround of "CREATE INDEX CONCURRENTLY cannot run inside a transaction block" exception
     op.execute('COMMIT')
 
+    # passing all columns to avoid DB trip to query original table making indexing efficient.
+    # when new columns are added and used in the query, the index might need to be rebuilt.
     op.create_index('task_state_calibration_exported_idx', 'task',
                     ['id', 'created', 'project_id', 'state', 'quorum',
                      'calibration', 'priority_0', 'info', 'n_answers',
