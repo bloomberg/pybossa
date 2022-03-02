@@ -231,6 +231,8 @@ def memoize_with_l2_cache(timeout=DEFAULT_TIMEOUT,
         timeout = DEFAULT_TIMEOUT
     if timeout < MIN_TIMEOUT:
         timeout = MIN_TIMEOUT
+    if timeout_mutex_lock > MUTEX_LOCK_TIMEOUT:
+        timeout_mutex_lock = MUTEX_LOCK_TIMEOUT
 
     def decorator(f):
         def update_cache(key_l1, key_l2, *args, **kwargs):
