@@ -28,6 +28,7 @@ It exports:
 """
 import os
 import hashlib
+import time
 from functools import wraps
 from pybossa.core import sentinel
 
@@ -51,6 +52,9 @@ ONE_HOUR = 60 * 60
 HALF_HOUR = 30 * 60
 FIVE_MINUTES = 5 * 60
 ONE_WEEK = 7 * ONE_DAY
+ONE_MINUTE = 60
+L2_CACHE_TIMEOUT = ONE_DAY
+MUTEX_LOCK_TIMEOUT = ONE_MINUTE
 
 management_dashboard_stats = [
     'project_chart', 'category_chart', 'task_chart',
@@ -212,6 +216,96 @@ def memoize_essentials(timeout=300, essentials=None, cache_group_keys=None):
     return decorator
 
 
+def memoize_with_l2_cache(timeout=DEFAULT_TIMEOUT,
+                          timeout_l2=L2_CACHE_TIMEOUT,
+                          timeout_mutex_lock=MUTEX_LOCK_TIMEOUT,
+                          cache_group_keys=None):
+    """
+    Decorator for caching functions using its arguments as part of the key.
+    Returns the cached value, or the function if the cache is disabled
+    If l1 cache miss, it will try to read l2 cache, which has a longer TTL
+    If l2 cache miss, it will try to obtain a mutex lock, read DB and
+    update l1 and l2 caches.
+    """
+    if timeout is None:
+        timeout = DEFAULT_TIMEOUT
+    if timeout < MIN_TIMEOUT:
+        timeout = MIN_TIMEOUT
+    if timeout_mutex_lock > MUTEX_LOCK_TIMEOUT:
+        timeout_mutex_lock = MUTEX_LOCK_TIMEOUT
+
+    def decorator(f):
+        def update_cache(key_l1, key_l2, *args, **kwargs):
+            """ Execute f and then update l1 and l2 cache """
+            output = f(*args, **kwargs)
+            output_bytes = pickle.dumps(output)
+            sentinel.master.setex(key_l1, timeout, output_bytes)
+            sentinel.master.setex(key_l2, timeout_l2, output_bytes)
+            add_key_to_cache_groups(key_l1, cache_group_keys, *args, **kwargs)
+            add_key_to_cache_groups(key_l2, cache_group_keys, *args, **kwargs)
+            return output
+
+        def update_cache_sync(key_l1, key_l2, *args, **kwargs):
+            """ Update l1 and l2 cache synchronously with a mutex lock.
+            If the other request is updating, return None """
+            lock_name = f"{key_l1}:mutex_lock"
+            mutex_lock = sentinel.master.lock(lock_name, timeout_mutex_lock)
+
+            # acquiring a non blocking lock: default is blocking
+            lock_success = mutex_lock.acquire(blocking=False)
+            if lock_success:
+                output = update_cache(key_l1, key_l2, *args, **kwargs)
+                mutex_lock.release()  # release the lock
+                return output
+            return None
+
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            key = "%s:%s_args:" % (REDIS_KEYPREFIX, f.__name__)
+            key_to_hash = get_key_to_hash(*args, **kwargs)
+            key = get_hash_key(key, key_to_hash)
+            key_l2 = f"{key}:l2"
+
+            if os.environ.get('PYBOSSA_REDIS_CACHE_DISABLED') is None:
+                output_bytes = sentinel.slave.get(key)  # read l1 cache
+                if output_bytes:
+                    return pickle.loads(output_bytes)
+
+                # If l1 cache miss, try to read from l2 cache
+                output_bytes = sentinel.slave.get(key_l2)
+
+                # If l2 cache has the data
+                if output_bytes:
+                    # Try to keep the cache up-to-date
+                    output = update_cache_sync(key, key_l2, *args, **kwargs)
+                    if output:
+                        return output
+
+                    # return l2 cache data if the other request is updating data
+                    return pickle.loads(output_bytes)
+
+                # If l1 and l2 cache miss: get a mutex lock, then update cache
+                output = update_cache_sync(key, key_l2, *args, **kwargs)
+                if output:
+                    return output
+
+                # output is None, meaning the other request is updating data.
+                # Then just keep querying the l2 cache until MUTEX_LOCK_TIMEOUT
+                total_retry_time = 0
+                while total_retry_time < timeout_mutex_lock:
+                    output_bytes = sentinel.slave.get(key_l2)
+                    if output_bytes:
+                        return pickle.loads(output_bytes)
+
+                    sleep_time = 0.1  # seconds
+                    total_retry_time += sleep_time
+                    time.sleep(sleep_time)
+            output = update_cache(key, key_l2, *args, **kwargs)
+            return output
+        return wrapper
+    return decorator
+
+
 def delete_cached(key):
     """
     Delete a cached value from the cache.
@@ -256,6 +350,29 @@ def delete_memoized_essential(function, *args, **kwargs):
         key = "%s:%s_args:" % (REDIS_KEYPREFIX, function.__name__)
         if args or kwargs:
             key += get_key_to_hash(*args, **kwargs)
+        keys_to_delete = list(sentinel.slave.scan_iter(match=key + '*', count=10000))
+        if not keys_to_delete:
+            return False
+        return bool(sentinel.master.delete(*keys_to_delete))
+    return True
+
+
+def delete_memoize_with_l2_cache(function, *args, **kwargs):
+    """
+    Delete a memoize_with_l2_cache value from the cache.
+
+    Returns True if success or no cache is enabled
+
+    """
+    if os.environ.get('PYBOSSA_REDIS_CACHE_DISABLED') is None:
+        key = "%s:%s_args:" % (REDIS_KEYPREFIX, function.__name__)
+        if args or kwargs:
+            key_to_hash = get_key_to_hash(*args, **kwargs)
+            key = get_hash_key(key, key_to_hash)
+            key_l2 = f"{key}:l2"
+            key_deleted = bool(sentinel.master.delete(key))
+            key_l2_deleted = bool(sentinel.master.delete(key_l2))
+            return key_deleted and key_l2_deleted
         keys_to_delete = list(sentinel.slave.scan_iter(match=key + '*', count=10000))
         if not keys_to_delete:
             return False
