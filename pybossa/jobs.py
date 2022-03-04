@@ -19,6 +19,7 @@
 import json
 import math
 import os
+import time
 from collections import OrderedDict
 from datetime import datetime
 from io import BytesIO
@@ -164,7 +165,7 @@ def get_default_jobs():  # pragma: no cover
         yield dict(name=warn_old_project_owners, args=[], kwargs={},
                    timeout=timeout, queue='low')
     yield dict(name=warm_cache, args=[], kwargs={},
-               timeout=timeout, queue='super')
+               timeout=2*timeout, queue='super')
     yield dict(name=news, args=[], kwargs={},
                timeout=timeout, queue='low')
     yield dict(name=disable_users_job, args=[],kwargs={},
@@ -437,20 +438,10 @@ def warm_cache():  # pragma: no cover
 
         def warm_project(_id, short_name, featured=False):
             if _id not in projects_cached:
-                #cached_projects.get_project(short_name)
-                #cached_projects.n_tasks(_id)
-                #n_task_runs = cached_projects.n_task_runs(_id)
-                #cached_projects.overall_progress(_id)
-                #cached_projects.last_activity(_id)
-                #cached_projects.n_completed_tasks(_id)
-                #cached_projects.n_volunteers(_id)
-                #cached_projects.browse_tasks(_id)
-                #if n_task_runs >= 1000 or featured:
-                #    # print ("Getting stats for %s as it has %s task runs" %
-                #    #        (short_name, n_task_runs))
                 stats.update_stats(_id)
                 projects_cached.append(_id)
 
+        start = time.time()
         # Cache top projects
         projects = cached_projects.get_top()
         for p in projects:
@@ -474,19 +465,33 @@ def warm_cache():  # pragma: no cover
                 current_app.logger.info('warm_project - categories->rank project. id {} short_name{}'
                     .format(p['id'], p['short_name']))
                 warm_project(p['id'], p['short_name'])
+
+        current_app.logger.info(f'warm_project - completed {len(projects_cached)} projects in {time.time() - start} seconds')
+
         # Users
-        current_app.logger.info('warm_project - get_leaderboard')
         users = cached_users.get_leaderboard(app.config['LEADERBOARD'])
+        current_app.logger.info(f'warm_project - get_leaderboard for {len(users)} users')
         for user in users:
             u = user_repo.get_by_name(user['name'])
-            current_app.logger.info('warm_project - user get_user_summary: name {}'.format(user['name']))
             cached_users.get_user_summary(user['name'])
-            current_app.logger.info('warm_project - user projects_contributed_cached: id {}'.format(u.id))
+            current_app.logger.info(
+                f"warm_project - user get_user_summary: name { user['name']} "
+                f"in {time.time() - start} seconds")
+
             cached_users.projects_contributed_cached(u.id)
-            current_app.logger.info('warm_project - user published_projects_cached: id {}'.format(u.id))
+            current_app.logger.info(
+                f"warm_project - user projects_contributed_cached: id {u.id} "
+                f"in {time.time() - start} seconds")
+
             cached_users.published_projects_cached(u.id)
-            current_app.logger.info('warm_project - user draft_projects_cached: id {}'.format(u.id))
+            current_app.logger.info(
+                f"warm_project - user published_projects_cached: id {u.id} "
+                f"in {time.time() - start} seconds")
+
             cached_users.draft_projects_cached(u.id)
+            current_app.logger.info(
+                f"warm_project - user draft_projects_cached: id {u.id} "
+                f"in {time.time() - start} seconds")
 
         return True
 

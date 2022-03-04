@@ -30,6 +30,8 @@ import os
 import hashlib
 import time
 from functools import wraps
+from random import randrange
+
 from pybossa.core import sentinel
 
 try:
@@ -123,6 +125,9 @@ def cache(key_prefix, timeout=300, cache_group_keys=None):
         timeout = DEFAULT_TIMEOUT
     elif timeout < MIN_TIMEOUT:
         timeout = MIN_TIMEOUT
+
+    timeout += randrange(30)  # add a random jitter to reduce DB load
+
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -154,6 +159,9 @@ def memoize(timeout=300, cache_group_keys=None):
         timeout = DEFAULT_TIMEOUT
     elif timeout < MIN_TIMEOUT:
         timeout = MIN_TIMEOUT
+
+    timeout += randrange(30)  # add a random jitter to reduce DB load
+
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -191,6 +199,9 @@ def memoize_essentials(timeout=300, essentials=None, cache_group_keys=None):
         timeout = MIN_TIMEOUT
     if essentials is None:
         essentials = []
+
+    timeout += randrange(30)  # add a random jitter to reduce DB load
+
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -233,6 +244,8 @@ def memoize_with_l2_cache(timeout=DEFAULT_TIMEOUT,
         timeout = MIN_TIMEOUT
     if timeout_mutex_lock > MUTEX_LOCK_TIMEOUT:
         timeout_mutex_lock = MUTEX_LOCK_TIMEOUT
+
+    timeout += randrange(30)  # add a random jitter to reduce DB load
 
     def decorator(f):
         def update_cache(key_l1, key_l2, *args, **kwargs):

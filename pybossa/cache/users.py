@@ -19,7 +19,8 @@
 from sqlalchemy.sql import text
 from sqlalchemy.exc import ProgrammingError
 from pybossa.core import db, timeouts
-from pybossa.cache import cache, memoize, delete_memoized, FIVE_MINUTES, ONE_DAY, ONE_WEEK
+from pybossa.cache import cache, memoize, delete_memoized, FIVE_MINUTES, \
+    ONE_DAY, ONE_WEEK, memoize_with_l2_cache
 from pybossa.util import pretty_date, exists_materialized_view
 from pybossa.model.user import User
 from pybossa.cache.projects import overall_progress, n_tasks, n_volunteers
@@ -36,6 +37,7 @@ from pybossa.util import get_taskrun_date_range_sql_clause_params
 session = db.slave_session
 
 
+@memoize_with_l2_cache(timeout=timeouts.get('USER_TIMEOUT'))
 def get_leaderboard(n, user_id=None, window=0, info=None):
     """Return the top n users with their rank."""
     try:

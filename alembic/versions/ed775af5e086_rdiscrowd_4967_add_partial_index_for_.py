@@ -17,17 +17,20 @@ def upgrade():
     # Workaround of "CREATE INDEX CONCURRENTLY cannot run inside a transaction block" exception
     op.execute('COMMIT')
 
-    # passing all columns to avoid DB trip to query original table making indexing efficient.
-    # when new columns are added and used in the query, the index might need to be rebuilt.
     op.create_index('task_state_calibration_exported_idx', 'task',
-                    ['id', 'created', 'project_id', 'state', 'quorum',
-                     'calibration', 'priority_0', 'info', 'n_answers',
-                     'fav_user_ids', 'exported', 'user_pref', 'worker_pref',
-                     'worker_filter', 'gold_answers', 'expiration'],
+                    ['id'],
                     postgresql_where="(state = 'completed'::text OR calibration = 1) AND exported = false",
+                    postgresql_concurrently=True
+                    )
+
+    op.create_index('task_state_enrich_idx', 'task',
+                    ['id'],
+                    postgresql_where="state = 'enrich'::text",
                     postgresql_concurrently=True
                     )
 
 
 def downgrade():
-    op.drop_index('task_state_calibration_exported_idx')
+    op.execute('COMMIT')
+    op.execute('DROP INDEX CONCURRENTLY IF EXISTS task_state_calibration_exported_idx')
+    op.execute('DROP INDEX CONCURRENTLY IF EXISTS task_state_enrich_idx')
