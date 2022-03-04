@@ -1500,13 +1500,15 @@ def tasks_browse(short_name, page=1, records_per_page=None):
     scheduler = project.info.get('sched', "default")
 
     try:
-        args = parse_tasks_browse_args(request.args)
+        args = {}
         view_type = request.args.get('view')
         task_browse_default_records_per_page = 10
         task_list_default_records_per_page = 30
         if view_type != 'tasklist' and (current_user.subadmin or current_user.admin or current_user.id in project.owners_ids):
             # owners and (sub)admin have full access, default size page for owner view is 10
             per_page = records_per_page if records_per_page in allowed_records_per_page else task_browse_default_records_per_page
+            # parse args
+            args = parse_tasks_browse_args(request.args.to_dict())
         elif scheduler == Schedulers.task_queue:
             # worker can access limited tasks only when task_queue_scheduler is selected
             user = cached_users.get_user_by_id(current_user.id)
@@ -1520,15 +1522,20 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                                                                         project.info.get("timeout"),
                                                                         current_user.id,
                                                                         True)
+            # parse args
+            dict_args = request.args.to_dict()
+            dict_args["display_info_columns"] = project.info.get('tasklist_columns', [])
+            columns = dict_args["display_info_columns"]
+            args = parse_tasks_browse_args(dict_args)
+
+            # populate additional args for task list view
             args["filter_by_wfilter_upref"] = dict(current_user_pref=user_pref,
                                                 current_user_email=user_email,
                                                 current_user_profile=user_profile,
                                                 reserve_filter=reserve_task_filter)
             args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
             args["display_columns"] = ['task_id', 'priority', 'created']
-            args["display_info_columns"] = project.info.get('tasklist_columns', [])
-            args["view"] = view_type
-            columns = args["display_info_columns"]
+
             # default page size for worker view is 100
             per_page = records_per_page if records_per_page in allowed_records_per_page else task_list_default_records_per_page
         else:
@@ -1611,6 +1618,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         language_options = valid_user_preferences.get('languages')
         location_options = valid_user_preferences.get('locations')
         rdancy_upd_exp = current_app.config.get('REDUNDANCY_UPDATE_EXPIRATION', 30)
+
         data = dict(template='/projects/tasks_browse.html',
                     users=[],
                     project=project_sanitized,
