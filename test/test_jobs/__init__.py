@@ -62,7 +62,10 @@ class TestJobs(Test):
         job_names = [warm_up_stats, warn_old_project_owners, warm_cache, news,
                      disable_users_job, send_email_notifications]
         for job in get_default_jobs():
-            assert job['timeout'] == timeout, job
+            if job['name'] == warm_cache:
+                assert job['timeout'] == 2*timeout, job
+            else:
+                assert job['timeout'] == timeout, job
             assert job['name'] in job_names, job
 
     @with_context
