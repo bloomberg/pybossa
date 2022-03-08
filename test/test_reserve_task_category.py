@@ -175,7 +175,7 @@ class TestReserveTaskCategory(sched.Helper):
         # release reserve task lock
         expiry = 1
         release_reserve_task_lock_by_keys([expected_reserve_task_key], timeout, expiry=expiry)
-        time.sleep(expiry)
+        time.sleep(expiry + 0.1)  # add a little time to make sure the ttl expires
         assert expected_reserve_task_key.encode() not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
 
 

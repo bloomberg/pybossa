@@ -38,16 +38,18 @@ session = db.slave_session
 @cache(timeout=timeouts.get('STATS_FRONTPAGE_TIMEOUT'),
        key_prefix="front_page_top_projects")
 def get_top(n=4):
-    """Return top n=4 projects."""
-    sql = text('''SELECT project.id, project.name, project.short_name, project.description,
-               project.info,
-               COUNT(project_id) AS total
-               FROM task_run, project
-               WHERE project_id IS NOT NULL
-               AND project.id=project_id
-               AND project.published=True
-               AND (project.info->>'passwd_hash') IS NULL
-               GROUP BY project.id ORDER BY total DESC LIMIT :limit;''')
+    """Return top n=4 projects with most task runs.
+    projects without updating more than 3 months could be ignored, depending on
+    whether the project owner is "pro" or not.
+    ref:  get_project_jobs in jobs.py
+    """
+    sql = text('''SELECT p.id, p.name, p.short_name, p.description, p.info, ps.n_task_runs AS total
+                FROM project p
+                JOIN project_stats ps
+                ON p.id = ps.project_id
+                ORDER BY ps.n_task_runs DESC
+                LIMIT :limit;''')
+
     results = session.execute(sql, dict(limit=n))
     top_projects = []
     for row in results:
@@ -670,14 +672,15 @@ def get_from_pro_user():
 
 @memoize(timeout=ONE_DAY)
 def get_recently_updated_projects():
-    """Return the list of published projects that has task creations in last 3 months."""
+    """Return the list of published projects that has task creations in last 3 months.
+    "updated" column in the project table get updated when new tasks are created,
+    new task runs submitted, task setting updated, project updated and etc.
+    ref: model/event_listener.py:update_project
+    """
 
-    sql = text('''SELECT p.id, p.short_name
-               FROM project p INNER JOIN task t
-               ON p.id = t.project_id
-               GROUP BY p.id, p.short_name
-               HAVING p.published = true
-               AND TO_DATE(max(t.created), 'YYYY-MM-DD"T"HH24:MI:SS.US') >= NOW() - '3 months' :: INTERVAL;''')
+    sql = text('''SELECT id, short_name FROM project
+               WHERE published = true AND 
+               TO_DATE(updated, 'YYYY-MM-DD"T"HH24:MI:SS.US') >= NOW() - '3 months' :: INTERVAL;''')
     results = db.slave_session.execute(sql)
     projects = []
     for row in results:

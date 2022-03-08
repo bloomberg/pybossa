@@ -28,6 +28,7 @@ from pybossa.model.project import Project
 from pybossa.cache.project_stats import update_stats
 from nose.tools import nottest, assert_raises
 from pybossa.cache.task_browse_helpers import get_task_filters, parse_tasks_browse_args
+import pybossa.cache.project_stats as stats
 
 
 class TestProjectsCache(Test):
@@ -167,22 +168,28 @@ class TestProjectsCache(Test):
             if field == 'info':
                 assert sorted(draft['info'].keys()) == sorted(Project().public_info_keys())
 
-
-    @with_context
+    @with_request_context
     def test_get_top_returns_projects_with_most_taskruns(self):
         """Test CACHE PROJECTS get_top returns the projects with most taskruns in order"""
 
-        rankded_3_project = self.create_project_with_contributors(8, 0, name='three')
+        ranked_3_project = self.create_project_with_contributors(8, 0, name='three')
         ranked_2_project = self.create_project_with_contributors(9, 0, name='two')
         ranked_1_project = self.create_project_with_contributors(10, 0, name='one')
         ranked_4_project = self.create_project_with_contributors(7, 0, name='four')
 
+        stats.update_stats(ranked_3_project.id)
+        stats.update_stats(ranked_2_project.id)
+        stats.update_stats(ranked_1_project.id)
+        stats.update_stats(ranked_4_project.id)
+
         top_projects = cached_projects.get_top()
 
-        assert not top_projects
+        assert top_projects[0]['name'] == 'one', top_projects
+        assert top_projects[1]['name'] == 'two', top_projects
+        assert top_projects[2]['name'] == 'three', top_projects
+        assert top_projects[3]['name'] == 'four', top_projects
 
-
-    @with_context
+    @with_request_context
     def test_get_top_respects_limit(self):
         """Test CACHE PROJECTS get_top returns only the top n projects"""
 
@@ -190,23 +197,28 @@ class TestProjectsCache(Test):
         ranked_2_project = self.create_project_with_contributors(9, 0, name='two')
         ranked_1_project = self.create_project_with_contributors(10, 0, name='one')
 
+        stats.update_stats(ranked_3_project.id)
+        stats.update_stats(ranked_2_project.id)
+        stats.update_stats(ranked_1_project.id)
+
         top_projects = cached_projects.get_top(n=2)
 
-        assert len(top_projects) == 0, len(top_projects)
+        assert len(top_projects) == 2, len(top_projects)
 
-
-    @with_context
-    def test_get_top_returns_only_projects_without_password(self):
+    @with_request_context
+    def test_get_top_returns_not_only_projects_without_password(self):
         """Test CACHE PROJECTS get_top returns projects that don't have a password"""
 
         ranked_2_project = self.create_project_with_contributors(9, 0, name='two')
         ranked_1_project = self.create_project_with_contributors(
             10, 0, name='one', info={'passwd_hash': 'something'})
 
+        stats.update_stats(ranked_2_project.id)
+        stats.update_stats(ranked_1_project.id)
+
         top_projects = cached_projects.get_top()
 
-        assert len(top_projects) == 0, len(top_projects)
-
+        assert len(top_projects) == 2, len(top_projects)
 
     @with_context
     def test_n_completed_tasks_no_completed_tasks(self):
