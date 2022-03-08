@@ -38,7 +38,11 @@ session = db.slave_session
 @cache(timeout=timeouts.get('STATS_FRONTPAGE_TIMEOUT'),
        key_prefix="front_page_top_projects")
 def get_top(n=4):
-    """Return top n=4 projects with most task runs."""
+    """Return top n=4 projects with most task runs.
+    projects without updating more than 3 months could be ignored, depending on
+    whether the project owner is "pro" or not.
+    ref:  get_project_jobs in jobs.py
+    """
     sql = text('''SELECT p.id, p.name, p.short_name, p.description, p.info, ps.n_task_runs AS total
                 FROM project p
                 JOIN project_stats ps

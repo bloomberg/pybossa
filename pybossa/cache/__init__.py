@@ -126,7 +126,15 @@ def cache(key_prefix, timeout=300, cache_group_keys=None):
     elif timeout < MIN_TIMEOUT:
         timeout = MIN_TIMEOUT
 
-    timeout += randrange(30)  # add a random jitter to reduce DB load
+    """
+    Adding a random jitter to reduce DB load
+    There are scheduled jobs refreshing cache. When refreshing happens, caches
+    could have the same TTL. Thus they could expires at the same time, and 
+    requests will hitting DB, causing a burst of DB load. By adding a random 
+    jitter, it reduces the possibility that caches expiring at the same time 
+    and balanced the DB load to avoid many requests hitting the DB.
+    """
+    timeout += randrange(30)
 
     def decorator(f):
         @wraps(f)
