@@ -69,6 +69,9 @@ def get_top(n=4):
 def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwargs):
     """Cache browse tasks view for a project."""
 
+    sorting = {"lock_status asc": "(coalesce(ct, 0)/task.n_answers) desc",
+               "lock_status desc": "(coalesce(ct, 0)/task.n_answers) asc"}
+
     # TODO: use Jinja filters to format date
     def format_date(date):
         if date is not None:
@@ -104,31 +107,15 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     filters, filter_params = get_task_filters(args)
     filters += args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
 
-    # avoid sql planer doing indexscan when searching through table,
-    # the settings is LOCAL and only applies to current transaction,
-    # This optimization is aiming to resolve Task Browse Page slowness for those take >2s to complete.
-    # TODO: upgrade PostgreSQL from v10 to v12 to check if SQL planner does a better job on Task Browse
-    sql = """
-            SELECT task.id,
-            coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
-            priority_0, task.created, task.calibration,
-            task.user_pref, task.worker_filter, task.worker_pref
-            FROM task LEFT OUTER JOIN
-            (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
-            MAX(finish_time) as ft FROM task_run
-            WHERE project_id=:project_id GROUP BY task_id) AS log_counts
-            ON task.id=log_counts.task_id
-            WHERE task.project_id=:project_id""" + filters + \
-            " ORDER BY %s" % (args.get('order_by') or 'id ASC')
-
     params = dict(project_id=project_id, **filter_params)
     limit = args.get('records_per_page') or 10
     offset = args.get('offset') or 0
 
+     # TODO: RDISCROWD-5000
+     # refactor code once Task Browse page optimization is settled
     if filter_user_prefs:
         # construct task list for worker view
 
-        # TODO: may need to refactor code once Task Browse page optimization is settled
         sql = """ SELECT task.id,
                 (
                     SELECT COUNT(id) as ct FROM task_run
@@ -174,42 +161,83 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         tasks = select_available_tasks(task_rank_info, locked_tasks_in_project,
                                         project_id, user_id, offset+limit,
                                         args.get("order_by"))
-        tasks = tasks[offset: offset+limit]
+        tasks = [t[0] for t in tasks[offset: offset+limit]]
 
     else:
         # construct task browse page for owners/admins
-        if not "lock_status" in order_by:
-            sql += " LIMIT :limit OFFSET :offset;"
-            params["limit"] = limit
-            params["offset"] = offset
+        sql = """
+            SELECT task.id,
+            coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
+            priority_0, task.created, task.calibration,
+            task.user_pref, task.worker_filter, task.worker_pref
+            FROM task LEFT OUTER JOIN
+            (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
+            MAX(finish_time) as ft FROM task_run
+            WHERE project_id=:project_id GROUP BY task_id) AS log_counts
+            ON task.id=log_counts.task_id
+            WHERE task.project_id=:project_id""" + filters
 
-        task_rank_info = []
-        session.execute("SET LOCAL enable_indexscan = OFF;")
-        results = session.execute(text(sql), params)
-        session.execute("RESET enable_indexscan")
+        locked_task_ids = [lock["task_id"] for lock in get_locked_tasks_project(project_id)]
+        sql_lock_filter = " AND id IN ({})".format(",".join(locked_task_ids))
+        sql_unlock_filter = " AND id NOT IN ({})".format(",".join(locked_task_ids))
+        sql_order = " ORDER BY {} "
+        sql_limit_offset = " LIMIT :limit OFFSET :offset "
+        params["limit"] = limit
+        params["offset"] = offset
 
-        for row in results:
-            task = format_task(row, locked_tasks_in_project.get(row.id, []))
-            lock_score = 0
-            if row.id in locked_tasks_in_project:
-                lock_score = -1
-            else:
-                lock_score = task['pct_status']
+        if "lock_status" in order_by:
+            sql_order_by = sorting[order_by]
 
-            task_rank_info.append((task, lock_score))
+            # if there are locked tasks in project, need to merge sort locked tasks and unlocked tasks
+            # otherwise just sort by pcomplete
+            if locked_tasks_in_project:
+                locked_tasks = [format_task(row, locked_tasks_in_project.get(row.id, []))
+                                    for row in session.execute(text(sql+sql_lock_filter), params)]
 
-        if order_by == "lock_status asc":
-            task_rank_info = heapq.nlargest(offset+limit, task_rank_info,
-                                        key=lambda tup: tup[1])
-            tasks = task_rank_info[offset: offset+limit]
-        elif order_by == "lock_status desc":
-            task_rank_info = heapq.nsmallest(offset+limit, task_rank_info,
-                                        key=lambda tup: tup[1])
-            tasks = task_rank_info[offset: offset+limit]
+                if order_by == 'lock_status asc':
+                    # sort by completed tasks, then incomplete tasks, then locked tasks
+                    sql_query = sql + sql_unlock_filter + sql_order.format(sql_order_by) + sql_limit_offset
+
+                    if offset < total_count - len(locked_tasks):
+                        results = session.execute(text(sql_query), params)
+                    else:
+                        locked_tasks = locked_tasks[offset-(total_count-len(locked_tasks)):]
+                        results = []
+
+                    for row in results:
+                        tasks.append(format_task(row, locked_tasks_in_project.get(row.id, [])))
+
+                    for lt in locked_tasks:
+                        if len(tasks) < limit:
+                            tasks.append(lt)
+                        else:
+                            break
+
+                else:
+                    # sort by locked tasks, then incompleted tasks, then completed tasks
+                    sql_order_by = "(coalesce(ct, 0)/task.n_answers) asc"
+                    sql_query = sql + sql_unlock_filter + sql_order.format(sql_order_by) + sql_limit_offset
+
+                    tasks = locked_tasks[offset: offset+limit]
+                    params["offset"] = max(params["offset"]-len(locked_tasks), 0)
+                    results = session.execute(text(sql_query), params)
+
+                    for row in results:
+                        if len(tasks) < limit:
+                            tasks.append(format_task(row, locked_tasks_in_project.get(row.id, [])))
+                        else:
+                            break
+
+                return total_count, tasks
         else:
-            tasks = task_rank_info
+            # if not sort by lock_status, sort by the column "order_by"
+            sql_order_by = args.get('order_by') or 'id ASC'
 
-    return total_count, [t[0] for t in tasks]
+        sql_query = sql + sql_order.format(sql_order_by) + sql_limit_offset
+        results = session.execute(text(sql_query), params)
+        tasks = [format_task(row, locked_tasks_in_project.get(row.id, [])) for row in results]
+
+    return total_count, tasks
 
 
 def select_available_tasks(task_rank_info, locked_tasks, project_id, user_id, num_tasks_needed, sort_by=None):
@@ -679,7 +707,7 @@ def get_recently_updated_projects():
     """
 
     sql = text('''SELECT id, short_name FROM project
-               WHERE published = true AND 
+               WHERE published = true AND
                TO_DATE(updated, 'YYYY-MM-DD"T"HH24:MI:SS.US') >= NOW() - '3 months' :: INTERVAL;''')
     results = db.slave_session.execute(sql)
     projects = []
