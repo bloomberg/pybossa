@@ -256,25 +256,27 @@ def parse_tasks_browse_args(args):
                                           'created', 'finish_time', 'gold_task',
                                           'actions', 'lock_status']
     if 'display_info_columns' in args:
-        display_info_columns = json.loads(args['display_info_columns'])
+        display_info_columns = args['display_info_columns']
+
         if not isinstance(display_info_columns, list):
-            display_info_columns = []
+            display_info_columns = json.loads(display_info_columns)
         parsed_args['display_info_columns'] = display_info_columns
-        # allowing custom user added task.info columns to be sortable
-        allowed_fields.update({col.lower(): " task.info->>'{}'".format(col) for col in display_info_columns})
+
     parsed_args['order_by_dict'] = dict()
     if args.get('order_by'):
-        parsed_args['order_by'] = args['order_by'].strip().lower()
+        parsed_args['order_by'] = args['order_by'].strip()
+        # allowing custom user added task.info columns to be sortable
+        allowed_sort_fields = allowed_fields.copy()
+        allowed_sort_fields.update({col: "task.info->>'{}'".format(col) for col in parsed_args.get("display_info_columns", [])})
         for clause in parsed_args['order_by'].split(','):
             order_by_field = clause.split(' ')
-            if len(order_by_field) != 2 or order_by_field[0] not in allowed_fields:
+            if len(order_by_field) != 2 or order_by_field[0] not in allowed_sort_fields:
                 raise ValueError('order_by value sent by the user is invalid: %s'.format(args['order_by']))
             if order_by_field[0] in parsed_args["order_by_dict"]:
-                raise ValueError('order_by field is duplicated: %s'
-                                 .format(args['order_by']))
+                raise ValueError('order_by field is duplicated: %s'.format(args['order_by']))
             parsed_args["order_by_dict"][order_by_field[0]] = order_by_field[1]
 
-        for key, value in allowed_fields.items():
+        for key, value in allowed_sort_fields.items():
             parsed_args["order_by"] = parsed_args["order_by"].replace(key, value)
 
     if args.get('filter_by_field'):
