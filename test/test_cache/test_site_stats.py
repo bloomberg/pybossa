@@ -17,7 +17,7 @@
 # along with PYBOSSA.  If not,  see <http://www.gnu.org/licenses/>.
 
 import datetime
-from test import db, Test, with_context
+from test import db, Test, with_context, with_request_context
 from pybossa.cache import site_stats as stats
 from test.factories import (UserFactory, ProjectFactory, AnonymousTaskRunFactory,
                        TaskRunFactory, TaskFactory, CategoryFactory)
@@ -26,6 +26,7 @@ from unittest.mock import patch
 from pybossa.cache import management_dashboard_stats, delete_cache_group
 from pybossa.jobs import get_management_dashboard_stats
 from flask import current_app
+import pybossa.cache.project_stats as project_stats
 
 result_repo = ResultRepository(db)
 
@@ -227,18 +228,22 @@ class TestSiteStatsCache(Test):
         total_projects = stats.number_of_created_jobs()
         assert total_projects == 5, "Total number of projects created in last 30 days should be 5"
 
-    @with_context
+    @with_request_context
     def test_number_of_active_jobs(self):
         """Test number of active projects with submissions in last 30 days"""
-        recently_contributed_project = ProjectFactory.create()
-        long_ago_contributed_project = ProjectFactory.create()
-        date_60_days_old = (datetime.datetime.utcnow() -  datetime.timedelta(60)).isoformat()
+        date_60_days_old = (datetime.datetime.utcnow() - datetime.timedelta(60)).isoformat()
 
         recently_contributed_project = ProjectFactory.create()
         long_ago_contributed_project = ProjectFactory.create()
 
-        TaskRunFactory.create(project=recently_contributed_project)
-        TaskRunFactory.create(project=long_ago_contributed_project, finish_time=date_60_days_old)
+        task = TaskFactory.create(n_answers=1, project=recently_contributed_project)
+        TaskRunFactory.create(task=task, project=recently_contributed_project)
+
+        old_task = TaskFactory.create(n_answers=1, project=long_ago_contributed_project, created=date_60_days_old)
+        TaskRunFactory.create(task=old_task, project=long_ago_contributed_project, finish_time=date_60_days_old)
+
+        project_stats.update_stats(recently_contributed_project.id)
+        project_stats.update_stats(long_ago_contributed_project.id)
 
         total_active_projects = stats.number_of_active_jobs()
         assert total_active_projects == 1, "Total number of active projects in last 30 days should be 1"
@@ -317,7 +322,7 @@ class TestSiteStatsCache(Test):
         total_categories = stats.categories_with_new_projects()
         assert total_categories == 2, "Total categories with recent projects should be 2"
 
-    @with_context
+    @with_request_context
     def test_avg_task_per_job(self):
         """Test average task per job created since current time"""
         date_recent = (datetime.datetime.utcnow() -  datetime.timedelta(29)).isoformat()
@@ -330,6 +335,10 @@ class TestSiteStatsCache(Test):
 
         TaskFactory.create_batch(5, n_answers=1, project=project, created=date_now)
         TaskFactory.create_batch(5, n_answers=1, project=old_project, created=date_old)
+
+        # update the project_stats data so that avg_task_per_job get the correct data
+        project_stats.update_stats(project.id)
+        project_stats.update_stats(old_project.id)
 
         avg_tasks = stats.avg_task_per_job()
         assert avg_tasks == expected_avg_tasks, "Average task created per job should be {}".format(expected_avg_tasks)
@@ -348,7 +357,7 @@ class TestSiteStatsCache(Test):
         assert avg_time == expected_avg_time, \
             "Average time to complete tasks in last 30 days should be {}".format(expected_avg_time)
 
-    @with_context
+    @with_request_context
     def test_avg_tasks_per_category(self):
         """Test average tasks per category created since current time"""
         date_recent = (datetime.datetime.utcnow() -  datetime.timedelta(31)).isoformat()
@@ -368,6 +377,10 @@ class TestSiteStatsCache(Test):
 
         for i in range(3):
             TaskFactory.create(project=project3, created=date_recent)
+
+        project_stats.update_stats(project1.id)
+        project_stats.update_stats(project2.id)
+        project_stats.update_stats(project3.id)
 
         avg_tasks = round(stats.tasks_per_category())
         assert avg_tasks == expected_avg_tasks, "Average tasks created per category should be {}".format(expected_avg_tasks)

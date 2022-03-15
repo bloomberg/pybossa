@@ -24,14 +24,12 @@ import time
 from traceback import print_exc
 
 from rq import Queue, Connection, Worker
-from rq.worker import logger
-
-logger.setLevel(logging.DEBUG)
 
 from pybossa.core import create_app, sentinel
 
 app = create_app(run_as_server=False)
 app.config['REDIS_SOCKET_TIMEOUT'] = 600
+
 
 def retry(max_count):
     def decorator(func):
@@ -62,6 +60,7 @@ def get_worker(queues):
 def run_worker(queues, logger):
     with get_worker(queues) as w:
         try:
+            logger.setLevel(logging.INFO)
             w.log = logger
         except Exception:
             logger.warning('Unable to set logger')

@@ -438,14 +438,14 @@ def warm_cache():  # pragma: no cover
 
         def warm_project(_id, short_name, featured=False):
             if _id not in projects_cached:
-                stats.update_stats(_id)
+                # stats.update_stats(_id)  # duplicate work of get_project_jobs
                 projects_cached.append(_id)
 
         start = time.time()
         # Cache top projects
         projects = cached_projects.get_top()
         for p in projects:
-            current_app.logger.info('warm_project - top projects. id {} short_name{}'
+            current_app.logger.info('warm_project - top projects. id {} short_name: {}'
                 .format(p['id'], p['short_name']))
             warm_project(p['id'], p['short_name'])
 
@@ -1343,26 +1343,28 @@ def delete_file(fname, container):
     return uploader.delete_file(fname, container)
 
 
-def get_management_dashboard_stats(user_email):
-    """Rebuild management dashboard stats, notify user about its availability"""
-    project_chart = site_stats.project_chart()
-    category_chart = site_stats.category_chart()
-    task_chart = site_stats.task_chart()
-    submission_chart = site_stats.submission_chart()
+def load_management_dashboard_data():
+    # charts
+    project_chart = site_stats.project_chart()  # < 1s
+    category_chart = site_stats.category_chart()  # < 1s
+    task_chart = site_stats.task_chart()  # 110s in QA
+    submission_chart = site_stats.submission_chart()  # 9s in QA
 
+    # General platform usage
     timed_stats_funcs = [
-        site_stats.number_of_active_jobs,
-        site_stats.number_of_created_jobs,
-        site_stats.number_of_created_tasks,
-        site_stats.number_of_completed_tasks,
-        site_stats.avg_time_to_complete_task,
-        site_stats.number_of_active_users,
-        site_stats.categories_with_new_projects
+        site_stats.number_of_active_jobs,  # 1s
+        site_stats.number_of_created_jobs,  # 1s
+        site_stats.number_of_created_tasks,  # 90s(1.5,2.5,3s,81s) in QA with new index
+        site_stats.number_of_completed_tasks,  # 300s(6s,94s,82s,102s) in QA
+        site_stats.avg_time_to_complete_task,  # 24s(4s,4s,4s,12s) in QA
+        site_stats.number_of_active_users,  # 35s(4s,4s,5s,11s,11s) in QA
+        site_stats.categories_with_new_projects  # 1s
     ]
 
+    # Work on platform
     current_stats_funcs = [
-        site_stats.avg_task_per_job,
-        site_stats.tasks_per_category
+        site_stats.avg_task_per_job,  # < 1s
+        site_stats.tasks_per_category  # < 1s
     ]
 
     timed_stats = OrderedDict()
@@ -1373,6 +1375,12 @@ def get_management_dashboard_stats(user_email):
 
     current_stats = OrderedDict((func.__doc__, func())
                                 for func in current_stats_funcs)
+    return project_chart, category_chart, task_chart, submission_chart, timed_stats, current_stats
+
+
+def get_management_dashboard_stats(user_email):
+    """Rebuild management dashboard stats, notify user about its availability"""
+    load_management_dashboard_data()
 
     subject = 'Management Dashboard Statistics'
     msg = 'Management dashboard statistics is now available. It can be accessed by refreshing management dashboard page.'

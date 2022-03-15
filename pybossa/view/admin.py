@@ -16,67 +16,65 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Admin view for PYBOSSA."""
-from rq import Queue
-from sqlalchemy.exc import IntegrityError
+import json
+
 from flask import Blueprint
-from flask import render_template
-from flask import request
+from flask import Markup
+from flask import Response
 from flask import abort
+from flask import current_app
 from flask import flash
 from flask import redirect
+from flask import render_template
+from flask import request
 from flask import url_for
-from flask import current_app
-from flask import Response
-from flask import Markup
-from flask_login import login_required, current_user
 from flask_babel import gettext
+from flask_login import login_required, current_user
 from flask_wtf.csrf import generate_csrf
-from werkzeug.exceptions import HTTPException
+from rq import Queue
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import ProgrammingError
+from werkzeug.exceptions import HTTPException
 
-from pybossa.model import make_timestamp
-from pybossa.model.category import Category
-from pybossa.model.announcement import Announcement
-from pybossa.util import admin_required, handle_content_type
-from pybossa.util import redirect_content_type
-from pybossa.util import admin_or_subadmin_required
-from pybossa.util import generate_notification_email_for_admins
-from pybossa.util import generate_invitation_email_for_admins_subadmins
-from pybossa.util import generate_manage_user_email
-from pybossa.util import can_update_user_info, can_have_super_user_access
-from pybossa.cache import projects as cached_projects
+import pybossa.app_settings as app_settings
+import pybossa.dashboard.data as dashb
+from pybossa.auth import ensure_authorized_to
+from pybossa.cache import announcements
 from pybossa.cache import categories as cached_cat
+from pybossa.cache import projects as cached_projects
 from pybossa.cache import site_stats
 from pybossa.cache import task_browse_helpers as helper
-from pybossa.cache import announcements
-from pybossa.auth import ensure_authorized_to
 from pybossa.core import announcement_repo, project_repo, user_repo, sentinel
-from pybossa.feed import get_update_feed
-import pybossa.dashboard.data as dashb
-from pybossa.jobs import get_dashboard_jobs, export_all_users
-import json
-from io import StringIO
-
-
-from pybossa.forms.admin_view_forms import *
-from pybossa.news import NOTIFY_ADMIN
-from pybossa.jobs import send_mail
 from pybossa.core import userimporter
+from pybossa.feed import get_update_feed
+from pybossa.forms.admin_view_forms import *
 from pybossa.importers import BulkImportException
-from collections import OrderedDict
-import pybossa.app_settings as app_settings
-from datetime import datetime
+from pybossa.jobs import get_dashboard_jobs, export_all_users, \
+    load_management_dashboard_data
 from pybossa.jobs import get_management_dashboard_stats
+from pybossa.jobs import send_mail
+from pybossa.model import make_timestamp
+from pybossa.model.announcement import Announcement
+from pybossa.model.category import Category
+from pybossa.news import NOTIFY_ADMIN
+from pybossa.util import admin_or_subadmin_required
+from pybossa.util import admin_required, handle_content_type
+from pybossa.util import can_update_user_info, can_have_super_user_access
+from pybossa.util import generate_invitation_email_for_admins_subadmins
+from pybossa.util import generate_manage_user_email
+from pybossa.util import generate_notification_email_for_admins
+from pybossa.util import redirect_content_type
 
 blueprint = Blueprint('admin', __name__)
-DASHBOARD_TIMEOUT = 10 * 60
+DASHBOARD_TIMEOUT = 30 * 60
 DASHBOARD_QUEUE = Queue('super',
-    connection=sentinel.master,
-    default_timeout=DASHBOARD_TIMEOUT)
+                        connection=sentinel.master,
+                        default_timeout=DASHBOARD_TIMEOUT)
 
 mail_queue = Queue('super', connection=sentinel.master)
 
 MAX_NUM_USERS_IMPORT = 100
+
 
 def format_error(msg, status_code):
     """Return error as a JSON response."""
@@ -112,7 +110,7 @@ def featured(project_id=None):
                     category=c.short_name,
                     page=1,
                     per_page=n_projects)
-            response = dict(template = '/admin/projects.html',
+            response = dict(template='/admin/projects.html',
                             projects=projects,
                             categories=categories,
                             form=dict(csrf=generate_csrf()))
@@ -567,38 +565,8 @@ def management_dashboard():
         DASHBOARD_QUEUE.enqueue(get_management_dashboard_stats, current_user.email_addr)
         return redirect_content_type(url_for('admin.index'))
 
-    # charts
-    project_chart = site_stats.project_chart()
-    category_chart = site_stats.category_chart()
-    task_chart = site_stats.task_chart()
-    submission_chart = site_stats.submission_chart()
-    current_app.logger.info(task_chart)
-
-    # General platform usage
-    timed_stats_funcs = [
-        site_stats.number_of_active_jobs,
-        site_stats.number_of_created_jobs,
-        site_stats.number_of_created_tasks,
-        site_stats.number_of_completed_tasks,
-        site_stats.avg_time_to_complete_task,
-        site_stats.number_of_active_users,
-        site_stats.categories_with_new_projects
-    ]
-
-    # Work on platform
-    current_stats_funcs = [
-        site_stats.avg_task_per_job,
-        site_stats.tasks_per_category
-    ]
-
-    timed_stats = OrderedDict()
-    for func in timed_stats_funcs:
-        timed_stats[func.__doc__] = OrderedDict()
-        for days in [30, 60, 90, 350, 'all']:
-            timed_stats[func.__doc__][days] = func(days)
-
-    current_stats = OrderedDict((func.__doc__, func())    #TODO : uncomment later
-                                for func in current_stats_funcs)
+    project_chart, category_chart, task_chart, submission_chart, timed_stats, \
+        current_stats = load_management_dashboard_data()
 
     return render_template('admin/management_dashboard.html',
                            timed_stats=timed_stats,

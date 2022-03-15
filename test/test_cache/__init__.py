@@ -779,3 +779,16 @@ class TestCacheMemoizeFunctions(object):
         end = time.time()
         assert round(end - start) == execution_time, "close to single running time"
         assert result == 2, "hit simulate_db_query 1 more time, total twice"
+
+    def test_memoize_with_l2_cache_stores_function_call_first_time_called(self):
+        """Test CACHE memoize_with_l2_cache decorator stores the result of
+        calling a function in the cache the first time it's called"""
+
+        @memoize_with_l2_cache(key_prefix='my_cached_func')
+        def my_func():
+            return 'my_func was called'
+        my_func()
+        key = "%s::%s" % (settings_test.REDIS_KEYPREFIX, 'my_cached_func')
+
+        # in redis-py, all responses are returned as bytes in Python 3
+        assert key.encode() in list(test_sentinel.master.keys()), list(test_sentinel.master.keys())
