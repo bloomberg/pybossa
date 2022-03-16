@@ -178,7 +178,8 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                 task.worker_filter,
                 task.worker_pref
                 FROM task
-                WHERE task.project_id =:project_id""" + filters
+                WHERE task.project_id =:project_id""" + filters +\
+                " ORDER BY %s" % (args.get('order_by') or 'priority_0 desc')
 
         params["assign_user"] = args["sql_params"]["assign_user"]
         task_rank_info = []
