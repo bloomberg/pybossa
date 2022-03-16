@@ -129,7 +129,7 @@ def create_bulk_data(project_id, num_records):
         task_run_ids = [create_task_run(project_id, task_id, user_ids[i], created) for i in range(num_answers)]
         print("Taskruns created: ", str(task_run_ids))
 
-        result_id = create_result(project_id, task_id, task_run_ids, created)
+        result_id = [create_result(project_id, task_id, task_run_ids, created) for _ in range(randrange(1, 5))]
         print("Result created: ", result_id)
 
 def setup_args():

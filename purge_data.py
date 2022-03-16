@@ -113,21 +113,24 @@ def generate_sql_cols_vals(table_prefix, data):
 
     return columns, columns_placeholders, columns_values
 
-def generate_task_run_sql(task_runs):
+def generate_multiple_records(table, records):
     isql, dsql, columns_dict = "", "", {}
+    table_prefixes = {"task_run": "tr", "result": "r"}
 
-    if task_runs.empty:
+    table_prefix = table_prefixes[table]
+
+    if records.empty:
         return isql, dsql, columns_dict
 
-    for i, task_run in task_runs.iterrows():
-        task_run_data = pd.DataFrame(task_run).transpose()
-        task_run_columns, task_run_col_placeholders, task_run_col_dict = generate_sql_cols_vals(f"tr_{i}",task_run_data)
-        if not(task_run_columns or task_run_col_placeholders or task_run_col_dict):
+    for i, record in records.iterrows():
+        data = pd.DataFrame(record).transpose()
+        columns, col_placeholders, col_dict = generate_sql_cols_vals(f"{table_prefix}_{i}", data)
+        if not(columns or col_placeholders or col_dict):
             continue
 
-        isql += f"INSERT INTO task_run_archived({task_run_columns}) VALUES({task_run_col_placeholders});"
-        columns_dict.update(task_run_col_dict)
-    dsql = f"DELETE FROM task_run WHERE project_id = %(project_id)s AND task_id = %(task_id)s;"
+        isql += f"INSERT INTO {table}_archived({columns}) VALUES({col_placeholders});"
+        columns_dict.update(col_dict)
+    dsql = f"DELETE FROM {table} WHERE project_id = %(project_id)s AND task_id = %(task_id)s;"
     return isql, dsql, columns_dict
 
 
@@ -156,15 +159,14 @@ def purge_task_data(task_id, project_id):
         delete_sql += f"DELETE FROM task WHERE project_id = %(project_id)s AND id = %(task_id)s;"
 
     # archive task_run data
-    insert_task_run, delete_task_run, task_run_col_dict = generate_task_run_sql(task_run_data)
+    insert_task_run, delete_task_run, task_run_col_dict = generate_multiple_records("task_run", task_run_data)
     insert_sql += insert_task_run
     delete_sql += delete_task_run
 
     # archive result data
-    result_columns, result_col_placeholders, result_col_dict = generate_sql_cols_vals("r", result_data)
-    if result_columns and result_col_placeholders and result_col_dict:
-        insert_sql += f"INSERT INTO result_archived({result_columns}) VALUES({result_col_placeholders});"
-        delete_sql += f"DELETE FROM result WHERE project_id = %(project_id)s AND task_id = %(task_id)s;"
+    insert_result, delete_result, result_col_dict = generate_multiple_records("result", result_data)
+    insert_sql += insert_result
+    delete_sql += delete_result
 
     # combine task, task_run, result, col-val dict
     columns_values = {}
