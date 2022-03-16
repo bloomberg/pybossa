@@ -92,6 +92,57 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
         return task
 
+    def search_lock_status_sorting_result():
+        tasks = []
+        sql_order_by = sorting[order_by]
+
+        # if there are locked tasks in project, need to merge sort locked tasks and unlocked tasks
+        # otherwise just sort by pcomplete
+        if locked_tasks_in_project:
+            locked_tasks = [format_task(row, locked_tasks_in_project.get(row.id, []))
+                                for row in session.execute(text(sql+sql_lock_filter), params)]
+
+            if order_by == 'lock_status asc':
+                # sort by completed tasks, then incomplete tasks, then locked tasks
+
+                # if current offset is less than number of unlocked tasks
+                #   need to query unlocked tasks first, then append locked tasks to fulfill the page size
+                # if current offset is more than number of unlocked tasks
+                #   should skip all unlocked tasks and partial locked tasks, and present the rest locked tasks
+                if offset < total_count - len(locked_tasks):
+                    sql_query = sql + sql_unlock_filter + sql_order.format(sql_order_by) + sql_limit_offset
+                    results = session.execute(text(sql_query), params)
+                else:
+                    locked_tasks = locked_tasks[offset-(total_count-len(locked_tasks)):]
+                    results = []
+
+                for row in results:
+                    tasks.append(format_task(row, locked_tasks_in_project.get(row.id, [])))
+
+                # fill up the page size with locked tasks until the page size is reached or exhausted
+                for lt in locked_tasks:
+                    if len(tasks) < limit:
+                        tasks.append(lt)
+                    else:
+                        break
+            else:
+                # sort by locked tasks, then incompleted tasks, then completed tasks
+                tasks = locked_tasks[offset: offset+limit]
+
+                # if locked tasks is not enough to fulfill the page,
+                #   need to append unlocked tasks until the page size is fulfilled
+                #   query additional unlocked tasks and append them until the page size is reached or exhausted
+                if len(tasks) < limit:
+                    sql_query = sql + sql_unlock_filter + sql_order.format(sql_order_by) + sql_limit_offset
+                    params["offset"] = max(params["offset"]-len(locked_tasks), 0)
+                    params["limit"] -= len(tasks)
+                    results = session.execute(text(sql_query), params)
+
+                    for row in results:
+                        tasks.append(format_task(row, locked_tasks_in_project.get(row.id, [])))
+
+        return tasks
+
 
     order_by = args.get('order_by') or ""
     tasks = []
@@ -186,64 +237,14 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         params["offset"] = offset
 
         if "lock_status" in order_by:
-            sql_order_by = sorting[order_by]
-
-            # if there are locked tasks in project, need to merge sort locked tasks and unlocked tasks
-            # otherwise just sort by pcomplete
-            if locked_tasks_in_project:
-                locked_tasks = [format_task(row, locked_tasks_in_project.get(row.id, []))
-                                    for row in session.execute(text(sql+sql_lock_filter), params)]
-
-                if order_by == 'lock_status asc':
-                    # sort by completed tasks, then incomplete tasks, then locked tasks
-
-                    # if current offset is less than number of unlocked tasks
-                    #   need to query unlocked tasks first, then append locked tasks to fulfill the page size
-                    # if current offset is more than number of unlocked tasks
-                    #   should skip all unlocked tasks and partial locked tasks, and present the rest locked tasks
-                    if offset < total_count - len(locked_tasks):
-                        sql_query = sql + sql_unlock_filter + sql_order.format(sql_order_by) + sql_limit_offset
-                        results = session.execute(text(sql_query), params)
-                    else:
-                        locked_tasks = locked_tasks[offset-(total_count-len(locked_tasks)):]
-                        results = []
-
-                    for row in results:
-                        tasks.append(format_task(row, locked_tasks_in_project.get(row.id, [])))
-
-                    # fill up the page size with locked tasks until the page size is reached or exhausted
-                    for lt in locked_tasks:
-                        if len(tasks) < limit:
-                            tasks.append(lt)
-                        else:
-                            break
-
-                else:
-                    # sort by locked tasks, then incompleted tasks, then completed tasks
-                    tasks = locked_tasks[offset: offset+limit]
-
-                    # if locked tasks is not enough to fulfill the page,
-                    #   need to append unlocked tasks until the page size is fulfilled
-                    #   query additional unlocked tasks and append them until the page size is reached or exhausted
-                    if len(tasks) < limit:
-                        sql_query = sql + sql_unlock_filter + sql_order.format(sql_order_by) + sql_limit_offset
-                        params["offset"] = max(params["offset"]-len(locked_tasks), 0)
-                        results = session.execute(text(sql_query), params)
-
-                        for row in results:
-                            if len(tasks) < limit:
-                                tasks.append(format_task(row, locked_tasks_in_project.get(row.id, [])))
-                            else:
-                                break
-
-                return total_count, tasks
+            tasks = search_lock_status_sorting_result()
         else:
             # if not sort by lock_status, sort by the column "order_by"
             sql_order_by = args.get('order_by') or 'id ASC'
+            sql_query = sql + sql_order.format(sql_order_by) + sql_limit_offset
+            results = session.execute(text(sql_query), params)
+            tasks = [format_task(row, locked_tasks_in_project.get(row.id, [])) for row in results]
 
-        sql_query = sql + sql_order.format(sql_order_by) + sql_limit_offset
-        results = session.execute(text(sql_query), params)
-        tasks = [format_task(row, locked_tasks_in_project.get(row.id, [])) for row in results]
         session.execute("RESET enable_indexscan;")
 
     return total_count, tasks
