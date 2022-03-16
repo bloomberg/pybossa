@@ -452,7 +452,7 @@ class TestProjectsCache(Test):
         project = ProjectFactory.create(owner=owner, short_name="testproject")
         tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
 
-        locks.return_value = [{"task_id": tasks[0].id, "user_id": owner.id}]
+        locks.return_value = [{"task_id": str(tasks[0].id), "user_id": owner.id}]
 
         count, cached_tasks = cached_projects.browse_tasks(project.id, {"order_by": "lock_status asc"})
         assert count == 2
