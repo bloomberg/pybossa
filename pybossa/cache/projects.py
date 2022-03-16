@@ -164,13 +164,14 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
     else:
         # construct task browse page for owners/admins
+        session.execute("SET LOCAL enable_indexscan = OFF;")
         sql = """
             SELECT task.id,
             coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
             priority_0, task.created, task.calibration,
             task.user_pref, task.worker_filter, task.worker_pref
             FROM task LEFT OUTER JOIN
-            (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
+            (SELECT task_id, COUNT(id) AS ct,
             MAX(finish_time) as ft FROM task_run
             WHERE project_id=:project_id GROUP BY task_id) AS log_counts
             ON task.id=log_counts.task_id
@@ -243,6 +244,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         sql_query = sql + sql_order.format(sql_order_by) + sql_limit_offset
         results = session.execute(text(sql_query), params)
         tasks = [format_task(row, locked_tasks_in_project.get(row.id, [])) for row in results]
+        session.execute("RESET enable_indexscan;")
 
     return total_count, tasks
 
@@ -278,7 +280,7 @@ def task_count(project_id, args):
                 (
                 SELECT task.id FROM task LEFT OUTER JOIN
                     (
-                    SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
+                    SELECT task_id, COUNT(id) AS ct,
                     MAX(finish_time) as ft FROM task_run
                     WHERE project_id=:project_id GROUP BY task_id
                     ) AS log_counts
