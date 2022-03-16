@@ -117,7 +117,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     results = []
 
                 for row in results:
-                    tasks.append(format_task(row, locked_tasks_in_project.get(row.id, [])))
+                    tasks.append(format_task(row))
 
                 # fill up the page size with locked tasks until the page size is reached or exhausted
                 for lt in locked_tasks:
@@ -139,7 +139,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     results = session.execute(text(sql_query), params)
 
                     for row in results:
-                        tasks.append(format_task(row, locked_tasks_in_project.get(row.id, [])))
+                        tasks.append(format_task(row))
 
         return tasks
 
