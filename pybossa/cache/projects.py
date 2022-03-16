@@ -130,8 +130,8 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                 tasks = locked_tasks[offset: offset+limit]
 
                 # if locked tasks is not enough to fulfill the page,
-                #   need to append unlocked tasks until the page size is fulfilled
-                #   query additional unlocked tasks and append them until the page size is reached or exhausted
+                #   need to append unlocked tasks to get full page size
+                #   query additional unlocked tasks and append them
                 if len(tasks) < limit:
                     sql_query = sql + sql_unlock_filter + sql_order.format(sql_order_by) + sql_limit_offset
                     params["offset"] = max(params["offset"]-len(locked_tasks), 0)
