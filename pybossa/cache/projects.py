@@ -116,15 +116,11 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     locked_tasks = locked_tasks[offset-(total_count-len(locked_tasks)):]
                     results = []
 
-                for row in results:
-                    tasks.append(format_task(row))
+                tasks.extend([format_task(row) for row in results])
 
                 # fill up the page size with locked tasks until the page size is reached or exhausted
-                for lt in locked_tasks:
-                    if len(tasks) < limit:
-                        tasks.append(lt)
-                    else:
-                        break
+                tasks.extend(locked_tasks[:limit-len(tasks)])
+
             else:
                 # sort by locked tasks, then incompleted tasks, then completed tasks
                 tasks = locked_tasks[offset: offset+limit]
@@ -138,8 +134,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     params["limit"] -= len(tasks)
                     results = session.execute(text(sql_query), params)
 
-                    for row in results:
-                        tasks.append(format_task(row))
+                    tasks.extend([format_task(row) for row in results])
 
         return tasks
 
