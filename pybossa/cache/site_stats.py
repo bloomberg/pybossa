@@ -233,6 +233,9 @@ def number_of_completed_tasks(days=30):
 @allow_all_time
 def number_of_active_users(days=30):
     """Number of active users"""
+
+    # TODO - revisit the SQL performance with index on finish_time in
+    #  task_run table after DB engine upgrade
     sql = text('''
         SELECT COUNT(DISTINCT(user_id)) as id 
         FROM task_run
