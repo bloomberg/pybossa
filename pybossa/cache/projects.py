@@ -17,8 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Cache module for projects."""
 from sqlalchemy.sql import text
-from pybossa.contributions_guard import ContributionsGuard
-from pybossa.core import db, sentinel, timeouts
+from pybossa.core import db, timeouts
 from pybossa.model.project import Project
 from pybossa.util import pretty_date, static_vars, convert_utc_to_est
 from pybossa.cache import memoize, cache, delete_memoized, delete_cached, \
@@ -30,7 +29,6 @@ from pybossa.redis_lock import get_locked_tasks_project
 from pybossa.util import get_taskrun_date_range_sql_clause_params
 
 import heapq
-import time
 
 session = db.slave_session
 
@@ -55,9 +53,7 @@ def get_top(n=4):
     for row in results:
         project = dict(id=row.id, name=row.name, short_name=row.short_name,
                        description=row.description,
-                       info=row.info,
-                       n_volunteers=n_volunteers(row.id),
-                       n_completed_tasks=n_completed_tasks(row.id))
+                       info=row.info)
 
         top_projects.append(Project().to_public_json(project))
     return top_projects
@@ -465,7 +461,7 @@ def overall_progress(project_id):
     return ((n_completed_tasks(project_id) * 100) // total_tasks) if total_tasks != 0 else 0
 
 
-@memoize(timeout=timeouts.get('APP_TIMEOUT'), cache_group_keys=[[0]])
+@memoize_with_l2_cache(timeout=timeouts.get('APP_TIMEOUT'), cache_group_keys=[[0]])
 def last_activity(project_id):
     """Return last activity, date, from a project."""
     sql = text('''SELECT finish_time FROM task_run WHERE project_id=:project_id
@@ -706,15 +702,18 @@ def get_from_pro_user():
 
 @memoize(timeout=ONE_DAY)
 def get_recently_updated_projects():
-    """Return the list of published projects that has task creations in last 3 months.
+    """Return the list of projects that has task creations in last 3 months.
     "updated" column in the project table get updated when new tasks are created,
     new task runs submitted, task setting updated, project updated and etc.
     ref: model/event_listener.py:update_project
     """
 
-    sql = text('''SELECT id, short_name FROM project
-               WHERE published = true AND
-               TO_DATE(updated, 'YYYY-MM-DD"T"HH24:MI:SS.US') >= NOW() - '3 months' :: INTERVAL;''')
+    # Including unpublished projects so that project_stats data is more accurate
+    sql = text('''
+               SELECT id, short_name FROM project
+               WHERE TO_DATE(updated, 'YYYY-MM-DD"T"HH24:MI:SS.US') >= NOW() - '3 months' :: INTERVAL;
+               ''')
+
     results = db.slave_session.execute(sql)
     projects = []
     for row in results:
@@ -861,7 +860,7 @@ def delete_overall_progress(project_id):
 
 def delete_last_activity(project_id):
     """Reset last_activity value in cache"""
-    delete_memoized(last_activity, project_id)
+    delete_memoize_with_l2_cache(last_activity, project_id)
 
 
 def delete_n_registered_volunteers(project_id):

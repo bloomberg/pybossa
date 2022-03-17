@@ -17,19 +17,22 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Cache module for site statistics."""
 from functools import wraps
-from sqlalchemy.sql import text
-from flask import current_app
 
-from pybossa.core import db
-from pybossa.cache import cache, memoize, ONE_DAY, ONE_WEEK
+from flask import current_app
+from sqlalchemy.sql import text
+
 import pybossa.app_settings as app_settings
-from pybossa.cache import sentinel, management_dashboard_stats
+from pybossa.cache import ONE_DAY, ONE_WEEK, \
+    memoize_with_l2_cache, TWO_WEEKS
 from pybossa.cache import get_cache_group_key, delete_cache_group
+from pybossa.cache import sentinel, management_dashboard_stats
+from pybossa.core import db
 
 session = db.slave_session
 
 
-@cache(timeout=ONE_DAY, key_prefix="site_n_auth_users")
+@memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
+                       key_prefix="site_n_auth_users")
 def n_auth_users():
     """Return number of authenticated users."""
     sql = text('''SELECT COUNT("user".id) AS n_auth FROM "user";''')
@@ -39,9 +42,16 @@ def n_auth_users():
     return n_auth or 0
 
 
-@cache(timeout=ONE_DAY, key_prefix="site_n_anon_users")
+@memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
+                       key_prefix="site_n_anon_users")
 def n_anon_users():
-    """Return number of anonymous users."""
+    """Return number of anonymous users.
+    This is a slow query doing seq scan on task_run
+    """
+
+    # No anonymous users supported in Gigwork. Return 0 to speed up
+    return 0
+
     if app_settings.config.get('DISABLE_ANONYMOUS_ACCESS'):
         return 0
 
@@ -54,7 +64,8 @@ def n_anon_users():
     return n_anon or 0
 
 
-@cache(timeout=ONE_DAY, key_prefix="site_n_tasks")
+@memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
+                       key_prefix="site_n_tasks")
 def n_tasks_site():
     """Return number of tasks in the server."""
     sql = text('''SELECT COUNT(task.id) AS n_tasks FROM task''')
@@ -64,9 +75,12 @@ def n_tasks_site():
     return n_tasks or 0
 
 
-@cache(timeout=ONE_DAY, key_prefix="site_n_total_tasks")
+@memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
+                       key_prefix="site_n_total_tasks")
 def n_total_tasks_site():
-    """Return number of total tasks based on redundancy."""
+    """Return number of total tasks based on redundancy.
+    This is a slow query doing seq scan on task
+    """
     sql = text('''SELECT SUM(n_answers) AS n_tasks FROM task''')
     results = session.execute(sql)
     for row in results:
@@ -74,7 +88,8 @@ def n_total_tasks_site():
     return total or 0
 
 
-@cache(timeout=ONE_DAY, key_prefix="site_n_task_runs")
+@memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
+                       key_prefix="site_n_task_runs")
 def n_task_runs_site():
     """Return number of task runs in the server."""
     sql = text('''SELECT COUNT(task_run.id) AS n_task_runs FROM task_run''')
@@ -84,7 +99,8 @@ def n_task_runs_site():
     return n_task_runs or 0
 
 
-@cache(timeout=ONE_DAY, key_prefix="site_n_results")
+@memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
+                       key_prefix="site_n_results")
 def n_results_site():
     """Return number of results in the server."""
     sql = text('''
@@ -97,7 +113,8 @@ def n_results_site():
     return n_results or 0
 
 
-@cache(timeout=ONE_DAY, key_prefix="site_top5_apps_24_hours")
+@memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
+                       key_prefix="site_top5_apps_24_hours")
 def get_top5_projects_24_hours():
     """Return the top 5 projects more active in the last 24 hours."""
     # Top 5 Most active projects in last 24 hours
@@ -117,7 +134,8 @@ def get_top5_projects_24_hours():
     return top5_apps_24_hours
 
 
-@cache(timeout=ONE_DAY, key_prefix="site_top5_users_24_hours")
+@memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
+                       key_prefix="site_top5_users_24_hours")
 def get_top5_users_24_hours():
     """Return top 5 users in last 24 hours."""
     # Top 5 Most active users in last 24 hours
@@ -145,10 +163,12 @@ def allow_all_time(func):
         if days == 'all':
             days = 999999
         return func(days=days)
+
     return wrapper
 
 
-@memoize(ONE_WEEK, cache_group_keys=['number_of_created_jobs'])
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['number_of_created_jobs'])
 @allow_all_time
 def number_of_created_jobs(days=30):
     """Number of created jobs"""
@@ -161,17 +181,13 @@ def number_of_created_jobs(days=30):
     return session.execute(sql, dict(days=days)).scalar()
 
 
-@memoize(ONE_WEEK, cache_group_keys=['number_of_active_jobs'])
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['number_of_active_jobs'])
 @allow_all_time
 def number_of_active_jobs(days=30):
     """Number of jobs with submissions"""
     sql = text('''
-        WITH activity AS (SELECT project.id as id,
-               MAX(task_run.finish_time) as last_activity
-            FROM project LEFT JOIN task_run
-            ON project.id = task_run.project_id
-            GROUP BY project.id)
-        SELECT COUNT(id) FROM activity
+        SELECT COUNT(id) from project_stats
         WHERE clock_timestamp() -
               to_timestamp(last_activity, 'YYYY-MM-DD"T"HH24:MI:SS.US')
             < interval ':days days';
@@ -179,50 +195,57 @@ def number_of_active_jobs(days=30):
     return session.execute(sql, dict(days=days)).scalar()
 
 
-@memoize(ONE_WEEK, cache_group_keys=['number_of_created_tasks'])
-@allow_all_time
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['number_of_created_tasks'])
 def number_of_created_tasks(days=30):
     """Number of created tasks"""
-    sql = text('''
-        SELECT count(id) FROM task
-        WHERE
-        to_timestamp(created, 'YYYY-MM-DD"T"HH24:MI:SS.US')
-            > NOW() - interval ':days days';
-        ''')
+    if days == 'all':
+        sql = text('''select sum(n_tasks) from project_stats;''')
+    else:
+        sql = text('''
+            SELECT count(id) FROM task
+            WHERE created >= CAST(CURRENT_DATE - INTERVAL ':days days' AS TEXT);
+            ''')
     return session.execute(sql, dict(days=days)).scalar()
 
 
-@memoize(ONE_WEEK, cache_group_keys=['number_of_completed_tasks'])
-@allow_all_time
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['number_of_completed_tasks'])
 def number_of_completed_tasks(days=30):
     """Number of completed tasks"""
-    sql = text('''
-        WITH taskruns AS (
-            SELECT DISTINCT task_id FROM task_run
-            WHERE to_timestamp(finish_time, 'YYYY-MM-DD"T"HH24:MI:SS.US')
-            >= NOW() -  interval ':days days')
-        SELECT COUNT(*) FROM task JOIN taskruns
-        ON task.id = taskruns.task_id
-        WHERE task.state = 'completed';
-        ''')
+    if days == 'all':
+        sql = text('''select sum(n_completed_tasks) from project_stats;''')
+    else:
+        sql = text('''
+            WITH taskruns AS (
+                SELECT DISTINCT task_id FROM task_run
+                WHERE finish_time >= CAST(CURRENT_DATE - INTERVAL ':days days' AS TEXT)
+            )
+            SELECT COUNT(*) FROM task JOIN taskruns
+            ON task.id = taskruns.task_id
+            WHERE task.state = 'completed';
+            ''')
     return session.execute(sql, dict(days=days)).scalar()
 
 
-@memoize(ONE_WEEK, cache_group_keys=['number_of_active_users'])
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['number_of_active_users'])
 @allow_all_time
 def number_of_active_users(days=30):
     """Number of active users"""
+
+    # TODO - revisit the SQL performance with index on finish_time in
+    #  task_run table after DB engine upgrade
     sql = text('''
-        WITH active_users AS (
-            SELECT DISTINCT(user_id) as id FROM task_run
-            WHERE to_timestamp(task_run.finish_time, 'YYYY-MM-DD"T"HH24:MI:SS.US')
-            > NOW() - interval ':days days')
-        SELECT COUNT(id) FROM active_users;
+        SELECT COUNT(DISTINCT(user_id)) as id 
+        FROM task_run
+        WHERE task_run.finish_time > CAST(CURRENT_DATE - INTERVAL ':days days' AS TEXT);
     ''')
     return session.execute(sql, dict(days=days)).scalar()
 
 
-@memoize(ONE_WEEK, cache_group_keys=['categories_with_new_projects'])
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['categories_with_new_projects'])
 @allow_all_time
 def categories_with_new_projects(days=30):
     """Categories with new projects"""
@@ -239,67 +262,73 @@ def categories_with_new_projects(days=30):
     return session.execute(sql, dict(days=days)).scalar()
 
 
-@memoize(ONE_WEEK, cache_group_keys=['avg_time_to_complete_task'])
-@allow_all_time
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['avg_time_to_complete_task'])
 def avg_time_to_complete_task(days=30):
     """Average time to complete a task"""
-    sql = text('''
-        WITH taskruns AS (
-            SELECT finish_time, created FROM task_run
-            WHERE to_timestamp(finish_time, 'YYYY-MM-DD"T"HH24:MI:SS.US')
-            > NOW() -  interval ':days days'
-        )
-        SELECT to_char(
-            AVG(
-                to_timestamp(finish_time, 'YYYY-MM-DD"T"HH24-MI-SS.US') -
-                to_timestamp(created, 'YYYY-MM-DD"T"HH24-MI-SS.US')
-            ),
-            'MI"m" SS"s"'
-        )
-        AS average_time from taskruns;
-    ''')
+    if days == 'all':
+        sql = text('''
+        SELECT TO_CHAR(
+            (AVG(average_time) || ' second')::interval, 'MI"m" SS"s"')
+        AS average_time FROM project_stats WHERE average_time > 0;
+        ''')
+    else:
+        sql = text('''
+            WITH taskruns AS (
+                SELECT finish_time, created FROM task_run
+                WHERE finish_time > CAST(CURRENT_DATE - INTERVAL ':days days' AS TEXT)
+            )
+            SELECT to_char(
+                AVG(
+                    to_timestamp(finish_time, 'YYYY-MM-DD"T"HH24-MI-SS.US') -
+                    to_timestamp(created, 'YYYY-MM-DD"T"HH24-MI-SS.US')
+                ),
+                'MI"m" SS"s"'
+            )
+            AS average_time from taskruns;
+        ''')
     return session.execute(sql, dict(days=days)).scalar() or 'N/A'
 
 
-@memoize(ONE_WEEK, cache_group_keys=['avg_task_per_job'])
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['avg_task_per_job'])
 def avg_task_per_job():
     """Average number of tasks per job"""
-    sql = text('''
-        SELECT AVG(ct) FROM (
-            SELECT project_id, count(task.id) AS ct
-            FROM task
-            GROUP BY project_id
-        ) AS t WHERE ct > 0;
-        ''')
+    sql = text('''SELECT AVG(n_tasks) FROM project_stats WHERE n_tasks > 0;''')
     return session.execute(sql).scalar()
 
 
-@memoize(ONE_WEEK, cache_group_keys=['tasks_per_category'])
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['tasks_per_category'])
 def tasks_per_category():
     """Average number of tasks per category"""
     sql = text('''
-        SELECT AVG(ct) FROM (
-            SELECT p.category_id, COUNT(t.id) AS ct
-            FROM project p LEFT OUTER JOIN task t
-            ON p.id = t.project_id
-            GROUP BY p.category_id
-        ) AS t WHERE ct > 0;
+        WITH tasks AS (
+            SELECT SUM(n_tasks) AS n_tasks FROM project_stats ps
+            JOIN project p ON p.id = ps.project_id 
+            JOIN category c ON c.id = p.category_id
+            WHERE n_tasks > 0
+            GROUP BY c.id
+        ) 
+        SELECT AVG(n_tasks) FROM tasks;
     ''')
     return session.execute(sql).scalar() or 'N/A'
 
 
-@memoize(ONE_WEEK, cache_group_keys=['project_chart'])
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['project_chart'])
 def project_chart():
     """
     Fetch data for a monthly chart of the number of projects
+    This query takes 75 ms in Prod
     """
     sql = text('''
         WITH dates AS (
-            SELECT * FROM
+            SELECT generate_series as date FROM
             generate_series(
                 date_trunc('month', clock_timestamp()) - interval '24 month',
                 clock_timestamp(),
-                '1 month') as date
+                '1 month')
         )
         SELECT date, count(project.id) as num_created FROM
         dates LEFT JOIN project ON
@@ -312,18 +341,20 @@ def project_chart():
     return dict(labels=labels, series=[series])
 
 
-@memoize(ONE_WEEK, cache_group_keys=['category_chart'])
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['category_chart'])
 def category_chart():
     """
     Fetch data for a monthly chart of the number of categories
+    This query takes 1 ms in Prod
     """
     sql = text('''
         WITH dates AS (
-            SELECT * FROM
+            SELECT generate_series as date FROM
             generate_series(
                 date_trunc('month', clock_timestamp()) - interval '24 month',
                 clock_timestamp(),
-                '1 month') as date
+                '1 month')
         )
         SELECT date, count(category.id) as num_created FROM
         dates LEFT JOIN category ON
@@ -336,7 +367,8 @@ def category_chart():
     return dict(labels=labels, series=[series])
 
 
-@memoize(ONE_WEEK, cache_group_keys=['task_chart'])
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['task_chart'])
 def task_chart():
     """
     Fetch data for a monthly chart of the number of tasks
@@ -358,7 +390,8 @@ def task_chart():
     return dict(labels=labels, series=[series])
 
 
-@memoize(ONE_WEEK, cache_group_keys=['submission_chart'])
+@memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
+                       cache_group_keys=['submission_chart'])
 def submission_chart():
     """
     Fetch data for a monthly chart of the number of submissions
@@ -381,10 +414,10 @@ def submission_chart():
 
 
 def management_dashboard_stats_cached():
-    stats_cached = all([bool(list(sentinel.slave.smembers(get_cache_group_key((ms)))))
-        for ms in management_dashboard_stats])
+    stats_cached = all([sentinel.slave.smembers(get_cache_group_key(ms))
+                        for ms in management_dashboard_stats])
 
     if not stats_cached:
         # reset stats for any missing stat
-        list(map(delete_cache_group, management_dashboard_stats))
+        map(delete_cache_group, management_dashboard_stats)
     return stats_cached

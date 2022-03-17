@@ -32,6 +32,9 @@ import time
 from functools import wraps
 from random import randrange
 
+from flask import current_app
+from redis.exceptions import LockError
+
 from pybossa.core import sentinel
 
 try:
@@ -57,6 +60,7 @@ ONE_WEEK = 7 * ONE_DAY
 ONE_MINUTE = 60
 L2_CACHE_TIMEOUT = ONE_DAY
 MUTEX_LOCK_TIMEOUT = ONE_MINUTE
+TWO_WEEKS = 14 * ONE_DAY
 
 management_dashboard_stats = [
     'project_chart', 'category_chart', 'task_chart',
@@ -238,7 +242,8 @@ def memoize_essentials(timeout=300, essentials=None, cache_group_keys=None):
 def memoize_with_l2_cache(timeout=DEFAULT_TIMEOUT,
                           timeout_l2=L2_CACHE_TIMEOUT,
                           timeout_mutex_lock=MUTEX_LOCK_TIMEOUT,
-                          cache_group_keys=None):
+                          cache_group_keys=None,
+                          key_prefix=None):
     """
     Decorator for caching functions using its arguments as part of the key.
     Returns the cached value, or the function if the cache is disabled
@@ -250,8 +255,6 @@ def memoize_with_l2_cache(timeout=DEFAULT_TIMEOUT,
         timeout = DEFAULT_TIMEOUT
     if timeout < MIN_TIMEOUT:
         timeout = MIN_TIMEOUT
-    if timeout_mutex_lock > MUTEX_LOCK_TIMEOUT:
-        timeout_mutex_lock = MUTEX_LOCK_TIMEOUT
 
     timeout += randrange(30)  # add a random jitter to reduce DB load
 
@@ -276,15 +279,23 @@ def memoize_with_l2_cache(timeout=DEFAULT_TIMEOUT,
             lock_success = mutex_lock.acquire(blocking=False)
             if lock_success:
                 output = update_cache(key_l1, key_l2, *args, **kwargs)
-                mutex_lock.release()  # release the lock
-                return output
+                try:
+                    mutex_lock.release()  # release the lock
+                except LockError as e:
+                    msg = "Consider to set a longer timeout_mutex_lock value."
+                    current_app.logger.info(f"{str(e)}. {msg}")
+                finally:
+                    return output
             return None
 
         @wraps(f)
         def wrapper(*args, **kwargs):
-            key = "%s:%s_args:" % (REDIS_KEYPREFIX, f.__name__)
-            key_to_hash = get_key_to_hash(*args, **kwargs)
-            key = get_hash_key(key, key_to_hash)
+            if key_prefix is None:
+                key = "%s:%s_args:" % (REDIS_KEYPREFIX, f.__name__)
+                key_to_hash = get_key_to_hash(*args, **kwargs)
+                key = get_hash_key(key, key_to_hash)
+            else:
+                key = "%s::%s" % (REDIS_KEYPREFIX, key_prefix)
             key_l2 = f"{key}:l2"
 
             if os.environ.get('PYBOSSA_REDIS_CACHE_DISABLED') is None:
