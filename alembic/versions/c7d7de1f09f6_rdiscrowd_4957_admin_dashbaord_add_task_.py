@@ -1,14 +1,14 @@
 """RDISCROWD-4957 admin dashbaord-add task_crated_idx
 
 Revision ID: c7d7de1f09f6
-Revises: ed775af5e086
+Revises: 82cb40487506
 Create Date: 2022-03-16 11:14:18.737830
 
 """
 
 # revision identifiers, used by Alembic.
 revision = 'c7d7de1f09f6'
-down_revision = 'ed775af5e086'
+down_revision = '82cb40487506'
 
 from alembic import op
 

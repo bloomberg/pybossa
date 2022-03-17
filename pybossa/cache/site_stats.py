@@ -48,6 +48,10 @@ def n_anon_users():
     """Return number of anonymous users.
     This is a slow query doing seq scan on task_run
     """
+
+    # No anonymous users supported in Gigwork. Return 0 to speed up
+    return 0
+
     if app_settings.config.get('DISABLE_ANONYMOUS_ACCESS'):
         return 0
 

@@ -68,7 +68,9 @@ class TestSiteStatsCache(Test):
 
         anonymous_users = stats.n_anon_users()
 
-        assert anonymous_users == 2, anonymous_users
+        # No anonymous users supported in Gigwork. Return 0 to speed up
+
+        assert anonymous_users == 0, anonymous_users
 
     @with_context
     def test_n_tasks_site_returns_number_of_total_tasks(self):

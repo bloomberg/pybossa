@@ -708,6 +708,7 @@ def get_recently_updated_projects():
     ref: model/event_listener.py:update_project
     """
 
+    # Including unpublished projects so that project_stats data is more accurate
     sql = text('''
                SELECT id, short_name FROM project
                WHERE TO_DATE(updated, 'YYYY-MM-DD"T"HH24:MI:SS.US') >= NOW() - '3 months' :: INTERVAL;
