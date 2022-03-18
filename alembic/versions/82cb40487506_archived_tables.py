@@ -32,8 +32,8 @@ def upgrade():
         sa.Column('user_pref', JSONB),
         sa.Column('gold_answers', JSONB),
         sa.Column('expiration', sa.DateTime),
-        sa.Column('worker_filter', sa.Integer),
-        sa.Column('worker_pref', sa.Integer),
+        sa.Column('worker_filter', JSONB),
+        sa.Column('worker_pref', JSONB),
         sa.Column('updated', sa.DateTime, nullable=False)
     )
 
@@ -48,9 +48,10 @@ def upgrade():
         sa.Column('finish_time', sa.Text),
         sa.Column('timeout', sa.Integer),
         sa.Column('calibration', sa.Integer),
-        sa.Column('external_uid', sa.Text),
-        sa.Column('media_url', sa.Text),
         sa.Column('info', JSONB),
+        sa.Column('gold_ans_status', sa.Unicode(length=20)),
+        sa.Column('external_uid', sa.String),
+        sa.Column('media_url', sa.String),
         sa.Column('updated', sa.DateTime, nullable=False)
     )
 
