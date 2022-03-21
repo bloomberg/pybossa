@@ -230,6 +230,7 @@ def main():
         logger.info("End purge data script")
         return
 
+    data.to_csv("purgedata.csv", index=False)
     logger.info(f"List of projects data older than {duration} months")
     logger.info(data)
     logger.info(f"Top {num_projects} projects data can be purged")
