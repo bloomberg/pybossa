@@ -26,31 +26,51 @@ root_logger.addHandler(handler)
 logger = logging.getLogger("datapurge")
 
 
-def get_data_to_purge(duration):
-    sql = f"""
+def get_data_to_purge(duration, project_id):
+    params = {"duration": duration}
+
+    sql = """
         SELECT project_id, count(*) as n_tasks, min(created) as first_create_date, max(created) as last_create_date
-        FROM task
-        WHERE TO_DATE(created, 'YYYY-MM-DD"T"HH24:MI:SS.US') <= NOW() - '{duration} months' :: INTERVAL
+        FROM task WHERE """
+
+    if project_id:
+        sql += "project_id = %(project_id)s AND"
+        params["project_id"] = project_id
+
+    sql +="""
+        TO_DATE(created, 'YYYY-MM-DD"T"HH24:MI:SS.US') <= NOW() - '%(duration)s months' :: INTERVAL
         GROUP BY project_id
         ORDER BY n_tasks DESC;
     """
     logger.info("get_data_to_purge sql")
     logger.info(sql)
-    with AccessDatabase() as db:
-        data = pd.read_sql_query(sql, db.conn)
+    try:
+        with AccessDatabase() as db:
+            db.execute_sql(sql, params)
+            data = pd.DataFrame(db.cursor.fetchall(), columns=["project_id", "n_tasks", "first_create_date", "last_create_date"])
+    except (Exception, psycopg2.DatabaseError):
+        logger.error("params %s", str(params))
+        logger.exception("Error obtaining project data to purge. project_id: %s", project_id)
     return data
 
 
 def get_tasks_to_purge(project_id, duration):
-    sql = f"""
+    sql = """
         SELECT id, created
         FROM task
-        WHERE project_id={project_id} AND
-        TO_DATE(created, 'YYYY-MM-DD"T"HH24:MI:SS.US') <= NOW() - '{duration} months' :: INTERVAL
+        WHERE project_id=%(project_id)s AND
+        TO_DATE(created, 'YYYY-MM-DD"T"HH24:MI:SS.US') <= NOW() - '%(duration)s months' :: INTERVAL
         ORDER BY created;
     """
-    with AccessDatabase() as db:
-        tasks = pd.read_sql_query(sql, db.conn)
+    logger.info(sql)
+    params = {"project_id": project_id, "duration": duration}
+    try:
+        with AccessDatabase() as db:
+            db.execute_sql(sql, params)
+            tasks = pd.DataFrame(db.cursor.fetchall(), columns=["id", "created"])
+    except (Exception, psycopg2.DatabaseError):
+        logger.error("params %s", str(params))
+        logger.exception("Error obtaining tasks data to purge. project_id: %s", project_id)
     return tasks
 
 
@@ -79,15 +99,14 @@ def generate_sql_cols_vals(table_prefix, data):
             columns_values[col_id] = val
             continue
 
-        if isinstance(val, np.int64) or isinstance(val, np.int):
+        if isinstance(val, np.int_):
             data_cols.append(col)
             col_placeholders.append(f"%({col_id})s")
             columns_values[col_id] = int(val)
             continue
 
-        # True/False -> true/false
-        if isinstance(val, bool):
-            val = "true" if val else "false"
+        if isinstance(val, np.bool_):
+            val = bool(val)
             data_cols.append(col)
             col_placeholders.append(f"%({col_id})s")
             columns_values[col_id] = val
@@ -185,18 +204,11 @@ def purge_task_data(task_id, project_id):
             SET session_replication_role = DEFAULT;
             COMMIT;
         """
-
-        # # TODO: disable delete during testing. Replace following with commented code above
-        # sql = f"""
-        #     BEGIN;
-        #     {insert_sql}
-        #     COMMIT;
-        # """
-
         with AccessDatabase() as db:
             db.execute_sql(sql, columns_values)
-    except (Exception, psycopg2.DatabaseError) as error:
-        logger.exception("Error: ", error)
+    except (Exception, psycopg2.DatabaseError):
+        logger.error("params %s", str(columns_values))
+        logger.exception("Error purging task data. task_id: %s, project_id: %s", task_id, project_id)
 
 
 def purge_data(data, duration):
@@ -212,8 +224,8 @@ def purge_data(data, duration):
 def setup_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--duration", dest="duration", type=int, choices=[1, 6, 12, 24, 36], required=True, help="duration - integer value in months")
-    parser.add_argument("-n", "--num_projects", dest="num_projects", type=int, required=True, help="top n number of projects")
-    parser.add_argument("-p", "--purge", dest="purge", type=bool, default=False, help="purge data")
+    parser.add_argument("-n", "--num_projects", dest="num_projects", type=int, help="top n number of projects")
+    parser.add_argument("-p", "--project_id", dest="project_id", type=int, help="purge data by project id")
     args = parser.parse_args()
     return args
 
@@ -221,10 +233,10 @@ def setup_args():
 def main():
     args = setup_args()
     duration = args.duration
-    num_projects = args.num_projects
-    purge = args.purge
+    num_projects = args.num_projects or 0
+    project_id = args.project_id or 0
 
-    data = get_data_to_purge(duration=duration)
+    data = get_data_to_purge(duration=duration, project_id=project_id)
     if data.empty:
         logger.info(f"No projects exists with data older than {duration} months")
         logger.info("End purge data script")
@@ -233,20 +245,19 @@ def main():
     data.to_csv("purgedata.csv", index=False)
     logger.info(f"List of projects data older than {duration} months")
     logger.info(data)
-    logger.info(f"Top {num_projects} projects data can be purged")
-    logger.info(data.head(num_projects))
-    if not purge:
-        logger.info("Data purge not opted. Process complete...")
-        return
 
-    confirm_purge = input("Data will be purged now. Confirm (y/n)")
+    if not (num_projects or project_id):
+        logger.info(f"Project id or number of projects to purge not selected. All projects with <= {duration} months old data will be purged.")
+
+    confirm_purge = input("Confirm data purge(y/n)")
     if not confirm_purge in ['y', "Y"]:
         logger.info("Purge data cancelled upon confirmation.")
         logger.info("End purge data script")
         return
 
+    data = data.head(num_projects) if num_projects else data
     logger.info(f"Purge data for top {num_projects} projects")
-    purge_data(data.head(num_projects), duration=duration)
+    purge_data(data, duration=duration)
     logger.info("End purge data script")
 
 
