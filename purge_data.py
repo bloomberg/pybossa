@@ -86,7 +86,7 @@ def generate_sql_cols_vals(table_prefix, data):
             continue
 
         col_id = f"{table_prefix}_{col}"
-        if isinstance(val, dict):
+        if isinstance(val, dict) or (isinstance(val, list) and col in ["info", "user_pref", "gold_answers", "worker_filter", "worker_pref"]):
             val = json.dumps(val)
             data_cols.append(col)
             col_placeholders.append(f"%({col_id})s")
@@ -107,6 +107,13 @@ def generate_sql_cols_vals(table_prefix, data):
 
         if isinstance(val, np.bool_):
             val = bool(val)
+            data_cols.append(col)
+            col_placeholders.append(f"%({col_id})s")
+            columns_values[col_id] = val
+            continue
+
+        if isinstance(val, np.float_):
+            val = float(val)
             data_cols.append(col)
             col_placeholders.append(f"%({col_id})s")
             columns_values[col_id] = val
