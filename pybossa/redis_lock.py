@@ -21,7 +21,7 @@ from datetime import timedelta
 from time import time
 
 from pybossa.contributions_guard import ContributionsGuard
-from pybossa.core import sentinel, task_repo
+from pybossa.core import sentinel
 from werkzeug.exceptions import BadRequest
 
 TASK_USERS_KEY_PREFIX = 'pybossa:project:task_requested:timestamps:{0}'
