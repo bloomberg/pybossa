@@ -21,7 +21,7 @@ from datetime import timedelta
 from time import time
 
 from pybossa.contributions_guard import ContributionsGuard
-from pybossa.core import sentinel
+from pybossa.core import sentinel, task_repo
 from werkzeug.exceptions import BadRequest
 
 TASK_USERS_KEY_PREFIX = 'pybossa:project:task_requested:timestamps:{0}'
@@ -98,6 +98,8 @@ def get_locked_tasks_project(project_id):
 
         # For each locked task, check if the lock is still active.
         for task_id, task_project_id in zip(user_task_ids, results):
+            if not task_project_id:
+                task_project_id = task_repo.get_task(task_id).project_id
             # Match the requested project id.
             if int(task_project_id) == project_id:
                 # Calculate seconds remaining.
