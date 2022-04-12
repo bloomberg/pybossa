@@ -59,3 +59,31 @@ class TestModelTaskRun(Test):
         db.session.add(task_run)
         assert_raises(IntegrityError, db.session.commit)
         db.session.rollback()
+
+    @with_context
+    def test_completed_task_marked_exported_true(self):
+        user = User(
+            email_addr="john.doe@example.com",
+            name="johndoe",
+            fullname="John Doe",
+            locale="en")
+        db.session.add(user)
+        db.session.commit()
+
+        user = db.session.query(User).first()
+        category = Category(name='cat', short_name='cat', description='cat')
+        project = Project(name='Application', short_name='app', description='desc',
+            owner_id=user.id, category=category, published=True)
+
+        db.session.add(project)
+        db.session.commit()
+
+        task = Task(project_id=project.id, exported=True)
+        db.session.add(task)
+        db.session.commit()
+
+        assert task.state == "ongoing" and task.exported == True
+        task_run = TaskRun(project_id=project.id, task_id=task.id)
+        db.session.add(task_run)
+        db.session.commit()
+        assert task.state == "completed" and task.exported == False

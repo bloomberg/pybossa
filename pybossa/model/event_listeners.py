@@ -192,8 +192,8 @@ def update_task_state(conn, task_id):
         set_task_export(task_id)
         return
 
-    sql_query = ("UPDATE task SET state=\'completed\' \
-                 where id=%s") % task_id
+    sql_query = ("UPDATE task SET state=\'completed\', exported=False \
+                 WHERE id=%s") % task_id
     conn.execute(sql_query)
 
 
