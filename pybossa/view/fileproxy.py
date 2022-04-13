@@ -112,7 +112,7 @@ def read_encrypted_file(project_id, bucket, key_name, signature):
         decrypted, key = get_content_and_key_from_s3(
             bucket, key_name, 'S3_TASK_REQUEST', decrypt=secret, secret=secret)
     except S3ResponseError as e:
-        current_app.logger.exception('Project id {} get task file {} {}'.format(project_id, path, e))
+        current_app.logger.exception('Project id {} get task file {} {}'.format(project_id, key_name, e))
         if e.error_code == 'NoSuchKey':
             raise NotFound('File Does Not Exist')
         else:
