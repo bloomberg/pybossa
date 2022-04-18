@@ -65,8 +65,8 @@ def get_top(n=4):
 def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwargs):
     """Cache browse tasks view for a project."""
 
-    sorting = {"lock_status asc": "(coalesce(ct, 0)/task.n_answers) desc",
-               "lock_status desc": "(coalesce(ct, 0)/task.n_answers) asc"}
+    sorting = {"lock_status asc": "(coalesce(ct, 0)/float4(task.n_answers)) desc",
+               "lock_status desc": "(coalesce(ct, 0)/float4(task.n_answers)) asc"}
 
     # TODO: use Jinja filters to format date
     def format_date(date):
@@ -234,6 +234,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
             # if not sort by lock_status, sort by the column "order_by"
             sql_order_by = args.get('order_by') or 'id ASC'
             sql_query = sql + sql_order.format(sql_order_by) + sql_limit_offset
+
             results = session.execute(text(sql_query), params)
             tasks = [format_task(row, locked_tasks_in_project.get(row.id, [])) for row in results]
 
