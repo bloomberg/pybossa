@@ -50,6 +50,11 @@ class TestFileproxy(web.Helper):
         res = self.app.get(url, follow_redirects=True)
         assert res.status_code == 403, res.status_code
 
+        url = '/fileproxy/encrypted/s3/test/workflow_request/abcd/%s/file.pdf?api_key=%s' \
+             % (project.id, owner.api_key)
+        res = self.app.get(url, follow_redirects=True)
+        assert res.status_code == 403, res.status_code
+
     @with_context
     def test_proxy_invalid_signature(self):
         """invalid signature beyond max length (128)"""
@@ -321,7 +326,7 @@ class TestHDFSproxy(web.Helper):
         signature = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(129))
         url = '/fileproxy/hdfs/test/%s/file.pdf?api_key=%s&task-signature=%s' \
             % (project.id, owner.api_key, signature)
-        with patch.dict(self.flask_app.config, self.app_config):            
+        with patch.dict(self.flask_app.config, self.app_config):
             res = self.app.get(url, follow_redirects=True)
             assert res.status == '403 FORBIDDEN', res.status_code
 
