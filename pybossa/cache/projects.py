@@ -84,7 +84,8 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     calibration=row.calibration,
                     userPrefLang=", ".join(user_pref.get("languages", [])),
                     userPrefLoc=", ".join(user_pref.get("locations", [])),
-                    lock_users=lock_users)
+                    lock_users=lock_users,
+                    available=False)
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
         return task
 
@@ -200,10 +201,10 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
         # get a list of available tasks for current worker
         total_count = len(task_rank_info)
-        tasks = select_available_tasks(task_rank_info, locked_tasks_in_project,
-                                        project_id, user_id, offset+limit,
-                                        args.get("order_by"))
-        tasks = [t[0] for t in tasks[offset: offset+limit]]
+        select_available_tasks(task_rank_info, locked_tasks_in_project,
+                                project_id, user_id, offset+limit,
+                                args.get("order_by"))
+        tasks = [t[0] for t in task_rank_info[offset: offset+limit]]
 
     else:
         # construct task browse page for owners/admins
@@ -240,6 +241,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
         session.execute("RESET enable_indexscan;")
 
+    print(tasks[:5])
     return total_count, tasks
 
 
@@ -252,17 +254,17 @@ def select_available_tasks(task_rank_info, locked_tasks, project_id, user_id, nu
                                         task_rank_info,
                                         key=lambda tup: tup[1])
     # remove tasks if task is unavailable to contribute
-    tasks = []
-    for t, score in task_rank_info:
+    # tasks = []
+    for t, _ in task_rank_info:
         remaining = float('inf') if t["calibration"] else t["n_answers"]-t["n_task_runs"]
         if remaining == 0:
             # does not show completed tasks to users
             continue
         locked_users = locked_tasks.get(t["id"], [])
         if str(user_id) in locked_users or len(locked_users) < remaining:
-            tasks.append((t, score))
-
-    return tasks
+            # tasks.append((t, score))
+            # t["available"] = True
+            t["available"] = False
 
 
 def task_count(project_id, args):
