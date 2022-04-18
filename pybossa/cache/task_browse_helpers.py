@@ -27,6 +27,7 @@ comparator_func = {
     "!=": operator.ne,
 }
 
+
 def get_task_filters(args):
     """
     build the WHERE part of the query using the filter parameters
@@ -43,10 +44,10 @@ def get_task_filters(args):
         filters += " AND task.state='ongoing'"
     if args.get('pcomplete_from') is not None:
         params['pcomplete_from'] = args['pcomplete_from']
-        filters += " AND (coalesce(ct, 0)/task.n_answers) >= :pcomplete_from"
+        filters += " AND (coalesce(ct, 0)/float4(task.n_answers)) >= :pcomplete_from"
     if args.get('pcomplete_to') is not None:
         params['pcomplete_to'] = args['pcomplete_to']
-        filters += " AND LEAST(coalesce(ct, 0)/task.n_answers, 1.0) <= :pcomplete_to"
+        filters += " AND LEAST(coalesce(ct, 0)/float4(task.n_answers), 1.0) <= :pcomplete_to"
     if args.get('priority_from') is not None:
         params['priority_from'] = args['priority_from']
         filters += " AND priority_0 >= :priority_from"
@@ -77,7 +78,7 @@ def get_task_filters(args):
         filters += " AND task.calibration = :calibration"
 
     if args.get('order_by'):
-        args["order_by"] = args['order_by'].replace('lock_status', '(coalesce(ct, 0)/task.n_answers)')
+        args["order_by"] = args['order_by'].replace('lock_status', '(coalesce(ct, 0)/float4(task.n_answers))')
     if args.get('filter_by_field'):
         filter_query, filter_params = _get_task_info_filters(
             args['filter_by_field'])
@@ -194,7 +195,7 @@ allowed_fields = {
     'task_id': 'id',
     'priority': 'priority_0',
     'finish_time': 'ft',
-    'pcomplete': '(coalesce(ct, 0)/task.n_answers)',
+    'pcomplete': '(coalesce(ct, 0)/float4(task.n_answers))',
     'created': 'task.created',
     'filter_by_field': 'filter_by_field',
     'lock_status': 'lock_status'
