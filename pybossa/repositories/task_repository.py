@@ -91,7 +91,6 @@ class TaskRepository(Repository):
             conditions.append(TaskRun.finish_time >= finish_time)
 
         query = self.db.session.query(TaskRun).join(Task).\
-            filter(TaskRun.task_id == Task.id).\
             filter(or_(Task.state == 'completed', Task.calibration == 1)).\
             filter(*conditions).\
             filter_by(**filters)
