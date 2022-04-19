@@ -263,10 +263,12 @@ def parse_tasks_browse_args(args):
             display_info_columns = json.loads(display_info_columns)
         parsed_args['display_info_columns'] = display_info_columns
 
-        # Parse order_by fields.
-        parsed_args['order_by'], parsed_args['order_by_dict'] = parse_tasks_browse_order_by_args(
-            args.get('order_by'),
-            parsed_args.get('display_info_columns', []))
+    # Parse order_by fields.
+    order_by, parsed_args['order_by_dict'] = parse_tasks_browse_order_by_args(
+        args.get('order_by'),
+        parsed_args.get('display_info_columns', []))
+    if order_by:
+        parsed_args['order_by'] = order_by
 
     if args.get('filter_by_field'):
         parsed_args['filter_by_field'] = _get_field_filters(args['filter_by_field'])
@@ -291,7 +293,7 @@ def parse_tasks_browse_args(args):
     return parsed_args
 
 def parse_tasks_browse_order_by_args(order_by, display_info_columns):
-    order_by_result = ''
+    order_by_result = None
     order_by_dict = dict()
 
     if order_by:
