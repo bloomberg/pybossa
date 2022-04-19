@@ -20,7 +20,7 @@ from test import Test, with_context, with_request_context
 from test.factories import (ProjectFactory, TaskFactory, TaskRunFactory, UserFactory)
 from pybossa.cache import helpers
 from pybossa.cache.project_stats import update_stats
-
+from pybossa.cache.task_browse_helpers import parse_tasks_browse_order_by_args
 
 class TestHelpersCache(Test):
 
@@ -407,3 +407,43 @@ class TestHelpersCache(Test):
         assert n_priority_x_tasks_include_gold == 1, n_priority_x_tasks_include_gold
         assert n_priority_x_tasks_exclude_gold == 0, n_priority_x_tasks_exclude_gold
         assert n_priority_x_tasks_include_gold_default_priority == 0, n_priority_x_tasks_include_gold_default_priority
+
+    @with_context
+    def test_order_by_args_none(self):
+        """Test parse_tasks_browse_order_by_args with empty order_by."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args(None, None)
+
+        assert order_by_result == ''
+        assert order_by_dict == dict()
+
+    @with_context
+    def test_order_by_args_asc(self):
+        """Test parse_tasks_browse_order_by_args with asc field."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args('field asc', ['field'])
+
+        assert order_by_result == "task.info->>'field' asc"
+        assert 'field' in order_by_dict
+
+    @with_context
+    def test_order_by_args_desc(self):
+        """Test parse_tasks_browse_order_by_args with desc field."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args('field desc', ['field'])
+
+        assert order_by_result == "task.info->>'field' desc"
+        assert 'field' in order_by_dict
+
+    @with_context
+    def test_order_by_args_substring1(self):
+        """Test parse_tasks_browse_order_by_args with substring match: companyBbid."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args('companyBbid desc', ['bi', 'companyBbid'])
+
+        assert order_by_result == "task.info->>'companyBbid' desc"
+        assert 'companyBbid' in order_by_dict
+
+    @with_context
+    def test_order_by_args_substring2(self):
+        """Test parse_tasks_browse_order_by_args with substring match: bi."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args('bi desc', ['bi', 'companyBbid'])
+
+        assert order_by_result == "task.info->>'bi' desc"
+        assert 'bi' in order_by_dict
