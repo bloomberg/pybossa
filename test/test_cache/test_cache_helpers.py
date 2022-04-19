@@ -413,7 +413,7 @@ class TestHelpersCache(Test):
         """Test parse_tasks_browse_order_by_args with empty order_by."""
         order_by_result, order_by_dict = parse_tasks_browse_order_by_args(None, None)
 
-        assert order_by_result == ''
+        assert order_by_result == None
         assert order_by_dict == dict()
 
     @with_context
