@@ -263,22 +263,12 @@ def parse_tasks_browse_args(args):
             display_info_columns = json.loads(display_info_columns)
         parsed_args['display_info_columns'] = display_info_columns
 
-    parsed_args['order_by_dict'] = dict()
-    if args.get('order_by'):
-        parsed_args['order_by'] = args['order_by'].strip()
-        # allowing custom user added task.info columns to be sortable
-        allowed_sort_fields = allowed_fields.copy()
-        allowed_sort_fields.update({col: "task.info->>'{}'".format(col) for col in parsed_args.get("display_info_columns", [])})
-        for clause in parsed_args['order_by'].split(','):
-            order_by_field = clause.split(' ')
-            if len(order_by_field) != 2 or order_by_field[0] not in allowed_sort_fields:
-                raise ValueError('order_by value sent by the user is invalid: %s'.format(args['order_by']))
-            if order_by_field[0] in parsed_args["order_by_dict"]:
-                raise ValueError('order_by field is duplicated: %s'.format(args['order_by']))
-            parsed_args["order_by_dict"][order_by_field[0]] = order_by_field[1]
-
-        for key, value in allowed_sort_fields.items():
-            parsed_args["order_by"] = parsed_args["order_by"].replace(key, value)
+    # Parse order_by fields.
+    order_by, parsed_args['order_by_dict'] = parse_tasks_browse_order_by_args(
+        args.get('order_by'),
+        parsed_args.get('display_info_columns', []))
+    if order_by:
+        parsed_args['order_by'] = order_by
 
     if args.get('filter_by_field'):
         parsed_args['filter_by_field'] = _get_field_filters(args['filter_by_field'])
@@ -301,6 +291,34 @@ def parse_tasks_browse_args(args):
             raise ValueError('invalid gold value')
 
     return parsed_args
+
+def parse_tasks_browse_order_by_args(order_by, display_info_columns):
+    order_by_result = None
+    order_by_dict = dict()
+
+    if order_by:
+        order_by_result = order_by.strip()
+
+        # allowing custom user added task.info columns to be sortable
+        allowed_sort_fields = allowed_fields.copy()
+        allowed_sort_fields.update({col: "task.info->>'{}'".format(col) for col in display_info_columns})
+        for clause in order_by.split(','):
+            clause = clause.strip()
+            order_by_field = clause.split(' ')
+            if len(order_by_field) != 2 or order_by_field[0] not in allowed_sort_fields:
+                raise ValueError('order_by value sent by the user is invalid: %s'.format(order_by))
+            if order_by_field[0] in order_by_dict:
+                raise ValueError('order_by field is duplicated: %s'.format(order_by))
+            order_by_dict[order_by_field[0]] = order_by_field[1]
+
+        # Update order_by value to use query format.
+        for key, value in allowed_sort_fields.items():
+            # Sort by single field: bi desc -> task.info->>'bi' desc
+            order_by_result = re.sub(r'^' + key + ' ', value + ' ', order_by_result)
+            # Sort by multiple fields: bi desc, companyId asc -> task.info->>'bi' desc, task.info->>'companyId' asc
+            order_by_result = re.sub(r',\s{0,1}' + key + ' ', ', ' + value + ' ', order_by_result)
+
+    return (order_by_result, order_by_dict)
 
 def validate_user_preferences(user_pref):
     if not isinstance(user_pref, dict) or \
