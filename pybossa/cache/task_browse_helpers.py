@@ -310,9 +310,9 @@ def parse_tasks_browse_order_by_args(order_by, display_info_columns):
                 raise ValueError('order_by field is duplicated: %s'.format(order_by))
             order_by_dict[order_by_field[0]] = order_by_field[1]
 
-        # Update order_by value to use query format. Example: bi desc -> task.info->>'bi' desc
-        item, order = order_by.split()
-        order_by_result = f"{allowed_sort_fields[item]} {order}"
+        for key, value in allowed_sort_fields.items():
+            # Update order_by value to use query format. Example: bi desc -> task.info->>'bi' desc
+            order_by_result = re.sub(r'^' + key + ' ', value + ' ', order_by_result)
 
     return (order_by_result, order_by_dict)
 
