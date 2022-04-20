@@ -447,3 +447,41 @@ class TestHelpersCache(Test):
 
         assert order_by_result == "task.info->>'bi' desc"
         assert 'bi' in order_by_dict
+
+    @with_context
+    def test_order_by_args_multiple_columns1(self):
+        """Test parse_tasks_browse_order_by_args with multiple fields."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args('bi desc, companyBbid asc', ['bi', 'companyBbid'])
+
+        assert order_by_result == "task.info->>'bi' desc, task.info->>'companyBbid' asc"
+        assert 'bi' in order_by_dict
+        assert 'companyBbid' in order_by_dict
+
+    @with_context
+    def test_order_by_args_multiple_columns2(self):
+        """Test parse_tasks_browse_order_by_args with multiple fields."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args('bi desc,companyBbid asc', ['bi', 'companyBbid'])
+
+        assert order_by_result == "task.info->>'bi' desc, task.info->>'companyBbid' asc"
+        assert 'bi' in order_by_dict
+        assert 'companyBbid' in order_by_dict
+
+    @with_context
+    def test_order_by_args_multiple_columns3(self):
+        """Test parse_tasks_browse_order_by_args with multiple fields."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args('bi desc, companyBbid asc, somethingElse desc', ['bi', 'companyBbid', 'somethingElse'])
+
+        assert order_by_result == "task.info->>'bi' desc, task.info->>'companyBbid' asc, task.info->>'somethingElse' desc"
+        assert 'bi' in order_by_dict
+        assert 'companyBbid' in order_by_dict
+        assert 'somethingElse' in order_by_dict
+
+    @with_context
+    def test_order_by_args_multiple_columns4(self):
+        """Test parse_tasks_browse_order_by_args with multiple fields."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args('bi desc,companyBbid asc,somethingElse desc', ['bi', 'companyBbid', 'somethingElse'])
+
+        assert order_by_result == "task.info->>'bi' desc, task.info->>'companyBbid' asc, task.info->>'somethingElse' desc"
+        assert 'bi' in order_by_dict
+        assert 'companyBbid' in order_by_dict
+        assert 'somethingElse' in order_by_dict

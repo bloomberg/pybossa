@@ -303,6 +303,7 @@ def parse_tasks_browse_order_by_args(order_by, display_info_columns):
         allowed_sort_fields = allowed_fields.copy()
         allowed_sort_fields.update({col: "task.info->>'{}'".format(col) for col in display_info_columns})
         for clause in order_by.split(','):
+            clause = clause.strip()
             order_by_field = clause.split(' ')
             if len(order_by_field) != 2 or order_by_field[0] not in allowed_sort_fields:
                 raise ValueError('order_by value sent by the user is invalid: %s'.format(order_by))
@@ -310,9 +311,12 @@ def parse_tasks_browse_order_by_args(order_by, display_info_columns):
                 raise ValueError('order_by field is duplicated: %s'.format(order_by))
             order_by_dict[order_by_field[0]] = order_by_field[1]
 
+        # Update order_by value to use query format.
         for key, value in allowed_sort_fields.items():
-            # Update order_by value to use query format. Example: bi desc -> task.info->>'bi' desc
+            # Sort by single field: bi desc -> task.info->>'bi' desc
             order_by_result = re.sub(r'^' + key + ' ', value + ' ', order_by_result)
+            # Sort by multiple fields: bi desc, companyId asc -> task.info->>'bi' desc, task.info->>'companyId' asc
+            order_by_result = re.sub(r',\s{0,1}' + key + ' ', ', ' + value + ' ', order_by_result)
 
     return (order_by_result, order_by_dict)
 
