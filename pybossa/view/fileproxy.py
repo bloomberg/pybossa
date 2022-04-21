@@ -84,7 +84,6 @@ def check_allowed(user_id, task_id, project, is_valid_url):
 
 
 def read_encrypted_file(project_id, bucket, key_name, signature):
-    print(key_name)
     if not signature:
         current_app.logger.exception('Project id {} no signature {}'.format(project_id, key_name))
         raise Forbidden('No signature')
@@ -132,7 +131,6 @@ def read_encrypted_file(project_id, bucket, key_name, signature):
 @login_required
 def encrypted_workflow_file(store, bucket, workflow_uid, path):
     """Proxy encrypted task file in a cloud storage"""
-    print("workflow")
     project_id = int(path.split('/')[0])
     key_name = '/workflow_request/{}/{}'.format(workflow_uid, path)
     signature = request.args.get('task-signature')
@@ -145,7 +143,6 @@ def encrypted_workflow_file(store, bucket, workflow_uid, path):
 @login_required
 def encrypted_file(store, bucket, project_id, path):
     """Proxy encrypted task file in a cloud storage"""
-    print("not workflow")
     key_name = '/{}/{}'.format(project_id, path)
     signature = request.args.get('task-signature')
     current_app.logger.info('Project id {} decrypt file. {}'.format(project_id, path))
