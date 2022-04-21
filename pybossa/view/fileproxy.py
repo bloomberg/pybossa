@@ -125,27 +125,21 @@ def read_encrypted_file(project_id, bucket, key_name, signature):
         response.headers.add('Content-Disposition', key.content_disposition)
     return response
 
-
-@blueprint.route('/encrypted/<string:store>/<string:bucket>/<string:workflow>/<string:workflow_uid>/<path:path>')
+@blueprint.route('/encrypted/<string:store>/<string:bucket>/<path:path>')
 @no_cache
 @login_required
-def encrypted_workflow_file(store, bucket, workflow, workflow_uid, path):
+def encrypted_file(store, bucket, path):
     """Proxy encrypted task file in a cloud storage"""
-    project_id = int(path.split('/')[0])
-    key_name = '{}/{}/{}'.format(workflow, workflow_uid, path)
-    signature = request.args.get('task-signature')
-    current_app.logger.info('Project id {} decrypt workflow file. {}'.format(project_id, path))
-    return read_encrypted_file(project_id, bucket, key_name, signature)
+    if path.startswith("workflow_request"):
+        workflow, workflow_uid, project_id, path = path.split('/')
+        key_name = '/{}/{}/{}/{}'.format(workflow, workflow_uid, project_id, path)
+        current_app.logger.info('Project id {} decrypt workflow file. {}'.format(project_id, path))
+    else:
+        project_id, path = path.split('/', 1)
+        key_name = '/{}/{}'.format(project_id, path)
+        current_app.logger.info('Project id {} decrypt file. {}'.format(project_id, path))
 
-
-@blueprint.route('/encrypted/<string:store>/<string:bucket>/<int:project_id>/<path:path>')
-@no_cache
-@login_required
-def encrypted_file(store, bucket, project_id, path):
-    """Proxy encrypted task file in a cloud storage"""
-    key_name = '/{}/{}'.format(project_id, path)
     signature = request.args.get('task-signature')
-    current_app.logger.info('Project id {} decrypt file. {}'.format(project_id, path))
     return read_encrypted_file(project_id, bucket, key_name, signature)
 
 
