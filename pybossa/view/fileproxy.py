@@ -126,13 +126,12 @@ def read_encrypted_file(project_id, bucket, key_name, signature):
     return response
 
 
-@blueprint.route('/encrypted/<string:store>/<string:bucket>/workflow_request/<string:workflow_uid>/<path:path>')
+@blueprint.route('/encrypted/<string:store>/<string:bucket>/workflow_request/<string:workflow_uid>/<int:project_id>/<path:path>')
 @no_cache
 @login_required
-def encrypted_workflow_file(store, bucket, workflow_uid, path):
-    """Proxy encrypted task file in a cloud storage"""
-    project_id = int(path.split('/')[0])
-    key_name = '/workflow_request/{}/{}'.format(workflow_uid, path)
+def encrypted_workflow_file(store, bucket, workflow_uid, project_id, path):
+    """Proxy encrypted task file in a cloud storage for workflow"""
+    key_name = '/workflow_request/{}/{}/{}'.format(workflow_uid, project_id, path)
     signature = request.args.get('task-signature')
     current_app.logger.info('Project id {} decrypt workflow file. {}'.format(project_id, path))
     return read_encrypted_file(project_id, bucket, key_name, signature)
