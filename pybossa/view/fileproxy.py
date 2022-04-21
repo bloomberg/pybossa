@@ -84,6 +84,7 @@ def check_allowed(user_id, task_id, project, is_valid_url):
 
 
 def read_encrypted_file(project_id, bucket, key_name, signature):
+    print(key_name)
     if not signature:
         current_app.logger.exception('Project id {} no signature {}'.format(project_id, key_name))
         raise Forbidden('No signature')
@@ -125,21 +126,29 @@ def read_encrypted_file(project_id, bucket, key_name, signature):
         response.headers.add('Content-Disposition', key.content_disposition)
     return response
 
-@blueprint.route('/encrypted/<string:store>/<string:bucket>/<path:path>')
+
+@blueprint.route('/encrypted/<string:store>/<string:bucket>/workflow_request/<string:workflow_uid>/<path:path>')
 @no_cache
 @login_required
-def encrypted_file(store, bucket, path):
+def encrypted_workflow_file(store, bucket, workflow_uid, path):
     """Proxy encrypted task file in a cloud storage"""
-    if path.startswith("workflow_request"):
-        workflow, workflow_uid, project_id, path = path.split('/')
-        key_name = '/{}/{}/{}/{}'.format(workflow, workflow_uid, project_id, path)
-        current_app.logger.info('Project id {} decrypt workflow file. {}'.format(project_id, path))
-    else:
-        project_id, path = path.split('/', 1)
-        key_name = '/{}/{}'.format(project_id, path)
-        current_app.logger.info('Project id {} decrypt file. {}'.format(project_id, path))
-
+    print("workflow")
+    project_id = int(path.split('/')[0])
+    key_name = '/workflow_request/{}/{}'.format(workflow_uid, path)
     signature = request.args.get('task-signature')
+    current_app.logger.info('Project id {} decrypt workflow file. {}'.format(project_id, path))
+    return read_encrypted_file(project_id, bucket, key_name, signature)
+
+
+@blueprint.route('/encrypted/<string:store>/<string:bucket>/<int:project_id>/<path:path>')
+@no_cache
+@login_required
+def encrypted_file(store, bucket, project_id, path):
+    """Proxy encrypted task file in a cloud storage"""
+    print("not workflow")
+    key_name = '/{}/{}'.format(project_id, path)
+    signature = request.args.get('task-signature')
+    current_app.logger.info('Project id {} decrypt file. {}'.format(project_id, path))
     return read_encrypted_file(project_id, bucket, key_name, signature)
 
 
