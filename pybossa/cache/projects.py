@@ -149,7 +149,6 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     args['user_id'] = user_id
     filters, filter_params = get_task_filters(args)
     task_reserve_filter =  args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
-    print(task_reserve_filter)
 
     params = dict(project_id=project_id, **filter_params)
     limit = args.get('records_per_page') or 10
@@ -186,7 +185,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         sql_with_reserve_filter = sql + filters + task_reserve_filter
 
         tasks_without_reserve_filter = session.execute(text(sql_without_reserve_filter), params)
-        tasks_with_reserve_filter = session.execute(text(sql_with_reserve_filter), params) if task_reserve_filter else tasks_without_reserve_filter
+        tasks_with_reserve_filter = session.execute(text(sql_with_reserve_filter), params)
         task_id_with_reserve_filter = set([row.id for row in tasks_with_reserve_filter])
 
         task_rank_info = []
