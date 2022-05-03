@@ -177,16 +177,18 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                 FROM task
                 WHERE task.project_id =:project_id"""
 
-        task_reserve_filter = args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
-
         params["assign_user"] = args["sql_params"]["assign_user"]
+
         sql_without_reserve_filter = sql + filters +\
                 " ORDER BY %s" % (args.get('order_by') or 'priority_0 desc')
-        sql_with_reserve_filter = sql + filters + task_reserve_filter
-
         tasks_without_reserve_filter = [row for row in session.execute(text(sql_without_reserve_filter), params)]
-        tasks_with_reserve_filter = session.execute(text(sql_with_reserve_filter), params) if task_reserve_filter \
-                                    else tasks_without_reserve_filter
+
+        task_reserve_filter = args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
+        if task_reserve_filter:
+            sql_with_reserve_filter = sql + filters + task_reserve_filter
+            tasks_with_reserve_filter = session.execute(text(sql_with_reserve_filter), params)
+        else:
+            tasks_with_reserve_filter = tasks_without_reserve_filter
         task_id_with_reserve_filter = set([row.id for row in tasks_with_reserve_filter])
 
         task_rank_info = []
@@ -205,10 +207,6 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
             task = format_task(row)
             task_rank_info.append((task, score))
-
-        print("task_rank_info: ", len(task_rank_info))
-        print("task_id_with_reserve_filter: ", len(task_id_with_reserve_filter))
-        print(task_id_with_reserve_filter)
 
         # get a list of available tasks for current worker
         total_count = len(task_rank_info)
@@ -264,15 +262,15 @@ def select_available_tasks(task_rank_info, locked_tasks, user_id, num_tasks_need
         task_rank_info = heapq.nlargest(num_tasks_needed+len(locked_tasks)+1,
                                         task_rank_info,
                                         key=lambda tup: tup[1])
-    # remove tasks if task is unavailable to contribute
-    # tasks = []
+
     for t, _ in task_rank_info:
         remaining = float('inf') if t["calibration"] else t["n_answers"]-t["n_task_runs"]
+        # does not show completed tasks to users
         if remaining == 0:
-            # does not show completed tasks to users
             continue
-        locked_users = locked_tasks.get(t["id"], [])
 
+        # for tasks that are available to contribute, mark available=true
+        locked_users = locked_tasks.get(t["id"], [])
         if t["id"] in eligible and (str(user_id) in locked_users or len(locked_users) < remaining):
             t["available"] = True
 
