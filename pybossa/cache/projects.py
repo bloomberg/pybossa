@@ -73,7 +73,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         if date is not None:
             return convert_utc_to_est(date).strftime('%m-%d-%y %H:%M')
 
-    def format_task(row, lock_users=[], available=False):
+    def format_task(row, lock_users=[]):
         """convert database record to task dictionary and format data."""
         finish_time = format_date(row.ft)
         created = format_date(row.created)
@@ -85,7 +85,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     userPrefLang=", ".join(user_pref.get("languages", [])),
                     userPrefLoc=", ".join(user_pref.get("locations", [])),
                     lock_users=lock_users,
-                    available=available)
+                    available=False)
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
         return task
 
@@ -212,7 +212,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         total_count = len(task_rank_info)
         select_available_tasks(task_rank_info, locked_tasks_in_project,
                                 user_id, offset+limit, args.get("order_by"),
-                                eligible=task_id_with_reserve_filter)
+                                eligible_tasks=task_id_with_reserve_filter)
 
         tasks = [t[0] for t in task_rank_info[offset: offset+limit]]
 
@@ -254,8 +254,10 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     return total_count, tasks
 
 
-def select_available_tasks(task_rank_info, locked_tasks, user_id, num_tasks_needed, sort_by=None, eligible=set()):
-    """execude tasks that had been locked and sort tasks based on preference score"""
+def select_available_tasks(task_rank_info, locked_tasks, user_id, num_tasks_needed, sort_by=None, eligible_tasks=set()):
+    """remove tasks without redundant taskruns,
+       disable tasks that had been locked,
+       sort tasks based on preference score"""
 
     # if there is no sort parameter, use preference score to sort tasks
     if not sort_by:
@@ -271,7 +273,7 @@ def select_available_tasks(task_rank_info, locked_tasks, user_id, num_tasks_need
 
         # for tasks that are available to contribute, mark available=true
         locked_users = locked_tasks.get(t["id"], [])
-        if t["id"] in eligible and (str(user_id) in locked_users or len(locked_users) < remaining):
+        if t["id"] in eligible_tasks and (str(user_id) in locked_users or len(locked_users) < remaining):
             t["available"] = True
 
 
