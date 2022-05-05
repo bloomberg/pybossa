@@ -53,6 +53,7 @@ from pybossa.util import (Pagination, admin_required, get_user_id_or_ip, rank,
                           get_avatar_url, admin_or_subadmin_required,
                           s3_get_file_contents, fuzzyboolean, is_own_url_or_else,
                           description_from_long_description)
+from pybossa.api import fetch_lock
 from pybossa.auth import ensure_authorized_to
 from pybossa.cache import projects as cached_projects
 from pybossa.cache import users as cached_users
@@ -1262,24 +1263,16 @@ def task_presenter(short_name, task_id):
     guard.stamp(task, get_user_id_or_ip())
 
     # Verify the worker has an unexpired lock on the task. Otherwise, task will fail to submit.
-    locks = _get_locks(project.id, task_id)
-    valid_locks = {key:seconds for key, seconds in locks.items() if seconds > 0}
-    if not valid_locks and mode != 'read_only':
+    timeout, remaining_lock_time = get_remaining_lock_time(task.project_id, task_id)
+    # valid_locks = {key:seconds for key, seconds in locks.items() if seconds > 0}
+    if not remaining_lock_time and mode != 'read_only':
         flash(gettext("Unable to lock task or task expired. Please cancel and begin a new task."), "error")
     else:
         if mode != 'read_only':
-            # The user already has a valid lock (page reload).
             # Set the original timeout seconds to display in the message.
-            seconds = project.info.get('timeout', DEFAULT_TASK_TIMEOUT)
-            template_args['project']['original_timeout'] = seconds
-
-            # Find the seconds remaining on this task.
-            lock = {key:seconds for key, seconds in locks.items() if key == current_user.id and seconds > 0}
-            if lock:
-                seconds = lock[current_user.id]
-
+            template_args['project']['original_timeout'] = timeout
             # Set the seconds remaining to display in the message.
-            template_args['project']['timeout'] = seconds
+            template_args['project']['timeout'] = remaining_lock_time or timeout
 
         if not guard.check_task_presented_timestamp(task, get_user_id_or_ip()):
             guard.stamp_presented_time(task, get_user_id_or_ip())
@@ -1439,6 +1432,17 @@ def _get_locks(project_id, task_id):
     lock_ttls = {int(k.replace('.', '')): float(v) - now
                  for k, v in locks.items()}
     return lock_ttls
+
+def get_remaining_lock_time(project_id, task_id):
+    _, timeout = sched.get_project_scheduler_and_timeout(
+            project_id)
+    try:
+        lock = fetch_lock(task_id)
+        remaining_lock_time = lock.seconds_to_expire
+    except Exception:
+        remaining_lock_time = None
+    return timeout, remaining_lock_time
+
 
 
 @blueprint.route('/<short_name>/tasks/')
