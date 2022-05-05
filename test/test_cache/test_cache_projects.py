@@ -559,6 +559,37 @@ class TestProjectsCache(Test):
         assert len(browse_tasks) == 3
         assert browse_tasks[0]["id"] == tasks[2].id, "the third task should come first as it sorts by priority"
 
+    @with_context
+    def test_browse_tasks_grey_out_unavailable_tasks_for_workers_0(self):
+        """Test CACHE PROJECTS browse_tasks returns a subset of tasks
+        from a given project"""
+
+        admin, owner, user = UserFactory.create_batch(3)
+        category_config = ["field_1", "field_2"]
+        project = ProjectFactory.create(
+            zip_download=True, owner=admin,
+            info=dict(
+                sched="task_queue_scheduler",
+                reserve_tasks=dict(
+                    category=category_config
+                )
+            )
+        )
+        tasks = TaskFactory.create_batch(3, project=project, info=dict(field_1=1, field_2=2))
+
+        reserve_filter = " AND (task.info->>'field_1' = '1' AND task.info->>'field_2' = '2') IS NOT TRUE"
+        filter_by_wfilter_upref = dict(current_user_pref={},
+                                        current_user_email="user@user.com",
+                                        current_user_profile={},
+                                        reserve_filter=reserve_filter)
+        args = dict(filter_by_wfilter_upref=filter_by_wfilter_upref,
+                    sql_params=dict(assign_user=json.dumps({'assign_user': ["user@user.com"]})))
+
+        count, browse_tasks = cached_projects.browse_tasks(project.id, args, True, user.id)
+
+        assert len(browse_tasks) == 3, browse_tasks
+        assert all(not t["available"] for t in browse_tasks), "all tasks is unavailable for user"
+
 
     @with_context
     def test_n_featured_returns_nothing(self):
