@@ -8893,6 +8893,56 @@ class TestWeb(web.Helper):
         assert res.status_code == 403, res.status_code
 
     @with_context
+    @patch('pybossa.view.projects._check_if_redirect_to_password')
+    @patch('pybossa.redis_lock.get_locked_tasks_project')
+    def test_task_list_worker_view_2(self, locked, check_password):
+        """Test task list worker access available tasks."""
+        check_password.return_value = None
+        admin, owner, user = UserFactory.create_batch(3)
+        project = ProjectFactory.create(zip_download=True, owner=owner, info={"sched": "task_queue_scheduler"})
+        task = TaskFactory.create_batch(10, project=project)
+        # owner locked a task
+        locked.return_value = [{"user_id": owner.id, "task_id": task[0].id, "second_remaining": 100}]
+
+        url = '/project/%s/tasks/browse?api_key=%s' \
+                % (project.short_name, user.api_key)
+        res = self.app.get(url, follow_redirects=True)
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert len(data.tasks) == 3, data
+
+
+    @with_context
+    @patch('pybossa.view.projects._check_if_redirect_to_password')
+    @patch('pybossa.redis_lock.LockManager.get_task_category_lock')
+    def test_task_list_worker_view_3(self, category_lock, check_password):
+        """Test task list worker access available tasks."""
+        check_password.return_value = None
+
+        admin, owner, user = UserFactory.create_batch(3)
+        category_config = ["field_1", "field_2"]
+        project = ProjectFactory.create(
+            zip_download=True, owner=admin,
+            info=dict(
+                sched="task_queue_scheduler",
+                reserve_tasks=dict(
+                    category=category_config
+                )
+            )
+        )
+        task = TaskFactory.create_batch(3, project=project, info=dict(field_1=1, field_2=2))
+        category_lock.side_effect = [[
+            "reserve_task:project:{}:category:field_1:value1:field_2:value2:user:{}:task:454".format(project.id, admin.id)
+        ], []]
+
+        url = '/project/%s/tasks/browse?api_key=%s' \
+                % (project.short_name, user.api_key)
+        res = self.app.get(url, follow_redirects=True)
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert len(data.tasks) == 3, data
+
+    @with_context
     def test_projects_account(self):
         """Test projecs on profiles are good."""
         owner, contributor = UserFactory.create_batch(2)
