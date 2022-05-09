@@ -746,58 +746,45 @@ def get_task_ids_project_id(task_ids):
     return []
 
 
-# def get_task_users_key(task_id):
-#     # bytes to unicode string
-#     if type(task_id) == bytes:
-#         task_id = task_id.decode()
-#     return TASK_USERS_KEY_PREFIX.format(task_id)
+# def get_locked_tasks_project(project_id):
+#     """Returns a list of locked tasks for a given project."""
+#     tasks = []
+#     redis_conn = sentinel.master
 
+#     # Get the active users key for this project.
+#     key = get_active_user_key(project_id)
+#     print(" ^^^^^^^^^ get_active_user_key ^^^^^^^^^")
+#     print(redis_conn.hgetall(key))
+#     # Get the users for each locked task.
+#     for user_key in redis_conn.hgetall(key).items():
+#         user_id = user_key[0]
+#         # Data from Redis is bytes, thus convert it to unicode string
+#         if type(user_id) == bytes:
+#             user_id = user_id.decode()
 
-# def get_user_tasks_key(user_id):
-#     # bytes to unicode string
-#     if type(user_id) == bytes:
-#         user_id = user_id.decode()
-#     return USER_TASKS_KEY_PREFIX.format(user_id)
-
-def get_locked_tasks_project(project_id):
-    """Returns a list of locked tasks for a given project."""
-    tasks = []
-    redis_conn = sentinel.master
-
-    # Get the active users key for this project.
-    key = get_active_user_key(project_id)
-    print(" ^^^^^^^^^ get_active_user_key ^^^^^^^^^")
-    print(redis_conn.hgetall(key))
-    # Get the users for each locked task.
-    for user_key in redis_conn.hgetall(key).items():
-        user_id = user_key[0]
-        # Data from Redis is bytes, thus convert it to unicode string
-        if type(user_id) == bytes:
-            user_id = user_id.decode()
-
-        # Get locks by user.
-        user_tasks = get_user_tasks(user_id, TIMEOUT)
-        # Get task ids for the locks.
-        user_task_ids = list(user_tasks.keys())
-        '''task_id=list(user_tasks.keys())'''
-        # Get project ids for the task ids.
-        results = get_task_ids_project_id(user_task_ids)
-        # For each locked task, check if the lock is still active.
-        for task_id, task_project_id in zip(user_task_ids, results):
-            if not task_project_id:
-                task_project_id = task_repo.get_task(task_id).project_id
-            # Match the requested project id.
-            if int(task_project_id) == project_id:
-                # Calculate seconds remaining.
-                seconds_remaining = LockManager.seconds_remaining(user_tasks[task_id])
-                if seconds_remaining > 0:
-                    # This lock has not yet expired.
-                    tasks.append({
-                        "user_id": user_id,
-                        "task_id": task_id,
-                        "seconds_remaining": seconds_remaining
-                    })
-    return tasks
+#         # Get locks by user.
+#         user_tasks = get_user_tasks(user_id, TIMEOUT)
+#         # Get task ids for the locks.
+#         user_task_ids = list(user_tasks.keys())
+#         '''task_id=list(user_tasks.keys())'''
+#         # Get project ids for the task ids.
+#         results = get_task_ids_project_id(user_task_ids)
+#         # For each locked task, check if the lock is still active.
+#         for task_id, task_project_id in zip(user_task_ids, results):
+#             if not task_project_id:
+#                 task_project_id = task_repo.get_task(task_id).project_id
+#             # Match the requested project id.
+#             if int(task_project_id) == project_id:
+#                 # Calculate seconds remaining.
+#                 seconds_remaining = LockManager.seconds_remaining(user_tasks[task_id])
+#                 if seconds_remaining > 0:
+#                     # This lock has not yet expired.
+#                     tasks.append({
+#                         "user_id": user_id,
+#                         "task_id": task_id,
+#                         "seconds_remaining": seconds_remaining
+#                     })
+#     return tasks
 
 
 def get_task_id_and_duration_for_project_user(project_id, user_id):

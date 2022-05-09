@@ -36,9 +36,14 @@ def get_active_user_key(project_id):
     return ACTIVE_USER_KEY.format(project_id)
 
 def get_task_users_key(task_id):
+    if type(task_id) == bytes:
+        task_id = task_id.decode()
     return TASK_USERS_KEY_PREFIX.format(task_id)
 
 def get_user_tasks_key(user_id):
+    # bytes to unicode string
+    if type(user_id) == bytes:
+        user_id = user_id.decode()
     return USER_TASKS_KEY_PREFIX.format(user_id)
 
 def get_task_id_project_id_key(task_id):

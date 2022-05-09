@@ -579,12 +579,10 @@ def fetch_lock(task_id):
         return abort(401)
 
     task = task_repo.get_task(task_id)
-
     if not task:
         return abort(400)
 
     _, ttl = fetch_lock_for_user(task.project_id, task.id, current_user.id)
-
     if not ttl:
         return abort(404)
 

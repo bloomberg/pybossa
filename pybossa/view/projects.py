@@ -86,8 +86,8 @@ from pybossa.cache.helpers import n_gold_tasks, n_available_tasks, oldest_availa
 from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date
 from pybossa.util import crossdomain
 from pybossa.error import ErrorStatus
-from pybossa.sched import (Schedulers, select_task_for_gold_mode, lock_task_for_user, get_locked_tasks_project,
-                            fetch_lock_for_user)
+from pybossa.redis_lock import get_locked_tasks_project
+from pybossa.sched import Schedulers, select_task_for_gold_mode, lock_task_for_user, fetch_lock_for_user
 from pybossa.syncer import NotEnabled, SyncUnauthorized
 from pybossa.syncer.project_syncer import ProjectSyncer
 from pybossa.exporter.csv_reports_export import ProjectReportCsvExporter
@@ -1436,12 +1436,6 @@ def _get_locks(project_id, task_id):
     lock_ttls = {int(k): float(v) - now
                  for k, v in locks.items()}
     return lock_ttls
-
-# def get_remaining_lock_time(project_id, task_id, user_id):
-#     _, timeout = sched.get_project_scheduler_and_timeout(
-#             project_id)
-#     ttl = fetch_lock_for_user(project_id, task_id, user_id)
-#     return timeout, ttl
 
 
 @blueprint.route('/<short_name>/tasks/')
