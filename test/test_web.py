@@ -3170,8 +3170,15 @@ class TestWeb(web.Helper):
         assert 'TaskPresenter' in str(res.data), res.data
 
     @with_context
-    def test_23_get_specific_ongoing_task_user_json(self):
+    @patch('pybossa.view.projects.fetch_lock_for_user')
+    @patch('pybossa.view.projects.time')
+    def test_23_get_specific_ongoing_task_user_json(self, mock_time, fetch_lock):
         """Test WEB get specific ongoing task_id for a project works as an user"""
+        mock_now = 1652131709
+        mock_time = MagicMock()
+        mock_time.time = mock_now
+
+        fetch_lock.return_value = (3600, mock_now+10)
         self.create()
         self.delete_task_runs()
         self.register()
@@ -3232,8 +3239,14 @@ class TestWeb(web.Helper):
         assert msg in str(res.data), 'Flash message not found: "{}"'.format(msg)
 
     @with_context
-    @patch('pybossa.view.projects._get_locks', return_value={4: 10})
-    def test_get_specific_task_with_lock_seconds_remaining(self, _get_locks):
+    @patch('pybossa.view.projects.fetch_lock_for_user')
+    @patch('pybossa.view.projects.time')
+    def test_get_specific_task_with_lock_seconds_remaining(self, mock_time, fetch_lock):
+        mock_now = 1652131709
+        mock_time = MagicMock()
+        mock_time.time = mock_now
+
+        fetch_lock.return_value = (3600, mock_now+10)
         self.create()
         self.delete_task_runs()
         self.register()
@@ -3253,7 +3266,13 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.view.projects.has_no_presenter')
-    def test_get_specific_task_no_presenter_flash_message(self, has_no_presenter):
+    @patch('pybossa.view.projects.fetch_lock_for_user')
+    def test_get_specific_task_no_presenter_flash_message(self, fetch_lock, has_no_presenter):
+        mock_now = 1652131709
+        mock_time = MagicMock()
+        mock_time.time = mock_now
+
+        fetch_lock.return_value = (3600, mock_now+10)
         self.create()
         self.delete_task_runs()
         self.register()
