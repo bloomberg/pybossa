@@ -179,22 +179,22 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
         params["assign_user"] = args["sql_params"]["assign_user"]
 
-        sql_without_reserve_filter = sql + filters +\
+        all_available_tasks_sql = sql + filters +\
                 " ORDER BY %s" % (args.get('order_by') or 'priority_0 desc')
-        tasks_without_reserve_filter = [row for row in session.execute(text(sql_without_reserve_filter), params)]
+        all_available_tasks = [row for row in session.execute(text(all_available_tasks_sql), params)]
 
         task_reserve_filter = args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
         if task_reserve_filter:
-            sql_with_reserve_filter = sql + filters + task_reserve_filter
-            tasks_with_reserve_filter = session.execute(text(sql_with_reserve_filter), params)
+            unreserved_tasks_sql = sql + filters + task_reserve_filter
+            unreserved_tasks = session.execute(text(unreserved_tasks_sql), params)
         else:
-            tasks_with_reserve_filter = tasks_without_reserve_filter
-        task_id_with_reserve_filter = set([row.id for row in tasks_with_reserve_filter])
+            unreserved_tasks = all_available_tasks
+        unreserved_task_ids = set([row.id for row in unreserved_tasks])
 
         task_rank_info = []
         user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
 
-        for row in tasks_without_reserve_filter:
+        for row in all_available_tasks:
             score = 0
             w_pref = row.worker_pref or {}
             w_filter = row.worker_filter or {}
@@ -212,7 +212,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         total_count = len(task_rank_info)
         select_available_tasks(task_rank_info, locked_tasks_in_project,
                                 user_id, offset+limit, args.get("order_by"),
-                                eligible_tasks=task_id_with_reserve_filter)
+                                eligible_tasks=unreserved_task_ids)
 
         tasks = [t[0] for t in task_rank_info[offset: offset+limit]]
 
