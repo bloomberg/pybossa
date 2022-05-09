@@ -560,6 +560,19 @@ TASK_ID_PROJECT_ID_KEY_PREFIX = 'pybossa:task_id:project_id:{0}'
 TIMEOUT = ContributionsGuard.STAMP_TTL
 
 
+def fetch_lock_for_user(project_id, task_id, user_id):
+    scheduler, timeout = get_project_scheduler_and_timeout(project_id)
+
+    ttl = None
+    if is_locking_scheduler(scheduler):
+        task_locked_by_user = has_lock(task_id, user_id, timeout)
+        if task_locked_by_user:
+            locks = get_locks(task_id, timeout)
+            ttl = locks.get(str(user_id))
+
+    return timeout, ttl
+
+
 def has_lock(task_id, user_id, timeout):
     lock_manager = LockManager(sentinel.master, timeout)
     task_users_key = get_task_users_key(task_id)
@@ -733,18 +746,18 @@ def get_task_ids_project_id(task_ids):
     return []
 
 
-def get_task_users_key(task_id):
-    # bytes to unicode string
-    if type(task_id) == bytes:
-        task_id = task_id.decode()
-    return TASK_USERS_KEY_PREFIX.format(task_id)
+# def get_task_users_key(task_id):
+#     # bytes to unicode string
+#     if type(task_id) == bytes:
+#         task_id = task_id.decode()
+#     return TASK_USERS_KEY_PREFIX.format(task_id)
 
 
-def get_user_tasks_key(user_id):
-    # bytes to unicode string
-    if type(user_id) == bytes:
-        user_id = user_id.decode()
-    return USER_TASKS_KEY_PREFIX.format(user_id)
+# def get_user_tasks_key(user_id):
+#     # bytes to unicode string
+#     if type(user_id) == bytes:
+#         user_id = user_id.decode()
+#     return USER_TASKS_KEY_PREFIX.format(user_id)
 
 def get_locked_tasks_project(project_id):
     """Returns a list of locked tasks for a given project."""
@@ -753,7 +766,8 @@ def get_locked_tasks_project(project_id):
 
     # Get the active users key for this project.
     key = get_active_user_key(project_id)
-
+    print(" ^^^^^^^^^ get_active_user_key ^^^^^^^^^")
+    print(redis_conn.hgetall(key))
     # Get the users for each locked task.
     for user_key in redis_conn.hgetall(key).items():
         user_id = user_key[0]
@@ -765,6 +779,7 @@ def get_locked_tasks_project(project_id):
         user_tasks = get_user_tasks(user_id, TIMEOUT)
         # Get task ids for the locks.
         user_task_ids = list(user_tasks.keys())
+        '''task_id=list(user_tasks.keys())'''
         # Get project ids for the task ids.
         results = get_task_ids_project_id(user_task_ids)
         # For each locked task, check if the lock is still active.

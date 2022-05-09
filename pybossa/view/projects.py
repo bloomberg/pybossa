@@ -53,7 +53,6 @@ from pybossa.util import (Pagination, admin_required, get_user_id_or_ip, rank,
                           get_avatar_url, admin_or_subadmin_required,
                           s3_get_file_contents, fuzzyboolean, is_own_url_or_else,
                           description_from_long_description)
-from pybossa.api import fetch_lock
 from pybossa.auth import ensure_authorized_to
 from pybossa.cache import projects as cached_projects
 from pybossa.cache import users as cached_users
@@ -87,7 +86,8 @@ from pybossa.cache.helpers import n_gold_tasks, n_available_tasks, oldest_availa
 from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date
 from pybossa.util import crossdomain
 from pybossa.error import ErrorStatus
-from pybossa.sched import Schedulers, select_task_for_gold_mode, lock_task_for_user, get_locked_tasks_project
+from pybossa.sched import (Schedulers, select_task_for_gold_mode, lock_task_for_user, get_locked_tasks_project,
+                            fetch_lock_for_user)
 from pybossa.syncer import NotEnabled, SyncUnauthorized
 from pybossa.syncer.project_syncer import ProjectSyncer
 from pybossa.exporter.csv_reports_export import ProjectReportCsvExporter
@@ -1263,16 +1263,18 @@ def task_presenter(short_name, task_id):
     guard.stamp(task, get_user_id_or_ip())
 
     # Verify the worker has an unexpired lock on the task. Otherwise, task will fail to submit.
-    timeout, remaining_lock_time = get_remaining_lock_time(task.project_id, task_id)
-    # valid_locks = {key:seconds for key, seconds in locks.items() if seconds > 0}
-    if not remaining_lock_time and mode != 'read_only':
+    timeout, ttl = fetch_lock_for_user(task.project_id, task_id, user_id)
+    remaining_time = float(ttl) - time.time() if ttl else None
+    if (not remaining_time or remaining_time <= 0) and mode != 'read_only':
         flash(gettext("Unable to lock task or task expired. Please cancel and begin a new task."), "error")
     else:
         if mode != 'read_only':
             # Set the original timeout seconds to display in the message.
             template_args['project']['original_timeout'] = timeout
             # Set the seconds remaining to display in the message.
-            template_args['project']['timeout'] = remaining_lock_time or timeout
+            template_args['project']['timeout'] = remaining_time
+            current_app.logger.info("User %s present task %s, remaining time %s, original timeout %s",
+                                    user_id, task_id, remaining_time, timeout)
 
         if not guard.check_task_presented_timestamp(task, get_user_id_or_ip()):
             guard.stamp_presented_time(task, get_user_id_or_ip())
@@ -1311,6 +1313,8 @@ def presenter(short_name):
     user_id = user_id_or_ip['user_id'] or user_id_or_ip['external_uid'] or user_id_or_ip['user_ip']
     template_args = {"project": project, "title": title, "owner": owner,
                      "invite_new_volunteers": False, "user_id": user_id}
+
+    current_app.logger.info("User %s request task, original timeout %s", user_id, project.timeout)
 
     if request.args.get("mode"):
         template_args["mode"] = request.args.get("mode")
@@ -1429,20 +1433,15 @@ def _get_locks(project_id, task_id):
             project_id)
     locks = sched.get_locks(task_id, timeout)
     now = time.time()
-    lock_ttls = {int(k.replace('.', '')): float(v) - now
+    lock_ttls = {int(k): float(v) - now
                  for k, v in locks.items()}
     return lock_ttls
 
-def get_remaining_lock_time(project_id, task_id):
-    _, timeout = sched.get_project_scheduler_and_timeout(
-            project_id)
-    try:
-        lock = fetch_lock(task_id)
-        remaining_lock_time = lock.seconds_to_expire
-    except Exception:
-        remaining_lock_time = None
-    return timeout, remaining_lock_time
-
+# def get_remaining_lock_time(project_id, task_id, user_id):
+#     _, timeout = sched.get_project_scheduler_and_timeout(
+#             project_id)
+#     ttl = fetch_lock_for_user(project_id, task_id, user_id)
+#     return timeout, ttl
 
 
 @blueprint.route('/<short_name>/tasks/')
