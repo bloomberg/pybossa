@@ -151,13 +151,14 @@ class TestProjectTransferOwnership(web.Helper):
     def test_transfer_retain_coowners(self):
         """Test transfer ownership retains existing coowners after transfer to new owner."""
         admin, owner, user1, user2 = UserFactory.create_batch(4)
-        coowners = [user2.id]
+        coowners = [owner.id, user2.id]
         project = ProjectFactory.create(owner=owner, owners_ids=coowners)
         url = '/project/%s/transferownership?api_key=%s' % (project.short_name,
                                                             admin.api_key)
 
         # Sanity check that the correct owner and coowners have been set on the project.
         assert project.owner_id == owner.id
+        assert owner.id in project.owners_ids
         assert user2.id in project.owners_ids
 
         csrf = self.get_csrf(url)
