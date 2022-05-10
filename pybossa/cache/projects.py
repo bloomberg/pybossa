@@ -59,9 +59,9 @@ def get_top(n=4):
     return top_projects
 
 
-@memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
-                    cache_group_keys=[[0]])
-@static_vars(allowed_fields=allowed_fields)
+# @memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
+#                     cache_group_keys=[[0]])
+# @static_vars(allowed_fields=allowed_fields)
 def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwargs):
     """Cache browse tasks view for a project."""
 
@@ -73,7 +73,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         if date is not None:
             return convert_utc_to_est(date).strftime('%m-%d-%y %H:%M')
 
-    def format_task(row, lock_users=[]):
+    def format_task(row, lock_users=[], available=False):
         """convert database record to task dictionary and format data."""
         finish_time = format_date(row.ft)
         created = format_date(row.created)
@@ -85,7 +85,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     userPrefLang=", ".join(user_pref.get("languages", [])),
                     userPrefLoc=", ".join(user_pref.get("locations", [])),
                     lock_users=lock_users,
-                    available=False)
+                    available=available)
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
         return task
 
@@ -148,7 +148,8 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
     args['user_id'] = user_id
     filters, filter_params = get_task_filters(args)
-    filters += args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
+    task_reserve_filter =  args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
+    print(task_reserve_filter)
 
     params = dict(project_id=project_id, **filter_params)
     limit = args.get('records_per_page') or 10
@@ -175,20 +176,26 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                 task.worker_filter,
                 task.worker_pref
                 FROM task
-                WHERE task.project_id =:project_id""" + filters +\
-                " ORDER BY %s" % (args.get('order_by') or 'priority_0 desc')
+                WHERE task.project_id =:project_id"""
+
+        task_reserve_filter = args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
 
         params["assign_user"] = args["sql_params"]["assign_user"]
+        sql_without_reserve_filter = sql + filters +\
+                " ORDER BY %s" % (args.get('order_by') or 'priority_0 desc')
+        sql_with_reserve_filter = sql + filters + task_reserve_filter
+
+        tasks_without_reserve_filter = session.execute(text(sql_without_reserve_filter), params)
+        tasks_with_reserve_filter = session.execute(text(sql_with_reserve_filter), params) if task_reserve_filter else tasks_without_reserve_filter
+        task_id_with_reserve_filter = set([row.id for row in tasks_with_reserve_filter])
+
         task_rank_info = []
         user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
 
-        results = session.execute(text(sql), params)
-
-        for row in results:
+        for row in tasks_without_reserve_filter:
             score = 0
             w_pref = row.worker_pref or {}
             w_filter = row.worker_filter or {}
-            user_pref = row.user_pref or {}
             # validate worker_filter and compute preference score
             if not user_meet_task_requirement(row.id, w_filter, user_profile):
                 continue
@@ -199,11 +206,16 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
             task = format_task(row)
             task_rank_info.append((task, score))
 
+        print("task_rank_info: ", len(task_rank_info))
+        print("task_id_with_reserve_filter: ", len(task_id_with_reserve_filter))
+        print(task_id_with_reserve_filter)
+
         # get a list of available tasks for current worker
         total_count = len(task_rank_info)
         select_available_tasks(task_rank_info, locked_tasks_in_project,
-                                project_id, user_id, offset+limit,
-                                args.get("order_by"))
+                                user_id, offset+limit, args.get("order_by"),
+                                eligible=task_id_with_reserve_filter)
+
         tasks = [t[0] for t in task_rank_info[offset: offset+limit]]
 
     else:
@@ -241,11 +253,10 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
         session.execute("RESET enable_indexscan;")
 
-    print(tasks[:5])
     return total_count, tasks
 
 
-def select_available_tasks(task_rank_info, locked_tasks, project_id, user_id, num_tasks_needed, sort_by=None):
+def select_available_tasks(task_rank_info, locked_tasks, user_id, num_tasks_needed, sort_by=None, eligible=set()):
     """execude tasks that had been locked and sort tasks based on preference score"""
 
     # if there is no sort parameter, use preference score to sort tasks
@@ -261,10 +272,9 @@ def select_available_tasks(task_rank_info, locked_tasks, project_id, user_id, nu
             # does not show completed tasks to users
             continue
         locked_users = locked_tasks.get(t["id"], [])
-        if str(user_id) in locked_users or len(locked_users) < remaining:
-            # tasks.append((t, score))
-            # t["available"] = True
-            t["available"] = False
+
+        if t["id"] in eligible and (str(user_id) in locked_users or len(locked_users) < remaining):
+            t["available"] = True
 
 
 def task_count(project_id, args):
