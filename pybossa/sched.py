@@ -370,12 +370,13 @@ def reserve_task_sql_filters(project_id, reserve_task_keys, exclude):
         return filters, category_keys
 
     # convert task category redis cache key to sql query
-    # ex "co:name:IBM:ticker:IBM_US" would be converted to
-    # "task.info->>'co_name' IN ('IBM')"
-    filters_dict = {}
+    # eg "co_name:IBM:ticker:IBM_US" would be converted to
+    # "task.info->>'co_name' = 'IBM' AND task.info->>'ticker' = 'IBM_US"
+    filter_dict = {}
     current_app.logger.info("Project %s, exclude %s. Build sql filter from reserver task keys", project_id, exclude)
     current_app.logger.info("reserve tasks keys: %s", json.dumps(reserve_task_keys))
     regex_key = "reserve_task:project:{}:category:(.+?):user".format(project_id)
+
     for item in reserve_task_keys:
         data = re.search(regex_key, item)
         if not data:
@@ -383,29 +384,25 @@ def reserve_task_sql_filters(project_id, reserve_task_keys, exclude):
 
         category_keys += [item]
         category = data.group(1)
+        if category in filter_dict:
+            continue
+
         category_fv = category.split(":")
+        filter_list = []
         for i in range(0, len(category_fv), 2):
             key, value = category_fv[i], category_fv[i + 1]
-            if key in filters_dict:
-                if value not in filters_dict[key]:
-                    filters_dict[key] += [value]
-            else:
-                filters_dict[key] = [value]
+            filter_list.append("task.info->>'{}' = '{}'".format(key, value))
+        filter_dict[category] = "({})".format(" AND ".join(filter_list))
+
+    if filter_dict:
+        exclude_clause = "IS NOT TRUE " if exclude else ""
+        filters = "({}) {}".format(" OR ".join(filter_dict.values()), exclude_clause)
+        filters = " AND {}".format(filters) if filters else filters
+
+    current_app.logger.info("sql filter %s, reserve keys %s", filters, json.dumps(category_keys))
 
     # TODO: pull task # from category keys, look for values from task._add_user_info
     # generate sql_filter considering value field type instead.
-    data = []
-    for key, value in filters_dict.items():
-        val = ["'{}'".format(val) for val in value]
-        data += ["task.info->>'{}' IN ({})".format(key, ", ".join(val))]
-    if not data:
-        current_app.logger.info("sql filter %s, reserve keys %s", filters, json.dumps(category_keys))
-        return filters, category_keys
-
-    exclude_clause = "IS NOT TRUE" if exclude else ""
-    filters = "({}) {}".format(" AND ".join(data), exclude_clause)
-    filters = " AND {}".format(filters) if filters else filters
-    current_app.logger.info("sql filter %s, reserve keys %s", filters, json.dumps(category_keys))
     return filters, category_keys
 
 

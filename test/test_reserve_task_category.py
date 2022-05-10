@@ -52,7 +52,7 @@ class TestReserveTaskCategory(sched.Helper):
         # task category key exists, returns sql filter and its associated category_keys
         project_id, exclude = "202", False
         task_info = dict(name1="value1", name2="value2")
-        expected_sql_filter = " AND ({}) ".format(" AND ".join(["task.info->>'{}' IN ('{}')".format(field, task_info[field]) for field in sorted(task_info)]))
+        expected_sql_filter = " AND ((task.info->>'name1' = 'value1' AND task.info->>'name2' = 'value2')) "
         reserve_task_keys = ["reserve_task:project:{}:category:name1:value1:name2:value2:user:1008:task:454".format(project_id)]
         filters, category_keys = reserve_task_sql_filters(project_id, reserve_task_keys, exclude)
         assert filters == expected_sql_filter and \
@@ -70,9 +70,9 @@ class TestReserveTaskCategory(sched.Helper):
             "reserve_task:project:{}:category:{}:user:1008:task:454".format(project_id, expected_key_2)
         ]
         filters, category_keys = reserve_task_sql_filters(project_id, reserve_task_keys, exclude)
-        expected_sql_filter = ["task.info->>'{}' IN ('{}')".format(field, task_info[field]) for field in sorted(task_info)]
-        expected_sql_filter += ["task.info->>'{}' IN ('{}')".format(field, task_info_2[field]) for field in sorted(task_info_2)]
-        expected_sql_filter = " AND ({}) IS NOT TRUE".format(" AND ".join(expected_sql_filter))
+        expected_sql_filter_1 = ["task.info->>'{}' = '{}'".format(field, task_info[field]) for field in sorted(task_info)]
+        expected_sql_filter_2 = ["task.info->>'{}' = '{}'".format(field, task_info_2[field]) for field in sorted(task_info_2)]
+        expected_sql_filter = " AND (({}) OR ({})) IS NOT TRUE ".format(" AND ".join(expected_sql_filter_1), " AND ".join(expected_sql_filter_2))
         assert filters == expected_sql_filter and \
             category_keys == [
                 "reserve_task:project:202:category:name1:value1:name2:value2:user:1008:task:454",
@@ -137,9 +137,9 @@ class TestReserveTaskCategory(sched.Helper):
         ]
         get_task_category_lock.return_value = expected_category_keys
         sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project.id, timeout, owner.id)
-        expected_sql_filter = ["task.info->>'{}' IN ('{}')".format(field, task_info[field]) for field in sorted(task_info)]
-        expected_sql_filter += ["task.info->>'{}' IN ('{}')".format(field, task_info_2[field]) for field in sorted(task_info_2)]
-        expected_sql_filter = " AND ({}) ".format(" AND ".join(expected_sql_filter))
+        expected_sql_filter_1 = ["task.info->>'{}' = '{}'".format(field, task_info[field]) for field in sorted(task_info)]
+        expected_sql_filter_2 = ["task.info->>'{}' = '{}'".format(field, task_info_2[field]) for field in sorted(task_info_2)]
+        expected_sql_filter = " AND (({}) OR ({})) ".format(" AND ".join(expected_sql_filter_1), " AND ".join(expected_sql_filter_2))
         assert sql_filters == expected_sql_filter and \
             category_keys == expected_category_keys, "sql_filters, category_keys must be non empty"
 

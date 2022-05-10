@@ -84,7 +84,8 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     calibration=row.calibration,
                     userPrefLang=", ".join(user_pref.get("languages", [])),
                     userPrefLoc=", ".join(user_pref.get("locations", [])),
-                    lock_users=lock_users)
+                    lock_users=lock_users,
+                    available=False)
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
         return task
 
@@ -147,7 +148,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
     args['user_id'] = user_id
     filters, filter_params = get_task_filters(args)
-    filters += args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
+    task_reserve_filter =  args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
 
     params = dict(project_id=project_id, **filter_params)
     limit = args.get('records_per_page') or 10
@@ -174,20 +175,29 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                 task.worker_filter,
                 task.worker_pref
                 FROM task
-                WHERE task.project_id =:project_id""" + filters +\
-                " ORDER BY %s" % (args.get('order_by') or 'priority_0 desc')
+                WHERE task.project_id =:project_id"""
 
         params["assign_user"] = args["sql_params"]["assign_user"]
+
+        all_available_tasks_sql = sql + filters +\
+                " ORDER BY %s" % (args.get('order_by') or 'priority_0 desc')
+        all_available_tasks = [row for row in session.execute(text(all_available_tasks_sql), params)]
+
+        task_reserve_filter = args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
+        if task_reserve_filter:
+            unreserved_tasks_sql = sql + filters + task_reserve_filter
+            unreserved_tasks = session.execute(text(unreserved_tasks_sql), params)
+        else:
+            unreserved_tasks = all_available_tasks
+        unreserved_task_ids = set([row.id for row in unreserved_tasks])
+
         task_rank_info = []
         user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
 
-        results = session.execute(text(sql), params)
-
-        for row in results:
+        for row in all_available_tasks:
             score = 0
             w_pref = row.worker_pref or {}
             w_filter = row.worker_filter or {}
-            user_pref = row.user_pref or {}
             # validate worker_filter and compute preference score
             if not user_meet_task_requirement(row.id, w_filter, user_profile):
                 continue
@@ -200,10 +210,11 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
         # get a list of available tasks for current worker
         total_count = len(task_rank_info)
-        tasks = select_available_tasks(task_rank_info, locked_tasks_in_project,
-                                        project_id, user_id, offset+limit,
-                                        args.get("order_by"))
-        tasks = [t[0] for t in tasks[offset: offset+limit]]
+        select_available_tasks(task_rank_info, locked_tasks_in_project,
+                                user_id, offset+limit, args.get("order_by"),
+                                eligible_tasks=unreserved_task_ids)
+
+        tasks = [t[0] for t in task_rank_info[offset: offset+limit]]
 
     else:
         # construct task browse page for owners/admins
@@ -243,26 +254,27 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     return total_count, tasks
 
 
-def select_available_tasks(task_rank_info, locked_tasks, project_id, user_id, num_tasks_needed, sort_by=None):
-    """execude tasks that had been locked and sort tasks based on preference score"""
+def select_available_tasks(task_rank_info, locked_tasks, user_id, num_tasks_needed, sort_by=None, eligible_tasks=set()):
+    """remove tasks without redundant taskruns,
+       disable tasks that had been locked,
+       sort tasks based on preference score"""
 
     # if there is no sort parameter, use preference score to sort tasks
     if not sort_by:
         task_rank_info = heapq.nlargest(num_tasks_needed+len(locked_tasks)+1,
                                         task_rank_info,
                                         key=lambda tup: tup[1])
-    # remove tasks if task is unavailable to contribute
-    tasks = []
-    for t, score in task_rank_info:
-        remaining = float('inf') if t["calibration"] else t["n_answers"]-t["n_task_runs"]
-        if remaining == 0:
-            # does not show completed tasks to users
-            continue
-        locked_users = locked_tasks.get(t["id"], [])
-        if str(user_id) in locked_users or len(locked_users) < remaining:
-            tasks.append((t, score))
 
-    return tasks
+    for t, _ in task_rank_info:
+        remaining = float('inf') if t["calibration"] else t["n_answers"]-t["n_task_runs"]
+        # does not show completed tasks to users
+        if remaining == 0:
+            continue
+
+        # for tasks that are available to contribute, mark available=true
+        locked_users = locked_tasks.get(t["id"], [])
+        if t["id"] in eligible_tasks and (str(user_id) in locked_users or len(locked_users) < remaining):
+            t["available"] = True
 
 
 def task_count(project_id, args):
