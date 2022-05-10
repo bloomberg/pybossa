@@ -59,9 +59,9 @@ def get_top(n=4):
     return top_projects
 
 
-# @memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
-#                     cache_group_keys=[[0]])
-# @static_vars(allowed_fields=allowed_fields)
+@memoize_essentials(timeout=timeouts.get('BROWSE_TASKS_TIMEOUT'), essentials=[0],
+                    cache_group_keys=[[0]])
+@static_vars(allowed_fields=allowed_fields)
 def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwargs):
     """Cache browse tasks view for a project."""
 
@@ -184,8 +184,9 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                 " ORDER BY %s" % (args.get('order_by') or 'priority_0 desc')
         sql_with_reserve_filter = sql + filters + task_reserve_filter
 
-        tasks_without_reserve_filter = session.execute(text(sql_without_reserve_filter), params)
-        tasks_with_reserve_filter = session.execute(text(sql_with_reserve_filter), params)
+        tasks_without_reserve_filter = [row for row in session.execute(text(sql_without_reserve_filter), params)]
+        tasks_with_reserve_filter = session.execute(text(sql_with_reserve_filter), params) if task_reserve_filter \
+                                    else tasks_without_reserve_filter
         task_id_with_reserve_filter = set([row.id for row in tasks_with_reserve_filter])
 
         task_rank_info = []
