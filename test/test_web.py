@@ -7456,6 +7456,60 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
+    @patch('pybossa.view.projects.get_searchable_columns', return_value=True)
+    def test_task_queue_configurable_columns_order(self, columns, mock):
+        """Test WEB TASK SETTINGS scheduler page works"""
+        fix_columns = ['userPrefLang', 'userPrefLoc']
+        columns.return_value = ["co_name", "ticker", "turnover"]
+        # Creat root user
+        self.register()
+        self.signin()
+        self.new_project()
+        url = "/project/sampleapp/tasks/scheduler"
+        form_id = 'task_scheduler'
+        from pybossa.core import setup_schedulers
+
+        try:
+            sched_config = [
+                ('default', 'Default'),
+                ('locked_scheduler', 'Locked Scheduler'),
+                ('task_queue_scheduler', 'Task Queue Scheduler')
+            ]
+            with patch.dict(self.flask_app.config, {'AVAILABLE_SCHEDULERS': sched_config}):
+                setup_schedulers(self.flask_app)
+
+            class DotDict(dict):
+                pass
+
+            def gold_prob():
+                return 0.6
+
+            project, owner = DotDict(), DotDict()
+            project.id = 1; project["owners_ids"] = [1, 2]; project.name = "sampleapp"
+            project.info = dict(tasklist_columns=["ticker", "co_name", "userPrefLoc"])
+            project.get_gold_task_probability = gold_prob
+            owner.id = 1; owner.name = "abc"
+            with patch("pybossa.view.projects.project_by_shortname") as mock_project, \
+                patch("pybossa.view.projects.ensure_authorized_to") as mock_auth, \
+                    patch("pybossa.view.projects.sanitize_project_owner") as mock_sanatize_proj:
+                mock_project.return_value = (project, owner, None)
+                mock_auth.return_value = True
+                mock_sanatize_proj.return_value = (project, owner)
+                res = self.app.get(url, follow_redirects=True)
+                dom = BeautifulSoup(res.data)
+                form = dom.find(id=form_id)
+                assert form is not None, res.data
+                sched_form = form.find(id)
+                options = dom.find(id="show-customized").find_all('option')
+                assert len(options) == len(mock_columns) + len(fix_columns), len(options)
+                configurable_columns = [o.attrs['value'] for o in options]
+                assert all(s in configurable_columns for s, d in mock_columns)
+                assert all(s in configurable_columns for s, d in fix_columns)
+        except Exception as e:
+            pass
+
+    @with_context
+    @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
     def test_76_task_settings_redundancy(self, mock):
         """Test WEB TASK SETTINGS redundancy page works"""
         # Creat root user

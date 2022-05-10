@@ -121,7 +121,7 @@ task_queue = Queue('medium',
 export_queue = Queue('low',
                      connection=sentinel.master,
                      default_timeout=EXPORT_TASKS_TIMEOUT)
-
+USER_PREF_COLUMNS = [("userPrefLang", "user_pref_languages"), ("userPrefLoc", "user_pref_locations")]
 
 @blueprint_projectid.route('/<int:projectid>/', defaults={'path': ''})
 @blueprint_projectid.route('/<int:projectid>/<path:path>/')
@@ -2416,9 +2416,18 @@ def task_scheduler(short_name):
 
     title = project_title(project, gettext('Task Scheduler'))
     form = TaskSchedulerForm(request.body)
-    columns = get_searchable_columns(project.id)
-    configurable_columns = [(c, c) for c in columns]
-    configurable_columns.extend([("userPrefLang", "user_pref_languages"), ("userPrefLoc", "user_pref_locations")])
+    # order configured tasklist_columns including upref cols first
+    task_columns = get_searchable_columns(project.id)
+    tasklist_columns = project.info.get("tasklist_columns", [])
+    configurable_columns = []
+    for col in tasklist_columns:
+        if col in task_columns:
+            configurable_columns.append((col, col))
+        else:
+            configurable_columns += [(k, v) for k, v in USER_PREF_COLUMNS if col == k]
+    # add columns that are not configured so that user has option to add them later
+    configurable_columns += [(col, col) for col in task_columns if col not in tasklist_columns]
+    configurable_columns += [(k, v) for k, v in USER_PREF_COLUMNS if k not in tasklist_columns]
     form.set_customized_columns_options(configurable_columns)
     pro = pro_features()
 
