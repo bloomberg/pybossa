@@ -210,11 +210,11 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
         # get a list of available tasks for current worker
         total_count = len(task_rank_info)
-        select_available_tasks(task_rank_info, locked_tasks_in_project,
+        tasks = select_available_tasks(task_rank_info, locked_tasks_in_project,
                                 user_id, offset+limit, args.get("order_by"),
                                 eligible_tasks=unreserved_task_ids)
 
-        tasks = [t[0] for t in task_rank_info[offset: offset+limit]]
+        tasks = tasks[offset: offset+limit]
 
     else:
         # construct task browse page for owners/admins
@@ -265,6 +265,7 @@ def select_available_tasks(task_rank_info, locked_tasks, user_id, num_tasks_need
                                         task_rank_info,
                                         key=lambda tup: tup[1])
 
+    result = []
     for t, _ in task_rank_info:
         remaining = float('inf') if t["calibration"] else t["n_answers"]-t["n_task_runs"]
         # does not show completed tasks to users
@@ -275,6 +276,9 @@ def select_available_tasks(task_rank_info, locked_tasks, user_id, num_tasks_need
         locked_users = locked_tasks.get(t["id"], [])
         if t["id"] in eligible_tasks and (str(user_id) in locked_users or len(locked_users) < remaining):
             t["available"] = True
+        result.append(t)
+
+    return result
 
 
 def task_count(project_id, args):
