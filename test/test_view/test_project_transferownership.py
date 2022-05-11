@@ -228,3 +228,59 @@ class TestProjectTransferOwnership(web.Helper):
         # Confirm the old project owner is no longer included in the coowners.
         err_msg = "Old owner should not exist in coowners after transfer"
         assert owner.id not in project.owners_ids, err_msg
+
+    @with_context
+    def test_transfer_to_coowner_no_duplicate(self):
+        """Test transferring a project to a co-owner, retain existing coowners, avoid duplicate on new owner."""
+        admin, owner, user1, user2 = UserFactory.create_batch(4)
+
+        # Assign user1 to the coowners (user1 is the user we are transferring this project to).
+        coowners = [owner.id, user1.id, user2.id]
+
+        project = ProjectFactory.create(owner=owner, owners_ids=coowners)
+        url = '/project/%s/transferownership?api_key=%s' % (project.short_name,
+                                                            admin.api_key)
+
+        # Sanity check that the correct owner and coowners have been set on the project.
+        assert project.owner_id == owner.id
+        assert owner.id in project.owners_ids
+        assert user1.id in project.owners_ids
+        assert user2.id in project.owners_ids
+
+        csrf = self.get_csrf(url)
+        headers = {'X-CSRFToken': csrf}
+
+        # Transfer the project from owner to user1.
+        payload = dict(email_addr=user1.email_addr)
+        res = self.app_post_json(url, data=payload, headers=headers, follow_redirects=True)
+        data = json.loads(res.data)
+        assert data['next'] is not None, data
+
+        # Confirm the new owner id.
+        err_msg = "The project owner id should be different"
+        assert project.owner_id == user1.id, err_msg
+
+        # Confirm the existing coowners are retained.
+        err_msg = "Co-owner should still exist on project after transfer"
+        assert user2.id in project.owners_ids, err_msg
+
+        # Confirm the new project owner is included in the coowners.
+        err_msg = "New owner should exist in coowners after transfer"
+        assert user1.id in project.owners_ids, err_msg
+
+        # Confirm the old project owner is no longer included in the coowners.
+        err_msg = "Old owner should not exist in coowners after transfer"
+        assert owner.id not in project.owners_ids, err_msg
+
+        # Confirm only 1 entry for user1 exists in coowners.
+        err_msg = "No duplicate coowners should exist"
+        assert len(project.owners_ids) == 2, err_msg
+
+        # Confirm the new owner was not added a second time into co-owners.
+        err_msg = "New owner already exists in co-owners"
+        assert len([i for i, e in enumerate(project.owners_ids) if e == user1.id]) == 1, err_msg
+
+        # Sanity checks (owner should no longer exist in co-owners, user2 should exist once).
+        err_msg = "Santiy checks for duplicates"
+        assert len([i for i, e in enumerate(project.owners_ids) if e == owner.id]) == 0, err_msg
+        assert len([i for i, e in enumerate(project.owners_ids) if e == user2.id]) == 1, err_msg

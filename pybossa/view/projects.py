@@ -3039,10 +3039,12 @@ def transfer_ownership(short_name):
             project.owner_id = new_owner_id
 
             # Remove old project owner id from coowners.
-            project.owners_ids.remove(old_owner_id)
+            if old_owner_id in project.owners_ids:
+                project.owners_ids.remove(old_owner_id)
 
             # Add new project owner id to coowners.
-            project.owners_ids.append(new_owner_id)
+            if new_owner_id not in project.owners_ids:
+                project.owners_ids.append(new_owner_id)
 
             # Update project.
             project_repo.update(project)
