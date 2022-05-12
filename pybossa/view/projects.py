@@ -3032,10 +3032,23 @@ def transfer_ownership(short_name):
     if request.method == 'POST' and form.validate():
         new_owner = user_repo.filter_by(email_addr=form.email_addr.data)
         if len(new_owner) == 1:
-            new_owner = new_owner[0]
-            project.owner_id = new_owner.id
-            project.owners_ids = [new_owner.id]
+            old_owner_id = project.owner_id
+            new_owner_id = new_owner[0].id
+
+            # Assign new project owner id.
+            project.owner_id = new_owner_id
+
+            # Remove old project owner id from coowners.
+            if old_owner_id in project.owners_ids:
+                project.owners_ids.remove(old_owner_id)
+
+            # Add new project owner id to coowners.
+            if new_owner_id not in project.owners_ids:
+                project.owners_ids.append(new_owner_id)
+
+            # Update project.
             project_repo.update(project)
+
             msg = gettext("Project owner updated")
             flash(msg, 'info')
             return redirect_content_type(url_for('.details',
