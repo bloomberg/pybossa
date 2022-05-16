@@ -7460,7 +7460,8 @@ class TestWeb(web.Helper):
     def test_task_queue_configurable_columns_order(self, columns, mock):
         """Test WEB TASK SETTINGS scheduler page works"""
         fix_columns = ['userPrefLang', 'userPrefLoc']
-        columns.return_value = ["co_name", "ticker", "turnover"]
+        task_columns = ["co_name", "ticker", "turnover"]
+        columns.return_value = task_columns
         # Creat root user
         self.register()
         self.signin()
@@ -7469,44 +7470,100 @@ class TestWeb(web.Helper):
         form_id = 'task_scheduler'
         from pybossa.core import setup_schedulers
 
-        try:
-            sched_config = [
-                ('default', 'Default'),
-                ('locked_scheduler', 'Locked Scheduler'),
-                ('task_queue_scheduler', 'Task Queue Scheduler')
-            ]
-            with patch.dict(self.flask_app.config, {'AVAILABLE_SCHEDULERS': sched_config}):
-                setup_schedulers(self.flask_app)
+        sched_config = [
+            ('default', 'Default'),
+            ('locked_scheduler', 'Locked Scheduler'),
+            ('task_queue_scheduler', 'Task Queue Scheduler')
+        ]
+        with patch.dict(self.flask_app.config, {'AVAILABLE_SCHEDULERS': sched_config}):
+            setup_schedulers(self.flask_app)
 
-            class DotDict(dict):
-                pass
-
-            def gold_prob():
-                return 0.6
-
-            project, owner = DotDict(), DotDict()
-            project.id = 1; project["owners_ids"] = [1, 2]; project.name = "sampleapp"
-            project.info = dict(tasklist_columns=["ticker", "co_name", "userPrefLoc"])
-            project.get_gold_task_probability = gold_prob
-            owner.id = 1; owner.name = "abc"
-            with patch("pybossa.view.projects.project_by_shortname") as mock_project, \
-                patch("pybossa.view.projects.ensure_authorized_to") as mock_auth, \
-                    patch("pybossa.view.projects.sanitize_project_owner") as mock_sanatize_proj:
-                mock_project.return_value = (project, owner, None)
-                mock_auth.return_value = True
-                mock_sanatize_proj.return_value = (project, owner)
-                res = self.app.get(url, follow_redirects=True)
-                dom = BeautifulSoup(res.data)
-                form = dom.find(id=form_id)
-                assert form is not None, res.data
-                sched_form = form.find(id)
-                options = dom.find(id="show-customized").find_all('option')
-                assert len(options) == len(mock_columns) + len(fix_columns), len(options)
-                configurable_columns = [o.attrs['value'] for o in options]
-                assert all(s in configurable_columns for s, d in mock_columns)
-                assert all(s in configurable_columns for s, d in fix_columns)
-        except Exception as e:
+        class DotDict(dict):
             pass
+
+        def gold_prob():
+            return 0.6
+
+        project, owner = DotDict(), DotDict()
+        project.id = 1; project["owners_ids"] = [1, 2]; project.name = "sampleapp"
+        selected_columns = ["ticker", "co_name", "userPrefLoc"]
+        expected_columns_order = ["ticker", "co_name", "user_pref_locations", "turnover", "user_pref_languages"]
+        project.info = dict(tasklist_columns=selected_columns)
+        project.get_gold_task_probability = gold_prob
+        owner.id = 1; owner.name = "abc"
+        with patch("pybossa.view.projects.project_by_shortname") as mock_project, \
+            patch("pybossa.view.projects.ensure_authorized_to") as mock_auth, \
+                patch("pybossa.view.projects.sanitize_project_owner") as mock_sanatize_proj:
+            mock_project.return_value = (project, owner, None)
+            mock_auth.return_value = True
+            project = {'id': 1, 'name': 'xyz', 'short_name': 'sampleapp', 'description': 'xyz', 'long_description': 'xyz', 'owners_ids': [1], 'info': {}, 'n_tasks': 0, 'published': False}
+            owner = {'id': 1, 'name': 'johndoe', 'fullname': 'John Doe'}
+            mock_sanatize_proj.return_value = (project, owner)
+            res = self.app.get(url, follow_redirects=True)
+            dom = BeautifulSoup(res.data)
+            form = dom.find(id=form_id)
+            assert form is not None, res.data
+            sched_form = form.find(id)
+            options = dom.find(id="show-customized").find_all('option')
+            expected_num_cols = len(task_columns) + len(fix_columns)
+            assert len(options) == expected_num_cols, f"Unexpected number of customized_columns options; expected count is {expected_num_cols}"
+            columns_order = [o.text for o in options]
+            assert columns_order == expected_columns_order, f"Unexpected order of customized columns; expected order is {str(expected_columns_order)}"
+
+    @with_context
+    @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
+    @patch('pybossa.view.projects.get_searchable_columns', return_value=True)
+    def test_reserve_task_category_columns_order(self, columns, mock):
+        """Test WEB TASK SETTINGS scheduler page works"""
+        task_columns = ["co_name", "ticker", "turnover"]
+        columns.return_value = task_columns
+        # Creat root user
+        self.register()
+        self.signin()
+        self.new_project()
+        url = "/project/sampleapp/tasks/scheduler"
+        form_id = 'task_scheduler'
+        from pybossa.core import setup_schedulers
+
+        sched_config = [
+            ('default', 'Default'),
+            ('locked_scheduler', 'Locked Scheduler'),
+            ('task_queue_scheduler', 'Task Queue Scheduler')
+        ]
+        with patch.dict(self.flask_app.config, {'AVAILABLE_SCHEDULERS': sched_config}):
+            setup_schedulers(self.flask_app)
+
+        class DotDict(dict):
+            pass
+
+        def gold_prob():
+            return 0.6
+
+        project, owner = DotDict(), DotDict()
+        project.id = 1; project["owners_ids"] = [1, 2]; project.name = "sampleapp"
+        selected_columns = ["ticker", "co_name"]
+        expected_columns_order = ["ticker", "co_name", "turnover"]
+        project.info = dict(reserve_tasks=dict(category=selected_columns))
+        project.get_gold_task_probability = gold_prob
+        owner.id = 1; owner.name = "abc"
+        with patch("pybossa.view.projects.project_by_shortname") as mock_project, \
+            patch("pybossa.view.projects.ensure_authorized_to") as mock_auth, \
+                patch("pybossa.view.projects.sanitize_project_owner") as mock_sanatize_proj:
+            mock_project.return_value = (project, owner, None)
+            mock_auth.return_value = True
+            project = {'id': 1, 'name': 'xyz', 'short_name': 'sampleapp', 'description': 'xyz', 'long_description': 'xyz', 'owners_ids': [1], 'info': {}, 'n_tasks': 0, 'published': False}
+            owner = {'id': 1, 'name': 'johndoe', 'fullname': 'John Doe'}
+            mock_sanatize_proj.return_value = (project, owner)
+            res = self.app.get(url, follow_redirects=True)
+            dom = BeautifulSoup(res.data)
+            form = dom.find(id=form_id)
+            assert form is not None, res.data
+            sched_form = form.find(id)
+            options = dom.find(id="show-reserve-category-cols").find_all('option')
+            expected_num_cols = len(task_columns)
+            assert len(options) == expected_num_cols, f"Unexpected number of customized_columns options; expected count is {expected_num_cols}"
+            columns_order = [o.text for o in options]
+            assert columns_order == expected_columns_order, f"Unexpected order of customized columns; expected order is {str(expected_columns_order)}"
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)

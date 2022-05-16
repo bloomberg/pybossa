@@ -2429,6 +2429,11 @@ def task_scheduler(short_name):
     configurable_columns += [(col, col) for col in task_columns if col not in tasklist_columns]
     configurable_columns += [(k, v) for k, v in USER_PREF_COLUMNS if k not in tasklist_columns]
     form.set_customized_columns_options(configurable_columns)
+
+    reserve_category_columns = project.info.get("reserve_tasks", {}).get("category", [])
+    reserve_category_options = [(col, col) for col in reserve_category_columns]
+    reserve_category_options += [(col, col) for col in task_columns if col not in reserve_category_columns]
+    form.set_reserve_category_cols_options(reserve_category_options)
     pro = pro_features()
 
     def respond():
@@ -2455,6 +2460,7 @@ def task_scheduler(short_name):
                 if project.info['sched'] == sched_name:
                     form.sched.data = sched_name
                     break
+        form.reserve_category_columns.data = reserve_category_columns
         form.customized_columns.data = project.info.get('tasklist_columns', [])
         form.rand_within_priority.data = project.info.get('sched_rand_within_priority', False)
         form.gold_task_probability.data = project.get_gold_task_probability()
@@ -2469,6 +2475,8 @@ def task_scheduler(short_name):
         if form.sched.data:
             project.info['sched'] = form.sched.data
 
+        reserve_category_columns = form.reserve_category_columns.data if form.sched.data in ["task_queue_scheduler"] else []
+        project.info["reserve_tasks"] = dict(category=reserve_category_columns)
         project.info['tasklist_columns'] = form.customized_columns.data
         project.info['sched_rand_within_priority'] = form.rand_within_priority.data
         project.set_gold_task_probability(form.gold_task_probability.data)
