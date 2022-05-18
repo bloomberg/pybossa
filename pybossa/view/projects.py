@@ -1266,6 +1266,9 @@ def task_presenter(short_name, task_id):
     timeout, ttl = fetch_lock_for_user(task.project_id, task_id, user_id)
     remaining_time = float(ttl) - time.time() if ttl else None
     if (not remaining_time or remaining_time <= 0) and mode != 'read_only':
+        current_app.logger.info("unable to lock task or task expired. \
+                                project %s, task %s, user %s, remaining time %s, mode %s",
+                                task.project_id, task_id, user_id, remaining_time, mode)
         flash(gettext("Unable to lock task or task expired. Please cancel and begin a new task."), "error")
     else:
         if mode != 'read_only':
