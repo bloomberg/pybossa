@@ -9482,9 +9482,6 @@ class TestWeb(web.Helper):
         assert data["id"] == task[0].id, "First available task to be presented when all tasks with reserver category are consumed"
 
 
-
-
-
 class TestWebUserMetadataUpdate(web.Helper):
 
     original = {
@@ -9709,7 +9706,7 @@ class TestWebUserMetadataUpdate(web.Helper):
     @with_context
     @patch('pybossa.api.release_lock')
     @patch('pybossa.api.has_lock')
-    def test_cancel_task_succed(self, has_lock, release_lock):
+    def test_cancel_task_succeed(self, has_lock, release_lock):
         """Test cancel """
 
         has_lock.return_value = True
@@ -9735,6 +9732,67 @@ class TestWebUserMetadataUpdate(web.Helper):
         data = json.loads(res.data)
         assert data.get('success') == True, data
         assert release_lock.call_count == 1, release_lock.call_count
+
+    @with_context
+    def test_release_category_locks(self):
+        """Test cancel task with wrong payload"""
+
+        url = "/api/task/1/release_category_locks"
+
+        admin = UserFactory.create()
+        self.signin_user(admin)
+        project = ProjectFactory.create(owner=admin)
+        task = TaskFactory.create(project=project)
+        payload = {'info': {'ans1': 'test'}, 'task_id': 1, 'project_id': 1}
+
+        res = self.app_post_json(url,
+                            data=payload,
+                            follow_redirects=False,
+                            )
+        data = json.loads(res.data)
+        assert data.get('status_code') == 400, data
+
+    @with_context
+    def test_cancel_task_without_auth(self):
+        """Test cancel task without auth"""
+
+        url = "/api/task/1/release_category_locks"
+
+        payload = {}
+        res = self.app_post_json(url,
+                            data=payload,
+                            follow_redirects=False,
+                            )
+        data = json.loads(res.data)
+        assert data.get('status_code') == 401, data
+
+    @with_context
+    @patch('pybossa.api.release_reserve_task_lock_by_id')
+    def test_cancel_task_succeed(self, release_reserve_task_lock_by_id):
+        """Test cancel """
+
+        url = "/api/task/1/release_category_locks"
+
+        admin = UserFactory.create()
+        self.signin_user(admin)
+        project = ProjectFactory.create(
+            info= {
+                'sched': 'task_queue_scheduler',
+                'timeout': 60 * 60,
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public")
+            },
+            owner=admin
+        )
+        task = TaskFactory.create(project=project)
+        payload = {'projectname': project.short_name}
+
+        res = self.app_post_json(url,
+                            data=payload,
+                            follow_redirects=False,
+                            )
+        data = json.loads(res.data)
+        assert data.get('success') is True, data
+        assert release_reserve_task_lock_by_id.call_count == 1, release_reserve_task_lock_by_id.call_count
 
 
 class TestWebQuizModeUpdate(web.Helper):
