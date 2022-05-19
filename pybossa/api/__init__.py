@@ -70,9 +70,8 @@ from .completed_task import CompletedTaskAPI
 from .completed_task_run import CompletedTaskRunAPI
 from pybossa.cache.helpers import (n_available_tasks, n_available_tasks_for_user,
     n_unexpired_gold_tasks)
-from pybossa.sched import (get_project_scheduler_and_timeout, get_scheduler_and_timeout,
-                           has_lock, release_lock, Schedulers, get_locks,
-                           release_reserve_task_lock_by_id)
+from pybossa.sched import (get_scheduler_and_timeout, has_lock, release_lock, Schedulers,
+                           fetch_lock_for_user, release_reserve_task_lock_by_id)
 from pybossa.jobs import send_mail
 from pybossa.api.project_by_name import ProjectByNameAPI
 from pybossa.api.pwd_manager import get_pwd_manager
@@ -580,21 +579,10 @@ def fetch_lock(task_id):
         return abort(401)
 
     task = task_repo.get_task(task_id)
-
     if not task:
         return abort(400)
 
-    scheduler, timeout = get_project_scheduler_and_timeout(
-            task.project_id)
-
-    ttl = None
-    if scheduler in (Schedulers.locked, Schedulers.user_pref, Schedulers.task_queue):
-        task_locked_by_user = has_lock(
-                task.id, current_user.id, timeout)
-        if task_locked_by_user:
-            locks = get_locks(task.id, timeout)
-            ttl = locks.get(str(current_user.id))
-
+    _, ttl = fetch_lock_for_user(task.project_id, task.id, current_user.id)
     if not ttl:
         return abort(404)
 

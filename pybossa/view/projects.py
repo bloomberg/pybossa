@@ -86,7 +86,8 @@ from pybossa.cache.helpers import n_gold_tasks, n_available_tasks, oldest_availa
 from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date
 from pybossa.util import crossdomain
 from pybossa.error import ErrorStatus
-from pybossa.sched import Schedulers, select_task_for_gold_mode, lock_task_for_user, get_locked_tasks_project
+from pybossa.redis_lock import get_locked_tasks_project
+from pybossa.sched import Schedulers, select_task_for_gold_mode, lock_task_for_user, fetch_lock_for_user
 from pybossa.syncer import NotEnabled, SyncUnauthorized
 from pybossa.syncer.project_syncer import ProjectSyncer
 from pybossa.exporter.csv_reports_export import ProjectReportCsvExporter
@@ -1262,24 +1263,21 @@ def task_presenter(short_name, task_id):
     guard.stamp(task, get_user_id_or_ip())
 
     # Verify the worker has an unexpired lock on the task. Otherwise, task will fail to submit.
-    locks = _get_locks(project.id, task_id)
-    valid_locks = {key:seconds for key, seconds in locks.items() if seconds > 0}
-    if not valid_locks and mode != 'read_only':
+    timeout, ttl = fetch_lock_for_user(task.project_id, task_id, user_id)
+    remaining_time = float(ttl) - time.time() if ttl else None
+    if (not remaining_time or remaining_time <= 0) and mode != 'read_only':
+        current_app.logger.info("unable to lock task or task expired. \
+                                project %s, task %s, user %s, remaining time %s, mode %s",
+                                task.project_id, task_id, user_id, remaining_time, mode)
         flash(gettext("Unable to lock task or task expired. Please cancel and begin a new task."), "error")
     else:
         if mode != 'read_only':
-            # The user already has a valid lock (page reload).
             # Set the original timeout seconds to display in the message.
-            seconds = project.info.get('timeout', DEFAULT_TASK_TIMEOUT)
-            template_args['project']['original_timeout'] = seconds
-
-            # Find the seconds remaining on this task.
-            lock = {key:seconds for key, seconds in locks.items() if key == current_user.id and seconds > 0}
-            if lock:
-                seconds = lock[current_user.id]
-
+            template_args['project']['original_timeout'] = timeout
             # Set the seconds remaining to display in the message.
-            template_args['project']['timeout'] = seconds
+            template_args['project']['timeout'] = remaining_time
+            current_app.logger.info("User %s present task %s, remaining time %s, original timeout %s",
+                                    user_id, task_id, remaining_time, timeout)
 
         if not guard.check_task_presented_timestamp(task, get_user_id_or_ip()):
             guard.stamp_presented_time(task, get_user_id_or_ip())
@@ -1318,6 +1316,8 @@ def presenter(short_name):
     user_id = user_id_or_ip['user_id'] or user_id_or_ip['external_uid'] or user_id_or_ip['user_ip']
     template_args = {"project": project, "title": title, "owner": owner,
                      "invite_new_volunteers": False, "user_id": user_id}
+
+    current_app.logger.info("User %s request task, original timeout %s", user_id, project.timeout)
 
     if request.args.get("mode"):
         template_args["mode"] = request.args.get("mode")
@@ -1436,7 +1436,7 @@ def _get_locks(project_id, task_id):
             project_id)
     locks = sched.get_locks(task_id, timeout)
     now = time.time()
-    lock_ttls = {int(k.replace('.', '')): float(v) - now
+    lock_ttls = {int(k): float(v) - now
                  for k, v in locks.items()}
     return lock_ttls
 
