@@ -603,8 +603,11 @@ def release_reserve_task_lock_by_id(project_id, task_id, user_id, timeout, expir
             project_id, reserve_key, user_id)
         resource_ids = lock_manager.scan_keys(pattern)
         for k in resource_ids:
-            lock_manager.release_reserve_task_lock(k, expiry)
-            current_app.logger.info("Release reserve task locks: %s", k)
+            task_id_in_key = int(k.decode().split(":")[-1])
+            # If a task is locked by the user(in other tab), then the category lock should not be released
+            if task_id_in_key == task_id or not lock_manager.has_lock(get_task_users_key(task_id_in_key), user_id):
+                lock_manager.release_reserve_task_lock(k, expiry)
+                current_app.logger.info("Release reserve task locks: %s, task %d", k, task_id_in_key)
     else:
         resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
             project_id, reserve_key, user_id, task_id)

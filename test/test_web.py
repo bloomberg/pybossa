@@ -9753,7 +9753,7 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert data.get('status_code') == 400, data
 
     @with_context
-    def test_cancel_task_without_auth(self):
+    def test_release_category_locks_without_auth(self):
         """Test cancel task without auth"""
 
         url = "/api/task/1/release_category_locks"
@@ -9768,7 +9768,7 @@ class TestWebUserMetadataUpdate(web.Helper):
 
     @with_context
     @patch('pybossa.api.release_reserve_task_lock_by_id')
-    def test_cancel_task_succeed(self, release_reserve_task_lock_by_id):
+    def test_release_category_locks_succeed(self, release_reserve_task_lock_by_id):
         """Test cancel """
 
         url = "/api/task/1/release_category_locks"

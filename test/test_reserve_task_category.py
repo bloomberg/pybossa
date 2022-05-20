@@ -288,8 +288,6 @@ class TestReserveTaskCategory(sched.Helper):
             expected_reserve_task_key = f"reserve_task:project:{project.id}:category:{category_key}:user:{user.id}:task:{task.id}"
             assert expected_reserve_task_key.encode() in sentinel.master.keys(), "reserve task key must exist in redis cache"
 
-        expiry = 1
-        # import pdb; pdb.set_trace()
         release_reserve_task_lock_by_id(project.id, tasks[0].id, user.id, timeout,
                                         expiry=expiry, release_all_task=True)
         time.sleep(expiry)
@@ -297,9 +295,6 @@ class TestReserveTaskCategory(sched.Helper):
             category_key = ":".join([f"{field}:{task.info[field]}" for field in category_fields])
             expected_reserve_task_key = f"reserve_task:project:{project.id}:category:{category_key}:user:{user.id}:task:{task.id}"
             assert expected_reserve_task_key.encode() not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
-
-        time.sleep(expiry*2)
-
 
     @with_context
     def test_get_reserve_task_key(self):
