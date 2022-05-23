@@ -603,7 +603,11 @@ def release_reserve_task_lock_by_id(project_id, task_id, user_id, timeout, expir
             project_id, reserve_key, user_id)
         resource_ids = lock_manager.scan_keys(pattern)
 
-        tasks_locked_by_user = get_user_tasks(user_id, timeout)
+        # get_user_tasks contains task_id and time_stamp pair. Filter out non expired tasks
+        tasks_locked_by_user = {task_id: time_stamp for task_id, time_stamp
+                                in get_user_tasks(user_id, timeout).items()
+                                if LockManager.seconds_remaining(time_stamp) > EXPIRE_LOCK_DELAY}
+
         for k in resource_ids:
             task_id_in_key = int(k.decode().split(":")[-1])
             # If a task is locked by the user(in other tab), then the category lock should not be released
@@ -742,13 +746,7 @@ def get_locks(task_id, timeout):
 def get_user_tasks(user_id, timeout):
     lock_manager = LockManager(sentinel.master, timeout)
     user_tasks_key = get_user_tasks_key(user_id)
-    locks = lock_manager.get_locks(user_tasks_key)
-
-    # locks contains task_id and time_stamp pair. Filter out non expired tasks
-    valid_locks = {task_id: time_stamp for task_id, time_stamp in locks.items()
-                   if LockManager.seconds_remaining(time_stamp) > EXPIRE_LOCK_DELAY}
-
-    return valid_locks
+    return lock_manager.get_locks(user_tasks_key)
 
 
 def save_task_id_project_id(task_id, project_id, timeout):
