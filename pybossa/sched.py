@@ -28,7 +28,7 @@ from .redis_lock import (LockManager, get_active_user_key, get_user_tasks_key,
                          get_task_users_key, get_task_id_project_id_key,
                          register_active_user, unregister_active_user,
                          get_active_user_count,
-                         EXPIRE_RESERVE_TASK_LOCK_DELAY)
+                         EXPIRE_RESERVE_TASK_LOCK_DELAY, EXPIRE_LOCK_DELAY)
 from .contributions_guard import ContributionsGuard
 from werkzeug.exceptions import BadRequest, Forbidden
 import random
@@ -602,10 +602,12 @@ def release_reserve_task_lock_by_id(project_id, task_id, user_id, timeout, expir
         pattern = "reserve_task:project:{}:category:{}:user:{}:task:*".format(
             project_id, reserve_key, user_id)
         resource_ids = lock_manager.scan_keys(pattern)
+
+        tasks_locked_by_user = get_user_tasks(user_id, timeout)
         for k in resource_ids:
             task_id_in_key = int(k.decode().split(":")[-1])
             # If a task is locked by the user(in other tab), then the category lock should not be released
-            if task_id_in_key == task_id or not lock_manager.has_lock(get_task_users_key(task_id_in_key), user_id):
+            if task_id_in_key == task_id or str(task_id_in_key) not in tasks_locked_by_user:
                 lock_manager.release_reserve_task_lock(k, expiry)
                 current_app.logger.info("Release reserve task locks: %s, task: %d, project: %s, user: %s", k, task_id_in_key, project_id, user_id)
     else:
@@ -740,7 +742,13 @@ def get_locks(task_id, timeout):
 def get_user_tasks(user_id, timeout):
     lock_manager = LockManager(sentinel.master, timeout)
     user_tasks_key = get_user_tasks_key(user_id)
-    return lock_manager.get_locks(user_tasks_key)
+    locks = lock_manager.get_locks(user_tasks_key)
+
+    # locks contains task_id and time_stamp pair. Filter out non expired tasks
+    valid_locks = {task_id: time_stamp for task_id, time_stamp in locks.items()
+                   if LockManager.seconds_remaining(time_stamp) > EXPIRE_LOCK_DELAY}
+
+    return valid_locks
 
 
 def save_task_id_project_id(task_id, project_id, timeout):
