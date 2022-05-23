@@ -268,7 +268,6 @@ class LockManager(object):
             category_keys = [ key for key in category_keys if drop_user not in key ]
         return category_keys
 
-
     def acquire_reserve_task_lock(self, project_id, task_id, user_id, category):
         if not(project_id and user_id and task_id and category):
             raise BadRequest('Missing required parameters')
@@ -281,8 +280,10 @@ class LockManager(object):
         expiration = timestamp + self._duration + EXPIRE_RESERVE_TASK_LOCK_DELAY
         return self._redis.set(resource_id, expiration)
 
-
     def release_reserve_task_lock(self, resource_id, expiry):
         #cache = pipeline or self._redis # https://pythonrepo.com/repo/andymccurdy-redis-py-python-connecting-and-operating-databases#locks
         cache = self._redis
         cache.expire(resource_id, expiry)
+
+    def scan_keys(self, pattern):
+        return self._redis.scan_iter(pattern)

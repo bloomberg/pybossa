@@ -562,8 +562,29 @@ def cancel_task(task_id=None):
             current_app.logger.info(
                 'Project {} - user {} cancelled task {}'
                 .format(project.id, current_user.id, task_id))
-            release_reserve_task_lock_by_id(project.id, task_id, current_user.id, timeout, expiry=EXPIRE_LOCK_DELAY)
+            release_reserve_task_lock_by_id(project.id, task_id, current_user.id, timeout, expiry=EXPIRE_LOCK_DELAY, release_all_task=True)
 
+    return Response(json.dumps({'success': True}), 200, mimetype="application/json")
+
+
+@jsonpify
+@csrf.exempt
+@login_required
+@blueprint.route('/task/<int:task_id>/release_category_locks', methods=['POST'])
+@ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+def release_category_locks(task_id=None):
+    """Unlock all category (reservation) locks reserved by this user"""
+    if not current_user.is_authenticated:
+        return abort(401)
+
+    project_name = request.json.get('projectname', None)
+    project = project_repo.get_by_shortname(project_name)
+    if not project:
+        return abort(400)
+
+    scheduler, timeout = get_scheduler_and_timeout(project)
+    if scheduler == Schedulers.task_queue:
+        release_reserve_task_lock_by_id(project.id, task_id, current_user.id, timeout, expiry=EXPIRE_LOCK_DELAY, release_all_task=True)
 
     return Response(json.dumps({'success': True}), 200, mimetype="application/json")
 

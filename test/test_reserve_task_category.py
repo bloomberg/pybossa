@@ -274,8 +274,27 @@ class TestReserveTaskCategory(sched.Helper):
         expiry = 1
         release_reserve_task_lock_by_id(project.id, task.id, user.id, timeout, expiry=expiry)
         time.sleep(expiry)
-        assert expected_reserve_task_key not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
+        assert expected_reserve_task_key.encode() not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
 
+        # test releasing multiple locks
+        batch_number = 10
+        tasks = TaskFactory.create_batch(
+            batch_number, project=project, n_answers=1,
+            info=dict(field_1="abc", field_2=123)
+        )
+        for task in tasks:
+            acquire_reserve_task_lock(project.id, task.id, user.id, timeout)
+            category_key = ":".join([f"{field}:{task.info[field]}" for field in category_fields])
+            expected_reserve_task_key = f"reserve_task:project:{project.id}:category:{category_key}:user:{user.id}:task:{task.id}"
+            assert expected_reserve_task_key.encode() in sentinel.master.keys(), "reserve task key must exist in redis cache"
+
+        release_reserve_task_lock_by_id(project.id, tasks[0].id, user.id, timeout,
+                                        expiry=expiry, release_all_task=True)
+        time.sleep(expiry)
+        for task in tasks:
+            category_key = ":".join([f"{field}:{task.info[field]}" for field in category_fields])
+            expected_reserve_task_key = f"reserve_task:project:{project.id}:category:{category_key}:user:{user.id}:task:{task.id}"
+            assert expected_reserve_task_key.encode() not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
 
     @with_context
     def test_get_reserve_task_key(self):
