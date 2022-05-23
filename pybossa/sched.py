@@ -591,7 +591,7 @@ def acquire_lock(task_id, user_id, limit, timeout, pipeline=None, execute=True):
     return False
 
 
-def release_reserve_task_lock_by_id(project_id, task_id, user_id, timeout, expiry=EXPIRE_RESERVE_TASK_LOCK_DELAY, release_all_task=None):
+def release_reserve_task_lock_by_id(project_id, task_id, user_id, timeout, expiry=EXPIRE_RESERVE_TASK_LOCK_DELAY, release_all_task=False):
     reserve_key = get_reserve_task_key(task_id)
     if not reserve_key:
         return
@@ -607,7 +607,7 @@ def release_reserve_task_lock_by_id(project_id, task_id, user_id, timeout, expir
             # If a task is locked by the user(in other tab), then the category lock should not be released
             if task_id_in_key == task_id or not lock_manager.has_lock(get_task_users_key(task_id_in_key), user_id):
                 lock_manager.release_reserve_task_lock(k, expiry)
-                current_app.logger.info("Release reserve task locks: %s, task %d", k, task_id_in_key)
+                current_app.logger.info("Release reserve task locks: %s, task: %d, project: %s, user: %s", k, task_id_in_key, project_id, user_id)
     else:
         resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
             project_id, reserve_key, user_id, task_id)
