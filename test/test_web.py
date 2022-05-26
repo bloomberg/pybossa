@@ -3298,7 +3298,6 @@ class TestWeb(web.Helper):
         # Simulate user closing tab and clicking Start Contributing Now, should receive already locked task.
         res = self.app.get('project/%s/newtask' % (project.short_name), follow_redirects=True, headers={'X-CSRFToken': csrf})
         assert res.status_code == 200, res
-
         # Verify the remaining time (first parameter) has changed due to existing lock.
         assert 'setup_task_timeout_display(10.0, 3600)' in str(res.data), "Incorrect timeout value"
 
