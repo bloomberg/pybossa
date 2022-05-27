@@ -1346,11 +1346,11 @@ def presenter(short_name):
                           "not have a task presenter."), "error")
 
         # Get locked task for this project.
-        timeout = project.timeout
         task_id, remaining_time = get_task_id_and_duration_for_project_user(project.id, user_id)
-        if task_id and remaining_time:
+        if task_id and remaining_time > 10:
             # This user already has a locked task, take the first one being served.
             # Set the original timeout seconds to display in the message.
+            timeout = project.timeout
             template_args['project'].original_timeout = timeout
             # Set the seconds remaining to display in the message.
             template_args['project'].timeout = remaining_time
