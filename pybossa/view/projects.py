@@ -87,7 +87,8 @@ from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_
 from pybossa.util import crossdomain
 from pybossa.error import ErrorStatus
 from pybossa.redis_lock import get_locked_tasks_project
-from pybossa.sched import Schedulers, select_task_for_gold_mode, lock_task_for_user, fetch_lock_for_user
+from pybossa.sched import (Schedulers, select_task_for_gold_mode, lock_task_for_user, fetch_lock_for_user,
+    get_task_id_and_duration_for_project_user)
 from pybossa.syncer import NotEnabled, SyncUnauthorized
 from pybossa.syncer.project_syncer import ProjectSyncer
 from pybossa.exporter.csv_reports_export import ProjectReportCsvExporter
@@ -1344,24 +1345,17 @@ def presenter(short_name):
             flash(gettext("Sorry, but this project is still a draft and does "
                           "not have a task presenter."), "error")
 
-        # Get locked tasks for this project.
-        locked_tasks = get_locked_tasks_project(project.id)
-        # Filter locked tasks for this user.
-        user_locked_tasks = list(filter(lambda task, u_id=user_id: task.get('user_id') == str(u_id), locked_tasks))
-        if user_locked_tasks:
+        # Get locked task for this project.
+        timeout = project.timeout
+        task_id, remaining_time = get_task_id_and_duration_for_project_user(project.id, user_id)
+        if task_id and remaining_time:
             # This user already has a locked task, take the first one being served.
-            task = user_locked_tasks[0]
-
-            # Verify the worker has an unexpired lock on the task. Otherwise, task will fail to submit.
-            timeout, ttl = fetch_lock_for_user(project.id, task.get('task_id'), user_id)
-            remaining_time = float(ttl) - time.time() if ttl else None
-
             # Set the original timeout seconds to display in the message.
             template_args['project'].original_timeout = timeout
             # Set the seconds remaining to display in the message.
             template_args['project'].timeout = remaining_time
             current_app.logger.info("User %s present task %s, remaining time %s, original timeout %s",
-                                    user_id, task.get('task_id'), remaining_time, timeout)
+                                    user_id, task_id, remaining_time, timeout)
 
         return respond('/projects/presenter.html')
 
