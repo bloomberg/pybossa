@@ -1345,17 +1345,21 @@ def presenter(short_name):
             flash(gettext("Sorry, but this project is still a draft and does "
                           "not have a task presenter."), "error")
 
+        # Set the original timeout seconds to display in the message.
+        timeout = project.timeout
+        template_args['project'].original_timeout = timeout
+
         # Get locked task for this project.
         task_id, remaining_time = get_task_id_and_duration_for_project_user(project.id, user_id)
         if task_id and remaining_time > 10:
-            # This user already has a locked task, take the first one being served.
-            # Set the original timeout seconds to display in the message.
-            timeout = project.timeout
-            template_args['project'].original_timeout = timeout
-            # Set the seconds remaining to display in the message.
+            # This user already has a locked task, take the timeout for the first one being served.
             template_args['project'].timeout = remaining_time
-            current_app.logger.info("User %s present task %s, remaining time %s, original timeout %s",
-                                    user_id, task_id, remaining_time, timeout)
+        else:
+            template_args['project'].timeout = timeout
+
+        current_app.logger.info("User %s present task %s, remaining time %s, original timeout %s",
+                                user_id, task_id, template_args['project'].timeout,
+                                template_args['project'].original_timeout)
 
         return respond('/projects/presenter.html')
 
