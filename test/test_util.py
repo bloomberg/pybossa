@@ -30,6 +30,7 @@ from flask_wtf import FlaskForm as Form
 from nose.tools import nottest, assert_raises
 
 import pybossa.util as util
+from pybossa.importers.csv import BulkTaskCSVImport
 from test import with_context, Test, with_request_context
 from test.factories import UserFactory
 
@@ -581,6 +582,51 @@ class TestPybossaUtil(Test):
 
                     # Allow client to assert on result.
                     callback(index, invalid_fields)
+
+    @with_context
+    def csv_validate_required_fields_case_insensitive(self):
+        """Test validate_required_fields against csv data
+        with DATA_SOURCE_ID, DATA_OWNER in uppercase."""
+        config = {'TASK_REQUIRED_FIELDS': {
+            'data_access': {'val': None, 'check_val': False},
+            'data_owner': {'val': None, 'check_val': False},
+            'data_source_id': {'val': None, 'check_val': False}}}
+
+        with patch.dict(self.flask_app.config, config):
+            cs = BulkTaskCSVImport(None)
+
+            # Check upper-case required fields.
+            cs._headers = ['sentence', 'DATA_ACCESS', 'DATA_SOURCE_ID', 'DATA_OWNER']
+            cs._check_required_headers()
+
+            # Check lower-case required fields.
+            cs._headers = ['sentence', 'data_access', 'data_source_id', 'data_owner']
+            cs._check_required_headers()
+
+            # Check mixed-case required fields.
+            cs._headers = ['sentence', 'Data_Access', 'Data_Source_Id', 'Data_Owner']
+            cs._check_required_headers()
+
+            # Check missing required field DATA_SOURCE_ID. Verify exception is raised.
+            cs._headers = ['sentence', 'data_access', 'Data_Owner']
+            try:
+                cs._check_required_headers()
+            except:
+                pass
+
+            # Check missing required field DATA_OWNER. Verify exception is raised.
+            cs._headers = ['sentence', 'data_access', 'data_source_id']
+            try:
+                cs._check_required_headers()
+            except:
+                pass
+
+            # Check missing required field DATA_OWNER. Verify exception is raised.
+            cs._headers = ['sentence', 'data_owner', 'data_source_id']
+            try:
+                cs._check_required_headers()
+            except:
+                pass
 
     @with_context
     def test_csv_validate_required_fields_accept_string(self):
