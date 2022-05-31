@@ -1351,11 +1351,8 @@ def presenter(short_name):
 
         # Get locked task for this project.
         task_id, remaining_time = get_task_id_and_duration_for_project_user(project.id, user_id)
-        if task_id and remaining_time > 10:
-            # This user already has a locked task, take the timeout for the first one being served.
-            template_args['project'].timeout = remaining_time
-        else:
-            template_args['project'].timeout = timeout
+        # If this user already has a locked task, take the timeout for the first one being served else new.
+        template_args['project'].timeout = remaining_time if task_id and remaining_time > 10 else timeout
 
         current_app.logger.info("User %s present task %s, remaining time %s, original timeout %s",
                                 user_id, task_id, template_args['project'].timeout,
