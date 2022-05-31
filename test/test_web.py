@@ -3263,6 +3263,76 @@ class TestWeb(web.Helper):
         assert '"timeout":10' in str(res.data), "Incorrect value for timeout"
 
     @with_context
+    @patch('pybossa.view.projects.get_task_id_and_duration_for_project_user')
+    def test_get_next_task_with_lock_seconds_remaining(self, get_task_id_and_duration_for_project_user):
+        self.create()
+        self.delete_task_runs()
+        self.register()
+
+        # Sign-in as user.
+        email_addr = 'johndoe@example.com'
+        make_subadmin_by(email_addr=email_addr)
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=email_addr, csrf=csrf)
+
+        # Get the project, task, and user.
+        project = db.session.query(Project).first()
+        task = db.session.query(Task)\
+                 .filter(Project.id == project.id)\
+                 .first()
+        user = db.session.query(User).filter(User.email_addr == email_addr).first()
+
+        # Simulate lock on task.
+        get_task_id_and_duration_for_project_user.return_value = (None, -1)
+        res = self.app.get('project/%s/newtask' % (project.short_name), follow_redirects=True, headers={'X-CSRFToken': csrf})
+        assert res.status_code == 200, res
+        assert 'setup_task_timeout_display(3600, 3600)' in str(res.data), "Incorrect timeout value"
+
+        # Mock a redis lock return value.
+        get_task_id_and_duration_for_project_user.return_value = (task.id, 11)
+
+        # Simulate user closing tab and clicking Start Contributing Now, should receive already locked task.
+        res = self.app.get('project/%s/newtask' % (project.short_name), follow_redirects=True, headers={'X-CSRFToken': csrf})
+        assert res.status_code == 200, res
+        # Verify the remaining time (first parameter) has changed due to existing lock.
+        assert 'setup_task_timeout_display(11, 3600)' in str(res.data), "Incorrect timeout value"
+
+    @with_context
+    @patch('pybossa.view.projects.get_task_id_and_duration_for_project_user')
+    def test_get_next_task_with_lock_seconds_remaining_less_10(self, get_task_id_and_duration_for_project_user):
+        self.create()
+        self.delete_task_runs()
+        self.register()
+
+        # Sign-in as user.
+        email_addr = 'johndoe@example.com'
+        make_subadmin_by(email_addr=email_addr)
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=email_addr, csrf=csrf)
+
+        # Get the project, task, and user.
+        project = db.session.query(Project).first()
+        task = db.session.query(Task)\
+                 .filter(Project.id == project.id)\
+                 .first()
+        user = db.session.query(User).filter(User.email_addr == email_addr).first()
+
+        # Simulate lock on task.
+        get_task_id_and_duration_for_project_user.return_value = (None, -1)
+        res = self.app.get('project/%s/newtask' % (project.short_name), follow_redirects=True, headers={'X-CSRFToken': csrf})
+        assert res.status_code == 200, res
+        assert 'setup_task_timeout_display(3600, 3600)' in str(res.data), "Incorrect timeout value"
+
+        # Mock a redis lock return value.
+        get_task_id_and_duration_for_project_user.return_value = (task.id, 10)
+
+        # Simulate user closing tab and clicking Start Contributing Now, should receive already locked task.
+        res = self.app.get('project/%s/newtask' % (project.short_name), follow_redirects=True, headers={'X-CSRFToken': csrf})
+        assert res.status_code == 200, res
+        # Verify the remaining time (first parameter) is the default timeout since remaining was <= 10.
+        assert 'setup_task_timeout_display(3600, 3600)' in str(res.data), "Incorrect timeout value"
+
+    @with_context
     @patch('pybossa.view.projects.has_no_presenter')
     @patch('pybossa.view.projects.fetch_lock_for_user')
     @patch('pybossa.view.projects.time')
