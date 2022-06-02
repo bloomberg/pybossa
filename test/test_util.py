@@ -609,24 +609,15 @@ class TestPybossaUtil(Test):
 
             # Check missing required field DATA_SOURCE_ID. Verify exception is raised.
             cs._headers = ['sentence', 'data_access', 'Data_Owner']
-            try:
-                cs._check_required_headers()
-            except:
-                pass
+            assert_raises(Exception, cs._check_required_headers)
 
             # Check missing required field DATA_OWNER. Verify exception is raised.
             cs._headers = ['sentence', 'data_access', 'data_source_id']
-            try:
-                cs._check_required_headers()
-            except:
-                pass
+            assert_raises(Exception, cs._check_required_headers)
 
-            # Check missing required field DATA_OWNER. Verify exception is raised.
+            # Check missing required field DATA_ACCESS. Verify exception is raised.
             cs._headers = ['sentence', 'data_owner', 'data_source_id']
-            try:
-                cs._check_required_headers()
-            except:
-                pass
+            assert_raises(Exception, cs._check_required_headers)
 
     @with_context
     def test_csv_validate_required_fields_accept_string(self):
