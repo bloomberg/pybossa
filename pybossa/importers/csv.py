@@ -280,7 +280,7 @@ class BulkTaskCSVImportBase(BulkTaskImport):
 
     def _check_required_headers(self):
         required_headers = app.config.get("TASK_REQUIRED_FIELDS", {})
-        missing_headers = [r for r in required_headers if r not in self._headers]
+        missing_headers = [r for r in map(str.upper, required_headers) if r not in map(str.upper, self._headers)]
         if missing_headers:
             msg = gettext('The file you uploaded has missing '
                           'required header(s): {0}'.format(','.join(missing_headers)))
