@@ -88,6 +88,7 @@ from pybossa.cache.task_browse_helpers import get_searchable_columns
 from pybossa.cache.users import get_user_pref_metadata
 from pybossa.view.projects import get_locked_tasks
 from pybossa.redis_lock import EXPIRE_LOCK_DELAY
+from pybossa.api.bulktasks import BulkTasksAPI
 
 task_fields = [
     "id",
@@ -158,6 +159,7 @@ register_api(CompletedTaskAPI, 'api_completedtask', '/completedtask', pk='oid', 
 register_api(CompletedTaskRunAPI, 'api_completedtaskrun', '/completedtaskrun', pk='oid', pk_type='int')
 register_api(ProjectByNameAPI, 'api_projectbyname', '/projectbyname', pk='key', pk_type='string')
 register_api(PerformanceStatsAPI, 'api_performancestats', '/performancestats', pk='oid', pk_type='int')
+register_api(BulkTasksAPI, 'api_bulktasks', '/bulktasks', pk='oid', pk_type='int')
 
 
 def add_task_signature(tasks):

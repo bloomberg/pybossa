@@ -544,3 +544,24 @@ class TaskRepository(Repository):
             task_expiration=task_expiration, **params)).fetchall()
         tasks_not_updated = '\n'.join([str(task.id) for task in tasks])
         return tasks_not_updated
+
+
+    def bulk_update(self, payload):
+        return
+        exp = filters.pop('exported', None)
+        finish_time = filters.pop('finish_time', None)
+        filters.pop('state', None) # exclude state param
+
+        conditions = []
+        if exp:
+            conditions.append(Task.exported == exp)
+        if finish_time:
+            conditions.append(TaskRun.finish_time >= finish_time)
+
+        query = self.db.session.query(TaskRun).join(Task).\
+            filter(or_(Task.state == 'completed', Task.calibration == 1)).\
+            filter(*conditions).\
+            filter_by(**filters)
+
+        results = self._filter_query(query, Task, limit, offset, last_id, yielded, desc)
+        return results
