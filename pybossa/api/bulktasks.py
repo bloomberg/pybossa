@@ -23,15 +23,13 @@ from flask import current_app
 from flask_login import current_user
 from werkzeug.exceptions import NotFound, BadRequest
 from werkzeug.exceptions import MethodNotAllowed, Unauthorized
-from pybossa.cache import memoize
-from pybossa.core import project_repo, task_repo, timeouts
+from pybossa.core import project_repo, task_repo
 from pybossa.error import ErrorStatus
 from pybossa.api.task import TaskAPI
 from pybossa.model.task import Task
 from pybossa.util import jsonpify, crossdomain
 from pybossa.core import ratelimits
 from pybossa.ratelimit import ratelimit
-from pybossa.util import admin_or_subadmin_required
 
 
 cors_headers = ["Content-Type", "Authorization"]
@@ -88,6 +86,7 @@ class BulkTasksAPI(TaskAPI):
             json_response = {}
             return Response(json_response, mimetype="application/json")
         except Exception as e:
+            current_app.logger.exception(f"Error in bulktasks PUT request, {str(e)}")
             return error.format_exception(
                 e,
                 target=self.__class__.__name__.lower(),

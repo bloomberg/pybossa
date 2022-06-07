@@ -87,12 +87,60 @@ class TestBulkTasksApi(TestAPI):
         res = self.app.put(f"/api/bulktasks/{projects[0].id}?api_key={owner.api_key}", json=payload)
         assert res.status_code == 200, "Updating task for different project returns 200"
 
-        # subadmin coowner on project; task from another project dropped from updating
+        # subadmin coowner on project; task from another project/unsupported attributes dropped from updating
+        make_subadmin(owner)
+        payload =[{"id": tasks[0].id, "xyz": 0.6}]
+        res = self.app.put(f"/api/bulktasks/{projects[0].id}?api_key={owner.api_key}", json=payload)
         payload = [
             {"id": tasks[0].id, "priority_0": 0.2},
             {"id": tasks2[0].id, "priority_0": 0.6},
             {"id": tasks[1].id, "priority_0": 0.6}
         ]
-        make_subadmin(owner)
         res = self.app.put(f"/api/bulktasks/{projects[0].id}?api_key={owner.api_key}", json=payload)
         assert res.status_code == 200, "Updating task for different project returns 200"
+
+
+    @with_context
+    @patch('pybossa.api.task.TaskAPI._verify_auth')
+    def test_api_bulk_update_priority_works(self, auth):
+        """Test bulktasks API updates task priorities in bulk"""
+
+        admin, owner, user = UserFactory.create_batch(3)
+        project = ProjectFactory.create(owner=owner)
+        auth.return_value = True
+
+        tasks = TaskFactory.create_batch(5, project=project, priority_0=1)
+        for task in tasks:
+            TaskRunFactory.create(task=task)
+
+        # subadmin coowner on project; task from another project dropped from updating
+        payload = [
+            {"id": tasks[0].id, "priority_0": 0.2},
+            {"id": tasks[1].id, "priority_0": 0.6},
+            {"id": tasks[3].id, "priority_0": 0.7}
+        ]
+        make_subadmin(owner)
+        res = self.app.put(f"/api/bulktasks/{project.id}?api_key={owner.api_key}", json=payload)
+        assert res.status_code == 200, "Updating task for different project returns 200"
+        # tasks 1, 2 & 4 should have updated priority of 0.2, 0.6 & 0.7 respectively
+        # tasks 3 & 5 to have original priority value 1
+        assert tasks[0].priority_0 == 0.2 and tasks[1].priority_0 == 0.6 and tasks[3].priority_0 == 0.7, "Tasks should have updated priority"
+        assert tasks[2].priority_0 == 1.0 and tasks[4].priority_0 == 1.0, "Tasks should have original priority"
+
+
+    @with_context
+    @patch('pybossa.api.task.TaskAPI._verify_auth')
+    @patch('pybossa.api.bulktasks.task_repo.bulk_update')
+    def test_api_bulk_update_handle_exception(self, bulk_update, auth):
+        """Test bulktasks API handles db exception"""
+
+        bulk_update.side_effect = Exception('Bad Request')
+        admin, owner, user = UserFactory.create_batch(3)
+        project = ProjectFactory.create(owner=owner)
+        auth.return_value = True
+
+        task = TaskFactory.create(project=project)
+        make_subadmin(owner)
+        payload = [{"id": task.id, "priority_0": 0.2}]
+        res = self.app.put(f"/api/bulktasks/{project.id}?api_key={owner.api_key}", json=payload)
+        assert res.status_code == 500, "PUT request to return 500"
