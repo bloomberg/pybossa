@@ -1186,16 +1186,18 @@ def process_annex_load(tp_code, response_value):
         # Looking for code snippet like shell.setAttribute("hash", "abc");
         regex = r"(\w+)\.setAttribute\(\"hash\",\s*\"\w+\"\);"
         match = re.search(regex, tp_code)
-        if match:  # matching for annex_shell code
-            shell = match[1]
-            odfoa = json.dumps(response_value)
-            code_to_append = (
-                f"\n"
-                f"    {shell}.addEventListener('urn:bloomberg:annex:event:instance-success', () => {{\n"
-                f"      {shell}.internalModel.activeTab().loadAnnotationFromJson('{odfoa}')\n"
-                f"    }});"
-            )
+        if not match:
+            return tp_code
 
-            semi_colon_end = match.end()  # semi colon position - exclusive
-            tp_code = tp_code[:semi_colon_end] + code_to_append + tp_code[semi_colon_end:]
+        shell = match[1]
+        odfoa = json.dumps(response_value)
+        code_to_append = (
+            f"\n"
+            f"    {shell}.addEventListener('urn:bloomberg:annex:event:instance-success', () => {{\n"
+            f"      {shell}.internalModel.activeTab().loadAnnotationFromJson('{odfoa}')\n"
+            f"    }});"
+        )
+
+        semi_colon_end = match.end()  # semi colon position - exclusive
+        tp_code = tp_code[:semi_colon_end] + code_to_append + tp_code[semi_colon_end:]
     return tp_code

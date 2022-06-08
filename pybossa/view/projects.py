@@ -1255,11 +1255,11 @@ def task_presenter(short_name, task_id, task_submitter_id=None):
         "user_id": user_id
     }
 
-    if task_submitter_id is not None:
+    if task_submitter_id:
         taskruns = task_repo.filter_task_runs_by(task_id=task_id,
-                                                 project_id=project.id)
-        taskruns_dict = {tr.user_id: tr.info for tr in taskruns}
-        user_response = taskruns_dict.get(task_submitter_id, {})
+                                                 project_id=project.id,
+                                                 user_id=task_submitter_id)
+        user_response = taskruns[0].info
         tp_code = template_args["project"].get("info", {}).get("task_presenter", '')
 
         for response_field, response_value in user_response.items():
