@@ -8951,6 +8951,44 @@ class TestWeb(web.Helper):
         assert res.status_code == 400
 
     @with_context
+    @patch('pybossa.api.fetch_lock_for_user')
+    @patch('pybossa.view.projects.time')
+    def test_fetch_lock_without_project(self, mock_time, fetch_lock_for_user):
+        """Test fetch lock fails for a non-existent project."""
+        self.register()
+        self.signin()
+        user = User.query.first()
+
+        # Setup lock timeout with seconds remaining.
+        mock_now = 1652131709
+        mock_time.time.return_value = mock_now
+        fetch_lock_for_user.return_value = (3600, mock_now+60)
+
+        # Get a CSRF token.
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=user.email_addr, csrf=csrf)
+
+        # Create a project and task.
+        self.create()
+        self.delete_task_runs()
+        project = db.session.query(Project).first()
+        task = db.session.query(Task)\
+                 .filter(Project.id == project.id)\
+                 .first()
+
+        # Simulate lock on task (valid lock).
+        res = self.app_get_json('project/%s/task/%s' % (project.short_name, task.id))
+
+        # Delete the project.
+        db.session.query(Project).delete()
+
+        # Verify the lock with an invalid (deleted) project.
+        res = self.app_get_json('/api/task/{}/lock'.format(task.id), follow_redirects=True)
+        data = json.loads(res.data)
+
+        assert res.status_code == 400, res
+
+    @with_context
     @patch('pybossa.view.projects.rank', autospec=True)
     def test_project_index_historical_contributions(self, mock_rank):
         self.create()
