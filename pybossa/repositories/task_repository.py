@@ -559,10 +559,7 @@ class TaskRepository(Repository):
         if not payload:
             return
 
-        formatted_payload = {}
-        for data in payload:
-            formatted_payload[data["id"]] = data["priority_0"]
-
+        formatted_payload = {data["id"]: data["priority_0"] for data in payload}
         task_ids = formatted_payload.keys()
         tasks = self.db.session.query(Task).filter(Task.id.in_(task_ids))
         tasks.update({Task.priority_0: sqlalchemy_case(formatted_payload, value=Task.id)}, synchronize_session=False)

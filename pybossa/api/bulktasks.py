@@ -74,11 +74,10 @@ class BulkTasksAPI(TaskAPI):
                 task = task_repo.get_task(data.get("id"))
                 if not (task and task.project_id == project.id):
                     dropped_payload.append(data)
-                    continue
                 elif [k for k in data.keys() if k not in allowed_attributes]:
                     dropped_payload.append(data)
-                    continue
-                update_payload.append(data)
+                else:
+                    update_payload.append(data)
 
             current_app.logger.info(f"Project {project.id}, input for bulk update {str(update_info)}, dropped payload {dropped_payload}")
             current_app.logger.info(f"Calling bulk update for project {project.id} with payload {str(update_payload)}")
