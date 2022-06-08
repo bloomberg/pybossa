@@ -3375,6 +3375,29 @@ class TestWeb(web.Helper):
 
         assert fake_guard_instance.stamp.called
 
+    @with_context
+    def test_task_presenter(self):
+        """Test WEB get correct task.id for a project works"""
+        self.register()
+        self.signin()
+        self.create()
+        project = db.session.query(Project).get(1)
+        self.new_task(project.id)
+        project_short_name = project.short_name
+
+        task = db.session.query(Task).filter(Task.project_id == 1).first()
+
+        user = db.session.query(User).first()
+        task_run = TaskRun(project_id=project.id, task_id=task.id,
+                           info={'answer': 1,
+                                 'odfoa': {'a': 26},
+                                 'fake': {'b': 27}},
+                           user_id=user.id)
+        db.session.add(task_run)
+        db.session.commit()
+
+        res = self.app.get('/project/%s/task/%s/%s' % (project_short_name, task.id, user.id))
+        assert b'TaskPresenter' in res.data
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)

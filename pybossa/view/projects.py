@@ -51,8 +51,10 @@ from pybossa.model.blogpost import Blogpost
 from pybossa.util import (Pagination, admin_required, get_user_id_or_ip, rank,
                           handle_content_type, redirect_content_type,
                           get_avatar_url, admin_or_subadmin_required,
-                          s3_get_file_contents, fuzzyboolean, is_own_url_or_else,
-                          description_from_long_description)
+                          s3_get_file_contents, fuzzyboolean,
+                          is_own_url_or_else,
+                          description_from_long_description, is_annex_response,
+                          process_annex_load)
 from pybossa.auth import ensure_authorized_to
 from pybossa.cache import projects as cached_projects
 from pybossa.cache import users as cached_users
@@ -1192,8 +1194,9 @@ def make_random_task_gold(short_name):
 
 
 @blueprint.route('/<short_name>/task/<int:task_id>')
+@blueprint.route('/<short_name>/task/<int:task_id>/<int:task_submitter_id>')
 @login_required
-def task_presenter(short_name, task_id):
+def task_presenter(short_name, task_id, task_submitter_id=None):
     mode = request.args.get('mode')
     project, owner, ps = project_by_shortname(short_name)
     ensure_authorized_to('read', project)
@@ -1252,8 +1255,28 @@ def task_presenter(short_name, task_id):
         "user_id": user_id
     }
 
+    if task_submitter_id:
+        taskruns = task_repo.filter_task_runs_by(task_id=task_id,
+                                                 project_id=project.id,
+                                                 user_id=task_submitter_id)
+        user_response = taskruns[0].info
+        tp_code = template_args["project"].get("info", {}).get("task_presenter", '')
+
+        for response_field, response_value in user_response.items():
+            placeholder_regex = r"{{\s*" + response_field + r"\s*}}"
+            if type(response_value) == str or type(response_value) == int:
+                tp_code = re.sub(placeholder_regex, str(response_value), tp_code)
+            elif type(response_value) == dict:
+                if is_annex_response(response_field, response_value):
+                    tp_code = process_annex_load(tp_code, response_value)
+                else:  # TODO - for TP component
+                    response_value = json.dumps(response_value)
+                    tp_code = re.sub(placeholder_regex, response_value, tp_code)
+
+        template_args["project"]["info"]["task_presenter"] = tp_code
+
     def respond(tmpl):
-        response = dict(template = tmpl, **template_args)
+        response = dict(template=tmpl, **template_args)
         return handle_content_type(response)
 
     if not (task.project_id == project.id):
