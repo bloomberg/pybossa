@@ -8964,7 +8964,10 @@ class TestWeb(web.Helper):
         mock_time.time.return_value = mock_now
         fetch_lock_for_user.return_value = (3600, mock_now+60)
 
-        # Get a CSRF token.
+        # Sign-in as user.
+        email_addr = 'johndoe@example.com'
+        make_subadmin_by(email_addr=email_addr)
+
         csrf = self.get_csrf('/account/signin')
         self.signin(email=user.email_addr, csrf=csrf)
 
