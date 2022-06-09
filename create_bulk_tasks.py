@@ -11,7 +11,7 @@ task create date ranges.
 import argparse
 import pandas as pd
 import json
-import datetime
+from datetime import datetime
 import numpy as np
 from random import randrange
 import logging
@@ -35,7 +35,7 @@ handler.setLevel(logging.DEBUG)
 handler.setFormatter(formatter)
 root_logger.addHandler(handler)
 logger = logging.getLogger("datapurge")
-
+current_year = datetime.today().year
 
 def create_task(project_id, created, num_answers, priority, year):
     sql = """
@@ -110,11 +110,11 @@ def create_result(project_id, task_id, task_run_ids, created):
         logger.exception("Error: ", error)
 
 
-def create_bulk_data(project_id, num_records):
+def create_bulk_data(project_id, num_records, random_year):
     for _ in range(num_records):
         month = randrange(1, 12)
         day = randrange(1, 30)
-        year = randrange(2018, 2022)
+        year = randrange(current_year - 2, current_year) if random_year else current_year
         hour = randrange(1, 23)
         min = randrange(1, 59)
         priority=randrange(10)/10
@@ -136,6 +136,7 @@ def setup_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--numtasks", dest="num_tasks", type=int, required=True, help="number of tasks to create")
     parser.add_argument("-p", "--projectid", dest="project_id", type=int, required=True, help="project id under which tasks to create")
+    parser.add_argument("-y", "--no-random-year", dest="random_year", default=True, help="generate tasks by current year; disable random create year range", action="store_false")
     args = parser.parse_args()
     return args
 
@@ -144,7 +145,8 @@ def main():
     args = setup_args()
     logger.info(f"number of tasks to create: {args.num_tasks}")
     logger.info(f"number of projects: {args.project_id}")
-    create_bulk_data(project_id=args.project_id, num_records=args.num_tasks)
+    logger.info(f"generate tasks with random year: {args.random_year}")
+    create_bulk_data(project_id=args.project_id, num_records=args.num_tasks, random_year=args.random_year)
 
 if __name__ == "__main__":
     main()
