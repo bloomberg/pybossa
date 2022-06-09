@@ -3390,7 +3390,7 @@ class TestWeb(web.Helper):
         user = db.session.query(User).first()
         task_run = TaskRun(project_id=project.id, task_id=task.id,
                            info={'answer': 1,
-                                 'odfoa': {'a': 26},
+                                 'odfoa': {'version': 1, 'source-uri': 'http://fake.com', 'odf': {}, 'oa': {}},
                                  'fake': {'b': 27}},
                            user_id=user.id)
         db.session.add(task_run)
