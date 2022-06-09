@@ -603,13 +603,22 @@ def fetch_lock(task_id):
     if not task:
         return abort(400)
 
+    project = project_repo.get(task.project_id)
+    if not project:
+        return abort(400)
+
     _, ttl = fetch_lock_for_user(task.project_id, task.id, current_user.id)
     if not ttl:
         return abort(404)
 
+    timeout = project.info.get('timeout', ContributionsGuard.STAMP_TTL)
+    guard = ContributionsGuard(sentinel.master, timeout=timeout)
+
     seconds_to_expire = float(ttl) - time()
+
     res = json.dumps({'success': True,
-                      'expires': seconds_to_expire})
+                      'expires': seconds_to_expire,
+                      'lockTime': guard.retrieve_timestamp(task, get_user_id_or_ip())})
 
     return Response(res, 200, mimetype='application/json')
 
