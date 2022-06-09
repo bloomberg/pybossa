@@ -8955,38 +8955,34 @@ class TestWeb(web.Helper):
     @patch('pybossa.view.projects.time')
     def test_fetch_lock_without_project(self, mock_time, fetch_lock_for_user):
         """Test fetch lock fails for a non-existent project."""
+        self.create()
+        self.delete_task_runs()
         self.register()
-        self.signin()
-        user = User.query.first()
+
+        email_addr = 'johndoe@example.com'
+        make_subadmin_by(email_addr=email_addr)
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=email_addr, csrf=csrf)
 
         # Setup lock timeout with seconds remaining.
         mock_now = 1652131709
         mock_time.time.return_value = mock_now
         fetch_lock_for_user.return_value = (3600, mock_now+60)
 
-        # Sign-in as user.
-        email_addr = 'johndoe@example.com'
-        make_subadmin_by(email_addr=email_addr)
-
-        csrf = self.get_csrf('/account/signin')
-        self.signin(email=user.email_addr, csrf=csrf)
-
         # Create a project and task.
-        self.create()
-        self.delete_task_runs()
         project = db.session.query(Project).first()
         task = db.session.query(Task)\
                  .filter(Project.id == project.id)\
                  .first()
 
         # Simulate lock on task (valid lock).
-        res = self.app_get_json('project/%s/task/%s' % (project.short_name, task.id))
+        res = self.app_get_json('project/%s/task/%s' % (project.short_name, task.id), follow_redirects=True, headers={'X-CSRFToken': csrf})
 
         # Delete the project.
         db.session.query(Project).delete()
 
         # Verify the lock with an invalid (deleted) project.
-        res = self.app_get_json('/api/task/{}/lock'.format(task.id), follow_redirects=True)
+        res = self.app_get_json('/api/task/{}/lock'.format(task.id), follow_redirects=True, headers={'X-CSRFToken': csrf})
         data = json.loads(res.data)
 
         assert res.status_code == 400, res
