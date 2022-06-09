@@ -79,7 +79,7 @@ class TestBulkTasksApi(TestAPI):
         # subadmin not coowner on project
         payload =[{"id": task.id, "priority_0": 0.6}]
         res = self.app.put(f"/api/bulktasks/{projects[0].id}?api_key={user.api_key}", json=payload)
-        assert_equal(res.status, "401 UNAUTHORIZED", "User not admin/subadmin owner should should not be allowed to update task")
+        assert_equal(res.status, "403 FORBIDDEN", "User not admin/subadmin owner should should not be allowed to update task")
 
         # subadmin coowner on project updating task from another project
         payload =[{"id": tasks2[0].id, "priority_0": 0.6}]

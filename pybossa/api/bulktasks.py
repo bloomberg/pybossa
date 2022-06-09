@@ -30,11 +30,17 @@ from pybossa.model.task import Task
 from pybossa.util import jsonpify, crossdomain
 from pybossa.core import ratelimits
 from pybossa.ratelimit import ratelimit
+from pybossa.auth import ensure_authorized_to
 
 
 cors_headers = ["Content-Type", "Authorization"]
 allowed_attributes = ["id", "priority_0"]
 error = ErrorStatus()
+
+required_attributes = ["id"]
+
+# at least one attribute required from optional attribute to be present
+optional_attributes = ["priority_0"]
 
 class BulkTasksAPI(TaskAPI):
 
@@ -64,17 +70,16 @@ class BulkTasksAPI(TaskAPI):
         if not (project and update_info):
             raise BadRequest
 
-        all_owners = project.owners_ids + ([project.owner_id] if project.owner_id not in project.owners_ids else [])
-        if not (current_user.admin or current_user.id in all_owners):
-            raise Unauthorized("Insufficient privilege to the request")
-
+        ensure_authorized_to("update", project)
         try:
             update_payload, dropped_payload = [], []
             for data in update_info:
                 task = task_repo.get_task(data.get("id"))
-                if not (task and task.project_id == project.id):
-                    dropped_payload.append(data)
-                elif [k for k in data.keys() if k not in allowed_attributes]:
+                task_fields = data.keys() if isinstance(data, dict) else []
+                project_mismatch = not (task and task.project_id == project.id)
+                missing_required = any(True if k not in task_fields else False for k in required_attributes)
+                missing_optional = all(True if k not in task_fields else False for k in optional_attributes)
+                if project_mismatch or missing_required or missing_optional:
                     dropped_payload.append(data)
                 else:
                     update_payload.append(data)
