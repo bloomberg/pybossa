@@ -812,104 +812,104 @@ class TestPybossaUtil(Test):
         assert response is None
 
     def test_process_annex_load(self):
-        # annex_shell_tp_code = """function loadAnnex(task) {
-        #     const shell = document.getElementById("shell-container");
-        #     // this is the document field in your task.
-        #     shell.setAttribute("gigwork:doc-url", task.info.document__upload_url);
-        #     // this is the annotation field in your task
-        #     //shell.setAttribute("gigwork:annotation-url", task.info.annotation__upload_url);
-        #     // you need the task signature to load encrypted files
-        #     shell.setAttribute("gigwork:task-sig", task.signature);
-        #     // you should customize this for users.
-        #     console.log('483902jg')
-        #     console.log(task)
-        #     shell.setAttribute("user", "skorala");
-        #     // hash comes from gigwork task. for example, task.info.annex_hash.
-        #     shell.setAttribute("hash", "8A0FAE8EC1D64DF7539210CF9658C1C3");
-        #     shell.addEventListener("urn:bloomberg:annex:event:instance-ready", () => {
-        #       console.log("ready to start");
-        #       // add any code you need to run when Annex is ready.
-        #     });
-        #     shell.addEventListener("urn:bloomberg:annex:event:instance-error", () => {
-        #       document.getElementById("skipButton").classList.toggle('invisible')
-        #       document.getElementById("submitButton").classList.toggle('invisible')
-        #       // add any code you need to run when Annex is ready.
-        #     });
-        #   }
-        # </script>"""
+        annex_shell_tp_code = """function loadAnnex(task) {
+            const shell = document.getElementById("shell-container");
+            // this is the document field in your task.
+            shell.setAttribute("gigwork:doc-url", task.info.document__upload_url);
+            // this is the annotation field in your task
+            //shell.setAttribute("gigwork:annotation-url", task.info.annotation__upload_url);
+            // you need the task signature to load encrypted files
+            shell.setAttribute("gigwork:task-sig", task.signature);
+            // you should customize this for users.
+            console.log('483902jg')
+            console.log(task)
+            shell.setAttribute("user", "skorala");
+            // hash comes from gigwork task. for example, task.info.annex_hash.
+            shell.setAttribute("hash", "8A0FAE8EC1D64DF7539210CF9658C1C3");
+            shell.addEventListener("urn:bloomberg:annex:event:instance-ready", () => {
+              console.log("ready to start");
+              // add any code you need to run when Annex is ready.
+            });
+            shell.addEventListener("urn:bloomberg:annex:event:instance-error", () => {
+              document.getElementById("skipButton").classList.toggle('invisible')
+              document.getElementById("submitButton").classList.toggle('invisible')
+              // add any code you need to run when Annex is ready.
+            });
+          }
+        </script>"""
         odfoa_data = {"a": 1}
-        # tp_code = util.process_annex_load(annex_shell_tp_code, odfoa_data)
-        # assert "shell.addEventListener('urn:bloomberg:annex:event:instance-success', () => {" in tp_code
-        # assert f"shell.internalModel.activeTab().loadAnnotationFromJson('{json.dumps(odfoa_data)}')" in tp_code
-        #
-        # annex_js_tp_code = """async function doPybossa(pybossa, gigConfig) {
-        #     document.getElementById('collapse-guidelines').classList.remove('show');
-        #
-        #     const Annex = await window.loadDocx();
-        #     const annex = window.loadeddocx = new Annex();
-        #     document.getElementById('annex').appendChild(annex.getDom()[0]);
-        #
-        #     // Annex supports multiple tabs with a document in each one.
-        #     // However, for a single document you will not see the tab or its title.
-        #     const annexTab = annex.addTab('tab title', gigConfig.annex);
-        #     const {getAnswer, reset} = pointAndShoot(annexTab);
-        #     const annexModel = annexTab._internal.model;
-        #     annexModel.isAutoFormatRowColumnEnabled(false);
-        #     annexModel.isFillTableContentEnabled(false);
-        #
-        #     // 'LEFT', 'RIGHT', 'TOP', 'BOTTOM'
-        #     annexModel.annotatorPosition('BOTTOM');
-        #     annexModel.isThumbnailBarPinned(false);
-        #
-        #     pybossa.beforeSubmit(beforePybossaSubmitTask);
-        #     pybossa.beforePresent(beforePybossaPresentTask);
-        #  //   pybossa.run(gigConfig.project.name);
-        #
-        #     function beforePybossaSubmitTask(answer, task) {
-        #         // Return the actual answer you want to submit.
-        #         // We are ignoring the answer parameter provided by the framework
-        #         // and handling the entire answer construction ourselves.
-        #         return getAnswer(task);
-        #     }
-        #
-        #     function beforePybossaPresentTask(task) {
-        #         reset();
-        #         $('#field1').prop('disabled', false);
-        #         console.log('beforePybossaPresentTask, task.info=', JSON.stringify(task.info));
-        #         return annexTab.loadDocumentLite(
-        #           task.info.doc_url + '?t=' + Date.now(), {}
-        #         );
-        #     }
-        #   }
-        # </script>"""
-        # tp_code = util.process_annex_load(annex_js_tp_code, odfoa_data)
-        # assert f".then(() => annexTab.loadAnnotationFromJson('{json.dumps(odfoa_data)}'))" in tp_code
-        #
-        # annex_js_tp_code = """pybossa.presentTask(function (task, deferred) {
-        # console.log('pybossa:presentTask', arguments);
-        #
-        # if (!$.isEmptyObject(task)) {
-        #   //var docUrl = Object.values(task.info)[2];
-        #   var docUrl = task.info.docUrl;
-        #   console.log('docUrl', docUrl);
-        #
-        #   // Load document into Annex tab
-        #   const loadDocumentPromise = () => tab.loadDocumentLite(docUrl)
-        #   const loadOdfoaPromise = () => $.ajax({
-        #     url: odfUrl,
-        #     dataType: 'text'
-        #   });
-        #
-        #   Promise.all([
-        #     loadDocumentPromise(),
-        #   ]).then(([_void]) => {
-        #     console.log('doc loaded');
-        #   }).catch((err) => {
-        #     console.error(err);
-        #   });
-        # }"""
-        # tp_code = util.process_annex_load(annex_js_tp_code, odfoa_data)
-        # assert f".then(() => tab.loadAnnotationFromJson('{json.dumps(odfoa_data)}'))" in tp_code
+        tp_code = util.process_annex_load(annex_shell_tp_code, odfoa_data)
+        assert "shell.addEventListener('urn:bloomberg:annex:event:instance-success', () => {" in tp_code
+        assert f"shell.internalModel.activeTab().loadAnnotationFromJson('{json.dumps(odfoa_data)}')" in tp_code
+
+        annex_js_tp_code = """async function doPybossa(pybossa, gigConfig) {
+            document.getElementById('collapse-guidelines').classList.remove('show');
+
+            const Annex = await window.loadDocx();
+            const annex = window.loadeddocx = new Annex();
+            document.getElementById('annex').appendChild(annex.getDom()[0]);
+
+            // Annex supports multiple tabs with a document in each one.
+            // However, for a single document you will not see the tab or its title.
+            const annexTab = annex.addTab('tab title', gigConfig.annex);
+            const {getAnswer, reset} = pointAndShoot(annexTab);
+            const annexModel = annexTab._internal.model;
+            annexModel.isAutoFormatRowColumnEnabled(false);
+            annexModel.isFillTableContentEnabled(false);
+
+            // 'LEFT', 'RIGHT', 'TOP', 'BOTTOM'
+            annexModel.annotatorPosition('BOTTOM');
+            annexModel.isThumbnailBarPinned(false);
+
+            pybossa.beforeSubmit(beforePybossaSubmitTask);
+            pybossa.beforePresent(beforePybossaPresentTask);
+         //   pybossa.run(gigConfig.project.name);
+
+            function beforePybossaSubmitTask(answer, task) {
+                // Return the actual answer you want to submit.
+                // We are ignoring the answer parameter provided by the framework
+                // and handling the entire answer construction ourselves.
+                return getAnswer(task);
+            }
+
+            function beforePybossaPresentTask(task) {
+                reset();
+                $('#field1').prop('disabled', false);
+                console.log('beforePybossaPresentTask, task.info=', JSON.stringify(task.info));
+                return annexTab.loadDocumentLite(
+                  task.info.doc_url + '?t=' + Date.now(), {}
+                );
+            }
+          }
+        </script>"""
+        tp_code = util.process_annex_load(annex_js_tp_code, odfoa_data)
+        assert f".then(() => annexTab.loadAnnotationFromJson('{json.dumps(odfoa_data)}'))" in tp_code
+
+        annex_js_tp_code = """pybossa.presentTask(function (task, deferred) {
+        console.log('pybossa:presentTask', arguments);
+
+        if (!$.isEmptyObject(task)) {
+          //var docUrl = Object.values(task.info)[2];
+          var docUrl = task.info.docUrl;
+          console.log('docUrl', docUrl);
+
+          // Load document into Annex tab
+          const loadDocumentPromise = () => tab.loadDocumentLite(docUrl)
+          const loadOdfoaPromise = () => $.ajax({
+            url: odfUrl,
+            dataType: 'text'
+          });
+
+          Promise.all([
+            loadDocumentPromise(),
+          ]).then(([_void]) => {
+            console.log('doc loaded');
+          }).catch((err) => {
+            console.error(err);
+          });
+        }"""
+        tp_code = util.process_annex_load(annex_js_tp_code, odfoa_data)
+        assert f".then(() => tab.loadAnnotationFromJson('{json.dumps(odfoa_data)}'))" in tp_code
 
         annex_js_tp_code_multiple = """function beforePybossaPresentTask(task) {
         reset();

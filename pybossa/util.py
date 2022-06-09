@@ -1161,7 +1161,7 @@ def is_annex_response(key, value):
     result and odfoa response
     """
     odfoa_keys = {"version", "source-uri", "odf", "oa"}
-    if all(odfoa_key in value for odfoa_key in odfoa_keys):
+    if type(value) is dict and all(odfoa_key in value for odfoa_key in odfoa_keys):
         return True, value
     if type(value) is dict:
         for k, v in value.items():
