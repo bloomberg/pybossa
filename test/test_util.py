@@ -761,9 +761,6 @@ class TestPybossaUtil(Test):
         assert tyrion.email_addr in message["recipients"], "Enabled user to be part of recipients list"
 
     def test_is_annex_response(self):
-        key, value = "odfoa", "anything"
-        assert util.is_annex_response(key, value)
-
         key = "abc"
         valid_value = {"oa": [{"body": [{"@type": "bb:Transparency.Text.Text", "transparency": [{"selector": {"end": 2142, "@type": "oa:DataPositionSelector", "start": 2136}}]}],
                                "target": [{"selector": {"id": "829dd359-d18c-fead-d4f500000000000b", "@type": "bb:OdfElementSelector"}}]},
@@ -771,7 +768,36 @@ class TestPybossaUtil(Test):
                        "odf": {"office:document": {"office:body": {"office:text": [{"text:p": {"xml:id": "829dd359-d18c-fead-d4f500000000000b", "office:string-value": "ANNUAL"}}]}, "office:meta": {}}},
                        "version": "1.0",
                        "source-uri": "https://s3.amazonaws.com/cf-s3uploads/tjb/comppres/0000764478-19-000009.html?task-signature=undefined"}
-        assert util.is_annex_response(key, valid_value)
+        is_annex, response = util.is_annex_response(key, valid_value)
+        assert is_annex
+        assert response == valid_value
+
+        key = "abc"
+        valid_value = {"annex1":
+                           {"annex2":
+                                {"oa": [{"body": [{"@type": "bb:Transparency.Text.Text",
+                                         "transparency": [{"selector": {
+                                             "end": 2142,
+                                             "@type": "oa:DataPositionSelector",
+                                             "start": 2136}}]}],
+                               "target": [{"selector": {
+                                   "id": "829dd359-d18c-fead-d4f500000000000b",
+                                   "@type": "bb:OdfElementSelector"}}]},
+                              {"body": [
+                                  {"@type": "reportYear", "value": "2022"}],
+                               "target": [{}]}],
+                       "odf": {"office:document": {"office:body": {
+                           "office:text": [{"text:p": {
+                               "xml:id": "829dd359-d18c-fead-d4f500000000000b",
+                               "office:string-value": "ANNUAL"}}]},
+                                                   "office:meta": {}}},
+                       "version": "1.0",
+                       "source-uri": "https://s3.amazonaws.com/cf-s3uploads/tjb/comppres/0000764478-19-000009.html?task-signature=undefined"}
+                            }
+                       }
+        is_annex, response = util.is_annex_response(key, valid_value)
+        assert is_annex
+        assert response == valid_value['annex1']['annex2']
 
         key = "efg"
         invalid_value = {"odf": {"office:document": {"office:body": {
@@ -781,7 +807,9 @@ class TestPybossaUtil(Test):
                                                    "office:meta": {}}},
                        "version": "1.0",
                        "source-uri": "https://s3.amazonaws.com/cf-s3uploads/tjb/comppres/0000764478-19-000009.html?task-signature=undefined"}
-        assert not util.is_annex_response(key, invalid_value)
+        is_annex, response = util.is_annex_response(key, invalid_value)
+        assert not is_annex
+        assert response is None
 
     def test_process_annex_load(self):
         annex_shell_tp_code = """function loadAnnex(task) {
@@ -816,11 +844,11 @@ class TestPybossaUtil(Test):
 
         annex_js_tp_code = """async function doPybossa(pybossa, gigConfig) {
             document.getElementById('collapse-guidelines').classList.remove('show');
-        
+
             const Annex = await window.loadDocx();
             const annex = window.loadeddocx = new Annex();
             document.getElementById('annex').appendChild(annex.getDom()[0]);
-        
+
             // Annex supports multiple tabs with a document in each one.
             // However, for a single document you will not see the tab or its title.
             const annexTab = annex.addTab('tab title', gigConfig.annex);
@@ -828,22 +856,22 @@ class TestPybossaUtil(Test):
             const annexModel = annexTab._internal.model;
             annexModel.isAutoFormatRowColumnEnabled(false);
             annexModel.isFillTableContentEnabled(false);
-        
+
             // 'LEFT', 'RIGHT', 'TOP', 'BOTTOM'
             annexModel.annotatorPosition('BOTTOM');
             annexModel.isThumbnailBarPinned(false);
-        
+
             pybossa.beforeSubmit(beforePybossaSubmitTask);
             pybossa.beforePresent(beforePybossaPresentTask);
          //   pybossa.run(gigConfig.project.name);
-        
+
             function beforePybossaSubmitTask(answer, task) {
                 // Return the actual answer you want to submit.
                 // We are ignoring the answer parameter provided by the framework
                 // and handling the entire answer construction ourselves.
                 return getAnswer(task);
             }
-        
+
             function beforePybossaPresentTask(task) {
                 reset();
                 $('#field1').prop('disabled', false);
@@ -883,6 +911,36 @@ class TestPybossaUtil(Test):
         tp_code = util.process_annex_load(annex_js_tp_code, odfoa_data)
         assert f".then(() => tab.loadAnnotationFromJson('{json.dumps(odfoa_data)}'))" in tp_code
 
+        annex_js_tp_code_multiple = """function beforePybossaPresentTask(task) {
+        reset();
+        $('#field-1').prop('disabled', false);
+        $('#field-2').prop('disabled', false);
+        console.log('beforePybossaPresentTask, task.info=', JSON.stringify(task.info));
+        //old      
+          //return annexTab.loadDocumentLite(
+            //      task.info.doc_url + '?t=' + Date.now(), {}
+              //  );
+                            var oldlink = JSON.stringify(task.info.doc_url)
+                
+                if (typeof oldlink == "undefined"){ 
+                    console.log('using new link')
+                    return annexTab.loadDocumentLite(
+                        task.info.doc_url__upload_url + '&t=' + Date.now(), {}
+                         );
+             } 
+                else {
+                    console.log('using old link')
+                    return annexTab.loadDocumentLite(
+                    task.info.doc_url + '?t=' + Date.now(), {}
+                    );
+             }
+            }
+          }
+        </script>
+        """
+        tp_code = util.process_annex_load(annex_js_tp_code_multiple, odfoa_data)
+        assert f".then(() => annexTab.loadAnnotationFromJson('{json.dumps(odfoa_data)}'))" in tp_code
+        assert tp_code.count(f".then(() => annexTab.loadAnnotationFromJson('{json.dumps(odfoa_data)}'))") == 3
 
 class TestIsReservedName(object):
     from test import flask_app as app

@@ -1157,13 +1157,18 @@ def generate_bsso_account_notification(user):
 
 def is_annex_response(key, value):
     """
-    Check whether a response is a odfoa response.
+    Recursively check whether a response is a odfoa response. Returns the check
+    result and odfoa response
     """
-    if key == "odfoa":
-        return True
-
     odfoa_keys = {"version", "source-uri", "odf", "oa"}
-    return all(odfoa_key in value for odfoa_key in odfoa_keys)
+    if type(value) is dict and all(odfoa_key in value for odfoa_key in odfoa_keys):
+        return True, value
+    if type(value) is dict:
+        for k, v in value.items():
+            is_annex, response = is_annex_response(key, v)
+            if is_annex:
+                return is_annex, response
+    return False, None
 
 
 def process_annex_load(tp_code, response_value):
@@ -1171,33 +1176,32 @@ def process_annex_load(tp_code, response_value):
     Process the tp_code so that after annex document is loaded, it also loads
     annotations from the response_value
     """
+    odfoa = json.dumps(response_value)
+
     # Looking for loadDocument() or loadDocumentLite() code snippet
     regex = r"(\w+)\.(loadDocument|loadDocumentLite)\s*\(\s*.*\s*(\))"
-    match = re.search(regex, tp_code)
-
-    if match:  # maching for pure javascript Annex code
+    matches = re.finditer(regex, tp_code)
+    count = 0
+    for match in matches:  # maching for pure javascript Annex code
         annex_tab = match[1]  # the first group: (\w+)
-        odfoa = json.dumps(response_value)
         code_to_append = f".then(() => {annex_tab}.loadAnnotationFromJson('{odfoa}'))"
-
-        right_parenthesis_end = match.end(3)  # the 3rd group: (\)) - exclusive
+        right_parenthesis_end = match.end(3) + len(code_to_append) * count  # the 3rd group: (\)) - exclusive
         tp_code = tp_code[:right_parenthesis_end] + code_to_append + tp_code[right_parenthesis_end:]
-    else:
-        # Looking for code snippet like shell.setAttribute("hash", "abc");
-        regex = r"(\w+)\.setAttribute\(\"hash\",\s*\"\w+\"\);"
-        match = re.search(regex, tp_code)
-        if not match:
-            return tp_code
+        count += 1
 
+    # Looking for code snippet like shell.setAttribute("hash", "abc");
+    regex = r"(\w+)\.setAttribute\(\"hash\",\s*\"\w+\"\);"
+    matches = re.finditer(regex, tp_code)
+    count = 0
+    for match in matches:
         shell = match[1]
-        odfoa = json.dumps(response_value)
         code_to_append = (
             f"\n"
             f"    {shell}.addEventListener('urn:bloomberg:annex:event:instance-success', () => {{\n"
             f"      {shell}.internalModel.activeTab().loadAnnotationFromJson('{odfoa}')\n"
             f"    }});"
         )
-
-        semi_colon_end = match.end()  # semi colon position - exclusive
+        semi_colon_end = match.end() + len(code_to_append) * count  # semi colon position - exclusive
         tp_code = tp_code[:semi_colon_end] + code_to_append + tp_code[semi_colon_end:]
+        count += 1
     return tp_code
