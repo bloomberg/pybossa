@@ -35,6 +35,7 @@ from flask import Blueprint, request, abort, Response, make_response
 from flask import current_app
 from flask_login import current_user, login_required
 from time import time
+from datetime import datetime, timedelta
 from werkzeug.exceptions import NotFound
 from pybossa.util import jsonpify, get_user_id_or_ip, fuzzyboolean
 from pybossa.util import get_disqus_sso_payload, grant_access_with_api_key
@@ -614,13 +615,13 @@ def fetch_lock(task_id):
         return abort(404)
 
     timeout = project.info.get('timeout', ContributionsGuard.STAMP_TTL)
-    guard = ContributionsGuard(sentinel.master, timeout=timeout)
 
     seconds_to_expire = float(ttl) - time()
+    lock_time = datetime.utcnow() - timedelta(seconds=timeout-seconds_to_expire)
 
     res = json.dumps({'success': True,
                       'expires': seconds_to_expire,
-                      'lockTime': guard.retrieve_timestamp(task, get_user_id_or_ip())})
+                      'lockTime': lock_time.isoformat()})
 
     return Response(res, 200, mimetype='application/json')
 
