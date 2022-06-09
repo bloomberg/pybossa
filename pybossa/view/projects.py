@@ -1267,8 +1267,9 @@ def task_presenter(short_name, task_id, task_submitter_id=None):
             if type(response_value) == str or type(response_value) == int:
                 tp_code = re.sub(placeholder_regex, str(response_value), tp_code)
             elif type(response_value) == dict:
-                if is_annex_response(response_field, response_value):
-                    tp_code = process_annex_load(tp_code, response_value)
+                is_annex, odfoa_response = is_annex_response(response_field, response_value)
+                if is_annex:
+                    tp_code = process_annex_load(tp_code, odfoa_response)
                 else:  # TODO - for TP component
                     response_value = json.dumps(response_value)
                     tp_code = re.sub(placeholder_regex, response_value, tp_code)
