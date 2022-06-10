@@ -547,7 +547,7 @@ class TaskRepository(Repository):
         return tasks_not_updated
 
 
-    def bulk_update(self, payload):
+    def bulk_update(self, project_id, payload):
         """
         use sqlalchemy case clause to update db rows in bulk
         construct payload in the form {task_id: priority} as
@@ -564,6 +564,7 @@ class TaskRepository(Repository):
         tasks = self.db.session.query(Task).filter(Task.id.in_(task_ids))
         tasks.update({Task.priority_0: sqlalchemy_case(formatted_payload, value=Task.id)}, synchronize_session=False)
         self.db.session.commit()
+        cached_projects.clean_project(project_id)
 
 
 

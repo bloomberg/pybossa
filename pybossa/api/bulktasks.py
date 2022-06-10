@@ -86,7 +86,7 @@ class BulkTasksAPI(TaskAPI):
 
             current_app.logger.info(f"Project {project.id}, input for bulk update {str(update_info)}, dropped payload {dropped_payload}")
             current_app.logger.info(f"Calling bulk update for project {project.id} with payload {str(update_payload)}")
-            task_repo.bulk_update(update_payload)
+            task_repo.bulk_update(project.id, update_payload)
             json_response = {}
             return Response(json_response, mimetype="application/json")
         except Exception as e:
