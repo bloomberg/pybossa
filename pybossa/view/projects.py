@@ -2516,7 +2516,7 @@ def task_scheduler(short_name):
 
         reserve_category_columns = form.reserve_category_columns.data if form.sched.data in ["task_queue_scheduler"] else []
         project.info["reserve_tasks"] = dict(category=reserve_category_columns)
-        project.info['tasklist_columns'] = form.customized_columns.data
+        project.info['tasklist_columns'] = form.customized_columns.data or project.info.get('tasklist_columns', [])
         project.info['sched_rand_within_priority'] = form.rand_within_priority.data
         project.set_gold_task_probability(form.gold_task_probability.data)
         project_repo.save(project)
