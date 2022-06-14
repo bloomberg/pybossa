@@ -1042,7 +1042,7 @@ def is_int(s):
 def validate_required_fields(data):
     invalid_fields = []
     required_fields = current_app.config.get("TASK_REQUIRED_FIELDS", {})
-    data_items_lower = {k.lower():v for k,v in data.items()}
+    data_items_lower = {k.lower():v for k,v in data.items()} if required_fields.items() else {}
     for field_name, field_info in required_fields.items():
         field_val = field_info.get('val')
         check_val = field_info.get('check_val')
