@@ -1046,7 +1046,8 @@ def validate_required_fields(data):
         field_val = field_info.get('val')
         check_val = field_info.get('check_val')
         int_val = field_info.get('require_int')
-        import_data = data.get(field_name)
+        field_names_lower = {field_name.lower():v for k,v in data.items()}
+        import_data = field_names_lower.get(field_name.lower())
         if not import_data or \
             (check_val and import_data not in field_val) or \
             (int_val and ('.' in str(import_data) or not is_int(import_data))):
