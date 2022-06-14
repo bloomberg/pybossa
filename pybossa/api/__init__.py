@@ -35,6 +35,7 @@ from flask import Blueprint, request, abort, Response, make_response
 from flask import current_app
 from flask_login import current_user, login_required
 from time import time
+from datetime import datetime, timedelta
 from werkzeug.exceptions import NotFound
 from pybossa.util import jsonpify, get_user_id_or_ip, fuzzyboolean
 from pybossa.util import get_disqus_sso_payload, grant_access_with_api_key
@@ -88,6 +89,7 @@ from pybossa.cache.task_browse_helpers import get_searchable_columns
 from pybossa.cache.users import get_user_pref_metadata
 from pybossa.view.projects import get_locked_tasks
 from pybossa.redis_lock import EXPIRE_LOCK_DELAY
+from pybossa.api.bulktasks import BulkTasksAPI
 
 task_fields = [
     "id",
@@ -158,6 +160,7 @@ register_api(CompletedTaskAPI, 'api_completedtask', '/completedtask', pk='oid', 
 register_api(CompletedTaskRunAPI, 'api_completedtaskrun', '/completedtaskrun', pk='oid', pk_type='int')
 register_api(ProjectByNameAPI, 'api_projectbyname', '/projectbyname', pk='key', pk_type='string')
 register_api(PerformanceStatsAPI, 'api_performancestats', '/performancestats', pk='oid', pk_type='int')
+register_api(BulkTasksAPI, 'api_bulktasks', '/bulktasks', pk='oid', pk_type='int')
 
 
 def add_task_signature(tasks):
@@ -603,13 +606,22 @@ def fetch_lock(task_id):
     if not task:
         return abort(400)
 
+    project = project_repo.get(task.project_id)
+    if not project:
+        return abort(400)
+
     _, ttl = fetch_lock_for_user(task.project_id, task.id, current_user.id)
     if not ttl:
         return abort(404)
 
+    timeout = project.info.get('timeout', ContributionsGuard.STAMP_TTL)
+
     seconds_to_expire = float(ttl) - time()
+    lock_time = datetime.utcnow() - timedelta(seconds=timeout-seconds_to_expire)
+
     res = json.dumps({'success': True,
-                      'expires': seconds_to_expire})
+                      'expires': seconds_to_expire,
+                      'lockTime': lock_time.isoformat()})
 
     return Response(res, 200, mimetype='application/json')
 

@@ -33,6 +33,7 @@ import json
 from datetime import datetime, timedelta
 from flask import current_app
 from sqlalchemy import or_
+from sqlalchemy.sql import case as sqlalchemy_case
 
 
 class TaskRepository(Repository):
@@ -544,3 +545,27 @@ class TaskRepository(Repository):
             task_expiration=task_expiration, **params)).fetchall()
         tasks_not_updated = '\n'.join([str(task.id) for task in tasks])
         return tasks_not_updated
+
+
+    def bulk_update(self, project_id, payload):
+        """
+        use sqlalchemy case clause to update db rows in bulk
+        construct payload in the form {task_id: priority} as
+        sqlalchemy case works passing payload in the form
+        WHEN task_id THEN priority
+        https://stackoverflow.com/questions/54365873/sqlalchemy-update-multiple-rows-in-one-transaction
+        """
+
+        if not payload:
+            return
+
+        formatted_payload = {data["id"]: data["priority_0"] for data in payload}
+        task_ids = formatted_payload.keys()
+        tasks = self.db.session.query(Task).filter(Task.id.in_(task_ids))
+        tasks.update({Task.priority_0: sqlalchemy_case(formatted_payload, value=Task.id)}, synchronize_session=False)
+        self.db.session.commit()
+        cached_projects.clean_project(project_id)
+
+
+
+
