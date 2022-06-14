@@ -1205,3 +1205,7 @@ def process_annex_load(tp_code, response_value):
         tp_code = tp_code[:semi_colon_end] + code_to_append + tp_code[semi_colon_end:]
         count += 1
     return tp_code
+
+def admin_or_project_owner(user, project):
+    if not (user.is_authenticated and (user.admin or user.id in project.owners_ids)):
+        raise abort(403)

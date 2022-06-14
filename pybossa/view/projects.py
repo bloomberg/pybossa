@@ -101,6 +101,7 @@ import pybossa.app_settings as app_settings
 from copy import deepcopy
 from pybossa.cache import delete_memoized
 from sqlalchemy.orm.attributes import flag_modified
+from pybossa.util import admin_or_project_owner
 
 cors_headers = ['Content-Type', 'Authorization']
 
@@ -1746,12 +1747,11 @@ def tasks_browse(short_name, page=1, records_per_page=None):
 @crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/priorityupdate', methods=['POST'])
 @login_required
-@admin_or_subadmin_required
 def bulk_priority_update(short_name):
     try:
         project, owner, ps = project_by_shortname(short_name)
         ensure_authorized_to('read', project)
-        ensure_authorized_to('update', project)
+        admin_or_project_owner(current_user, project)
         req_data = request.json
         priority_0 = req_data.get('priority_0', 0)
         task_ids = req_data.get('taskIds')
@@ -1785,11 +1785,11 @@ def bulk_priority_update(short_name):
 @crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/assign-workersupdate', methods=['POST'])
 @login_required
-@admin_or_subadmin_required
 def bulk_update_assign_worker(short_name):
 
     response = {}
     project, owner, ps = project_by_shortname(short_name)
+    admin_or_project_owner(current_user, project)
     data = json.loads(request.data)
 
     if data.get("add") is None and data.get("remove") is None:
@@ -1886,12 +1886,10 @@ def bulk_update_assign_worker(short_name):
 @crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/redundancyupdate', methods=['POST'])
 @login_required
-@admin_or_subadmin_required
 def bulk_redundancy_update(short_name):
     try:
         project, owner, ps = project_by_shortname(short_name)
-        ensure_authorized_to('read', project)
-        ensure_authorized_to('update', project)
+        admin_or_project_owner(current_user, project)
         req_data = request.json
         n_answers = req_data.get('n_answers', 1)
         task_ids = req_data.get('taskIds')
