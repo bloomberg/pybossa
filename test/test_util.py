@@ -34,6 +34,11 @@ from pybossa.importers import BulkImportException
 from pybossa.importers.csv import BulkTaskCSVImport
 from test import with_context, Test, with_request_context
 from test.factories import UserFactory
+from pybossa.model.user import User
+from pybossa.model.project import Project
+from unittest.mock import Mock
+from werkzeug.exceptions import Forbidden
+from pybossa.util import admin_or_project_owner
 
 
 def myjsonify(data):
@@ -916,18 +921,18 @@ class TestPybossaUtil(Test):
         $('#field-1').prop('disabled', false);
         $('#field-2').prop('disabled', false);
         console.log('beforePybossaPresentTask, task.info=', JSON.stringify(task.info));
-        //old      
+        //old
           //return annexTab.loadDocumentLite(
             //      task.info.doc_url + '?t=' + Date.now(), {}
               //  );
                             var oldlink = JSON.stringify(task.info.doc_url)
-                
-                if (typeof oldlink == "undefined"){ 
+
+                if (typeof oldlink == "undefined"){
                     console.log('using new link')
                     return annexTab.loadDocumentLite(
                         task.info.doc_url__upload_url + '&t=' + Date.now(), {}
                          );
-             } 
+             }
                 else {
                     console.log('using old link')
                     return annexTab.loadDocumentLite(
@@ -941,6 +946,21 @@ class TestPybossaUtil(Test):
         tp_code = util.process_annex_load(annex_js_tp_code_multiple, odfoa_data)
         assert f".then(() => annexTab.loadAnnotationFromJson('{json.dumps(odfoa_data)}'))" in tp_code
         assert tp_code.count(f".then(() => annexTab.loadAnnotationFromJson('{json.dumps(odfoa_data)}'))") == 3
+
+    @with_context
+    def test_admin_or_project_owner_raises_forbidden(self):
+        """Test admin or project owner check raises forbidden for unauthorized users"""
+        user = Mock(spec=User)
+        project = Mock(spec=Project)
+
+        user.is_authenticated = False
+        assert_raises(Forbidden, admin_or_project_owner, user, project)
+
+        user.is_authenticated = True
+        user.admin = False
+        project.owners_ids = [999]
+        assert_raises(Forbidden, admin_or_project_owner, user, project)
+
 
 class TestIsReservedName(object):
     from test import flask_app as app

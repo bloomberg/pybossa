@@ -19,11 +19,12 @@
 from test import Test, assert_not_raises, with_context
 from pybossa.auth import ensure_authorized_to
 from nose.tools import assert_raises
-from werkzeug.exceptions import Forbidden, Unauthorized
-from unittest.mock import patch
+from werkzeug.exceptions import Forbidden, Unauthorized, NotFound
+from unittest.mock import patch, MagicMock
 from test.test_authorization import mock_current_user
 from test.factories import ProjectFactory, UserFactory, TaskFactory
 from pybossa.model.task import Task
+from pybossa.auth.task import TaskAuth
 
 
 class TestTaskAuthorization(Test):
@@ -97,3 +98,24 @@ class TestTaskAuthorization(Test):
         assert_not_raises(Forbidden, ensure_authorized_to, 'read', Task)
         assert_not_raises(Forbidden, ensure_authorized_to, 'update', task)
         assert_not_raises(Forbidden, ensure_authorized_to, 'delete', task)
+
+
+    @with_context
+    @patch('pybossa.auth.current_user', new=mock_authenticated)
+    def test_regular_coowner_can_update(self):
+        # """Test regular non subadmin coowner can update tasks"""
+
+        user = UserFactory.create()
+        project = ProjectFactory.create(owner=user)
+        task = TaskFactory.create(project=project)
+        project_repo = MagicMock()
+        project_repo.get.return_value = None
+        auth = TaskAuth(project_repo=project_repo)
+
+        can_update = auth._update(user=None, task=None)
+        assert not can_update, "Update task should fail due to missing user info"
+
+        can_update = auth._update(user=user, task=None)
+        assert not can_update, "Update task should fail due to missing task info"
+
+        assert_raises(NotFound, auth._update, user, task)

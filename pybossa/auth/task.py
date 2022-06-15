@@ -41,7 +41,7 @@ class TaskAuth(object):
         return user.is_authenticated
 
     def _update(self, user, task):
-        return self._only_admin_or_subadminowners(user, task)
+        return self._only_admin_or_owners(user, task)
 
     def _delete(self, user, task):
         if user.is_authenticated and user.admin:
@@ -64,6 +64,20 @@ class TaskAuth(object):
                 raise NotFound("Invalid project ID")
             project_owners_ids = project.owners_ids
         return user.admin or (user.subadmin and user.id in project_owners_ids)
+
+    def _only_admin_or_owners(self, user, task=None, project_owners_ids=None):
+        if not user:
+            return False
+        if user.is_anonymous:
+            return False
+        if project_owners_ids is None:
+            if task is None:
+                return False
+            project = self.project_repo.get(task.project_id)
+            if project is None:
+                raise NotFound("Invalid project ID")
+            project_owners_ids = project.owners_ids
+        return user.admin or user.id in project_owners_ids
 
     @staticmethod
     def apply_access_control(task_dict, user=None, project_data=None):
