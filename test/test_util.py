@@ -955,6 +955,50 @@ class TestPybossaUtil(Test):
         project.owners_ids = [999]
         assert_raises(Forbidden, admin_or_project_owner, user, project)
 
+    def test_process_tp_components(self):
+        tp_code = """  <task-presenter>
+            <text-input id='_kp6zwx2rs' type='text' :validations='[]' pyb-answer='freeText' initial-value='nothing special'></text-input>
+            
+            <div class="row">
+              <div class="col-sm-3">
+                <div class="form-group">
+                  <dropdown-input pyb-answer='isNewData'
+                    :choices='{&quot;yes&quot;:&quot;Yes&quot;,&quot;no&quot;:&quot;No&quot;}' :validations='["required"]'
+                    initial-value='no'>
+                  </dropdown-input>
+                </div>
+              </div>
+            </div>
+        
+            <radio-group-input pyb-answer='answer' name='userAnswer'
+              :choices='{&quot;Chinese&quot;:&quot;Chinese&quot;,&quot;Korean&quot;:&quot;Korean&quot;,&quot;Japanese&quot;:&quot;Japanese&quot;}'
+              initial-value='Chinese' :validations='["required"]'></radio-group-input>
+        
+            <div id="_e9pm92ges">
+              <div class="checkbox">
+                      <label for="_mg59znxa7">
+                          <checkbox-input :initial-value="false" id="_mg59znxa7" pyb-answer="isRelevant"></checkbox-input> Is this document relevant?
+                      </label>
+                </div>
+            </div>
+        
+            <multi-select-input
+              pyb-answer='subjects'
+              :choices='[&quot;Math&quot;,&quot;English&quot;,&quot;Social Study&quot;,&quot;Python&quot;]'
+              :validations='["required"]'
+              :initial-value='[&quot;Python&quot;,&quot;English&quot;]'
+          ></multi-select-input>
+        </task-presenter>
+        """
+
+        user_response = {'answer': 'Japanese', 'freeText': 'This is cool', 'subjects': ['Social Study', 'English', 'Math'], 'isNewData': 'yes', 'isRelevant': False}
+        result = util.process_tp_components(tp_code, user_response)
+
+        assert """<dropdown-input :choices='{"yes":"Yes","no":"No"}' :validations='["required"]' initial-value="yes" pyb-answer="isNewData">""" in result
+        assert """<radio-group-input :choices='{"Chinese":"Chinese","Korean":"Korean","Japanese":"Japanese"}' :validations='["required"]' initial-value="Japanese" name="userAnswer" pyb-answer="answer">""" in result
+        assert """<checkbox-input :initial-value="false" id="_mg59znxa7" pyb-answer="isRelevant">""" in result
+        assert """<multi-select-input :choices='["Math","English","Social Study","Python"]' :initial-value='["Social Study","English","Math"]' :validations='["required"]' pyb-answer="subjects">""" in result
+
 
 class TestIsReservedName(object):
     from test import flask_app as app

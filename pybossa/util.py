@@ -1214,23 +1214,32 @@ def process_annex_load(tp_code, response_value):
         count += 1
     return tp_code
 
+
 def admin_or_project_owner(user, project):
     if not (user.is_authenticated and (user.admin or user.id in project.owners_ids)):
         raise abort(403)
 
-# https://github.com/bloomberg/pybossa-default-theme/blob/main/static/src/components/builder/components/ComponentRender/ComponentRender.vue
-tp_component_tags = ["text-input", "dropdown-input", "radio-group-input", "multi-select-input"]
+
+tp_component_tags = ["text-input", "dropdown-input", "radio-group-input",
+                     "checkbox-input", "multi-select-input"]
 
 
-def process_tp_component(tp_code, user_response):
+def process_tp_components(tp_code, user_response):
     """grab the 'pyb-answer' value and use it as a key to retrieve the response
     from user_response(a dict). The response data is then used to set the
-    'initial-value'"""
+    'initial-value' or ':initial-value' based on different components"""
     soup = BeautifulSoup(tp_code, 'html.parser')
     for tp_component_tag in tp_component_tags:
         tp_components = soup.find_all(tp_component_tag)
         for tp_component in tp_components:
             response_key = tp_component.get('pyb-answer')
             response_value = user_response.get(response_key, '')
-            tp_component['initial-value'] = response_value
+            if tp_component.name in ["checkbox-input", "multi-select-input"]:
+                if type(response_value) is bool:
+                    response_value = str(response_value).lower()
+                elif type(response_value) is list:
+                    response_value = '[' + ",".join(map(lambda s: '"' + s + '"', response_value)) + ']'
+                tp_component[':initial-value'] = response_value
+            else:
+                tp_component['initial-value'] = response_value
     return soup.prettify()

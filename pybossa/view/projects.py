@@ -55,7 +55,7 @@ from pybossa.util import (Pagination, admin_required, get_user_id_or_ip, rank,
                           is_own_url_or_else,
                           description_from_long_description,
                           check_annex_response,
-                          process_annex_load, process_tp_component)
+                          process_annex_load, process_tp_components)
 from pybossa.auth import ensure_authorized_to
 from pybossa.cache import projects as cached_projects
 from pybossa.cache import users as cached_users
@@ -1270,9 +1270,7 @@ def task_presenter(short_name, task_id, task_submitter_id=None):
                 if odfoa_response:
                     tp_code = process_annex_load(tp_code, odfoa_response)
 
-        tp_code = process_tp_component(tp_code, user_response)
-        print("**** tp_code: ", tp_code)
-
+        tp_code = process_tp_components(tp_code, user_response)
         template_args["project"]["info"]["task_presenter"] = tp_code
 
     def respond(tmpl):
