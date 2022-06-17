@@ -765,19 +765,16 @@ class TestPybossaUtil(Test):
         assert ned.email_addr in message["bcc"] and robb.email_addr not in message["bcc"], "Filtered enabled users not to be part of email list"
         assert tyrion.email_addr in message["recipients"], "Enabled user to be part of recipients list"
 
-    def test_is_annex_response(self):
-        key = "abc"
+    def test_check_annex_response(self):
         valid_value = {"oa": [{"body": [{"@type": "bb:Transparency.Text.Text", "transparency": [{"selector": {"end": 2142, "@type": "oa:DataPositionSelector", "start": 2136}}]}],
                                "target": [{"selector": {"id": "829dd359-d18c-fead-d4f500000000000b", "@type": "bb:OdfElementSelector"}}]},
                               {"body": [{"@type": "reportYear", "value": "2022"}], "target": [{}]}],
                        "odf": {"office:document": {"office:body": {"office:text": [{"text:p": {"xml:id": "829dd359-d18c-fead-d4f500000000000b", "office:string-value": "ANNUAL"}}]}, "office:meta": {}}},
                        "version": "1.0",
                        "source-uri": "https://s3.amazonaws.com/cf-s3uploads/tjb/comppres/0000764478-19-000009.html?task-signature=undefined"}
-        is_annex, response = util.is_annex_response(key, valid_value)
-        assert is_annex
+        response = util.check_annex_response(valid_value)
         assert response == valid_value
 
-        key = "abc"
         valid_value = {"annex1":
                            {"annex2":
                                 {"oa": [{"body": [{"@type": "bb:Transparency.Text.Text",
@@ -800,11 +797,9 @@ class TestPybossaUtil(Test):
                        "source-uri": "https://s3.amazonaws.com/cf-s3uploads/tjb/comppres/0000764478-19-000009.html?task-signature=undefined"}
                             }
                        }
-        is_annex, response = util.is_annex_response(key, valid_value)
-        assert is_annex
+        response = util.check_annex_response(valid_value)
         assert response == valid_value['annex1']['annex2']
 
-        key = "efg"
         invalid_value = {"odf": {"office:document": {"office:body": {
                            "office:text": [{"text:p": {
                                "xml:id": "829dd359-d18c-fead-d4f500000000000b",
@@ -812,8 +807,7 @@ class TestPybossaUtil(Test):
                                                    "office:meta": {}}},
                        "version": "1.0",
                        "source-uri": "https://s3.amazonaws.com/cf-s3uploads/tjb/comppres/0000764478-19-000009.html?task-signature=undefined"}
-        is_annex, response = util.is_annex_response(key, invalid_value)
-        assert not is_annex
+        response = util.check_annex_response(invalid_value)
         assert response is None
 
     def test_process_annex_load(self):
