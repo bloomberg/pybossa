@@ -56,6 +56,8 @@ from pybossa.cloud_store_api.s3 import s3_upload_file_storage
 from bs4 import BeautifulSoup
 
 misaka = Misaka()
+TP_COMPONENT_TAGS = ["text-input", "dropdown-input", "radio-group-input",
+                     "checkbox-input", "multi-select-input"]
 
 
 def last_flashed_message():
@@ -1220,16 +1222,12 @@ def admin_or_project_owner(user, project):
         raise abort(403)
 
 
-tp_component_tags = ["text-input", "dropdown-input", "radio-group-input",
-                     "checkbox-input", "multi-select-input"]
-
-
 def process_tp_components(tp_code, user_response):
     """grab the 'pyb-answer' value and use it as a key to retrieve the response
     from user_response(a dict). The response data is then used to set the
     'initial-value' or ':initial-value' based on different components"""
     soup = BeautifulSoup(tp_code, 'html.parser')
-    for tp_component_tag in tp_component_tags:
+    for tp_component_tag in TP_COMPONENT_TAGS:
         tp_components = soup.find_all(tp_component_tag)
         for tp_component in tp_components:
             response_key = tp_component.get('pyb-answer')
