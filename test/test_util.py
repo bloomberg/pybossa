@@ -765,19 +765,16 @@ class TestPybossaUtil(Test):
         assert ned.email_addr in message["bcc"] and robb.email_addr not in message["bcc"], "Filtered enabled users not to be part of email list"
         assert tyrion.email_addr in message["recipients"], "Enabled user to be part of recipients list"
 
-    def test_is_annex_response(self):
-        key = "abc"
+    def test_check_annex_response(self):
         valid_value = {"oa": [{"body": [{"@type": "bb:Transparency.Text.Text", "transparency": [{"selector": {"end": 2142, "@type": "oa:DataPositionSelector", "start": 2136}}]}],
                                "target": [{"selector": {"id": "829dd359-d18c-fead-d4f500000000000b", "@type": "bb:OdfElementSelector"}}]},
                               {"body": [{"@type": "reportYear", "value": "2022"}], "target": [{}]}],
                        "odf": {"office:document": {"office:body": {"office:text": [{"text:p": {"xml:id": "829dd359-d18c-fead-d4f500000000000b", "office:string-value": "ANNUAL"}}]}, "office:meta": {}}},
                        "version": "1.0",
                        "source-uri": "https://s3.amazonaws.com/cf-s3uploads/tjb/comppres/0000764478-19-000009.html?task-signature=undefined"}
-        is_annex, response = util.is_annex_response(key, valid_value)
-        assert is_annex
+        response = util.check_annex_response(valid_value)
         assert response == valid_value
 
-        key = "abc"
         valid_value = {"annex1":
                            {"annex2":
                                 {"oa": [{"body": [{"@type": "bb:Transparency.Text.Text",
@@ -800,11 +797,9 @@ class TestPybossaUtil(Test):
                        "source-uri": "https://s3.amazonaws.com/cf-s3uploads/tjb/comppres/0000764478-19-000009.html?task-signature=undefined"}
                             }
                        }
-        is_annex, response = util.is_annex_response(key, valid_value)
-        assert is_annex
+        response = util.check_annex_response(valid_value)
         assert response == valid_value['annex1']['annex2']
 
-        key = "efg"
         invalid_value = {"odf": {"office:document": {"office:body": {
                            "office:text": [{"text:p": {
                                "xml:id": "829dd359-d18c-fead-d4f500000000000b",
@@ -812,8 +807,7 @@ class TestPybossaUtil(Test):
                                                    "office:meta": {}}},
                        "version": "1.0",
                        "source-uri": "https://s3.amazonaws.com/cf-s3uploads/tjb/comppres/0000764478-19-000009.html?task-signature=undefined"}
-        is_annex, response = util.is_annex_response(key, invalid_value)
-        assert not is_annex
+        response = util.check_annex_response(invalid_value)
         assert response is None
 
     def test_process_annex_load(self):
@@ -960,6 +954,50 @@ class TestPybossaUtil(Test):
         user.admin = False
         project.owners_ids = [999]
         assert_raises(Forbidden, admin_or_project_owner, user, project)
+
+    def test_process_tp_components(self):
+        tp_code = """  <task-presenter>
+            <text-input id='_kp6zwx2rs' type='text' :validations='[]' pyb-answer='freeText' initial-value='nothing special'></text-input>
+            
+            <div class="row">
+              <div class="col-sm-3">
+                <div class="form-group">
+                  <dropdown-input pyb-answer='isNewData'
+                    :choices='{&quot;yes&quot;:&quot;Yes&quot;,&quot;no&quot;:&quot;No&quot;}' :validations='["required"]'
+                    initial-value='no'>
+                  </dropdown-input>
+                </div>
+              </div>
+            </div>
+        
+            <radio-group-input pyb-answer='answer' name='userAnswer'
+              :choices='{&quot;Chinese&quot;:&quot;Chinese&quot;,&quot;Korean&quot;:&quot;Korean&quot;,&quot;Japanese&quot;:&quot;Japanese&quot;}'
+              initial-value='Chinese' :validations='["required"]'></radio-group-input>
+        
+            <div id="_e9pm92ges">
+              <div class="checkbox">
+                      <label for="_mg59znxa7">
+                          <checkbox-input :initial-value="false" id="_mg59znxa7" pyb-answer="isRelevant"></checkbox-input> Is this document relevant?
+                      </label>
+                </div>
+            </div>
+        
+            <multi-select-input
+              pyb-answer='subjects'
+              :choices='[&quot;Math&quot;,&quot;English&quot;,&quot;Social Study&quot;,&quot;Python&quot;]'
+              :validations='["required"]'
+              :initial-value='[&quot;Python&quot;,&quot;English&quot;]'
+          ></multi-select-input>
+        </task-presenter>
+        """
+
+        user_response = {'answer': 'Japanese', 'freeText': 'This is cool', 'subjects': ['Social Study', 'English', 'Math'], 'isNewData': 'yes', 'isRelevant': False}
+        result = util.process_tp_components(tp_code, user_response)
+
+        assert """<dropdown-input :choices='{"yes":"Yes","no":"No"}' :validations='["required"]' initial-value="yes" pyb-answer="isNewData">""" in result
+        assert """<radio-group-input :choices='{"Chinese":"Chinese","Korean":"Korean","Japanese":"Japanese"}' :validations='["required"]' initial-value="Japanese" name="userAnswer" pyb-answer="answer">""" in result
+        assert """<checkbox-input :initial-value="false" id="_mg59znxa7" pyb-answer="isRelevant">""" in result
+        assert """<multi-select-input :choices='["Math","English","Social Study","Python"]' :initial-value='["Social Study","English","Math"]' :validations='["required"]' pyb-answer="subjects">""" in result
 
 
 class TestIsReservedName(object):

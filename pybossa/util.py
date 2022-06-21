@@ -53,7 +53,12 @@ from pybossa.cloud_store_api.connection import create_connection
 from pybossa.cloud_store_api.s3 import get_file_from_s3, delete_file_from_s3
 from pybossa.cloud_store_api.s3 import s3_upload_file_storage
 
+from bs4 import BeautifulSoup
+
 misaka = Misaka()
+TP_COMPONENT_TAGS = ["text-input", "dropdown-input", "radio-group-input",
+                     "checkbox-input", "multi-select-input"]
+
 
 def last_flashed_message():
     """Return last flashed message by flask."""
@@ -1156,20 +1161,24 @@ def generate_bsso_account_notification(user):
     return msg
 
 
-def is_annex_response(key, value):
+def check_annex_response(response_value):
     """
-    Recursively check whether a response is a odfoa response. Returns the check
-    result and odfoa response
+    Recursively check whether a response is an odfoa response.
+    If it is a valid odfoa response, return odfoa response data. Otherwise
+    return None
     """
-    odfoa_keys = {"version", "source-uri", "odf", "oa"}
-    if type(value) is dict and all(odfoa_key in value for odfoa_key in odfoa_keys):
-        return True, value
-    if type(value) is dict:
-        for k, v in value.items():
-            is_annex, response = is_annex_response(key, v)
-            if is_annex:
-                return is_annex, response
-    return False, None
+    if type(response_value) is not dict:
+        return None
+
+    if all(k in response_value for k in {"version", "source-uri", "odf", "oa"}):
+        return response_value
+
+    for key in response_value:
+        response = check_annex_response(response_value[key])
+        if response:
+            return response
+
+    return None
 
 
 def process_annex_load(tp_code, response_value):
@@ -1207,6 +1216,28 @@ def process_annex_load(tp_code, response_value):
         count += 1
     return tp_code
 
+
 def admin_or_project_owner(user, project):
     if not (user.is_authenticated and (user.admin or user.id in project.owners_ids)):
         raise abort(403)
+
+
+def process_tp_components(tp_code, user_response):
+    """grab the 'pyb-answer' value and use it as a key to retrieve the response
+    from user_response(a dict). The response data is then used to set the
+    'initial-value' or ':initial-value' based on different components"""
+    soup = BeautifulSoup(tp_code, 'html.parser')
+    for tp_component_tag in TP_COMPONENT_TAGS:
+        tp_components = soup.find_all(tp_component_tag)
+        for tp_component in tp_components:
+            response_key = tp_component.get('pyb-answer')
+            response_value = user_response.get(response_key, '')
+            if tp_component.name in ["checkbox-input", "multi-select-input"]:
+                if type(response_value) is bool:
+                    response_value = str(response_value).lower()
+                elif type(response_value) is list:
+                    response_value = '[' + ",".join(map(lambda s: '"' + s + '"', response_value)) + ']'
+                tp_component[':initial-value'] = response_value
+            else:
+                tp_component['initial-value'] = response_value
+    return soup.prettify()
