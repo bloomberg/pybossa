@@ -365,7 +365,7 @@ class BulkTaskLocalCSVImport(BulkTaskCSVImportBase):
                     except UnicodeDecodeError as ex:
                         return (line_number, s)
                     line_number += 1
-            return None
+            return (None, None)
 
     def _get_csv_reader(self):
         csv_filename = self.form_data['csv_filename']
