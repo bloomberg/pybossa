@@ -231,3 +231,36 @@ class TestBulkTaskLocalCSVImport(Test):
                     with patch('pybossa.importers.csv.io.open', mock_open(read_data= str(header)), create=True):
                         field_names = BulkTaskLocalCSVImport(**form_data).fields()
                         assert field_names == ({field_name} if field_name else set()), {'field_names': field_names, 'field_name': field_name}
+
+    def raise_unicode_exception(self):
+        raise UnicodeDecodeError('test', b'test', 0, 0, 'test')
+
+    @with_context
+    @patch('pybossa.importers.csv.BulkTaskLocalCSVImport._get_csv_file_data', side_effect=raise_unicode_exception)
+    @patch('pybossa.importers.csv.get_import_csv_file')
+    def test_import_non_ascii_raises_exception_with_row_number(self, s3_get, _get_csv_file_data):
+        """Test non-ascii csv file import raises exception with row number"""
+        with patch('pybossa.importers.csv.io.open', mock_open(read_data=b'Te\x81st'), create=True):
+            with patch('pybossa.importers.csv.open', mock_open(read_data=b'Te\x81st'), create=True):
+                assert_raises(BulkImportException, self.importer._get_csv_reader)
+
+                msg = 'Invalid character in csv file at row 1:'
+                try:
+                    next(self.importer._get_csv_reader())
+                except BulkImportException as e:
+                    assert msg in e.args[0], e
+
+    @with_context
+    @patch('pybossa.importers.csv.BulkTaskLocalCSVImport._get_csv_file_data', side_effect=raise_unicode_exception)
+    @patch('pybossa.importers.csv.get_import_csv_file')
+    def test_import_non_ascii_raises_exception_with_no_row_number(self, s3_get, _get_csv_file_data):
+        """Test non-ascii csv file import raises exception with no row number"""
+        with patch('pybossa.importers.csv.io.open', mock_open(read_data=b'Te\x81st'), create=True):
+            with patch('pybossa.importers.csv.open', mock_open(read_data=b'Test'), create=True):
+                assert_raises(BulkImportException, self.importer._get_csv_reader)
+
+                msg = 'Invalid character in csv file at row None:'
+                try:
+                    next(self.importer._get_csv_reader())
+                except BulkImportException as e:
+                    assert msg in e.args[0], e
