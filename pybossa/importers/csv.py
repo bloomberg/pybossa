@@ -20,6 +20,7 @@ import io
 import json
 import numbers
 import re
+import codecs
 from io import StringIO
 
 import requests
@@ -354,6 +355,21 @@ class BulkTaskLocalCSVImport(BulkTaskCSVImportBase):
        BulkTaskCSVImportBase.__init__(self)
        self.form_data = form_data
 
+    def _find_non_ascii_row(self, file_name):
+            """ Returns the first row number in the file containing a non-ASCII (utf-8) character."""
+            with open(file_name, 'rb') as src:
+                line_number = 1
+                for line in src:
+                    try:
+                        codecs.decode(line, encoding='utf-8')
+                    except UnicodeDecodeError as ex:
+                        return line_number
+                    line_number += 1
+            return None
+
+    def _get_csv_file_data(self, csv_file):
+        return csv_file.stream.read()
+
     def _get_csv_reader(self):
         csv_filename = self.form_data['csv_filename']
         if csv_filename is None:
@@ -367,7 +383,14 @@ class BulkTaskLocalCSVImport(BulkTaskCSVImportBase):
             msg = ("Unable to load csv file for import, file {0}".format(csv_filename))
             raise BulkImportException(gettext(msg), 'error')
         csv_file.stream.seek(0)
-        csv_file_data = csv_file.stream.read()
+
+        try:
+            csv_file_data = self._get_csv_file_data(csv_file)
+        except UnicodeDecodeError as ex:
+            line_number = self._find_non_ascii_row(csv_filename)
+            msg = 'Invalid character in csv file at row {0}: {1}'.format(line_number, str(ex))
+            raise BulkImportException(msg)
+
         csvcontent = io.StringIO(csv_file_data)
         return unicode_csv_reader(csvcontent)
 
