@@ -238,29 +238,27 @@ class TestBulkTaskLocalCSVImport(Test):
     @with_context
     @patch('pybossa.importers.csv.BulkTaskLocalCSVImport._get_csv_file_data', side_effect=raise_unicode_exception)
     @patch('pybossa.importers.csv.get_import_csv_file')
-    def test_import_non_ascii_raises_exception_with_row_number(self, s3_get, _get_csv_file_data):
+    def test_import_non_ascii_raises_exception_with_row_number_1(self, s3_get, _get_csv_file_data):
         """Test non-ascii csv file import raises exception with row number"""
         with patch('pybossa.importers.csv.io.open', mock_open(read_data=b'Te\x81st'), create=True):
-            with patch('pybossa.importers.csv.open', mock_open(read_data=b'Te\x81st'), create=True):
-                assert_raises(BulkImportException, self.importer._get_csv_reader)
+            assert_raises(BulkImportException, self.importer._get_csv_reader)
 
-                msg = 'Invalid character in csv file at row 1:'
-                try:
-                    next(self.importer._get_csv_reader())
-                except BulkImportException as e:
-                    assert msg in e.args[0], e
+            msg = 'Invalid character in csv file at row 1:'
+            try:
+                next(self.importer._get_csv_reader())
+            except BulkImportException as e:
+                assert msg in e.args[0], e
 
     @with_context
     @patch('pybossa.importers.csv.BulkTaskLocalCSVImport._get_csv_file_data', side_effect=raise_unicode_exception)
     @patch('pybossa.importers.csv.get_import_csv_file')
-    def test_import_non_ascii_raises_exception_with_no_row_number(self, s3_get, _get_csv_file_data):
-        """Test non-ascii csv file import raises exception with no row number"""
-        with patch('pybossa.importers.csv.io.open', mock_open(read_data=b'Te\x81st'), create=True):
-            with patch('pybossa.importers.csv.open', mock_open(read_data=b'Test'), create=True):
-                assert_raises(BulkImportException, self.importer._get_csv_reader)
+    def test_import_non_ascii_raises_exception_with_row_number_2(self, s3_get, _get_csv_file_data):
+        """Test non-ascii csv file import raises exception with row number"""
+        with patch('pybossa.importers.csv.io.open', mock_open(read_data=b'First\nTe\x81st'), create=True):
+            assert_raises(BulkImportException, self.importer._get_csv_reader)
 
-                msg = 'Invalid character in csv file at row None:'
-                try:
-                    next(self.importer._get_csv_reader())
-                except BulkImportException as e:
-                    assert msg in e.args[0], e
+            msg = 'Invalid character in csv file at row 2:'
+            try:
+                next(self.importer._get_csv_reader())
+            except BulkImportException as e:
+                assert msg in e.args[0], e
