@@ -357,7 +357,7 @@ class BulkTaskLocalCSVImport(BulkTaskCSVImportBase):
 
     def _find_non_ascii_row(self, file_name):
             """ Returns the first row number in the file containing a non-ASCII (utf-8) character."""
-            with open(file_name, 'rb') as src:
+            with io.open(file_name, 'rb') as src:
                 line_number = 1
                 for line in src:
                     try:
@@ -387,7 +387,7 @@ class BulkTaskLocalCSVImport(BulkTaskCSVImportBase):
         try:
             csv_file_data = self._get_csv_file_data(csv_file)
         except UnicodeDecodeError as ex:
-            line_number = self._find_non_ascii_row(csv_filename)
+            line_number = self._find_non_ascii_row(datafile.name)
             msg = 'Invalid character in csv file at row {0}: {1}'.format(line_number, str(ex))
             raise BulkImportException(msg)
 
