@@ -170,12 +170,13 @@ def add_task_signature(tasks):
 
 @jsonpify
 @blueprint.route('/project/<project_id>/newtask')
+@blueprint.route('/project/<project_id>/newtask/<int:task_id>')
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
-def new_task(project_id):
+def new_task(project_id, task_id=None):
     """Return a new task for a project."""
     # Check if the request has an arg:
     try:
-        tasks, timeout, cookie_handler = _retrieve_new_task(project_id)
+        tasks, timeout, cookie_handler = _retrieve_new_task(project_id, task_id)
 
         if type(tasks) is Response:
             return tasks
@@ -210,8 +211,7 @@ def new_task(project_id):
         return error.format_exception(e, target='project', action='GET')
 
 
-def _retrieve_new_task(project_id):
-
+def _retrieve_new_task(project_id, task_id=None):
     project = project_repo.get(project_id)
     if project is None or not(project.published or current_user.admin
         or current_user.id in project.owners_ids):
@@ -298,7 +298,8 @@ def _retrieve_new_task(project_id):
                           orderby=orderby,
                           desc=desc,
                           rand_within_priority=sched_rand_within_priority,
-                          gold_only=quiz_mode_enabled)
+                          gold_only=quiz_mode_enabled,
+                          task_id=task_id)
 
     handler = partial(pwd_manager.update_response, project=project,
                       user=user_id_or_ip)
