@@ -25,6 +25,7 @@ from pybossa.model.project import Project
 from pybossa.repositories import ProjectRepository
 from pybossa.repositories import ResultRepository
 from pybossa.repositories import TaskRepository
+from pybossa.sched import Schedulers
 from test import db, with_context
 from test.factories import (ProjectFactory, TaskFactory, TaskRunFactory,
                             AnonymousTaskRunFactory, UserFactory,
@@ -1289,7 +1290,7 @@ class TestProjectAPI(TestAPI):
     def test_newtask(self):
         """Test API project new_task method and authentication"""
         project = ProjectFactory.create()
-        TaskFactory.create_batch(2, project=project)
+        tasks = TaskFactory.create_batch(2, project=project)
         user = UserFactory.create()
 
         # anonymous
@@ -1324,6 +1325,16 @@ class TestProjectAPI(TestAPI):
         url = '/api/project/%s/newtask?offset=1000&api_key=%s' % (project.id, user.api_key)
         res = self.app.get(url)
         assert res.data == b'{}', res.data
+
+        # Test new task with a task ID as a parameter to simulate cherry pick
+        project.info['sched'] = Schedulers.task_queue
+        project_repo.save(project)
+        url = '/api/project/%s/newtask/%s?api_key=%s' % (project.id, tasks[0].id, user.api_key)
+        res = self.app.get(url)
+        assert res, res
+        task = json.loads(res.data)
+        assert task['id'] == tasks[0].id
+
 
     @with_context
     @patch('pybossa.repositories.project_repository.uploader')

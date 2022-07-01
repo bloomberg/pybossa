@@ -58,7 +58,7 @@ TIMEOUT = ContributionsGuard.STAMP_TTL
 def new_task(project_id, sched, user_id=None, user_ip=None,
              external_uid=None, offset=0, limit=1, orderby='priority_0',
              desc=True, rand_within_priority=False,
-             gold_only=False):
+             gold_only=False, task_id=None):
     """Get a new task by calling the appropriate scheduler function."""
     sched_map = {
         'default': get_locked_task,
@@ -93,7 +93,8 @@ def new_task(project_id, sched, user_id=None, user_ip=None,
                      desc=desc,
                      rand_within_priority=rand_within_priority,
                      filter_user_prefs=(sched in [Schedulers.user_pref, Schedulers.task_queue]),
-                     task_type=task_type)
+                     task_type=task_type,
+                     task_id=task_id if sched in [Schedulers.task_queue] else None)
 
 
 def is_locking_scheduler(sched):
@@ -260,7 +261,13 @@ def locked_scheduler(query_factory):
                                  orderby='priority_0', desc=True,
                                  rand_within_priority=False, task_type='gold_last',
                                  filter_user_prefs=False,
-                                 task_category_filters=""):
+                                 task_category_filters="",
+                                 task_id=None):
+        if task_id:
+            task = session.query(Task).get(task_id)
+            if task:
+                return [task]
+
         if offset > 2:
             raise BadRequest('')
         if offset > 0:
@@ -356,7 +363,6 @@ def locked_scheduler(query_factory):
         return []
 
     return template_get_locked_task
-
 
 
 def reserve_task_sql_filters(project_id, reserve_task_keys, exclude):
@@ -552,12 +558,6 @@ def get_user_pref_task(project_id, user_id=None, limit=1, rand_within_priority=F
                            filter_user_prefs=True, task_category_filters=task_category_filters)
 
 
-TASK_USERS_KEY_PREFIX = 'pybossa:project:task_requested:timestamps:{0}'
-USER_TASKS_KEY_PREFIX = 'pybossa:user:task_acquired:timestamps:{0}'
-TASK_ID_PROJECT_ID_KEY_PREFIX = 'pybossa:task_id:project_id:{0}'
-TIMEOUT = ContributionsGuard.STAMP_TTL
-
-
 def fetch_lock_for_user(project_id, task_id, user_id):
     scheduler, timeout = get_project_scheduler_and_timeout(project_id)
 
@@ -706,9 +706,9 @@ def _lock_task_for_user(task_id, project_id, user_id, timeout, calibration=False
 def release_user_locks_for_project(user_id, project_id):
     user_tasks = get_user_tasks(user_id, TIMEOUT)
     user_task_ids = list(user_tasks.keys())
-    results = get_task_ids_project_id(user_task_ids)
+    project_ids = get_task_ids_project_id(user_task_ids)
     task_ids = []
-    for task_id, task_project_id in zip(user_task_ids, results):
+    for task_id, task_project_id in zip(user_task_ids, project_ids):
         if not task_project_id:
             task_project_id = task_repo.get_task(task_id).project_id
         if int(task_project_id) == project_id:
@@ -765,10 +765,10 @@ def get_task_id_and_duration_for_project_user(project_id, user_id):
     """Returns the max seconds remaining locked task for a user and project."""
     user_tasks = get_user_tasks(user_id, TIMEOUT)
     user_task_ids = list(user_tasks.keys())
-    results = get_task_ids_project_id(user_task_ids)
+    project_ids = get_task_ids_project_id(user_task_ids)
     max_seconds_task_id = -1
     max_seconds_remaining = float('-inf')
-    for task_id, task_project_id in zip(user_task_ids, results):
+    for task_id, task_project_id in zip(user_task_ids, project_ids):
         if not task_project_id:
             task_project_id = task_repo.get_task(task_id).project_id
             save_task_id_project_id(task_id, task_project_id, 2 * TIMEOUT)
