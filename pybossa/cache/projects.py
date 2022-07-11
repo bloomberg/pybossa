@@ -93,8 +93,9 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         tasks = []
         sql_order_by = sorting[order_by]
 
+
         # if there are locked tasks in project, need to merge sort locked tasks and unlocked tasks
-        # otherwise just sort by pcomplete
+        # with locked tasks not present, caller to take care of empty list of tasks
         if locked_tasks_in_project:
             locked_tasks = [format_task(row, locked_tasks_in_project.get(row.id, []))
                                 for row in session.execute(text(sql+sql_lock_filter), params)]
