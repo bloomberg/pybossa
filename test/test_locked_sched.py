@@ -15,6 +15,9 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
+import threading
+
+from nose.tools import assert_equal
 
 from test.helper import sched
 from pybossa.core import project_repo
@@ -22,7 +25,7 @@ from test.factories import TaskFactory, ProjectFactory, UserFactory
 from pybossa.sched import (
     Schedulers,
     get_task_users_key,
-    acquire_lock,
+    acquire_locks,
     has_lock,
     get_task_id_and_duration_for_project_user,
     get_task_id_project_id_key,
@@ -243,13 +246,40 @@ class TestLockedSched(sched.Helper):
         assert get_task_users_key(task2.id) in key_args
 
     @with_context
-    def test_acquire_lock_no_pipeline(self):
+    def test_acquire_locks_no_pipeline(self):
         task_id = 1
         user_id = 1
         limit = 1
         timeout = 100
-        acquire_lock(task_id, user_id, limit, timeout)
+        acquire_locks(task_id, user_id, limit, timeout)
         assert has_lock(task_id, user_id, limit)
+
+    @with_context
+    def test_acquire_locks_concurrently(self):
+        """Test acquire locks using 10 concurrent users to grab limit number(loop from 1 to 10) of resources"""
+        con_current_user = 1
+        task_id = 1
+        user_ids = list(range(con_current_user))
+        limits = list(range(1, con_current_user + 1))
+        timeout = 100
+
+        for limit in limits:
+            results = [False] * con_current_user
+
+            def call_acquire_locks(u_id):
+                result = acquire_locks(task_id, u_id, limit, timeout)
+                results[u_id] = result
+
+            threads = []
+            for user_id in user_ids:
+                thread = threading.Thread(target=call_acquire_locks,
+                                          args=(user_id,))
+                threads.append(thread)
+                thread.start()
+
+            for thread in threads:
+                thread.join()
+            assert_equal(sum(results), limit)
 
     @with_context
     def test_get_task_id_and_duration_for_project_user_missing(self):
@@ -259,7 +289,7 @@ class TestLockedSched(sched.Helper):
         task = TaskFactory.create_batch(1, project=project, n_answers=1)[0]
         limit = 1
         timeout = 100
-        acquire_lock(task.id, user.id, limit, timeout)
+        acquire_locks(task.id, user.id, limit, timeout)
         task_id, _ = get_task_id_and_duration_for_project_user(project.id, user.id)
 
         # Redis client returns bytes string in Python3
@@ -507,7 +537,7 @@ class TestLockedSched(sched.Helper):
         res = self.app.get('api/project/{}/newtask?api_key={}'
                            .format(project.id, owner.api_key))
         # fake expired user lock
-        acquire_lock(task1.id, 1000, 2, -10)
+        acquire_locks(task1.id, 1000, 2, -10)
 
         res = self.app.get('api/project/{}/newtask?api_key={}'
                            .format(project.id, owner.api_key))

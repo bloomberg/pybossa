@@ -84,7 +84,7 @@ LDAP_PYBOSSA_FIELDS = {'fullname': 'givenName',
 WEEKLY_ADMIN_REPORTS_EMAIL = ['admin@admin.com']
 
 FLASK_PROFILER = {
-    "enabled": True,
+    "enabled": False, # disable so that sqlite works in multithreading
     "storage": {
         "engine": "sqlite"
     },
