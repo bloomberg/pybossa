@@ -577,7 +577,6 @@ def has_lock(task_id, user_id, timeout):
 
 
 def acquire_locks(task_id, user_id, limit, timeout):
-    import pdb; pdb.set_trace()
     lock_manager = LockManager(sentinel.master, timeout)
     task_users_key = get_task_users_key(task_id)
     user_tasks_key = get_user_tasks_key(user_id)
