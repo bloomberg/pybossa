@@ -59,7 +59,7 @@ class BulkTasksAPI(TaskAPI):
 
     @jsonpify
     @crossdomain(origin="*", headers=cors_headers)
-    @ratelimit(limit=ratelimits.get("LIMIT"), per=ratelimits.get("PER"))
+    @ratelimit(limit=ratelimits["BULK_RATE_LIMIT"], per=ratelimits.get("PER"))
     def put(self, oid):
         """Update task attributes in bulk. Need atleast subadmin access"""
         if current_user.is_anonymous or not(current_user.admin or current_user.subadmin):
