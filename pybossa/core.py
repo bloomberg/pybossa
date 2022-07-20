@@ -733,6 +733,7 @@ def setup_ratelimits(app):
     global ratelimits
     ratelimits['LIMIT'] = app.config['LIMIT']
     ratelimits['PER'] = app.config['PER']
+    ratelimits['BULK_RATE_LIMIT'] = app.config.get('BULK_RATE_LIMIT') or app.config['LIMIT']
 
 
 def setup_cache_timeouts(app):
