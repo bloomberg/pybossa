@@ -51,7 +51,7 @@ from datetime import datetime
 
 class Repository(object):
 
-    def __init__(self, db, language='english', rdancy_upd_exp=30):
+    def __init__(self, db, language='english', rdancy_upd_exp=60):
         self.db = db
         self.language = language
         self.rdancy_upd_exp = rdancy_upd_exp

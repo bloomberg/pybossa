@@ -1653,7 +1653,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             if app_settings.upref_mdata else {}
         language_options = valid_user_preferences.get('languages')
         location_options = valid_user_preferences.get('locations')
-        rdancy_upd_exp = current_app.config.get('REDUNDANCY_UPDATE_EXPIRATION', 30)
+        rdancy_upd_exp = current_app.config.get('TASK_EXPIRATION', 60)
 
         data = dict(template='/projects/tasks_browse.html',
                     users=[],
@@ -1893,7 +1893,7 @@ def bulk_redundancy_update(short_name):
             tasks_updated = _update_task_redundancy(project.id, task_ids, n_answers)
             if not tasks_updated:
                 flash('Redundancy not updated for tasks containing files that are either completed or older than '
-                      '{} days.'.format(current_app.config.get('REDUNDANCY_UPDATE_EXPIRATION', 30)))
+                      '{} days.'.format(current_app.config.get('TASK_EXPIRATION', 60)))
             new_value = json.dumps({
                 'task_ids': task_ids,
                 'n_answers': n_answers
@@ -1925,7 +1925,7 @@ def _update_task_redundancy(project_id, task_ids, n_answers):
     and task was already exported
     """
     tasks_updated = False
-    rdancy_upd_exp = current_app.config.get('REDUNDANCY_UPDATE_EXPIRATION', 30)
+    rdancy_upd_exp = current_app.config.get('TASK_EXPIRATION', 60)
     for task_id in task_ids:
         if task_id:
             t = task_repo.get_task_by(project_id=project_id,
