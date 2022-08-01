@@ -1241,3 +1241,23 @@ def process_tp_components(tp_code, user_response):
             else:
                 tp_component['initial-value'] = response_value
     return soup.prettify()
+
+
+def process_table_component(tp_code, user_response):
+    """grab the value of 'name' and use it as a key to retrieve the response
+    from user_response(a dict). The response data is then used to set the
+    'data' or ':data' attribute"""
+    table_component_tag = "table-element"
+    soup = BeautifulSoup(tp_code, 'html.parser')
+    table_elements = soup.find_all(table_component_tag)
+    for table_element in table_elements:
+        response_key = table_element.get('name')
+        response_value = user_response.get(response_key, [])
+        table_element[':data'] = json.dumps(response_value)
+
+        # Remove initial-value attribute so that table can display the data
+        tag_list = table_element.find_all(
+            lambda tag: "initial-value" in tag.attrs)
+        for t in tag_list:
+            del t["initial-value"]
+    return soup.prettify()
