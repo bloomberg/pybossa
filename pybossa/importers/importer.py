@@ -153,7 +153,6 @@ class Importer(object):
         file_name = 'task_private_data.json'
         urls = upload_files_priv(task, project_id, private_fields, file_name)
         use_file_url = (task.get('state') == 'enrich')
-        task['expiration'] = get_task_expiration(task.get('expiration'))
         task['info']['private_json__upload_url'] = urls if use_file_url else urls['externalUrl']
 
     def _validate_headers(self, importer, project, **form_data):
@@ -209,6 +208,7 @@ class Importer(object):
         try:
             for task_data in tasks:
                 self.upload_private_data(task_data, project.id)
+                task_data['expiration'] = get_task_expiration(task_data.get('expiration'))
 
                 task = Task(project_id=project.id, n_answers=n_answers)
                 [setattr(task, k, v) for k, v in task_data.items()]

@@ -47,7 +47,7 @@ def get_task_expiration(current_expiration):
     the smallest between the current expiration and the data expiration.
     current_expiration can be a iso datetime string or a datetime object
     """
-    validity = current_app.config.get('REQUEST_FILE_VALIDITY_IN_DAYS', 60)
+    validity = current_app.config.get('TASK_EXPIRATION', 60)
     return _get_task_expiration(current_expiration, validity)
 
 

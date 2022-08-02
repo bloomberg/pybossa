@@ -17,7 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 from test.helper import sched
-from pybossa.core import project_repo
+from pybossa.core import project_repo, task_repo
 from test.factories import TaskFactory, ProjectFactory, UserFactory
 from pybossa.sched import (
     Schedulers,
@@ -530,3 +530,34 @@ class TestLockedSched(sched.Helper):
                            .format(project.id, owner.api_key))
 
         assert res.status_code == 400, res.data
+
+    @with_context
+    def test_tasks_with_different_expiration(self):
+        """ Test different task expiration values for locked scheduler """
+        owner = UserFactory.create(id=500)
+        user = UserFactory.create(id=501)
+
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.locked
+        project_repo.save(project)
+
+        # task1 with expiration set. task2 with null expiration
+        # considering task created date, both tasks expired.
+        # however, due to null task expiration task2 would be served.
+        task1 = TaskFactory.create(project=project, info='task 1', n_answers=1, created="2022-01-22T19:25:45.762592", expiration="2022-02-22T19:25:45.762592")
+        task2 = TaskFactory.create(project=project, info='task 2', n_answers=1, created="2022-01-22T19:25:45.762592", expiration=None)
+
+        self.set_proj_passwd_cookie(project, user)
+        res = self.app.get('api/project/{}/newtask?api_key={}'
+                        .format(project.id, user.api_key))
+        task_served = json.loads(res.data)
+        assert task_served["id"] == task2.id, "expired task as per created date but with null expiration should be served."
+
+        task_repo.delete_task_by_id(project.id, task2.id)
+        task3 = TaskFactory.create(project=project, info='task 3', n_answers=1, created="2022-01-22T19:25:45.762592", expiration="2022-02-22T19:25:45.762592")
+
+        # no task with null expiration present. all tasks expired. no task will be served
+        res = self.app.get('api/project/{}/newtask?api_key={}'
+                        .format(project.id, user.api_key))
+        task_served = json.loads(res.data)
+        assert not task_served, "all expired tasks have expiration set. no task should be served."
