@@ -999,6 +999,87 @@ class TestPybossaUtil(Test):
         assert """<checkbox-input :initial-value="false" id="_mg59znxa7" pyb-answer="isRelevant">""" in result
         assert """<multi-select-input :choices='["Math","English","Social Study","Python"]' :initial-value='["Social Study","English","Math"]' :validations='["required"]' pyb-answer="subjects">""" in result
 
+    def test_process_table_component(self):
+        tp_code = """
+            <h2>6) table element</h2>
+            <table-element
+          :key='task.id'
+          name='all_info'
+          :data='[{"name":"","position":"","phoneNumber":"","emailAddress":"","physicalLocation":"","linkedIn":"","zoomInfo":"","moreInfo":""}]'
+          :columns='["name","position","phoneNumber","emailAddress","physicalLocation","linkedIn","zoomInfo","moreInfo"]'
+          :options='{
+            "headings": {
+                "name": "Name",
+                "position": "Position",
+                "phoneNumber": "Phone Number",
+                "emailAddress": "Email Address",
+                "physicalLocation": "Physical Location",
+                "linkedIn": "LinkedIn Account",
+                "zoomInfo": "Zoom Info",
+                "moreInfo": "Additional Contact Info"
+            }
+        }'
+          column-id='__col_id'
+          :row-object='{
+            "name": "",
+            "position": "",
+            "phoneNumber": "",
+            "emailAddress": "",
+            "physicalLocation": "",
+            "linkedIn": "",
+            "zoomInfo": "",
+            "moreInfo": ""
+        }'
+          :enable-add-rows='true'
+          :add-button-after-table='true'
+          :add-button-before-table='false'
+          >
+            <div slot="name" slot-scope="props">
+                <text-input :row="props.row" :initial-value="props.row.name" :validations='["required"]' pyb-table-answer="name"></text-input>
+            </div>
+        
+            <div slot="position" slot-scope="props">
+                <text-input :row="props.row" :initial-value="props.row.position" :validations='["required"]' pyb-table-answer="position"></text-input>
+            </div>
+        
+            <div slot="phoneNumber" slot-scope="props">
+                <text-input :row="props.row" :initial-value="props.row.phoneNumber" :validations='["required"]' pyb-table-answer="phoneNumber"></text-input>
+            </div>
+        
+            <div slot="emailAddress" slot-scope="props">
+                <text-input :row="props.row" :initial-value="props.row.emailAddress" :validations='["required"]' pyb-table-answer="emailAddress"></text-input>
+            </div>
+        
+            <div slot="physicalLocation" slot-scope="props">
+                <text-input :row="props.row" :initial-value="props.row.physicalLocation" :validations='["required"]' pyb-table-answer="physicalLocation"></text-input>
+            </div>
+        
+            <div slot="linkedIn" slot-scope="props">
+                <text-input :row="props.row" :initial-value="props.row.linkedIn" :validations='["required"]' pyb-table-answer="linkedIn"></text-input>
+            </div>
+        
+            <div slot="zoomInfo" slot-scope="props">
+                <text-input :row="props.row" :initial-value="props.row.zoomInfo" :validations='["required"]' pyb-table-answer="zoomInfo"></text-input>
+            </div>
+        
+            <div slot="moreInfo" slot-scope="props">
+                <!--
+                    Please enter you custom component in this area.
+                    Ensure to add these props :row="props.row" :initial-value="props.row.moreInfo" pyb-table-answer="moreInfo"
+                 -->
+                <input-text-area cols="50" rows="4" :row="props.row" :initial-value="props.row.moreInfo" pyb-table-answer="moreInfo"></input-text-area>
+            </div>
+        
+        </table-element>
+        """
+        user_response = {"all_info":
+                         [{"name": "Xi", "linkedIn": "2343", "position": "software engieer", "zoomInfo": "aaa", "phoneNumber": "1234", "emailAddress": "xchen375@bb.net", "physicalLocation": "aa"},
+                          {"name": "Chen", "linkedIn": "2353", "moreInfo": "", "position": "CEO", "zoomInfo": "bbb", "phoneNumber": "546", "emailAddress": "aaaa@gg.com", "physicalLocation": "bb"}]
+                        }
+        result = util.process_table_component(tp_code, user_response)
+        assert ":data='" + json.dumps(user_response.get("all_info")) in result
+        assert " initial-value=" not in result
+
 
 class TestIsReservedName(object):
     from test import flask_app as app
