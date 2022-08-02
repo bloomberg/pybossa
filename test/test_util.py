@@ -1059,7 +1059,7 @@ class TestPybossaUtil(Test):
             </div>
         
             <div slot="zoomInfo" slot-scope="props">
-                <text-input :row="props.row" :initial-value="props.row.zoomInfo" :validations='["required"]' pyb-table-answer="zoomInfo"></text-input>
+                <text-input :row="props.row" :initial-value="props.row.zoomInfo" :validations='["required"]' pyb-table-answer="zoomInfo"></text-input initial-value="">
             </div>
         
             <div slot="moreInfo" slot-scope="props">
