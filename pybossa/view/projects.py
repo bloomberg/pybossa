@@ -3185,6 +3185,8 @@ def coowners(short_name):
             old_list = project.owners_ids or []
             new_list = [int(x) for x in json.loads(request.data).get('coowners') or []]
             overlap_list = [value for value in old_list if value in new_list]
+            auditlogger.log_event(project, current_user, 'update', 'project.coowners',
+                old_list, new_list)
             # delete ids that don't exist anymore
             delete = [value for value in old_list if value not in overlap_list]
             for _id in delete:
