@@ -1080,6 +1080,25 @@ class TestPybossaUtil(Test):
         assert ":data='" + json.dumps(user_response.get("all_info")) in result
         assert " initial-value=" not in result
 
+        user_response = {"all_info": {
+            "0":
+                {"name": "Xi", "linkedIn": "2343",
+                 "position": "software engieer",
+                 "zoomInfo": "aaa", "phoneNumber": "1234",
+                 "emailAddress": "xchen375@bb.net",
+                 "physicalLocation": "aa"}
+        },
+            "1":
+                {"name": "Chen", "linkedIn": "2353",
+                 "moreInfo": "", "position": "CEO",
+                 "zoomInfo": "bbb", "phoneNumber": "546",
+                 "emailAddress": "aaaa@gg.com",
+                 "physicalLocation": "bb"}
+        }
+        result = util.process_table_component(tp_code, user_response)
+        assert ":data='" + json.dumps(list(user_response.get("all_info").values())) in result
+        assert " initial-value=" not in result
+
 
 class TestIsReservedName(object):
     from test import flask_app as app
