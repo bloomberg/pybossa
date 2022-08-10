@@ -3142,7 +3142,8 @@ def coowners(short_name):
     for owner, p_owner in zip(owners, pub_owners):
         if owner.id == project.owner_id:
             p_owner['is_creator'] = True
-    contacts = project.info.get('contacts', [user for user in owners if user.enabled and (user.id == project.owner_id or user.admin or user.subadmin)])
+    contact_users = user_repo.get_users(project.info.get('contacts')) if project.info.get('contacts') else owners
+    contacts = [user for user in contact_users if user.enabled and (user.id == project.owner_id or user.admin or user.subadmin)]
     contacts_dict = [{"id": user.id, "fullname": user.fullname} for user in contacts]
 
     ensure_authorized_to('read', project)
@@ -3198,6 +3199,13 @@ def coowners(short_name):
             add = [value for value in new_list if value not in overlap_list]
             for _id in add:
                 project.owners_ids.append(_id)
+
+            # save contacts
+            new_list = [int(x) for x in json.loads(request.data).get('contacts', [])]
+            project.info['contacts'] = new_list
+            auditlogger.log_event(project, current_user, 'update', 'project.contacts',
+                old_list, new_list)
+
             project_repo.save(project)
             flash(gettext('Configuration updated successfully'), 'success')
 
@@ -3966,7 +3974,7 @@ def contact(short_name):
 
     # Get the email addrs for the owner, and all co-owners of the project who have sub-admin/admin rights and are not disabled.
     owners = user_repo.get_users(project.owners_ids)
-    recipients = [owner.email_addr for owner in owners if owner.enabled and (owner.id == project.owner_id or owner.admin or owner.subadmin)]
+    recipients = [owner.email_addr for owner in project.info.get('contacts', owners) if owner.enabled and (owner.id == project.owner_id or owner.admin or owner.subadmin)]
 
     # Send email.
     email = dict(recipients=recipients,
