@@ -3974,7 +3974,9 @@ def contact(short_name):
 
     # Get the email addrs for the owner, and all co-owners of the project who have sub-admin/admin rights and are not disabled.
     owners = user_repo.get_users(project.owners_ids)
-    recipients = [owner.email_addr for owner in project.info.get('contacts', owners) if owner.enabled and (owner.id == project.owner_id or owner.admin or owner.subadmin)]
+    # Use the customized list of contacts for the project, otherwise default to owners.
+    contact_users = user_repo.get_users(project.info.get('contacts')) if project.info.get('contacts') else owners
+    recipients = [contact.email_addr for contact in contact_users if contact.enabled and (contact.id == project.owner_id or contact.admin or contact.subadmin)]
 
     # Send email.
     email = dict(recipients=recipients,
