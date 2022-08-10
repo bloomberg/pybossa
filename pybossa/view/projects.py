@@ -3142,6 +3142,8 @@ def coowners(short_name):
     for owner, p_owner in zip(owners, pub_owners):
         if owner.id == project.owner_id:
             p_owner['is_creator'] = True
+    contacts = project.info.get('contacts', [user for user in owners if user.enabled and (user.id == project.owner_id or user.admin or user.subadmin)])
+    contacts_dict = [{"id": user.id, "fullname": user.fullname} for user in contacts]
 
     ensure_authorized_to('read', project)
     ensure_authorized_to('update', project)
@@ -3150,6 +3152,7 @@ def coowners(short_name):
         project=sanitize_project,
         coowners=pub_owners,
         coowners_dict=coowners,
+        contacts_dict=contacts_dict,
         owner=owner_sanitized,
         title=gettext("Manage Co-owners"),
         form=form,
