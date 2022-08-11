@@ -3142,9 +3142,9 @@ def coowners(short_name):
     for owner, p_owner in zip(owners, pub_owners):
         if owner.id == project.owner_id:
             p_owner['is_creator'] = True
-    contact_users = user_repo.get_users(project.info.get('contacts')) if project.info.get('contacts') else owners
-    contacts = [user for user in contact_users if user.enabled and (user.id == project.owner_id or user.admin or user.subadmin)]
-    contacts_dict = [{"id": user.id, "fullname": user.fullname} for user in contacts]
+    contact_owners = [user for user in owners if user.enabled and (user.id == project.owner_id or user.admin or user.subadmin)]
+    contact_users = user_repo.get_users(project.info.get('contacts')) if project.info.get('contacts') else contact_owners
+    contacts_dict = [{"id": user.id, "fullname": user.fullname} for user in contact_users]
 
     ensure_authorized_to('read', project)
     ensure_authorized_to('update', project)
@@ -3166,14 +3166,9 @@ def coowners(short_name):
         if form.user.data:
             # search users
             query = form.user.data
-            params = json.loads(request.data)
 
             filters = {'enabled': True}
             users = user_repo.search_by_name(query, **filters)
-            if params.get('contact'):
-                # Filter contacts only to users that are enabled and assigned to this project or are sub-admin/admin.
-                users = [user for user in users if user.enabled and (user.id == project.owner_id or user.admin or user.subadmin)]
-
             if not users:
                 markup = Markup('<strong>{}</strong> {} <strong>{}</strong>')
                 flash(markup.format(gettext("Ooops!"),
@@ -3980,8 +3975,8 @@ def contact(short_name):
     contact_ids = project.info.get('contacts') or project.owners_ids
     # Load the record for each contact id.
     contact_users = user_repo.get_users(contact_ids)
-    # Get the email address for each contact that is enabled and assigned to this project or is a sub-admin/admin.
-    recipients = [contact.email_addr for contact in contact_users if contact.enabled and (contact.id == project.owner_id or contact.admin or contact.subadmin)]
+    # Get the email address for each contact that was added manually or that is enabled and assigned to this project or is a sub-admin/admin.
+    recipients = [contact.email_addr for contact in contact_users if project.info.get('contacts') or (contact.enabled and (contact.id == project.owner_id or contact.admin or contact.subadmin))]
 
     # Send email.
     email = dict(recipients=recipients,
