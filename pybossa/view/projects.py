@@ -3201,10 +3201,9 @@ def coowners(short_name):
 
             # save contacts
             new_list = [int(x) for x in json.loads(request.data).get('contacts', [])]
-            if new_list:
-                project.info['contacts'] = new_list
-                auditlogger.log_event(project, current_user, 'update', 'project.contacts',
-                    old_list, new_list)
+            auditlogger.log_event(project, current_user, 'update', 'project.contacts',
+                project.info['contacts'], new_list)
+            project.info['contacts'] = new_list
 
             project_repo.save(project)
             flash(gettext('Configuration updated successfully'), 'success')
