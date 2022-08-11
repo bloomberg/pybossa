@@ -3972,7 +3972,7 @@ def contact(short_name):
     )
 
     # Use the customized list of contacts for the project or default to owners.
-    contact_ids = project.info.get('contacts') or project.owners_ids
+    contact_ids = project.info.get('contacts', project.owners_ids)
     # Load the record for each contact id.
     contact_users = user_repo.get_users(contact_ids)
     # Get the email address for each contact that was added manually or that is enabled and assigned to this project or is a sub-admin/admin.
