@@ -132,7 +132,7 @@ class LockManager(object):
         self._redis = cache
         self._duration = duration
 
-    def acquire_lock(self, resource_id, client_id, limit, pipeline=None):
+    def acquire_lock(self, resource_id, client_id, limit):
         """
         Acquire a lock on a resource.
         :param resource_id: resource on which lock is needed
@@ -145,13 +145,31 @@ class LockManager(object):
         self._release_expired_locks(resource_id, timestamp)
         if self._redis.hexists(resource_id, client_id):
             return True
-        num_acquired = self._redis.hlen(resource_id)
-        if num_acquired < limit:
-            cache = pipeline or self._redis
-            cache.hset(resource_id, client_id, expiration)
-            cache.expire(resource_id, timedelta(seconds=self._duration))
+
+        pipeline = self._redis.pipeline()
+        if limit == float('inf'):
+            pipeline.hset(resource_id, client_id, expiration)
+            pipeline.expire(resource_id, timedelta(seconds=self._duration))
+            pipeline.execute()
             return True
-        return False
+
+        # Get a mutex lock for updating redis hash with default TTL 3s
+        lock_name = f"{resource_id}_update_mutex"
+        result = False
+
+        try:
+            with self._redis.lock(lock_name, timeout=3, blocking_timeout=1) as mutex:
+                if not mutex.locked():
+                    return False
+
+                num_acquired = self._redis.hlen(resource_id)
+                if num_acquired < limit:
+                    pipeline.hset(resource_id, client_id, expiration)
+                    pipeline.expire(resource_id, timedelta(seconds=self._duration))
+                    pipeline.execute()
+                    result = True
+        finally:
+            return result
 
     def has_lock(self, resource_id, client_id):
         """
@@ -177,6 +195,7 @@ class LockManager(object):
         the database.
         :param resource_id: resource on which lock is being held
         :param client_id: id of client holding the lock
+        :param pipeline: object that can queue multiple commands for later execution
         """
         cache = pipeline or self._redis
         cache.hset(resource_id, client_id, time() + EXPIRE_LOCK_DELAY)
