@@ -3166,9 +3166,13 @@ def coowners(short_name):
         if form.user.data:
             # search users
             query = form.user.data
+            params = json.loads(request.data)
 
             filters = {'enabled': True}
             users = user_repo.search_by_name(query, **filters)
+            if params.get('contact'):
+                # Filter contacts only to users that are enabled and assigned to this project or are sub-admin/admin.
+                users = [user for user in users if user.enabled and (user.id == project.owner_id or user.admin or user.subadmin)]
 
             if not users:
                 markup = Markup('<strong>{}</strong> {} <strong>{}</strong>')
@@ -3972,10 +3976,11 @@ def contact(short_name):
         tasks_completed_user=request.body.get("tasksCompletedUser", 0)
     )
 
-    # Get the email addrs for the owner, and all co-owners of the project who have sub-admin/admin rights and are not disabled.
-    owners = user_repo.get_users(project.owners_ids)
-    # Use the customized list of contacts for the project, otherwise default to owners.
-    contact_users = user_repo.get_users(project.info.get('contacts')) if project.info.get('contacts') else owners
+    # Use the customized list of contacts for the project or default to owners.
+    contact_ids = project.info.get('contacts') or project.owners_ids
+    # Load the record for each contact id.
+    contact_users = user_repo.get_users(contact_ids)
+    # Get the email address for each contact that is enabled and assigned to this project or is a sub-admin/admin.
     recipients = [contact.email_addr for contact in contact_users if contact.enabled and (contact.id == project.owner_id or contact.admin or contact.subadmin)]
 
     # Send email.
@@ -3984,8 +3989,8 @@ def contact(short_name):
                  body=body)
     mail_queue.enqueue(send_mail, email)
 
-    current_app.logger.info('Contact form email sent to {} at {} for project {} {} {}'.format(
-        current_user.name, recipients, current_user.id, project.name, short_name, project.id))
+    current_app.logger.info('Contact email sent from user id {} ({}) to recipients {} for project id {} ({}, {})'.format(
+        current_user.id, current_user.name, recipients, project.id, project.name, short_name))
 
     response = {
         'success': True
