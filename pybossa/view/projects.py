@@ -3225,8 +3225,11 @@ def add_coowner(short_name, user_name=None):
         if user.id in project.owners_ids:
             flash(gettext('User is already an owner'), 'warning')
         else:
+            old_list = project.owners_ids.copy()
             project.owners_ids.append(user.id)
             project_repo.update(project)
+            auditlogger.log_event(project, current_user, 'update',
+                'project.coowners', old_list, project.owners_ids)
             flash(gettext('User was added to list of owners'), 'success')
         return redirect_content_type(url_for(".coowners", short_name=short_name))
     return abort(404)
@@ -3248,8 +3251,11 @@ def del_coowner(short_name, user_name=None):
         elif user.id not in project.owners_ids:
             flash(gettext('User is not a project owner'), 'error')
         else:
+            old_list = project.owners_ids.copy()
             project.owners_ids.remove(user.id)
             project_repo.update(project)
+            auditlogger.log_event(project, current_user, 'update',
+                'project.coowners', old_list, project.owners_ids)
             flash(gettext('User was deleted from the list of owners'),
                   'success')
         return redirect_content_type(url_for('.coowners', short_name=short_name))

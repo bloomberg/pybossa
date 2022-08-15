@@ -356,7 +356,7 @@ def locked_scheduler(query_factory):
         for task_id, taskcount, n_answers, calibration, _, _, timeout in rows:
             timeout = timeout or TIMEOUT
             remaining = float('inf') if calibration else n_answers - taskcount
-            if acquire_lock(task_id, user_id, remaining, timeout):
+            if acquire_locks(task_id, user_id, remaining, timeout):
                 # reserve tasks
                 acquire_reserve_task_lock(project_id, task_id, user_id, timeout)
                 return _lock_task_for_user(task_id, project_id, user_id, timeout, calibration)
@@ -509,7 +509,6 @@ def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=Fals
            LIMIT :limit;
            '''.format(' '.join(filters), task_category_filters,
                       ','.join(order_by))
-    print(sql)
     return text(sql)
 
 
@@ -577,16 +576,12 @@ def has_lock(task_id, user_id, timeout):
     return lock_manager.has_lock(task_users_key, user_id)
 
 
-def acquire_lock(task_id, user_id, limit, timeout, pipeline=None, execute=True):
-    redis_conn = sentinel.master
-    pipeline = pipeline or redis_conn.pipeline(transaction=True)
-    lock_manager = LockManager(redis_conn, timeout)
+def acquire_locks(task_id, user_id, limit, timeout):
+    lock_manager = LockManager(sentinel.master, timeout)
     task_users_key = get_task_users_key(task_id)
     user_tasks_key = get_user_tasks_key(user_id)
-    if lock_manager.acquire_lock(task_users_key, user_id, limit, pipeline=pipeline):
-        lock_manager.acquire_lock(user_tasks_key, task_id, float('inf'), pipeline=pipeline)
-        if execute:
-            return all(not isinstance(r, Exception) for r in pipeline.execute())
+    if lock_manager.acquire_lock(task_users_key, user_id, limit):
+        lock_manager.acquire_lock(user_tasks_key, task_id, float('inf'))
         return True
     return False
 
@@ -686,7 +681,7 @@ def lock_task_for_user(task_id, project_id, user_id):
     for task_id, taskcount, n_answers, calibration, timeout in rows:
         timeout = timeout or TIMEOUT
         remaining = float('inf') if calibration else n_answers - taskcount
-        if acquire_lock(task_id, user_id, remaining, timeout):
+        if acquire_locks(task_id, user_id, remaining, timeout):
             # reserve tasks
             acquire_reserve_task_lock(project_id, task_id, user_id, timeout)
             return _lock_task_for_user(task_id, project_id, user_id, timeout, calibration)
