@@ -3215,10 +3215,11 @@ def add_coowner(short_name, user_name=None):
         if user.id in project.owners_ids:
             flash(gettext('User is already an owner'), 'warning')
         else:
-            auditlogger.log_event(project, current_user, 'update',
-                'project.coowners', project.owners_ids, project.owners_ids + [user.id])
+            old_list = project.owners_ids.copy()
             project.owners_ids.append(user.id)
             project_repo.update(project)
+            auditlogger.log_event(project, current_user, 'update',
+                'project.coowners', old_list, project.owners_ids)
             flash(gettext('User was added to list of owners'), 'success')
         return redirect_content_type(url_for(".coowners", short_name=short_name))
     return abort(404)
