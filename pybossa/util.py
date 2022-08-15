@@ -1253,6 +1253,12 @@ def process_table_component(tp_code, user_response):
     for table_element in table_elements:
         response_key = table_element.get('name')
         response_value = user_response.get(response_key, [])
+
+        # In case the response_value is dict, we need to convert it to a list
+        # so that the table-element can display the data correctly
+        if type(response_value) is dict:
+            response_value = list(response_value.values())
+
         table_element[':data'] = json.dumps(response_value)
 
         # Remove initial-value attribute so that table can display the data
