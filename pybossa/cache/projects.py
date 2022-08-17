@@ -75,12 +75,10 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
     def format_task(row, lock_users=[]):
         """convert database record to task dictionary and format data."""
-        finish_time = format_date(row.ft)
-        created = format_date(row.created)
         user_pref = row.user_pref or {}
         task = dict(id=row.id, n_task_runs=row.n_task_runs,
                     n_answers=row.n_answers, priority_0=row.priority_0,
-                    finish_time=finish_time, created=created,
+                    finish_time=row.ft, created=row.created,
                     calibration=row.calibration,
                     userPrefLang=", ".join(user_pref.get("languages", [])),
                     userPrefLoc=", ".join(user_pref.get("locations", [])),
@@ -88,6 +86,11 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     available=False)
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
         return task
+
+    def format_task_dates(task):
+        """convert created and finish date utc to est."""
+        task["created"] = format_date(task["created"])
+        task["finish_time"] = format_date(task["finish_time"])
 
     def search_lock_status_sorting_result():
         tasks = []
@@ -214,8 +217,11 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         tasks = select_available_tasks(task_rank_info, locked_tasks_in_project,
                                 user_id, offset+limit, args.get("order_by"),
                                 eligible_tasks=unreserved_task_ids)
-
         tasks = tasks[offset: offset+limit]
+        # format current page task dates utc to est
+        # this is to obtain 10x better response time
+        for task in tasks:
+            format_task_dates(task)
 
     else:
         # construct task browse page for owners/admins
@@ -252,6 +258,11 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
             results = session.execute(text(sql_query), params)
             tasks = [format_task(row, locked_tasks_in_project.get(row.id, [])) for row in results]
 
+        # format first 100 task dates utc to est
+        # this is to obtain 10x better response time
+        num_tasks = min(len(tasks), 100)
+        for i in range(num_tasks):
+            format_task_dates(tasks[i])
         session.execute("RESET enable_indexscan;")
 
     return total_count, tasks
