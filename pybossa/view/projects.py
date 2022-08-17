@@ -3629,7 +3629,7 @@ def assign_users(short_name):
     project.set_project_users(project_users)
     project_repo.save(project)
     auditlogger.log_event(project, current_user, 'update', 'project.assign_users',
-              'N/A', users)
+              'N/A', project_users)
     if not project_users:
         msg = gettext('Users unassigned or no user assigned to project')
         current_app.logger.info('Project id {} users unassigned from project.'.format(project.id))
