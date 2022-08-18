@@ -143,6 +143,13 @@ class TestReserveTaskCategory(sched.Helper):
         assert sql_filters == expected_sql_filter and \
             category_keys == expected_category_keys, "sql_filters, category_keys must be non empty"
 
+        # reserve task disabled for private instance,
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project.id, timeout, owner.id)
+            assert not sql_filters, "sql_filters must be empty for private instance"
+            assert not category_keys, "sql_filters must be empty for private instance"
+
+
     @with_context
     def test_acquire_and_release_reserve_task_lock(self):
         user = UserFactory.create()

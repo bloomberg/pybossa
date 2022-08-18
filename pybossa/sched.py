@@ -442,6 +442,11 @@ def get_reserve_task_category_info(reserve_task_config, project_id, timeout, use
     if not reserve_task_config:
         return sql_filters, category_keys
 
+    if current_app.config.get('PRIVATE_INSTANCE'):
+        current_app.logger.info("Reserve task by category disabled for private instance. project_id %s, reserve_task_config %s",
+            project_id, str(reserve_task_config))
+        return sql_filters, category_keys
+
     category = ":".join(["{}:*".format(field) for field in sorted(reserve_task_config)])
     lock_manager = LockManager(sentinel.master, timeout)
     category_keys = lock_manager.get_task_category_lock(project_id, user_id, category, exclude_user)
