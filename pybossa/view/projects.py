@@ -3129,7 +3129,7 @@ def transfer_ownership(short_name):
         return handle_content_type(response)
 
 
-def is_user_enabled_assigned_project(self, user, project):
+def is_user_enabled_assigned_project(user, project):
     # Return true if the user is enabled and assigned to this project or is a sub-admin/admin.
     return user.enabled and (user.id == project.owner_id or user.admin or user.subadmin)
 
