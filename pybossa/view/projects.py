@@ -1876,7 +1876,6 @@ def bulk_update_assign_worker(short_name):
                 if assign_user:
                     user_pref["assign_user"] = assign_user
                 elif "assign_user" in user_pref:
-                    print('Deleted user_pref["assign_user"]')
                     del user_pref["assign_user"]
 
                 t.user_pref = user_pref
