@@ -3129,6 +3129,10 @@ def transfer_ownership(short_name):
         return handle_content_type(response)
 
 
+def is_user_enabled_assigned_project(self, user, project):
+    # Return true if the user is enabled and assigned to this project or is a sub-admin/admin.
+    return user.enabled and (user.id == project.owner_id or user.admin or user.subadmin)
+
 @blueprint.route('/<short_name>/coowners', methods=['GET', 'POST'])
 @login_required
 def coowners(short_name):
@@ -3142,7 +3146,7 @@ def coowners(short_name):
     for owner, p_owner in zip(owners, pub_owners):
         if owner.id == project.owner_id:
             p_owner['is_creator'] = True
-    contact_owners = [user for user in owners if user.enabled and (user.id == project.owner_id or user.admin or user.subadmin)]
+    contact_owners = [user for user in owners if is_user_enabled_assigned_project(user, project)]
     contact_users = user_repo.get_users(project.info.get('contacts')) if project.info.get('contacts') else contact_owners
     contacts_dict = [{"id": user.id, "fullname": user.fullname} for user in contact_users]
 
@@ -3982,7 +3986,7 @@ def contact(short_name):
     # Load the record for each contact id.
     contact_users = user_repo.get_users(contact_ids)
     # Get the email address for each contact that was added manually or that is enabled and assigned to this project or is a sub-admin/admin.
-    recipients = [contact.email_addr for contact in contact_users if project.info.get('contacts') or (contact.enabled and (contact.id == project.owner_id or contact.admin or contact.subadmin))]
+    recipients = [contact.email_addr for contact in contact_users if project.info.get('contacts') or is_user_enabled_assigned_project(contact, project)]
 
     # Send email.
     email = dict(recipients=recipients,
