@@ -5,7 +5,6 @@ from pybossa.core import user_repo, task_repo
 from test import with_context
 from test.factories import ProjectFactory, TaskFactory, UserFactory
 from test.helper import web
-from unittest.mock import patch
 
 
 class TestAssignTaskWorker(web.Helper):
