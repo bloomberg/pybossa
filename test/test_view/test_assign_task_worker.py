@@ -131,8 +131,9 @@ class TestAssignTaskWorker(web.Helper):
         res_data = json.loads(res.data)
 
         # Verify all users are returned.
-        assert res_data['all_users'][0]['email'] == user1.email_addr
-        assert res_data['all_users'][1]['email'] == user2.email_addr
+        assert res_data['all_users'][0]['email'] in [user1.email_addr, user2.email_addr]
+        assert res_data['all_users'][1]['email'] in [user1.email_addr, user2.email_addr]
+        assert res_data['all_users'][0]['email'] != res_data['all_users'][1]['email']
 
     @with_context
     def test_update_assign_workers_by_task_id(self):
