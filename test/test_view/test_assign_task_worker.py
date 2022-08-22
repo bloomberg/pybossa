@@ -104,8 +104,39 @@ class TestAssignTaskWorker(web.Helper):
 
 
     @with_context
+    def test_get_assign_workers_by_bulk(self):
+        """Test get assign worker by bulk."""
+        admin = UserFactory.create(admin=True)
+        admin.set_password('1234')
+        user_repo.save(admin)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
+        # Create a project with a worker assigned.
+        user1 = UserFactory.create(email_addr='a1@a.com', fullname="test_user1")
+        user2 = UserFactory.create(email_addr='a2@a.com', fullname="test_user2")
+        project = ProjectFactory.create(published=True, info={'project_users': [user1.id, user2.id]})
+
+        task1 = TaskFactory.create(project=project)
+        task_repo.update(task1)
+        task2 = TaskFactory.create(project=project)
+        task_repo.update(task2)
+
+        # Assign user to all tasks by filter.
+        req_data = dict(filters='{"add":[{"fullname":"' + user1.fullname + '","email":"' + user1.email_addr + '"}],"remove":[]}')
+
+        url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
+        res = self.app.post(url, content_type='application/json', data=json.dumps(req_data), follow_redirects=True, headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify all users are returned.
+        assert res_data['all_users'][0]['email'] == user1.email_addr
+        assert res_data['all_users'][1]['email'] == user2.email_addr
+
+    @with_context
     def test_update_assign_workers_by_task_id(self):
-        """Test update assign worker."""
+        """Test update assign worker by task id."""
         admin = UserFactory.create(admin=True)
         admin.set_password('1234')
         user_repo.save(admin)
@@ -135,7 +166,7 @@ class TestAssignTaskWorker(web.Helper):
 
     @with_context
     def test_update_assign_workers_by_filter(self):
-        """Test update assign worker."""
+        """Test update assign worker by filter."""
         admin = UserFactory.create(admin=True)
         admin.set_password('1234')
         user_repo.save(admin)
@@ -165,7 +196,7 @@ class TestAssignTaskWorker(web.Helper):
 
     @with_context
     def test_update_assign_workers_remove(self):
-        """Test update unassign worker."""
+        """Test remove assigned worker."""
         admin = UserFactory.create(admin=True)
         admin.set_password('1234')
         user_repo.save(admin)

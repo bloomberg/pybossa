@@ -1784,7 +1784,6 @@ def bulk_priority_update(short_name):
 @blueprint.route('/<short_name>/tasks/assign-workersupdate', methods=['POST'])
 @login_required
 def bulk_update_assign_worker(short_name):
-
     response = {}
     project, owner, ps = project_by_shortname(short_name)
     admin_or_project_owner(current_user, project)
@@ -1792,7 +1791,6 @@ def bulk_update_assign_worker(short_name):
 
     if data.get("add") is None and data.get("remove") is None:
         # read data and return users
-
         task_id = data.get("taskId")
         bulk_update = False
         assign_user_emails = []
@@ -1813,6 +1811,7 @@ def bulk_update_assign_worker(short_name):
             for task_id in task_ids:
                 t = task_repo.get_task_by(project_id=project.id,
                                         id=int(task_id))
+                t.user_pref = t.user_pref or {}
                 assign_user_emails = assign_user_emails.union(set(t.user_pref.get("assign_user", [])))
         assign_users = []
         for user_email in assign_user_emails:
@@ -1831,7 +1830,6 @@ def bulk_update_assign_worker(short_name):
             all_users = user_repo.get_all()
         all_user_data = []
         for user in all_users:
-
             # Exclude currently assigned users in the candidate list ONLY for single task update
             if user.email_addr in assign_user_emails and not bulk_update:
                 continue
