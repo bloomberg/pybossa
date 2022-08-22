@@ -198,8 +198,6 @@ class TestAssignTaskWorker(web.Helper):
         res = self.app.post(url, content_type='application/json', data=json.dumps(req_data), follow_redirects=True, headers={'X-CSRFToken': csrf})
         res_data = json.loads(res.data)
 
-        import pdb
-        pdb.set_trace()
         assert not res_data['assign_users']
 
         # Verify the assign_user parameter has been deleted from the user_pref.
