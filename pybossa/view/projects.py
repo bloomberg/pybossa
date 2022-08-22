@@ -1844,6 +1844,7 @@ def bulk_update_assign_worker(short_name):
         # update tasks with assign worker values
         assign_workers = data.get('add', [])
         remove_workers = data.get('remove', [])
+        assign_users = []
 
         assign_worker_emails = [w["email"] for w in assign_workers]
         remove_worker_emails = [w["email"] for w in remove_workers]
@@ -1875,6 +1876,7 @@ def bulk_update_assign_worker(short_name):
 
                 if assign_user:
                     user_pref["assign_user"] = assign_user
+                    assign_users.append({'taskId': int(task_id), 'assign_user': assign_user})
                 elif "assign_user" in user_pref:
                     del user_pref["assign_user"]
 
@@ -1882,6 +1884,8 @@ def bulk_update_assign_worker(short_name):
                 flag_modified(t, "user_pref")
 
                 task_repo.update(t)
+        response['assign_users'] = assign_users
+
     return Response(json.dumps(response), 200, mimetype='application/json')
 
 @crossdomain(origin='*', headers=cors_headers)

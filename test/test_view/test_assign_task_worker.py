@@ -5,6 +5,8 @@ from pybossa.core import user_repo, task_repo
 from test import with_context
 from test.factories import ProjectFactory, TaskFactory, UserFactory
 from test.helper import web
+from test.helper.gig_helper import make_subadmin_by
+from unittest.mock import patch
 
 
 class TestAssignTaskWorker(web.Helper):
@@ -103,24 +105,103 @@ class TestAssignTaskWorker(web.Helper):
         assert task1.priority_0 == .5, task1.priority_0
 
 
+    @with_context
+    def test_update_assign_workers_by_task_id(self):
+        """Test update assign worker."""
+        admin = UserFactory.create(admin=True)
+        admin.set_password('1234')
+        user_repo.save(admin)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
+        project = ProjectFactory.create(published=True)
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+
+        task1 = TaskFactory.create(project=project)
+        task_repo.update(task1)
+
+        # Assign user to task by task id.
+        req_data = dict(taskId=str(task1.id), add=[{'email':user.email_addr}])
+
+        url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
+        res = self.app.post(url, content_type='application/json', data=json.dumps(req_data), follow_redirects=True, headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify the user has been assigned to this task.
+        assert res_data['assign_users'][0]['taskId'] == task1.id
+        assert res_data['assign_users'][0]['assign_user'][0] == user.email_addr
+
+        task1_modified = task_repo.get_task(task1.id)
+        assert user.email_addr in task1_modified.user_pref.get('assign_user')
 
     @with_context
-    def test_update_assign_workers(self):
+    def test_update_assign_workers_by_filter(self):
         """Test update assign worker."""
+        admin = UserFactory.create(admin=True)
+        admin.set_password('1234')
+        user_repo.save(admin)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
+        project = ProjectFactory.create(published=True)
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+
+        task1 = TaskFactory.create(project=project)
+        task_repo.update(task1)
+
+        # Assign user to task by filter.
+        req_data = dict(filters='{"task_id": "' + str(task1.id) + '"}', add=[{'email':user.email_addr}])
+
+        url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
+        res = self.app.post(url, content_type='application/json', data=json.dumps(req_data), follow_redirects=True, headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify the user has been assigned to this task.
+        assert res_data['assign_users'][0]['taskId'] == task1.id
+        assert res_data['assign_users'][0]['assign_user'][0] == user.email_addr
+
+        task1_modified = task_repo.get_task(task1.id)
+        assert user.email_addr in task1_modified.user_pref.get('assign_user')
+
+    @with_context
+    def test_update_assign_workers_remove(self):
+        """Test update unassign worker."""
+        admin = UserFactory.create(admin=True)
+        admin.set_password('1234')
+        user_repo.save(admin)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
         project = ProjectFactory.create(published=True)
         user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
 
         task1_user_pref = dict(assign_user=[user.email_addr])
 
+        # Create a task with an assigned user.
         task1 = TaskFactory.create(project=project,  user_pref=task1_user_pref)
         task_repo.update(task1)
-        req_data = dict(taskIds=str(task1.id), add=user)
 
+        # Verify the user has been assigned to the task.
+        assert user.email_addr in task1.user_pref.get('assign_user')
+
+        # Load the task and verify the user has been assigned to the task.
+        task1_modified1 = task_repo.get_task(task1.id)
+        assert user.email_addr in task1_modified1.user_pref.get('assign_user')
+
+        # Remove the user.
+        req_data = dict(taskId=str(task1.id), remove=[{'email':user.email_addr}])
 
         url = '/project/%s/tasks/assign-workersupdate?api_key=%s' % (project.short_name, project.owner.api_key)
-        req_data = dict(taskId=None)
-        res = self.app.post(url, content_type='application/json',
-                            data=json.dumps(req_data))
+        res = self.app.post(url, content_type='application/json', data=json.dumps(req_data), follow_redirects=True, headers={'X-CSRFToken': csrf})
         res_data = json.loads(res.data)
-        assert res_data['assign_users'][0]['fullname'] == user.fullname
-        assert res_data['assign_users'][0]['email'] == user.email_addr
+
+        import pdb
+        pdb.set_trace()
+        assert not res_data['assign_users']
+
+        # Verify the assign_user parameter has been deleted from the user_pref.
+        task1_modified2 = task_repo.get_task(task1.id)
+        assert not task1_modified2.user_pref.get('assign_user')
