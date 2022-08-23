@@ -130,10 +130,14 @@ class TestAssignTaskWorker(web.Helper):
         res = self.app.post(url, content_type='application/json', data=json.dumps(req_data), follow_redirects=True, headers={'X-CSRFToken': csrf})
         res_data = json.loads(res.data)
 
-        # Verify all users are returned.
-        assert res_data['all_users'][0]['email'] in [user1.email_addr, user2.email_addr]
-        assert res_data['all_users'][1]['email'] in [user1.email_addr, user2.email_addr]
-        assert res_data['all_users'][0]['email'] != res_data['all_users'][1]['email']
+        # Verify users are returned.
+        assert len(res_data['all_users']) > 1
+        assert res_data['all_users'][0]['email']
+
+        # Verify emails are returned.
+        emails = [user['email'] for user in res_data['all_users']]
+        assert user1.email_addr in emails
+        assert user2.email_addr in emails
 
     @with_context
     def test_update_assign_workers_by_task_id(self):
