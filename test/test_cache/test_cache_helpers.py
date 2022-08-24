@@ -485,3 +485,20 @@ class TestHelpersCache(Test):
         assert 'bi' in order_by_dict
         assert 'companyBbid' in order_by_dict
         assert 'somethingElse' in order_by_dict
+
+    @with_context
+    def test_order_by_args_dict_1(self):
+        """Test parse_tasks_browse_order_by_args as dict 1 field."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args({'task_id': 'asc'}, ['bi', 'companyBbid', 'somethingElse'])
+
+        assert order_by_result == "id asc"
+        assert 'task_id' in order_by_dict
+
+    @with_context
+    def test_order_by_args_dict_2(self):
+        """Test parse_tasks_browse_order_by_args as dict 2 fields."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args({'task_id': 'asc', 'priority': 'desc'}, ['bi', 'companyBbid', 'somethingElse'])
+
+        assert order_by_result == "id asc, priority_0 desc"
+        assert 'task_id' in order_by_dict
+        assert 'priority' in order_by_dict
