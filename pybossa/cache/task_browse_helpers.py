@@ -297,6 +297,8 @@ def parse_tasks_browse_order_by_args(order_by, display_info_columns):
     order_by_dict = dict()
 
     if order_by:
+        # Convert dict {'task_id': 'asc'} to string "task_id asc".
+        order_by = re.sub("[{}:'\"]", '', str(order_by)) if type(order_by).__name__ == 'dict' else order_by
         order_by_result = order_by.strip()
 
         # allowing custom user added task.info columns to be sortable
