@@ -3134,6 +3134,10 @@ def transfer_ownership(short_name):
         return handle_content_type(response)
 
 
+def is_user_enabled_assigned_project(user, project):
+    # Return true if the user is enabled and assigned to this project or is a sub-admin/admin.
+    return user.enabled and (user.id == project.owner_id or user.admin or user.subadmin)
+
 @blueprint.route('/<short_name>/coowners', methods=['GET', 'POST'])
 @login_required
 def coowners(short_name):
@@ -3147,6 +3151,9 @@ def coowners(short_name):
     for owner, p_owner in zip(owners, pub_owners):
         if owner.id == project.owner_id:
             p_owner['is_creator'] = True
+    contact_owners = [user for user in owners if is_user_enabled_assigned_project(user, project)]
+    contact_users = user_repo.get_users(project.info.get('contacts')) if project.info.get('contacts') else contact_owners
+    contacts_dict = [{"id": user.id, "fullname": user.fullname} for user in contact_users]
 
     ensure_authorized_to('read', project)
     ensure_authorized_to('update', project)
@@ -3155,6 +3162,7 @@ def coowners(short_name):
         project=sanitize_project,
         coowners=pub_owners,
         coowners_dict=coowners,
+        contacts_dict=contacts_dict,
         owner=owner_sanitized,
         title=gettext("Manage Co-owners"),
         form=form,
@@ -3170,7 +3178,6 @@ def coowners(short_name):
 
             filters = {'enabled': True}
             users = user_repo.search_by_name(query, **filters)
-
             if not users:
                 markup = Markup('<strong>{}</strong> {} <strong>{}</strong>')
                 flash(markup.format(gettext("Ooops!"),
@@ -3200,6 +3207,13 @@ def coowners(short_name):
             add = [value for value in new_list if value not in overlap_list]
             for _id in add:
                 project.owners_ids.append(_id)
+
+            # save contacts
+            new_list = [int(x) for x in json.loads(request.data).get('contacts', [])]
+            auditlogger.log_event(project, current_user, 'update', 'project.contacts',
+                project.info.get('contacts'), new_list)
+            project.info['contacts'] = new_list
+
             project_repo.save(project)
             flash(gettext('Configuration updated successfully'), 'success')
 
@@ -3972,9 +3986,12 @@ def contact(short_name):
         tasks_completed_user=request.body.get("tasksCompletedUser", 0)
     )
 
-    # Get the email addrs for the owner, and all co-owners of the project who have sub-admin/admin rights and are not disabled.
-    owners = user_repo.get_users(project.owners_ids)
-    recipients = [owner.email_addr for owner in owners if owner.enabled and (owner.id == project.owner_id or owner.admin or owner.subadmin)]
+    # Use the customized list of contacts for the project or default to owners.
+    contact_ids = project.info.get('contacts', project.owners_ids)
+    # Load the record for each contact id.
+    contact_users = user_repo.get_users(contact_ids)
+    # Get the email address for each contact that was added manually or that is enabled and assigned to this project or is a sub-admin/admin.
+    recipients = [contact.email_addr for contact in contact_users if project.info.get('contacts') or is_user_enabled_assigned_project(contact, project)]
 
     # Send email.
     email = dict(recipients=recipients,
@@ -3982,8 +3999,8 @@ def contact(short_name):
                  body=body)
     mail_queue.enqueue(send_mail, email)
 
-    current_app.logger.info('Contact form email sent to {} at {} for project {} {} {}'.format(
-        current_user.name, recipients, current_user.id, project.name, short_name, project.id))
+    current_app.logger.info('Contact email sent from user id {} ({}) to recipients {} for project id {} ({}, {})'.format(
+        current_user.id, current_user.name, recipients, project.id, project.name, short_name))
 
     response = {
         'success': True
