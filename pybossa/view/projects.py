@@ -1784,7 +1784,6 @@ def bulk_priority_update(short_name):
 @blueprint.route('/<short_name>/tasks/assign-workersupdate', methods=['POST'])
 @login_required
 def bulk_update_assign_worker(short_name):
-
     response = {}
     project, owner, ps = project_by_shortname(short_name)
     admin_or_project_owner(current_user, project)
@@ -1792,7 +1791,6 @@ def bulk_update_assign_worker(short_name):
 
     if data.get("add") is None and data.get("remove") is None:
         # read data and return users
-
         task_id = data.get("taskId")
         bulk_update = False
         assign_user_emails = []
@@ -1813,6 +1811,7 @@ def bulk_update_assign_worker(short_name):
             for task_id in task_ids:
                 t = task_repo.get_task_by(project_id=project.id,
                                         id=int(task_id))
+                t.user_pref = t.user_pref or {}
                 assign_user_emails = assign_user_emails.union(set(t.user_pref.get("assign_user", [])))
         assign_users = []
         for user_email in assign_user_emails:
@@ -1831,7 +1830,6 @@ def bulk_update_assign_worker(short_name):
             all_users = user_repo.get_all()
         all_user_data = []
         for user in all_users:
-
             # Exclude currently assigned users in the candidate list ONLY for single task update
             if user.email_addr in assign_user_emails and not bulk_update:
                 continue
@@ -1844,6 +1842,7 @@ def bulk_update_assign_worker(short_name):
         # update tasks with assign worker values
         assign_workers = data.get('add', [])
         remove_workers = data.get('remove', [])
+        assign_users = []
 
         assign_worker_emails = [w["email"] for w in assign_workers]
         remove_worker_emails = [w["email"] for w in remove_workers]
@@ -1873,12 +1872,18 @@ def bulk_update_assign_worker(short_name):
                     if remove_user_email in assign_user:
                         assign_user.remove(remove_user_email)
 
-                user_pref["assign_user"] = assign_user
+                if assign_user:
+                    user_pref["assign_user"] = assign_user
+                    assign_users.append({'taskId': int(task_id), 'assign_user': assign_user})
+                elif "assign_user" in user_pref:
+                    del user_pref["assign_user"]
 
                 t.user_pref = user_pref
                 flag_modified(t, "user_pref")
 
                 task_repo.update(t)
+        response['assign_users'] = assign_users
+
     return Response(json.dumps(response), 200, mimetype='application/json')
 
 @crossdomain(origin='*', headers=cors_headers)
@@ -3643,7 +3648,7 @@ def assign_users(short_name):
     project.set_project_users(project_users)
     project_repo.save(project)
     auditlogger.log_event(project, current_user, 'update', 'project.assign_users',
-              'N/A', users)
+              'N/A', project_users)
     if not project_users:
         msg = gettext('Users unassigned or no user assigned to project')
         current_app.logger.info('Project id {} users unassigned from project.'.format(project.id))
