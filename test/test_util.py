@@ -33,7 +33,7 @@ import pybossa.util as util
 from pybossa.importers import BulkImportException
 from pybossa.importers.csv import BulkTaskCSVImport
 from test import with_context, Test, with_request_context
-from test.factories import UserFactory
+from test.factories import UserFactory, ProjectFactory, TaskFactory
 from pybossa.model.user import User
 from pybossa.model.project import Project
 from unittest.mock import Mock
@@ -999,13 +999,14 @@ class TestPybossaUtil(Test):
         assert """<checkbox-input :initial-value="false" id="_mg59znxa7" pyb-answer="isRelevant">""" in result
         assert """<multi-select-input :choices='["Math","English","Social Study","Python"]' :initial-value='["Social Study","English","Math"]' :validations='["required"]' pyb-answer="subjects">""" in result
 
+    @with_request_context
     def test_process_table_component(self):
         tp_code = """
             <h2>6) table element</h2>
             <table-element
           :key='task.id'
           name='all_info'
-          :data='[{"name":"","position":"","phoneNumber":"","emailAddress":"","physicalLocation":"","linkedIn":"","zoomInfo":"","moreInfo":""}]'
+          :data='[{"name":"", "key_not_in_response": "should_show_in_response"}]'
           :columns='["name","position","phoneNumber","emailAddress","physicalLocation","linkedIn","zoomInfo","moreInfo"]'
           :options='{
             "headings": {
@@ -1076,28 +1077,141 @@ class TestPybossaUtil(Test):
                          [{"name": "Xi", "linkedIn": "2343", "position": "software engieer", "zoomInfo": "aaa", "phoneNumber": "1234", "emailAddress": "xchen375@bb.net", "physicalLocation": "aa"},
                           {"name": "Chen", "linkedIn": "2353", "moreInfo": "", "position": "CEO", "zoomInfo": "bbb", "phoneNumber": "546", "emailAddress": "aaaa@gg.com", "physicalLocation": "bb"}]
                         }
-        result = util.process_table_component(tp_code, user_response)
+        project = ProjectFactory.create(published=True, id=1)
+        task = TaskFactory.create(id=101, project=project)
+        task.info = {'group': 'VEND - EMEA SALES RESULTS', 'ticker': 'ITV LN Equity', 'analyst': '18945069', 'ruleset': '32965',
+                     'concepts': [{'concept': 'Revenue', 'hgrt_feedback': 'Active', 'hgrt_variable': 'REVENUE', 'concept_period': 'Quarter', 'variable_notes': '', 'actual_forecast': 'Actuals', 'hgrt_variable_type': 'MONEY'},
+                                  {'concept': 'Revenue', 'hgrt_feedback': 'Active', 'hgrt_variable': 'REVTABLE', 'concept_period': 'Quarter', 'variable_notes': '', 'actual_forecast': 'Actuals', 'hgrt_variable_type': 'MONEY'}],
+                     'ruleset_name': 'SR_Q1', 'work_item_id': '6758716152079712264', 'work_item_type': 'Maintenance', 'last_announce_date': '3/5/2020', 'next_announce_date': '3/29/2020', 'work_item_completion_date': '3/24/2020'}
+
+        result = util.process_table_component(tp_code, user_response, task)
         assert ":data='" + json.dumps(user_response.get("all_info")) in result
+        assert "key_not_in_response" in user_response.get("all_info")[0]
         assert " initial-value=" not in result
 
         user_response = {"all_info": {
             "0":
                 {"name": "Xi", "linkedIn": "2343",
-                 "position": "software engieer",
+                 "position": "software engineer",
                  "zoomInfo": "aaa", "phoneNumber": "1234",
                  "emailAddress": "xchen375@bb.net",
-                 "physicalLocation": "aa"}
-        },
+                 "physicalLocation": "aa"},
             "1":
                 {"name": "Chen", "linkedIn": "2353",
                  "moreInfo": "", "position": "CEO",
                  "zoomInfo": "bbb", "phoneNumber": "546",
                  "emailAddress": "aaaa@gg.com",
-                 "physicalLocation": "bb"}
+                 "physicalLocation": "bb"}}
         }
-        result = util.process_table_component(tp_code, user_response)
+        result = util.process_table_component(tp_code, user_response, task)
         assert ":data='" + json.dumps(list(user_response.get("all_info").values())) in result
         assert " initial-value=" not in result
+
+    @with_request_context
+    def test_process_table_component_with_initial_data_from_task(self):
+        tp_code = """
+              <task-presenter>
+                <div class="form-group">
+                  <label for="_hc921dja4">My test notes</label>
+                  <input-text-area id='_hc921dja4' :validations='["required"]' rows='5' cols='100' pyb-answer='test notes'></input-text-area>
+                </div>
+                
+                <table-element
+                  :key='task.id'
+                   name='all_info'
+                  :data='task.info.a.b'
+                  :columns='["concept","actual_forecast","concept_period","hgrt_variable","hgrt_variable_type","hgrt_feedback","variable_notes","QC_Reason","QC_Notes"]'
+                  column-id='and_id'  
+                    :options='{
+                        "columnsClasses": {"QC_Notes":"min-width-class", "QC_Reason":"min-width-dropdown-class"},
+                        "headings": {
+                            "concept": "Concept",
+                            "actual_forecast": "Actual Forecast",
+                            "concept_period": "Concept Period",
+                            "hgrt_variable": "HGRT Variable",
+                            "hgrt_variable_type": "HGRT Variable Type",
+                            "hgrt_feedback": "HGRT Feedback",
+                            "variable_notes": "Variable Notes",
+                            "QC_Reason": "QCREASON",
+                            "QC_Notes": "QCNOTES"
+                    }
+                }'
+                  >
+                    <div slot="QC_Reason" slot-scope="props">
+                      <dropdown-input
+                          :validations='["required"]'
+                          pyb-table-answer="QC_Reason" :row="props.row"
+                          :choices="{&quot;bestpractices-provideqcnote&quot;:&quot;Best Practices - Provide QCNOTE&quot;,&quot;correct&quot;:&quot;Correct&quot;,&quot;datapointcanbeextracted-provideqcnote&quot;:&quot;Data point can be extracted - Provide QCNOTE&quot;,&quot;incorrectvariable&quot;:&quot;Incorrect Variable&quot;,&quot;incorrectwffeedback&quot;:&quot;Incorrect WF Feedback&quot;,&quot;incorrectwffeedback&amp;bestpractices-provideqcnote&quot;:&quot;Incorrect WF Feedback &amp; Best Practices - Provide QCNOTE&quot;,&quot;incorrectwffeedback&amp;incorrectrule-provideqcnote&quot;:&quot;Incorrect WF Feedback &amp; Incorrect Rule - Provide QCNOTE&quot;,&quot;n&#x2F;a-borgupdate&quot;:&quot;N&#x2F;A - Borg Update&quot;,&quot;n&#x2F;a-blocked&quot;:&quot;N&#x2F;A - Blocked&quot;,&quot;nocomparisonordirectionallanguage&quot;:&quot;No Comparison or Directional Language&quot;,&quot;nocurrencyparameter&quot;:&quot;No Currency Parameter&quot;,&quot;nomultiplierselected&quot;:&quot;No Multiplier Selected&quot;,&quot;noperiodreference&quot;:&quot;No Period Reference&quot;,&quot;nostartinganchor&quot;:&quot;No Starting Anchor&quot;,&quot;other-provideqcnote&quot;:&quot;Other - Provide QCNOTE&quot;}"
+                      ></dropdown-input>
+                    </div>
+                
+                    <div slot="QC_Notes" slot-scope="props">
+                     <!-- <text-input :row="props.row" pyb-table-answer="QC_Notes"></text-input> -->
+                      <input-text-area :initial-value="props.row.QC_Notes" cols="50" rows="4" pyb-table-answer="QC_Notes" :row="props.row"></input-text-area>  
+                    </div>
+                
+                </table-element>
+                  <task-timer>2</task-timer>
+                  </task-presenter>
+                </div>
+        """
+
+        user_response = {"all_info": {
+            "0":
+                {"name": "admin_0", "linkedIn": "2343",
+                 "position": "software engineer",
+                 "zoomInfo": "aaa", "phoneNumber": "1234",
+                 "emailAddress": "xchen375@bb.net",
+                 "physicalLocation": "aa"},
+            "1":
+                {"name": "admin_1", "linkedIn": "2353",
+                 "moreInfo": "", "position": "CEO",
+                 "zoomInfo": "bbb", "phoneNumber": "546",
+                 "emailAddress": "aaaa@gg.com",
+                 "physicalLocation": "bb"}}
+        }
+
+        project = ProjectFactory.create(published=True, id=1)
+        task = TaskFactory.create(id=101, project=project)
+
+        task.info = {"do_not_match": "hello world"}
+        result = util.process_table_component(tp_code, user_response, task)
+        assert ':data="task.info.a.b"' in result
+
+        task.info = {'group': 'VEND - EMEA SALES RESULTS',
+                     'ticker': 'ITV LN Equity', 'analyst': '18945069',
+                     'ruleset': '32965',
+                     'a': {
+                         'b': [
+                             {'concept': 'Revenue', 'hgrt_feedback': 'Active',
+                              'hgrt_variable': 'REVENUE',
+                              'concept_period': 'Quarter', 'variable_notes': '',
+                              'actual_forecast': 'Actuals',
+                              'hgrt_variable_type': 'MONEY'},
+                             {'concept': 'Revenue', 'hgrt_feedback': 'Active',
+                              'hgrt_variable': 'REVTABLE',
+                              'concept_period': 'Quarter', 'variable_notes': '',
+                              'actual_forecast': 'Actuals',
+                              'hgrt_variable_type': 'MONEY'},
+                             {'concept': 'Revenue3', 'hgrt_feedback': 'Active3',
+                              'hgrt_variable': 'UNKNOWN',
+                              'concept_period': 'Yearly', 'variable_notes': '',
+                              'actual_forecast': 'Actuals',
+                              'hgrt_variable_type': 'MONEY'}
+                         ]
+                     },
+                     'ruleset_name': 'SR_Q1',
+                     'work_item_completion_date': '3/24/2020'}
+        result = util.process_table_component(tp_code, user_response, task)
+        user_response_list = list(user_response.get("all_info").values())
+
+        # user response is shorter than initial data
+        user_response_list.append({"concept": "Revenue3", "hgrt_feedback": "Active3", "hgrt_variable": "UNKNOWN", "concept_period": "Yearly", "variable_notes": "", "actual_forecast": "Actuals", "hgrt_variable_type": "MONEY"})
+        expected_result = ":data='" + json.dumps(user_response_list)
+
+        assert expected_result in result
+        assert ':initial-value="props.row.QC_Reason"' in result
+        assert ':initial-value="props.row.QC_Notes"' in result
 
 
 class TestIsReservedName(object):
