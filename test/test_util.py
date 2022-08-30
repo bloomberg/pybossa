@@ -1147,7 +1147,7 @@ class TestPybossaUtil(Test):
                 
                     <div slot="QC_Notes" slot-scope="props">
                      <!-- <text-input :row="props.row" pyb-table-answer="QC_Notes"></text-input> -->
-                      <input-text-area :initial-value="props.row.QC_Notes" cols="50" rows="4" pyb-table-answer="QC_Notes" :row="props.row"></input-text-area>  
+                      <input-text-area :initial-value="props.row.QC_Notes" initial-value="" cols="50" rows="4" pyb-table-answer="QC_Notes" :row="props.row"></input-text-area>  
                     </div>
                 
                 </table-element>

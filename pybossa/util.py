@@ -1252,42 +1252,43 @@ def process_table_component(tp_code, user_response, task):
     table_elements = soup.find_all(table_component_tag)
     for table_element in table_elements:
         response_key = table_element.get('name')
-        response_value = user_response.get(response_key, [])
+        response_values = user_response.get(response_key, [])
 
-        # In case the response_value is dict, we need to convert it to a list
+        # In case the response_values is dict, we need to convert it to a list
         # so that the table-element can display the data correctly
-        if type(response_value) is dict:
-            response_value = list(response_value.values())
+        if type(response_values) is dict:
+            response_values = list(response_values.values())
 
-        # handle existing data in the response
+        # handle existing data for the response
         initial_data_str = table_element[':data']
-        initial_data = []
+        existing_data = []  # holds reqeust fields or data from :initial_data
         if initial_data_str:
             if initial_data_str.startswith("task.info"):  # e.g. task.info.a.b.c
                 attributes = initial_data_str.split(".")
-                initial_data = task.info
+                request_fields = task.info
                 for attribute in attributes[2:]:  # skip "task" and "info"
-                    initial_data = initial_data.get(attribute, {})
-                if type(initial_data) is not list:
+                    request_fields = request_fields.get(attribute, {})
+                if type(request_fields) is not list:
                     break
+                existing_data = request_fields
             elif initial_data_str.strip().startswith("["):  # if it is a list
-                initial_data = json.loads(initial_data_str)
+                existing_data = json.loads(initial_data_str)
 
-            # merge initial data into response_value
-            for i in range(min(len(initial_data), len(response_value))):
-                for key in initial_data[i].keys():
+            # merge existing_data into response_value
+            for i in range(min(len(existing_data), len(response_values))):
+                for key in existing_data[i].keys():
                     # only overwrite when key not existed in response_value
-                    if key not in response_value[i]:
-                        response_value[i][key] = initial_data[i][key]
+                    if key not in response_values[i]:
+                        response_values[i][key] = existing_data[i][key]
 
-            # if initial_value is longer: take whatever left in the initial_data
-            if len(initial_data) > len(response_value):
-                response_value.extend(initial_data[len(response_value):])
+            # if existing_data is longer: take whatever left in it
+            if len(existing_data) > len(response_values):
+                response_values.extend(existing_data[len(response_values):])
 
-        table_element[':data'] = json.dumps(response_value)
+        table_element[':data'] = json.dumps(response_values)
 
-        # append ":initial-value="props.row.COL_NAME" to the element and also
         # remove initial-value attribute so that table can display the data
+        # append ":initial-value="props.row.COL_NAME" to the element and also
         tag_list = table_element.find_all(
             lambda tag: "pyb-table-answer" in tag.attrs)
         for t in tag_list:
