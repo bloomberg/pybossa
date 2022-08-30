@@ -57,7 +57,7 @@ from bs4 import BeautifulSoup
 
 misaka = Misaka()
 TP_COMPONENT_TAGS = ["text-input", "dropdown-input", "radio-group-input",
-                     "checkbox-input", "multi-select-input"]
+                     "checkbox-input", "multi-select-input", "input-text-area"]
 
 
 def last_flashed_message():
@@ -1243,7 +1243,7 @@ def process_tp_components(tp_code, user_response):
     return soup.prettify()
 
 
-def process_table_component(tp_code, user_response):
+def process_table_component(tp_code, user_response, task):
     """grab the value of 'name' and use it as a key to retrieve the response
     from user_response(a dict). The response data is then used to set the
     'data' or ':data' attribute"""
@@ -1252,18 +1252,48 @@ def process_table_component(tp_code, user_response):
     table_elements = soup.find_all(table_component_tag)
     for table_element in table_elements:
         response_key = table_element.get('name')
-        response_value = user_response.get(response_key, [])
+        response_values = user_response.get(response_key, [])
 
-        # In case the response_value is dict, we need to convert it to a list
+        # In case the response_values is dict, we need to convert it to a list
         # so that the table-element can display the data correctly
-        if type(response_value) is dict:
-            response_value = list(response_value.values())
+        if type(response_values) is dict:
+            response_values = list(response_values.values())
 
-        table_element[':data'] = json.dumps(response_value)
+        # handle existing data for the response
+        initial_data_str = table_element[':data']
+        existing_data = []  # holds reqeust fields or data from :initial_data
+        if initial_data_str:
+            if initial_data_str.startswith("task.info"):  # e.g. task.info.a.b.c
+                attributes = initial_data_str.split(".")
+                request_fields = task.info
+                for attribute in attributes[2:]:  # skip "task" and "info"
+                    request_fields = request_fields.get(attribute, {})
+                if type(request_fields) is not list:
+                    break
+                existing_data = request_fields
+            elif initial_data_str.strip().startswith("["):  # if it is a list
+                existing_data = json.loads(initial_data_str)
 
-        # Remove initial-value attribute so that table can display the data
+            # merge existing_data into response_value
+            for i in range(min(len(existing_data), len(response_values))):
+                for key in existing_data[i].keys():
+                    # only overwrite when key not existed in response_value
+                    if key not in response_values[i]:
+                        response_values[i][key] = existing_data[i][key]
+
+            # if existing_data is longer: take whatever left in it
+            if len(existing_data) > len(response_values):
+                response_values.extend(existing_data[len(response_values):])
+
+        table_element[':data'] = json.dumps(response_values)
+
+        # remove initial-value attribute so that table can display the data
+        # append ":initial-value="props.row.COL_NAME" to the element and also
         tag_list = table_element.find_all(
-            lambda tag: "initial-value" in tag.attrs)
+            lambda tag: "pyb-table-answer" in tag.attrs)
         for t in tag_list:
-            del t["initial-value"]
+            if "initial-value" in t.attrs:
+                del t["initial-value"]
+            column_name = t.get("pyb-table-answer", "")
+            t[":initial-value"] = "props.row." + column_name
     return soup.prettify()

@@ -1272,7 +1272,7 @@ def task_presenter(short_name, task_id, task_submitter_id=None):
                     tp_code = process_annex_load(tp_code, odfoa_response)
 
         tp_code = process_tp_components(tp_code, user_response)
-        tp_code = process_table_component(tp_code, user_response)
+        tp_code = process_table_component(tp_code, user_response, task)
         template_args["project"]["info"]["task_presenter"] = tp_code
 
     def respond(tmpl):
