@@ -1463,7 +1463,10 @@ def export_statuses(short_name, task_id):
         elif user_detail['lock_ttl']:
             user_detail['status'] = 'Locked'
 
-    tr_statuses = dict(redundancy=task.n_answers,
+    # gold tasks may have more answers than redundancy 1
+    # in rare case, task may have answers more than redundancy
+    redundancy = max(task.n_answers, len(task.task_runs))
+    tr_statuses = dict(redundancy=redundancy,
                        user_details=user_details)
 
     return jsonify(tr_statuses)
