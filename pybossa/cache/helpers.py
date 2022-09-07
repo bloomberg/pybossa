@@ -21,7 +21,7 @@ import json
 from flask import current_app
 from sqlalchemy.sql import text
 from pybossa.core import db
-from pybossa.cache import memoize, ONE_HOUR
+from pybossa.cache import memoize, HALF_HOUR
 from pybossa.model.project_stats import ProjectStats
 from pybossa.cache import users as cached_users
 from pybossa.cache import task_browse_helpers as cached_task_browse_helpers
@@ -171,6 +171,7 @@ def _has_no_tasks(project_id):
     return n_tasks == 0
 
 
+@memoize(timeout=HALF_HOUR)
 def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     """Return the number of tasks for a given project a user can contribute to.
     based on the completion of the project tasks, previous task_runs
@@ -214,6 +215,7 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     sqltext = text(sql)
     try:
         result = session.execute(sqltext, dict(project_id=project_id, user_id=user_id, assign_user=assign_user))
+        current_app.logger.info("n_available_tasks_for_user. making db request %s", sql)
         if scheduler not in [Schedulers.user_pref, Schedulers.task_queue]:
             for row in result:
                 n_tasks = row.n_tasks
@@ -230,7 +232,7 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
             return num_available_tasks
 
     except Exception as e:
-        current_app.logger.exception('Exception in get_user_pref_task {0}, sql: {1}'.format(str(e), str(sqltext)))
+        current_app.logger.exception('Exception in n_available_tasks_for_user {0}, sql: {1}'.format(str(e), str(sqltext)))
         return None
 
 
