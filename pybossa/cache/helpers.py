@@ -215,7 +215,7 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     sqltext = text(sql)
     try:
         result = session.execute(sqltext, dict(project_id=project_id, user_id=user_id, assign_user=assign_user))
-        current_app.logger.info("n_available_tasks_for_user. making db request %s", sql)
+        current_app.logger.info("n_available_tasks_for_user making db request for project_id %d. user_id %d", project_id, user_id)
         if scheduler not in [Schedulers.user_pref, Schedulers.task_queue]:
             for row in result:
                 n_tasks = row.n_tasks
