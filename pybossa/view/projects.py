@@ -1200,6 +1200,16 @@ def make_random_task_gold(short_name):
 @blueprint.route('/<short_name>/task/<int:task_id>/<int:task_submitter_id>')
 @login_required
 def task_presenter(short_name, task_id, task_submitter_id=None):
+    """
+    displaying task presenter code. There are two endpoints. One for submitting
+    task (including read-only viewing tasks and cherry-pick modes) and the other
+    for viewing user's completed response (with task_submitter_id in the
+    endpoint)
+    :param short_name: project's short name
+    :param task_id: task ID
+    :param task_submitter_id: task submitter's user id. It is received only upon
+    viewing the task answers by the user
+    """
     mode = request.args.get('mode')
     project, owner, ps = project_by_shortname(short_name)
     ensure_authorized_to('read', project)
