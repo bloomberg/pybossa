@@ -1225,21 +1225,22 @@ def admin_or_project_owner(user, project):
 def process_tp_components(tp_code, user_response):
     """grab the 'pyb-answer' value and use it as a key to retrieve the response
     from user_response(a dict). The response data is then used to set the
-    'initial-value' or ':initial-value' based on different components"""
+    :initial-value' """
     soup = BeautifulSoup(tp_code, 'html.parser')
+
+    # Disable autosave so that response for different users will be different
+    task_presenter_elements = soup.find_all("task-presenter")
+    for task_presenter in task_presenter_elements:
+        remove_element_attributes(task_presenter, "auto-save-seconds")
+        remove_element_attributes(task_presenter, "allow-save-work")
+
     for tp_component_tag in TP_COMPONENT_TAGS:
         tp_components = soup.find_all(tp_component_tag)
         for tp_component in tp_components:
-            response_key = tp_component.get('pyb-answer')
+            response_key = get_first_existing_data(tp_component, "pyb-answer")
             response_value = user_response.get(response_key, '')
-            if tp_component.name in ["checkbox-input", "multi-select-input"]:
-                if type(response_value) is bool:
-                    response_value = str(response_value).lower()
-                elif type(response_value) is list:
-                    response_value = '[' + ",".join(map(lambda s: '"' + s + '"', response_value)) + ']'
-                tp_component[':initial-value'] = response_value
-            else:
-                tp_component['initial-value'] = response_value
+            remove_element_attributes(tp_component, "initial-value")
+            tp_component[':initial-value'] = json.dumps(response_value)
     return soup.prettify()
 
 
@@ -1260,7 +1261,7 @@ def process_table_component(tp_code, user_response, task):
             response_values = list(response_values.values())
 
         # handle existing data for the response
-        initial_data_str = table_element[':data']
+        initial_data_str = get_first_existing_data(table_element, "data")
         existing_data = []  # holds reqeust fields or data from :initial_data
         if initial_data_str:
             if initial_data_str.startswith("task.info"):  # e.g. task.info.a.b.c
@@ -1285,6 +1286,8 @@ def process_table_component(tp_code, user_response, task):
             if len(existing_data) > len(response_values):
                 response_values.extend(existing_data[len(response_values):])
 
+        # Remove attributes like :data, v-bind:data and data before appending
+        remove_element_attributes(table_element, "data")
         table_element[':data'] = json.dumps(response_values)
 
         # remove initial-value attribute so that table can display the data
@@ -1292,8 +1295,40 @@ def process_table_component(tp_code, user_response, task):
         tag_list = table_element.find_all(
             lambda tag: "pyb-table-answer" in tag.attrs)
         for t in tag_list:
-            if "initial-value" in t.attrs:
-                del t["initial-value"]
+            remove_element_attributes(t, "initial-value")
             column_name = t.get("pyb-table-answer", "")
             t[":initial-value"] = "props.row." + column_name
     return soup.prettify()
+
+
+def get_first_existing_data(page_element, attribute):
+    """
+    Get the first non None data from a serials of attributes from a
+    page_element. e.g. if an attribute is "data", a serials of attributes is
+    defined as [":data", "v-bind:data", "data"]
+
+    :param page_element: A PageElement.
+    :param attribute: an attribute of the page_element.
+    :return: the corresponding value of the attribute
+    :rtype: string
+    """
+    attributes = [f":{attribute}", f"v-bind:{attribute}", attribute]
+    values = [page_element.get(attr) for attr in attributes]
+    data = next((v for v in values if v), None)
+    return data
+
+
+def remove_element_attributes(page_element, attribute):
+    """
+    Remove a serials of attributes from a page_element.
+    e.g. if an attribute is "data", a serials of attributes is defined as
+    [":data", "v-bind:data", "data"]
+
+    :param page_element: A PageElement.
+    :param attribute: an attribute of the page_element.
+    :return: None.
+    """
+    attributes = [f":{attribute}", f"v-bind:{attribute}", attribute]
+    for attr in attributes:
+        if page_element.has_attr(attr):
+            del page_element[attr]
