@@ -1201,7 +1201,7 @@ def make_random_task_gold(short_name):
 @login_required
 def task_presenter(short_name, task_id, task_submitter_id=None):
     """
-    displaying task presenter code. There are two endpoints. One for submitting
+    Displaying task presenter code. There are two endpoints. One for submitting
     task (including read-only viewing tasks and cherry-pick modes) and the other
     for viewing user's completed response (with task_submitter_id in the
     endpoint)
