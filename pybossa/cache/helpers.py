@@ -21,7 +21,7 @@ import json
 from flask import current_app
 from sqlalchemy.sql import text
 from pybossa.core import db
-from pybossa.cache import memoize, HALF_HOUR
+from pybossa.cache import memoize, FIVE_MINUTES
 from pybossa.model.project_stats import ProjectStats
 from pybossa.cache import users as cached_users
 from pybossa.cache import task_browse_helpers as cached_task_browse_helpers
@@ -171,7 +171,7 @@ def _has_no_tasks(project_id):
     return n_tasks == 0
 
 
-@memoize(timeout=HALF_HOUR)
+@memoize(timeout=FIVE_MINUTES)
 def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     """Return the number of tasks for a given project a user can contribute to.
     based on the completion of the project tasks, previous task_runs
