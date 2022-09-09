@@ -26,6 +26,7 @@ import time
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
+from bs4 import BeautifulSoup
 from flask_wtf import FlaskForm as Form
 from nose.tools import nottest, assert_raises
 
@@ -956,7 +957,8 @@ class TestPybossaUtil(Test):
         assert_raises(Forbidden, admin_or_project_owner, user, project)
 
     def test_process_tp_components(self):
-        tp_code = """  <task-presenter>
+        tp_code = """  <task-presenter auto-save-seconds="15" />
+        <task-presenter :auto-save-seconds="15" v-bind:allow-save-work="true">
             <text-input id='_kp6zwx2rs' type='text' :validations='[]' pyb-answer='freeText' initial-value='nothing special'></text-input>
             
             <div class="row">
@@ -977,7 +979,7 @@ class TestPybossaUtil(Test):
             <div id="_e9pm92ges">
               <div class="checkbox">
                       <label for="_mg59znxa7">
-                          <checkbox-input :initial-value="false" id="_mg59znxa7" pyb-answer="isRelevant"></checkbox-input> Is this document relevant?
+                          <checkbox-input v-bind:initial-value="false" id="_mg59znxa7" pyb-answer="isRelevant"></checkbox-input> Is this document relevant?
                       </label>
                 </div>
             </div>
@@ -994,10 +996,12 @@ class TestPybossaUtil(Test):
         user_response = {'answer': 'Japanese', 'freeText': 'This is cool', 'subjects': ['Social Study', 'English', 'Math'], 'isNewData': 'yes', 'isRelevant': False}
         result = util.process_tp_components(tp_code, user_response)
 
-        assert """<dropdown-input :choices='{"yes":"Yes","no":"No"}' :validations='["required"]' initial-value="yes" pyb-answer="isNewData">""" in result
-        assert """<radio-group-input :choices='{"Chinese":"Chinese","Korean":"Korean","Japanese":"Japanese"}' :validations='["required"]' initial-value="Japanese" name="userAnswer" pyb-answer="answer">""" in result
+        assert """<dropdown-input :choices='{"yes":"Yes","no":"No"}' :initial-value='"yes"' :validations='["required"]' pyb-answer="isNewData">""" in result
+        assert """<radio-group-input :choices='{"Chinese":"Chinese","Korean":"Korean","Japanese":"Japanese"}' :initial-value='"Japanese"' :validations='["required"]' name="userAnswer" pyb-answer="answer">""" in result
         assert """<checkbox-input :initial-value="false" id="_mg59znxa7" pyb-answer="isRelevant">""" in result
-        assert """<multi-select-input :choices='["Math","English","Social Study","Python"]' :initial-value='["Social Study","English","Math"]' :validations='["required"]' pyb-answer="subjects">""" in result
+        assert """<multi-select-input :choices='["Math","English","Social Study","Python"]' :initial-value='["Social Study", "English", "Math"]' :validations='["required"]' pyb-answer="subjects">""" in result
+        assert "auto-save-seconds" not in result
+        assert "allow-save-work" not in result
 
     @with_request_context
     def test_process_table_component(self):
@@ -1006,7 +1010,7 @@ class TestPybossaUtil(Test):
             <table-element
           :key='task.id'
           name='all_info'
-          :data='[{"name":"", "key_not_in_response": "should_show_in_response"}]'
+          v-bind:data='[{"name":"", "key_not_in_response": "should_show_in_response"}]'
           :columns='["name","position","phoneNumber","emailAddress","physicalLocation","linkedIn","zoomInfo","moreInfo"]'
           :options='{
             "headings": {
@@ -1212,6 +1216,34 @@ class TestPybossaUtil(Test):
         assert expected_result in result
         assert ':initial-value="props.row.QC_Reason"' in result
         assert ':initial-value="props.row.QC_Notes"' in result
+
+    def test_get_first_existing_data(self):
+        tag = BeautifulSoup('<b id="boldest">bold</b>', 'html.parser').b
+        assert util.get_first_existing_data(tag, "id") == "boldest"
+
+        tag = BeautifulSoup('<b :id="boldest">bold</b>', 'html.parser').b
+        assert util.get_first_existing_data(tag, "id") == "boldest"
+
+        tag = BeautifulSoup('<b v-bind:id="boldest">bold</b>', 'html.parser').b
+        assert util.get_first_existing_data(tag, "id") == "boldest"
+
+    def test_remove_element_attributes(self):
+        tag = BeautifulSoup('<b id="boldest">bold</b>', 'html.parser').b
+        util.remove_element_attributes(tag, "id")
+        assert not tag.has_attr("id")
+
+        tag = BeautifulSoup('<b :id="boldest">bold</b>', 'html.parser').b
+        util.remove_element_attributes(tag, "id")
+        assert not tag.has_attr(":id")
+
+        tag = BeautifulSoup('<b v-bind:id="boldest">bold</b>', 'html.parser').b
+        util.remove_element_attributes(tag, "id")
+        assert not tag.has_attr("v-bind:id")
+
+        tag = BeautifulSoup('<b :id="boldest" id="a">bold</b>', 'html.parser').b
+        util.remove_element_attributes(tag, "id")
+        assert not tag.has_attr(":id")
+        assert not tag.has_attr("id")
 
 
 class TestIsReservedName(object):
