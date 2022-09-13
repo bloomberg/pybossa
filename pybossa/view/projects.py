@@ -3190,10 +3190,9 @@ def coowners(short_name):
             query = form.user.data
 
             filters = {'enabled': True}
-            users = user_repo.search_by_name(query, **filters)
 
-            # Filter contacts only to coowners of the project.
-            users = owners if form.contact and form.contact.data else users
+            # If searching contacts, filter to coowners of the project. Otherwise, search all users.
+            users = owners if form.contact and form.contact.data else user_repo.search_by_name(query, **filters)
 
             if not users:
                 markup = Markup('<strong>{}</strong> {} <strong>{}</strong>')
