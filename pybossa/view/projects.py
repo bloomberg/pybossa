@@ -3188,12 +3188,11 @@ def coowners(short_name):
         if form.user.data:
             # search users
             query = form.user.data
-            params = json.loads(request.data)
 
             filters = {'enabled': True}
             users = user_repo.search_by_name(query, **filters)
 
-            if params.get('contact'):
+            if form.contact and form.contact.data.lower() == 'true':
                 # Filter contacts only to users that are enabled and assigned to this project or are sub-admin/admin.
                 users = [user for user in users if is_user_enabled_assigned_project(user, project) or user.id in project.owners_ids]
 
