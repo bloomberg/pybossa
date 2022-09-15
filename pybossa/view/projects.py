@@ -3197,12 +3197,7 @@ def coowners(short_name):
             users = user_repo.search_by_name(query, **filters)
 
             # If searching contacts, filter results to only coowners.
-            if params.get('contact'):
-                filtered_list = []
-                for user in users:
-                    if user.id in project.owners_ids:
-                        filtered_list.append(user)
-                users = filtered_list
+            users = [user for user in users if user.id in project.owners_ids] if params.get('contact') else users
 
             if not users:
                 markup = Markup('<strong>{}</strong> {} <strong>{}</strong>')
