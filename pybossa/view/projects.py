@@ -3244,7 +3244,7 @@ def coowners(short_name):
 
             # remove any contacts that were just removed from coowners.
             for _id in delete:
-                if _id in project.info.get('contacts', []):
+                if _id in new_list:
                     new_list.remove(_id)
 
             auditlogger.log_event(project, current_user, 'update', 'project.contacts',

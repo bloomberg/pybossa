@@ -235,7 +235,7 @@ class TestCoowners(web.Helper):
         assert res_data['coowners_dict'][1]['id'] == user3.id
 
         # Add user3 (coowner) as a contact.
-        data = {'contacts': [user2.id, user3.id]}
+        data = {'coowners': project.owners_ids, 'contacts': [user2.id, user3.id]}
         res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
                             content_type='application/json',
                             data=json.dumps(data),
@@ -247,6 +247,71 @@ class TestCoowners(web.Helper):
         assert len(res_data['contacts_dict']) == 2
         assert res_data['contacts_dict'][0]['id'] == user2.id
         assert res_data['contacts_dict'][1]['id'] == user3.id
+
+    @with_context
+    def test_coowner_remove_contact(self):
+        from pybossa.core import project_repo
+
+        admin, user2, user3, user4 = UserFactory.create_batch(4)
+
+        project = ProjectFactory.create(owner=user2, published=True, short_name='sampleapp')
+        project.owners_ids.append(user3.id)
+        project_repo.save(project)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
+        data = {'user': user3.name}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify project owner is only user included in contacts.
+        assert len(res_data['contacts_dict']) == 1
+        assert res_data['contacts_dict'][0]['id'] == user2.id
+
+        # Verify project coowner is included in coowners.
+        assert len(res_data['coowners_dict']) == 2
+        assert res_data['coowners_dict'][0]['id'] == user2.id
+        assert res_data['coowners_dict'][1]['id'] == user3.id
+
+        # Add user3 (coowner) as a contact.
+        data = {'coowners': project.owners_ids, 'contacts': [user2.id, user3.id]}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify project owner and coowner are included in contacts.
+        assert len(res_data['contacts_dict']) == 2
+        assert res_data['contacts_dict'][0]['id'] == user2.id
+        assert res_data['contacts_dict'][1]['id'] == user3.id
+
+        # Remove user3 as a coowner.
+        data = {'coowners': [user2.id], 'contacts': [user2.id, user3.id]}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify project owner is only user included in contacts.
+        assert len(res_data['contacts_dict']) == 1
+        assert res_data['contacts_dict'][0]['id'] == user2.id
+
+        # Verify coowner has been removed.
+        assert len(res_data['coowners_dict']) == 1
+        assert res_data['coowners_dict'][0]['id'] == user2.id
+
+        # Verify contact has been removed.
+        assert len(res_data['contacts_dict']) == 1
+        assert res_data['contacts_dict'][0]['id'] == user2.id
 
     @with_context
     def test_user_search_found(self):
