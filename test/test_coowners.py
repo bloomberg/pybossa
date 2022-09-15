@@ -372,34 +372,6 @@ class TestCoowners(web.Helper):
         assert len(res_data['found']) == 0
 
     @with_context
-    def test_user_search_not_coowner(self):
-        from pybossa.core import project_repo
-
-        admin, user2, user3, user4 = UserFactory.create_batch(4)
-
-        project = ProjectFactory.create(owner=user2, published=True, short_name='sampleapp')
-        project.owners_ids.append(user3.id)
-        project_repo.save(project)
-
-        csrf = self.get_csrf('/account/signin')
-        self.signin(email=admin.email_addr, csrf=csrf)
-
-        data = {'user': user3.name, 'contact': True}
-        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
-                            content_type='application/json',
-                            data=json.dumps(data),
-                            follow_redirects=True,
-                            headers={'X-CSRFToken': csrf})
-        res_data = json.loads(res.data)
-
-        import pdb
-        pdb.set_trace()
-
-        # Verify found contains only user 2 and user 3.
-        # Verify project owner is only user included in contacts.
-        #assert len(res_data['found']) == 1
-
-    @with_context
     def test_coowner_invalid(self):
         """
         Test adding and deleting a non-existing user
