@@ -3170,6 +3170,7 @@ def coowners(short_name):
 
     ensure_authorized_to('read', project)
     ensure_authorized_to('update', project)
+
     response = dict(
         template='/projects/coowners.html',
         project=sanitize_project,
@@ -3192,8 +3193,16 @@ def coowners(short_name):
 
             filters = {'enabled': True}
 
-            # If searching contacts, filter to coowners of the project. Otherwise, search all users.
-            users = owners if params.get('contact') else user_repo.search_by_name(query, **filters)
+            # Search all users.
+            users = user_repo.search_by_name(query, **filters)
+
+            # If searching contacts, filter results to only coowners.
+            if params.get('contact'):
+                filtered_list = []
+                for user in users:
+                    if user.id in project.owners_ids:
+                        filtered_list.append(user)
+                users = filtered_list
 
             if not users:
                 markup = Markup('<strong>{}</strong> {} <strong>{}</strong>')
@@ -3219,19 +3228,35 @@ def coowners(short_name):
             # delete ids that don't exist anymore
             delete = [value for value in old_list if value not in overlap_list]
             for _id in delete:
+                # Remove the coowner.
                 project.owners_ids.remove(_id)
             # add ids that weren't there
             add = [value for value in new_list if value not in overlap_list]
             for _id in add:
                 project.owners_ids.append(_id)
 
+            # Update coowners_dict in response.
+            coowners_dict = [{"id": user.id, "fullname": user.fullname} for user in user_repo.get_users(project.owners_ids)]
+            response['coowners_dict'] = coowners_dict
+
             # save contacts
             new_list = [int(x) for x in json.loads(request.data).get('contacts', [])]
+
+            # remove any contacts that were just removed from coowners.
+            for _id in delete:
+                if _id in project.info.get('contacts', []):
+                    new_list.remove(_id)
+
             auditlogger.log_event(project, current_user, 'update', 'project.contacts',
                 project.info.get('contacts'), new_list)
             project.info['contacts'] = new_list
 
             project_repo.save(project)
+
+            # Update contacts_dict in response.
+            contacts_dict = [{"id": user.id, "fullname": user.fullname} for user in user_repo.get_users(project.info['contacts'])]
+            response['contacts_dict'] = contacts_dict
+
             flash(gettext('Configuration updated successfully'), 'success')
 
     return handle_content_type(response)
