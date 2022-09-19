@@ -1,6 +1,9 @@
+import json
 from test.helper import web
 from test import with_context
 from test import db, Fixtures
+from test.factories import ProjectFactory, UserFactory
+from pybossa.core import user_repo
 from pybossa.repositories import ProjectRepository
 
 
@@ -173,28 +176,265 @@ class TestCoowners(web.Helper):
 
     @with_context
     def test_user_search(self):
-        self.register()
-        self.signin()
-        self.register(name="John2", email="john2@john.com",
-                      password="passwd")
-        self.app.get("/admin/users/addsubadmin/2", follow_redirects=True)
-        self.register(name="John3", email="john3@john.com",
-                      password="passwd")
-        self.app.get("/admin/users/addsubadmin/3", follow_redirects=True)
-        self.signin(email="john2@john.com", password="passwd")
-        self.new_project()
+        from pybossa.core import project_repo
 
-        data = {'user': 'johnny9'}
-        res = self.app.post('/project/sampleapp/coowners',
-                            data=data,
-                            follow_redirects=True)
-        assert "We didn&#39;t find any enabled user matching your query" in str(res.data), res.data
+        admin, user2, user3, user4 = UserFactory.create_batch(4)
 
-        data = {'user': 'John3'}
-        res = self.app.post('/project/sampleapp/coowners',
-                            data=data,
-                            follow_redirects=True)
-        assert "/project/sampleapp/add_coowner/John3" in str(res.data), res.data
+        project = ProjectFactory.create(owner=user2, published=True, short_name='sampleapp')
+        project.owners_ids.append(user3.id)
+        project_repo.save(project)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
+        data = {'user': user2.name}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify project owner is only user included in contacts.
+        assert len(res_data['contacts_dict']) == 1
+        assert res_data['contacts_dict'][0]['id'] == user2.id
+
+        # Verify project coowner is included in coowners.
+        assert len(res_data['coowners_dict']) == 2
+        assert res_data['coowners_dict'][0]['id'] == user2.id
+        assert res_data['coowners_dict'][1]['id'] == user3.id
+
+    @with_context
+    def test_coowner_add_contact(self):
+        from pybossa.core import project_repo
+
+        admin, user2, user3, user4 = UserFactory.create_batch(4)
+
+        project = ProjectFactory.create(owner=user2, published=True, short_name='sampleapp')
+        project.owners_ids.append(user3.id)
+        project_repo.save(project)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
+        data = {'user': user3.name}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify project owner is only user included in contacts.
+        assert len(res_data['contacts_dict']) == 1
+        assert res_data['contacts_dict'][0]['id'] == user2.id
+
+        # Verify project coowner is included in coowners.
+        assert len(res_data['coowners_dict']) == 2
+        assert res_data['coowners_dict'][0]['id'] == user2.id
+        assert res_data['coowners_dict'][1]['id'] == user3.id
+
+        # Add user3 (coowner) as a contact.
+        data = {'coowners': project.owners_ids, 'contacts': [user2.id, user3.id]}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify project owner and coowner are included in contacts.
+        assert len(res_data['contacts_dict']) == 2
+        assert res_data['contacts_dict'][0]['id'] == user2.id
+        assert res_data['contacts_dict'][1]['id'] == user3.id
+
+    @with_context
+    def test_coowner_remove_contact(self):
+        from pybossa.core import project_repo
+
+        admin, user2, user3, user4 = UserFactory.create_batch(4)
+
+        project = ProjectFactory.create(owner=user2, published=True, short_name='sampleapp')
+        project.owners_ids.append(user3.id)
+        project_repo.save(project)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
+        data = {'user': user3.name}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify project owner is only user included in contacts.
+        assert len(res_data['contacts_dict']) == 1
+        assert res_data['contacts_dict'][0]['id'] == user2.id
+
+        # Verify project coowner is included in coowners.
+        assert len(res_data['coowners_dict']) == 2
+        assert res_data['coowners_dict'][0]['id'] == user2.id
+        assert res_data['coowners_dict'][1]['id'] == user3.id
+
+        # Add user3 (coowner) as a contact.
+        data = {'coowners': project.owners_ids, 'contacts': [user2.id, user3.id]}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify project owner and coowner are included in contacts.
+        assert len(res_data['contacts_dict']) == 2
+        assert res_data['contacts_dict'][0]['id'] == user2.id
+        assert res_data['contacts_dict'][1]['id'] == user3.id
+
+        # Remove user3 as a coowner.
+        data = {'coowners': [user2.id], 'contacts': [user2.id, user3.id]}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify project owner is only user included in contacts.
+        assert len(res_data['contacts_dict']) == 1
+        assert res_data['contacts_dict'][0]['id'] == user2.id
+
+        # Verify coowner has been removed.
+        assert len(res_data['coowners_dict']) == 1
+        assert res_data['coowners_dict'][0]['id'] == user2.id
+
+        # Verify contact has been removed.
+        assert len(res_data['contacts_dict']) == 1
+        assert res_data['contacts_dict'][0]['id'] == user2.id
+
+    @with_context
+    def test_user_search_found(self):
+        from pybossa.core import project_repo
+
+        admin, user2, user3, user4 = UserFactory.create_batch(4)
+
+        project = ProjectFactory.create(owner=user2, published=True, short_name='sampleapp')
+        project.owners_ids.append(user3.id)
+        project_repo.save(project)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
+        data = {'user': user3.name}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify user3 is found in result.
+        assert len(res_data['found']) == 1
+        assert (res_data['found'][0]['id'] == user3.id)
+
+    @with_context
+    def test_user_search_not_found(self):
+        from pybossa.core import project_repo
+
+        admin, user2, user3, user4 = UserFactory.create_batch(4)
+
+        project = ProjectFactory.create(owner=user2, published=True, short_name='sampleapp')
+        project.owners_ids.append(user3.id)
+        project_repo.save(project)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
+        data = {'user': 'not exist'}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify no results
+        assert len(res_data['found']) == 0
+
+    @with_context
+    def test_user_search_partial_found(self):
+        from pybossa.core import project_repo
+
+        admin, user2, user3, user4 = UserFactory.create_batch(4)
+
+        project = ProjectFactory.create(owner=user2, published=True, short_name='sampleapp')
+        project.owners_ids.append(user3.id)
+        project_repo.save(project)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
+        data = {'user': 'User'}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify results (admin, user2, user3, user4)
+        assert len(res_data['found']) == 4
+
+    @with_context
+    def test_user_search_contact_found(self):
+        from pybossa.core import project_repo
+
+        admin, user2, user3, user4 = UserFactory.create_batch(4)
+
+        project = ProjectFactory.create(owner=user2, published=True, short_name='sampleapp')
+        project.owners_ids.append(user3.id)
+        project_repo.save(project)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
+        data = {'user': 'User', 'contact': True}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify results (user2, user3)
+        assert len(res_data['found']) == 2
+        assert res_data['found'][0]['id'] == user2.id
+        assert res_data['found'][1]['id'] == user3.id
+
+    @with_context
+    def test_user_search_contact_not_found(self):
+        from pybossa.core import project_repo
+
+        admin, user2, user3, user4 = UserFactory.create_batch(4)
+
+        project = ProjectFactory.create(owner=user2, published=True, short_name='sampleapp')
+        project.owners_ids.append(user3.id)
+        project_repo.save(project)
+
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=admin.email_addr, csrf=csrf)
+
+        data = {'user': user4.name, 'contact': True}
+        res = self.app.post('/project/%s/coowners?api_key=%s' % (project.short_name, admin.api_key),
+                            content_type='application/json',
+                            data=json.dumps(data),
+                            follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+
+        # Verify no results.
+        assert len(res_data['found']) == 0
 
     @with_context
     def test_coowner_invalid(self):
@@ -223,8 +463,8 @@ class TestCoowners(web.Helper):
         from pybossa.core import project_repo
         self.register()
         project = Fixtures.create_project({
-            'passwd_hash': 'hello', 
-            'data_classification': dict(input_data="L4 - public", output_data="L4 - public"), 
+            'passwd_hash': 'hello',
+            'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
             'kpi': 0.5,
             'product': 'abc',
             'subproduct': 'def'
