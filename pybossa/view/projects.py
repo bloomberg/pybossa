@@ -1873,6 +1873,9 @@ def bulk_update_assign_worker(short_name):
             if task_id is not None:
                 t = task_repo.get_task_by(project_id=project.id,
                                         id=int(task_id))
+                # Skip gold task for bulk assign users; allow single assign users for gold task
+                if bool(t.gold_answers) and len(task_ids) > 1:
+                    continue
                 # add new users
                 user_pref = t.user_pref or {}
                 assign_user = user_pref.get("assign_user", [])

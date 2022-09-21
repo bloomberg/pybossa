@@ -102,7 +102,6 @@ class TestAssignTaskWorker(web.Helper):
         res_data = json.loads(res.data)
         assert task1.priority_0 == .5, task1.priority_0
 
-
     @with_context
     def test_get_assign_workers_by_bulk(self):
         """Test get assign worker by bulk."""
@@ -122,6 +121,8 @@ class TestAssignTaskWorker(web.Helper):
         task_repo.update(task1)
         task2 = TaskFactory.create(project=project)
         task_repo.update(task2)
+        task3 = TaskFactory.create(project=project, gold_answers={'answer': 1})
+        task_repo.update(task3)
 
         # Assign user to all tasks by filter.
         req_data = dict(filters='{"add":[{"fullname":"' + user1.fullname + '","email":"' + user1.email_addr + '"}],"remove":[]}')
@@ -138,6 +139,17 @@ class TestAssignTaskWorker(web.Helper):
         emails = [user['email'] for user in res_data['all_users']]
         assert user1.email_addr in emails
         assert user2.email_addr in emails
+
+        # Test bulk assign users: skip gold task
+        req_data = {
+            "add": [{"fullname": user1.fullname, "email": user1.email_addr}],
+            "remove": [],
+            "filters": json.dumps({"changed": False})}
+        res = self.app.post(url, content_type='application/json',
+                            data=json.dumps(req_data), follow_redirects=True,
+                            headers={'X-CSRFToken': csrf})
+        res_data = json.loads(res.data)
+        assert len(res_data["assign_users"]) == 2
 
     @with_context
     def test_update_assign_workers_by_task_id(self):
