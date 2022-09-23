@@ -10,7 +10,7 @@ jobs:
         python-version: [3.9]
     services:
       postgres:
-        image: postgres:9.5
+        image: postgres:13.6
         env:
           POSTGRES_PASSWORD: postgres
         # Set health checks to wait until postgres has started
@@ -34,11 +34,17 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Pre installation
+        env:
+          REDIS_VERSION: 6.2.7
         run: |
+          wget https://download.redis.io/releases/redis-$REDIS_VERSION.tar.gz
+          tar -xzf redis-$REDIS_VERSION.tar.gz
+          cd redis-$REDIS_VERSION && make install && cd ..
           sudo apt-get update -y
-          sudo apt-get install -y libxml2-dev libxmlsec1-dev libsasl2-dev libldap2-dev libssl-dev libkrb5-dev libpq-dev redis-server redis-tools postgresql-client
+          sudo apt-get install -y libxml2-dev libxmlsec1-dev libsasl2-dev libldap2-dev libssl-dev libkrb5-dev libpq-dev postgresql-client
           redis-server --version
           redis-server contrib/redis/sentinel.conf --sentinel
+          redis-server&
           cd pybossa && ln -s themes/default/translations && cd ..
           cp settings_test.py.tmpl pybossa/settings_test.py
 
