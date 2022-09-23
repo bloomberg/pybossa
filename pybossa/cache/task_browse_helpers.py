@@ -344,8 +344,9 @@ def validate_user_preferences(user_pref):
         raise ValueError('invalid locations user preference: {}'
                         .format(loc))
 
-def _get_field_filters(filter_string):
-    filters = json.loads(filter_string)
+
+def _get_field_filters(filters):
+    filters = filters if type(filters) is list else json.loads(filters)
     return [(name, operator, value)
             for name, operator, value in filters
             if value and is_valid_searchable_column(name)]
