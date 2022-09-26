@@ -3192,7 +3192,7 @@ def coowners(short_name):
         if form.user.data:
             # search users
             query = form.user.data
-            params = json.loads(request.data)
+            params = json.loads(request.data) if request.data else {}
 
             filters = {'enabled': True}
 
