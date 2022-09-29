@@ -3548,6 +3548,7 @@ def project_config(short_name):
             if bool(data_access_levels):
                 # for private gigwork
                 project.info['data_access'] = data.get('data_access')
+            project.info['completed_tasks_cleanup_days'] = data.get('completed_tasks_cleanup_days')
             project_repo.save(project)
             flash(gettext('Configuration updated successfully'), 'success')
         except Exception as e:
@@ -3559,12 +3560,14 @@ def project_config(short_name):
     ext_config = project.info.get('ext_config', {})
     input_forms, ext_config_dict = generate_input_forms_and_external_config_dict()
     data_access = project.info.get('data_access') or []
+    completed_tasks_cleanup_days = project.info.get('completed_tasks_cleanup_days')
     response = dict(template='/projects/summary.html',
                     external_config_dict=json.dumps(ext_config_dict),
                     forms=input_forms,
                     data_access=json.dumps(data_access),
-                    valid_access_levels=data_access_levels.get('valid_access_levels') or [],
-                    csrf=generate_csrf()
+                    valid_access_levels=data_access_levels.get('valid_access_levels'),
+                    csrf=generate_csrf(),
+                    completed_tasks_cleanup_days=completed_tasks_cleanup_days
                     )
 
     return handle_content_type(response)
