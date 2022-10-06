@@ -16,12 +16,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pybossa.jobs import create_dict_jobs, enqueue_periodic_jobs,\
-    get_quarterly_date, get_periodic_jobs
+    get_quarterly_date, get_periodic_jobs, perform_completed_tasks_cleanup
 from unittest.mock import patch
 from nose.tools import assert_raises
 from test import with_context, Test
+from test.factories import ProjectFactory, TaskFactory, TaskRunFactory
+from accessdb import AccessDatabase
+from sqlalchemy.sql import text
 
 
 def jobs():
@@ -34,6 +37,7 @@ def jobs():
     yield dict(name='name', args=[], kwargs={}, timeout=10, queue='medium')
     yield dict(name='name', args=[], kwargs={}, timeout=10, queue='monthly')
     yield dict(name='name', args=[], kwargs={}, timeout=10, queue='quaterly')
+    yield dict(name='name', args=[], kwargs={}, timeout=10, queue='weekly')
 
 
 class TestJobs(Test):
@@ -87,6 +91,16 @@ class TestJobs(Test):
         queue_name = 'badqueue'
         res = enqueue_periodic_jobs(queue_name)
         msg = "%s jobs in %s have been enqueued" % (0, queue_name)
+        assert res == msg, res
+
+    @with_context
+    @patch('pybossa.jobs.get_periodic_jobs')
+    def test_enqueue_periodic_weekly_job(self, mock_get_periodic_jobs):
+        """Test JOB enqueue_periodic_jobs for queue name 'weekly' works."""
+        mock_get_periodic_jobs.return_value = jobs()
+        queue_name = "weekly"
+        res = enqueue_periodic_jobs(queue_name)
+        msg = "%s jobs in %s have been enqueued" % (1, queue_name)
         assert res == msg, res
 
     @with_context
@@ -216,3 +230,96 @@ class TestJobs(Test):
     @with_context
     def test_get_quarterly_date_raises_TypeError_on_wrong_args(self):
         assert_raises(TypeError, get_quarterly_date, 'wrong_arg')
+
+    @with_context
+    @patch('pybossa.jobs.get_export_task_jobs')
+    @patch('pybossa.jobs.get_project_jobs')
+    @patch('pybossa.jobs.get_autoimport_jobs')
+    @patch('pybossa.jobs.get_inactive_users_jobs')
+    @patch('pybossa.jobs.get_non_contributors_users_jobs')
+    def test_completed_tasks_cleanup_scheduled_with_weekly_queue(self, non_contr, inactive,
+            autoimport, project, export):
+        """Test completed_tasks_cleanup gets scheduled."""
+        inactive.return_value = jobs()
+        non_contr.return_value = jobs()
+
+        project = ProjectFactory.create(info=dict(completed_tasks_cleanup_days=30))
+        weekly_jobs = get_periodic_jobs("weekly")
+        # Only returns jobs for the specified queue
+        for job in weekly_jobs:
+            assert job["name"].__name__ == "perform_completed_tasks_cleanup", "completed tasks cleanup job should be scheduled"
+            assert job['queue'] == "weekly"
+
+    @with_context
+    def test_completed_tasks_cleanup(self):
+        """Test completed_tasks_cleanup deletes tasks qualify for deletion."""
+
+        cleanup_days = 30
+        project = ProjectFactory.create(info=dict(completed_tasks_cleanup_days=cleanup_days))
+        # task creation dates. generate sample tasks
+        # 2 tasks completed are with creation date more than 30 days from current date
+        # 1 task completed and is with current creation date
+        now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+        created = (datetime.utcnow() - timedelta(60)).strftime('%Y-%m-%dT%H:%M:%S')
+        past_30days = (datetime.utcnow() - timedelta(30)).strftime('%Y-%m-%dT%H:%M:%S')
+
+        task1 = TaskFactory.create(project=project, created=past_30days, n_answers=2, state="completed")
+        task2 = TaskFactory.create(project=project, created=now, n_answers=4, state="completed")
+        task3 = TaskFactory.create(project=project, created=past_30days, n_answers=3, state="completed")
+
+        TaskRunFactory.create_batch(2, project=project, created=created, finish_time=now, task=task1)
+        TaskRunFactory.create_batch(4, project=project, created=created, finish_time=now, task=task2)
+        TaskRunFactory.create_batch(3, project=project, created=created, finish_time=now, task=task3)
+
+        task1_id, task2_id, task3_id = task1.id, task2.id, task3.id
+        project_id = project.id
+        perform_completed_tasks_cleanup()
+        with AccessDatabase() as db:
+            # confirm expected task data cleaned up from task table
+            # sql = f"SELECT count(*) FROM task WHERE id IN({task1.id}, {task2.id}, {task3.id});"
+            sql = f"SELECT count(*) FROM task WHERE id IN({task1_id}, {task2_id}, {task3_id});"
+            db.execute_sql(sql)
+            available_task_count = db.cursor.fetchone()[0]
+            assert available_task_count == 1, "With task1 & task3 deleted, only task2 that is less than 30 days old should be available"
+
+            # confirm expected task run data cleaned up from task_run table
+            sql = f"SELECT count(*) FROM task_run WHERE task_id IN({task1_id}, {task2_id}, {task3_id});"
+            db.execute_sql(sql)
+            available_task_run_count = db.cursor.fetchone()[0]
+            assert available_task_run_count == 4, "With task1 & task3 deleted, only task2 taskruns that are less than 30 days old should be available"
+
+            # confirm expected task result data cleaned up from task table
+            sql = f"SELECT count(*) FROM result WHERE task_id IN({task1_id}, {task2_id}, {task3_id});"
+            db.execute_sql(sql)
+            available_result_count = db.cursor.fetchone()[0]
+            assert available_result_count == 1, "With task1 & task3 deleted, only task2 results that are less than 30 days old should be available"
+
+            # 2 tasks expected to be archived; task1 and task3 that are 30 days old tasks
+            sql = f"SELECT count(*) FROM task_archived WHERE project_id = {project_id};"
+            db.execute_sql(sql)
+            archived_tasks_count = db.cursor.fetchone()[0]
+            assert archived_tasks_count == 2, "Two completed tasks that are 30 days old should be archived"
+
+            # 5 task runs expected to be archived. 2 from taskid 1 and 3 from taskid 3 that are 30 days old tasks
+            sql = f"SELECT count(*) FROM task_run_archived WHERE project_id = {project_id};"
+            db.execute_sql(sql)
+            archived_task_runs_count = db.cursor.fetchone()[0]
+            assert archived_task_runs_count == 5, "Two completed tasks that are 30 days old should be archived"
+
+            # 2 results expected to be archived. 1 for taskid 1 and 1 for taskid 3 that are 30 days old tasks
+            sql = f"SELECT count(*) FROM result_archived WHERE project_id = {project_id};"
+            db.execute_sql(sql)
+            archived_results_count = db.cursor.fetchone()[0]
+            assert archived_results_count == 2, "Two completed tasks that are 30 days old should be archived"
+
+        # perform archived records cleanup upon tests complete
+        with AccessDatabase() as db:
+            sql = f"DELETE FROM task_archived WHERE id IN({task1_id}, {task2_id}, {task3_id});"
+            db.execute_sql(sql)
+            db.conn.commit()
+            sql = f"DELETE FROM task_run_archived WHERE task_id IN({task1_id}, {task2_id}, {task3_id});"
+            db.execute_sql(sql)
+            db.conn.commit()
+            sql = f"DELETE FROM result_archived WHERE task_id IN({task1_id}, {task2_id}, {task3_id});"
+            db.execute_sql(sql)
+            db.conn.commit()

@@ -21,7 +21,7 @@ import math
 import os
 import time
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 from zipfile import ZipFile
 
@@ -47,6 +47,7 @@ from pybossa.leaderboard.jobs import leaderboard
 from pybossa.model.webhook import Webhook
 from pybossa.util import with_cache_disabled, publish_channel, \
     mail_with_enabled_users
+from purge_data import purge_task_data
 
 MINUTE = 60
 IMPORT_TASKS_TIMEOUT = (20 * MINUTE)
@@ -96,6 +97,20 @@ def get_quarterly_date(now):
     execute_day = 31 if execute_month in [3, 12] else 30
     execute_date = datetime(now.year, execute_month, execute_day)
     return datetime.combine(execute_date, now.time())
+
+
+def get_saturday_4pm_date(now):
+    """Get weekend date Saturday 4pm for weekly execution jobs."""
+    if not isinstance(now, datetime):
+        raise TypeError('Expected %s, got %s' % (type(datetime), type(now)))
+    # Mon - 0, Tue - 1, Wed - 2, Thurs - 3, Fri - 4, Sat - 5, Sun - 6
+    SATURDAY = 5
+    DAYS_IN_WEEK = 7
+    offset = (SATURDAY - now.weekday()) % DAYS_IN_WEEK
+    saturday = now + timedelta(days=offset)
+    saturday = saturday.strftime('%Y-%m-%dT16:00:00')
+    saturday = datetime.strptime(saturday, '%Y-%m-%dT%H:%M:%S')
+    return saturday
 
 
 def enqueue_job(job):
@@ -149,9 +164,11 @@ def get_periodic_jobs(queue):
     leaderboard_jobs = get_leaderboard_jobs() if queue == 'super' else []
     weekly_update_jobs = get_weekly_stats_update_projects() if queue == 'low' else []
     failed_jobs = get_maintenance_jobs() if queue == 'maintenance' else []
+    completed_tasks_cleanup_job = get_completed_tasks_cleaup_jobs() if queue == "weekly" else []
     _all = [jobs, admin_report_jobs, project_jobs, autoimport_jobs,
             engage_jobs, non_contrib_jobs, dashboard_jobs,
-            weekly_update_jobs, failed_jobs, leaderboard_jobs]
+            weekly_update_jobs, failed_jobs, leaderboard_jobs,
+            completed_tasks_cleanup_job]
     return (job for sublist in _all for job in sublist if job['queue'] == queue)
 
 
@@ -1522,3 +1539,61 @@ def export_all_users(fmt, email_addr):
         raise
     finally:
         send_mail(mail_dict)
+
+
+def get_completed_tasks_cleaup_jobs(queue="weekly"):
+    """Return job that will perform cleanup of completed tasks."""
+    timeout = current_app.config.get('TIMEOUT')
+    job = dict(name=perform_completed_tasks_cleanup,
+                args=[],
+                kwargs={},
+                timeout=timeout,
+                queue=queue)
+    yield job
+
+
+def perform_completed_tasks_cleanup():
+    from sqlalchemy.sql import text
+    from pybossa.core import db
+
+    valid_days = [days[0] for days in current_app.config.get('COMPLETED_TASK_CLEANUP_DAYS', [(None, None)]) if days[0]]
+    if not valid_days:
+        current_app.logger.info("Skipping perform completed tasks cleanup. Missing configuration COMPLETED_TASK_CLEANUP_DAYS.")
+        return
+
+    # identify projects that are set for automated completed tasks cleanup
+    projects = []
+    sql = text('''SELECT id as project_id, info->>'completed_tasks_cleanup_days' as cleanup_days FROM project
+               WHERE info->>'completed_tasks_cleanup_days' IS NOT NULL
+               ;''')
+    results = db.slave_session.execute(sql)
+    for row in results:
+        project_id = row.project_id
+        try:
+            cleanup_days = int(row.cleanup_days)
+        except ValueError:
+            cleanup_days = -1
+        if cleanup_days not in valid_days:
+            current_app.logger.info(
+                f"Skipping project cleanup days due to invalid configuration,"
+                f"project id {project_id}, completed_tasks_cleanup_days {cleanup_days}, valid days {valid_days}"
+            )
+        else:
+            projects.append((project_id, cleanup_days))
+
+    for project in projects:
+        project_id, cleanup_days = project
+        # identify tasks that are set for automated completed tasks cleanup
+        sql = text('''SELECT id AS task_id FROM task
+                    WHERE  project_id=:project_id AND
+                    state=:state AND
+                    TO_DATE(created, 'YYYY-MM-DD"T"HH24:MI:SS.US') <= NOW() - ':duration days' :: INTERVAL
+                    ORDER BY created;
+                ;''')
+        params = dict(project_id=project_id, state="completed", duration=cleanup_days)
+        results = db.slave_session.execute(sql, params)
+        total_tasks = results.rowcount if results else 0
+        current_app.logger.info(f"Performing completed tasks cleanup for project {project_id}. Total tasks: {total_tasks}")
+        for row in results:
+            purge_task_data(row.task_id, project_id)
+        current_app.logger.info(f"Performing completed tasks cleanup for project {project_id}")
