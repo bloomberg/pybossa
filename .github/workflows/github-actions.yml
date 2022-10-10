@@ -73,7 +73,7 @@ jobs:
       - name: Run unit test
         run: |
           echo "::remove-matcher owner=python::"
-          ./run_tests
+          ./run_tests ./test/test_jobs:TestJobs.test_completed_tasks_cleanup -s
 
       - name: Run code coverage
         run: |

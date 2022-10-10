@@ -1556,8 +1556,11 @@ def perform_completed_tasks_cleanup():
     from sqlalchemy.sql import text
     from pybossa.core import db
 
+    print("Inside perform_completed_tasks_cleanup")
     valid_days = [days[0] for days in current_app.config.get('COMPLETED_TASK_CLEANUP_DAYS', [(None, None)]) if days[0]]
+    print("COMPLETED_TASK_CLEANUP_DAYS config value", valid_days)
     if not valid_days:
+        print("COMPLETED_TASK_CLEANUP_DAYS not configured. exiting perform_completed_tasks_cleanup.")
         current_app.logger.info("Skipping perform completed tasks cleanup. Missing configuration COMPLETED_TASK_CLEANUP_DAYS.")
         return
 
@@ -1566,6 +1569,7 @@ def perform_completed_tasks_cleanup():
     sql = text('''SELECT id as project_id, info->>'completed_tasks_cleanup_days' as cleanup_days FROM project
                WHERE info->>'completed_tasks_cleanup_days' IS NOT NULL
                ;''')
+    print("Identify projects having completed tasks cleanup configured")
     results = db.slave_session.execute(sql)
     for row in results:
         project_id = row.project_id
@@ -1580,7 +1584,9 @@ def perform_completed_tasks_cleanup():
             )
         else:
             projects.append((project_id, cleanup_days))
+    print("Projects with completed tasks cleanup configured", str(projects))
 
+    print("Identify completed tasks to be cleaned up")
     for project in projects:
         project_id, cleanup_days = project
         # identify tasks that are set for automated completed tasks cleanup
@@ -1593,7 +1599,9 @@ def perform_completed_tasks_cleanup():
         params = dict(project_id=project_id, state="completed", duration=cleanup_days)
         results = db.slave_session.execute(sql, params)
         total_tasks = results.rowcount if results else 0
+        print("Project ", project_id, ". Total tasks to cleanup ", total_tasks)
         current_app.logger.info(f"Performing completed tasks cleanup for project {project_id}. Total tasks: {total_tasks}")
         for row in results:
+            print("Calling purge_task_data. project_id ", project_id, ", task_id ", row.task_id)
             purge_task_data(row.task_id, project_id)
         current_app.logger.info(f"Performing completed tasks cleanup for project {project_id}")

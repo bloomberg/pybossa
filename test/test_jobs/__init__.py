@@ -280,7 +280,8 @@ class TestJobs(Test):
             sql = f"SELECT count(*) FROM task WHERE id IN({task1_id}, {task2_id}, {task3_id});"
             db.execute_sql(sql)
             available_task_count = db.cursor.fetchone()[0]
-            assert available_task_count == 1, "With task1 & task3 deleted, only task2 that is less than 30 days old should be available"
+            print("Available tasks after completed tasks cleanup", available_task_count)
+            assert available_task_count == 1, available_task_count
 
             # confirm expected task run data cleaned up from task_run table
             sql = f"SELECT count(*) FROM task_run WHERE task_id IN({task1_id}, {task2_id}, {task3_id});"
