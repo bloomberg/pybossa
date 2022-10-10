@@ -252,7 +252,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
             # if not sort by lock_status or locked_tasks_in_project is empty/None,
             # sort by the column "order_by"
             order_by =  args.get('order_by')
-            sql_order_by = order_by if not locked_tasks_in_project and order_by else 'id ASC'
+            sql_order_by = order_by or 'id ASC'
             sql_query = sql + sql_order.format(sql_order_by) + sql_limit_offset
 
             results = session.execute(text(sql_query), params)
