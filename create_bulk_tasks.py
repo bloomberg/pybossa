@@ -20,6 +20,7 @@ import sys
 
 from accessdb import AccessDatabase
 import psycopg2
+from pybossa.core import db, create_app
 
 root_logger = logging.getLogger()
 hdlr = TimedRotatingFileHandler("databulk.log", when="D", backupCount=10)
@@ -36,6 +37,8 @@ handler.setFormatter(formatter)
 root_logger.addHandler(handler)
 logger = logging.getLogger("datapurge")
 current_year = datetime.today().year
+
+app = create_app(run_as_server=False)
 
 def create_task(project_id, created, num_answers, priority, year):
     sql = """
@@ -122,21 +125,23 @@ def create_bulk_data(project_id, num_records, random_year):
         created = f"{year}-{month}-{day}T{hour}:{min}:01.604603"
         user_ids = [4, 5, 6]
 
+        with app.app_context():
+            task_id = create_task(project_id, created, num_answers, priority, year)
+            print("Task created: ", task_id)
 
-        task_id = create_task(project_id, created, num_answers, priority, year)
-        print("Task created: ", task_id)
+            task_run_ids = [create_task_run(project_id, task_id, user_ids[i], created) for i in range(num_answers)]
+            print("Taskruns created: ", str(task_run_ids))
 
-        task_run_ids = [create_task_run(project_id, task_id, user_ids[i], created) for i in range(num_answers)]
-        print("Taskruns created: ", str(task_run_ids))
-
-        result_id = [create_result(project_id, task_id, task_run_ids, created) for _ in range(randrange(1, 5))]
-        print("Result created: ", result_id)
+            result_id = [create_result(project_id, task_id, task_run_ids, created) for _ in range(randrange(1, 5))]
+            print("Result created: ", result_id)
 
 def setup_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--numtasks", dest="num_tasks", type=int, required=True, help="number of tasks to create")
     parser.add_argument("-p", "--projectid", dest="project_id", type=int, required=True, help="project id under which tasks to create")
-    parser.add_argument("-y", "--no-random-year", dest="random_year", default=True, help="generate tasks by current year; disable random create year range", action="store_false")
+    parser.add_argument("--random-year", dest="random_year", action="store_true", help="generate tasks with random year for task created date")
+    parser.add_argument("--no-random-year", dest="random_year", action="store_false", help="generate tasks with current year for task created date; no random year")
+    parser.set_defaults(random_year=True) # create tasks with created date having random year number
     args = parser.parse_args()
     return args
 
