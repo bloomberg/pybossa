@@ -277,15 +277,16 @@ class TestJobs(Test):
         project_id = project.id
         perform_completed_tasks_cleanup()
         assert mock_purge_tasks.call_count == 2
-        mock_purge_tasks.assert_called_with(task1.id, project.id)
-
         # task 1 and task 3 would be cleaned up as they are completed
         # and 30 days old hence qualifying for deletion.
         # task 2 though complete is less than 30 days old, hence not
         # get called for deletion
-        calls_params = [(task3_id, project.id), (task1_id, project.id)]
-        for i, call in enumerate(mock_purge_tasks.call_args_list):
-            assert call[0] == calls_params[i]
+        expected_calls_params = [(task3_id, project.id), (task1_id, project.id)]
+        actual_calls_params = []
+        for call in mock_purge_tasks.call_args_list:
+            assert call[0] in expected_calls_params
+            actual_calls_params.append(call[0])
+        assert (task2_id, project_id) not in actual_calls_params, "Task id 2 should not be purged"
 
         # To test actual task cleanup against database, make sure to have
         # archived tables created in you local test database.
