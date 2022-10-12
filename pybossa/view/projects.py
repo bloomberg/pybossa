@@ -1060,6 +1060,7 @@ def _import_tasks(project, **form_data):
         if report.total > 0:
             # reset cache / memoized
             delete_memoized(get_searchable_columns)
+            delete_memoized(n_available_tasks_for_user)
             cached_projects.delete_browse_tasks(project.id)
             check_and_send_task_notifications(project.id)
     else:
@@ -1982,6 +1983,7 @@ def delete_selected_tasks(short_name):
     try:
         # reset cache / memoized
         delete_memoized(get_searchable_columns)
+        delete_memoized(n_available_tasks_for_user)
 
         project, owner, ps = project_by_shortname(short_name)
         ensure_authorized_to('read', project)
@@ -2056,6 +2058,7 @@ def delete_tasks(short_name):
     else:
         # reset cache / memoized
         delete_memoized(get_searchable_columns)
+        delete_memoized(n_available_tasks_for_user)
 
         force_reset = request.form.get("force_reset") == 'true'
         if ps.n_tasks <= MAX_NUM_SYNCHRONOUS_TASKS_DELETE:
