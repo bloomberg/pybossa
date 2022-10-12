@@ -18,7 +18,8 @@
 
 from datetime import datetime, timedelta
 from pybossa.jobs import create_dict_jobs, enqueue_periodic_jobs,\
-    get_quarterly_date, get_periodic_jobs, perform_completed_tasks_cleanup
+    get_quarterly_date, get_periodic_jobs, perform_completed_tasks_cleanup,\
+    get_saturday_4pm_date
 from unittest.mock import patch
 from nose.tools import assert_raises
 from test import with_context, Test
@@ -342,3 +343,14 @@ class TestJobs(Test):
         #     sql = f"DELETE FROM result_archived WHERE task_id IN({task1_id}, {task2_id}, {task3_id});"
         #     db.execute_sql(sql)
         #     db.conn.commit()
+
+    @with_context
+    def test_saturday_4pm_date(self):
+        """Test date generated is saturday 4 pm date from a given date."""
+        date1 = datetime.strptime("2022-10-12 10:00PM", "%Y-%m-%d %I:%M%p")
+        saturday = get_saturday_4pm_date(date1)
+        assert saturday.strftime("%Y-%m-%d %H:%M:%S") == "2022-10-15 16:00:00"
+        # test with some other date
+        date2 = datetime.strptime("2026-01-31 10:00AM", "%Y-%m-%d %I:%M%p")
+        saturday = get_saturday_4pm_date(date2)
+        assert saturday.strftime("%Y-%m-%d %H:%M:%S") == "2026-01-31 16:00:00"
