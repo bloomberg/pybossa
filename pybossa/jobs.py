@@ -164,11 +164,10 @@ def get_periodic_jobs(queue):
     leaderboard_jobs = get_leaderboard_jobs() if queue == 'super' else []
     weekly_update_jobs = get_weekly_stats_update_projects() if queue == 'low' else []
     failed_jobs = get_maintenance_jobs() if queue == 'maintenance' else []
-    completed_tasks_cleanup_job = get_completed_tasks_cleaup_jobs() if queue == "weekly" else []
+    # completed_tasks_cleanup_job = get_completed_tasks_cleaup_jobs() if queue == 'weekly' else [] # TODO: uncomment in future PR
     _all = [jobs, admin_report_jobs, project_jobs, autoimport_jobs,
             engage_jobs, non_contrib_jobs, dashboard_jobs,
-            weekly_update_jobs, failed_jobs, leaderboard_jobs,
-            completed_tasks_cleanup_job]
+            weekly_update_jobs, failed_jobs, leaderboard_jobs]
     return (job for sublist in _all for job in sublist if job['queue'] == queue)
 
 
@@ -1541,15 +1540,16 @@ def export_all_users(fmt, email_addr):
         send_mail(mail_dict)
 
 
-def get_completed_tasks_cleaup_jobs(queue="weekly"):
-    """Return job that will perform cleanup of completed tasks."""
-    timeout = current_app.config.get('TIMEOUT')
-    job = dict(name=perform_completed_tasks_cleanup,
-                args=[],
-                kwargs={},
-                timeout=timeout,
-                queue=queue)
-    yield job
+# TODO: uncomment, reuse this under future PR
+# def get_completed_tasks_cleaup_jobs(queue="weekly"):
+#     """Return job that will perform cleanup of completed tasks."""
+#     timeout = current_app.config.get('TIMEOUT')
+#     job = dict(name=perform_completed_tasks_cleanup,
+#                 args=[],
+#                 kwargs={},
+#                 timeout=timeout,
+#                 queue=queue)
+#     yield job
 
 
 def perform_completed_tasks_cleanup():
@@ -1575,8 +1575,8 @@ def perform_completed_tasks_cleanup():
             cleanup_days = -1
         if cleanup_days not in valid_days:
             current_app.logger.info(
-                f"Skipping project cleanup days due to invalid configuration,"
-                f"project id {project_id}, completed_tasks_cleanup_days {cleanup_days}, valid days {valid_days}"
+                f"Skipping project cleanup days due to invalid cleanup days,"
+                f"project id {project_id}, completed_tasks_cleanup_days {row.cleanup_days}, valid days {valid_days}"
             )
         else:
             projects.append((project_id, cleanup_days))
@@ -1593,7 +1593,7 @@ def perform_completed_tasks_cleanup():
         params = dict(project_id=project_id, state="completed", duration=cleanup_days)
         results = db.slave_session.execute(sql, params)
         total_tasks = results.rowcount if results else 0
-        current_app.logger.info(f"Performing completed tasks cleanup for project {project_id}. Total tasks: {total_tasks}")
+        current_app.logger.info(f"Performing cleanup of {total_tasks} completed tasks for project {project_id} that are older than {cleanup_days} days or more.")
         for row in results:
             purge_task_data(row.task_id, project_id)
-        current_app.logger.info(f"Performing completed tasks cleanup for project {project_id}")
+        current_app.logger.info(f"Finished cleanup of completed tasks for project {project_id}")

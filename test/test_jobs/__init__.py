@@ -289,6 +289,81 @@ class TestJobs(Test):
             actual_calls_params.append(call[0])
         assert (task2_id, project_id) not in actual_calls_params, "Task id 2 should not be purged"
 
+    @with_context
+    def test_saturday_4pm_date(self):
+        """Test date generated is saturday 4 pm date from a given date."""
+        date1 = datetime.strptime("2022-10-12 10:00PM", "%Y-%m-%d %I:%M%p")
+        saturday = get_saturday_4pm_date(date1)
+        assert saturday.strftime("%Y-%m-%d %H:%M:%S") == "2022-10-15 16:00:00"
+        # test with some other date
+        date2 = datetime.strptime("2026-01-31 10:00AM", "%Y-%m-%d %I:%M%p")
+        saturday = get_saturday_4pm_date(date2)
+        assert saturday.strftime("%Y-%m-%d %H:%M:%S") == "2026-01-31 16:00:00"
+
+    @with_context
+    @patch('pybossa.jobs.purge_task_data')
+    def test_completed_tasks_cleanup_bad_config(self, mock_purge_tasks):
+        """Test completed_tasks_cleanup deletes tasks qualify for deletion."""
+
+        from flask import current_app
+        current_app.config['COMPLETED_TASK_CLEANUP_DAYS'] = [(None, None)]
+        perform_completed_tasks_cleanup()
+        assert not mock_purge_tasks.called
+
+    @with_context
+    @patch('pybossa.jobs.purge_task_data')
+    def test_completed_tasks_cleanup_bad_project_config(self, mock_purge_tasks):
+        """Test completed_tasks_cleanup deletes tasks qualify for deletion."""
+
+        from flask import current_app
+        current_app.config['COMPLETED_TASK_CLEANUP_DAYS'] = [(30, "30 days"), (60, "60 days")]
+        ProjectFactory.create(info=dict(completed_tasks_cleanup_days=240))
+        ProjectFactory.create(info=dict(completed_tasks_cleanup_days="xyz"))
+        perform_completed_tasks_cleanup()
+        assert not mock_purge_tasks.called
+
+    # TODO: uncomment after tests database can be upgraded similar to pybossa database
+    # this test performs end to end testing archiving data to tables and cleaning up
+    # archive tables from test db upon testing complete for future test runs to be successful
+    # mock_purge_tasks can be removed with task data cleanup and archive happening in actual
+    # @with_context
+    # @patch('pybossa.jobs.purge_task_data')
+    # def test_completed_tasks_cleanup(self, mock_purge_tasks):
+    #     """Test completed_tasks_cleanup deletes tasks qualify for deletion."""
+
+    #     cleanup_days = 30
+    #     project = ProjectFactory.create(info=dict(completed_tasks_cleanup_days=cleanup_days))
+
+    #     # task creation dates. generate sample tasks
+    #     # 2 tasks completed are with creation date more than 30 days from current date
+    #     # 1 task completed and is with current creation date
+    #     now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+    #     created = (datetime.utcnow() - timedelta(60)).strftime('%Y-%m-%dT%H:%M:%S')
+    #     past_30days = (datetime.utcnow() - timedelta(30)).strftime('%Y-%m-%dT%H:%M:%S')
+
+    #     task1 = TaskFactory.create(project=project, created=past_30days, n_answers=2, state="completed")
+    #     task2 = TaskFactory.create(project=project, created=now, n_answers=4, state="completed")
+    #     task3 = TaskFactory.create(project=project, created=past_30days, n_answers=3, state="completed")
+
+    #     TaskRunFactory.create_batch(2, project=project, created=created, finish_time=now, task=task1)
+    #     TaskRunFactory.create_batch(4, project=project, created=created, finish_time=now, task=task2)
+    #     TaskRunFactory.create_batch(3, project=project, created=created, finish_time=now, task=task3)
+
+    #     task1_id, task2_id, task3_id = task1.id, task2.id, task3.id
+    #     project_id = project.id
+    #     perform_completed_tasks_cleanup()
+    #     assert mock_purge_tasks.call_count == 2
+    #     # task 1 and task 3 would be cleaned up as they are completed
+    #     # and 30 days old hence qualifying for deletion.
+    #     # task 2 though complete is less than 30 days old, hence not
+    #     # get called for deletion
+    #     expected_calls_params = [(task3_id, project.id), (task1_id, project.id)]
+    #     actual_calls_params = []
+    #     for call in mock_purge_tasks.call_args_list:
+    #         assert call[0] in expected_calls_params
+    #         actual_calls_params.append(call[0])
+    #     assert (task2_id, project_id) not in actual_calls_params, "Task id 2 should not be purged"
+
         # To test actual task cleanup against database, make sure to have
         # archived tables created in you local test database.
         # Uncommment following code before running tests locally
@@ -343,14 +418,3 @@ class TestJobs(Test):
         #     sql = f"DELETE FROM result_archived WHERE task_id IN({task1_id}, {task2_id}, {task3_id});"
         #     db.execute_sql(sql)
         #     db.conn.commit()
-
-    @with_context
-    def test_saturday_4pm_date(self):
-        """Test date generated is saturday 4 pm date from a given date."""
-        date1 = datetime.strptime("2022-10-12 10:00PM", "%Y-%m-%d %I:%M%p")
-        saturday = get_saturday_4pm_date(date1)
-        assert saturday.strftime("%Y-%m-%d %H:%M:%S") == "2022-10-15 16:00:00"
-        # test with some other date
-        date2 = datetime.strptime("2026-01-31 10:00AM", "%Y-%m-%d %I:%M%p")
-        saturday = get_saturday_4pm_date(date2)
-        assert saturday.strftime("%Y-%m-%d %H:%M:%S") == "2026-01-31 16:00:00"

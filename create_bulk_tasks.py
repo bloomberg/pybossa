@@ -50,7 +50,7 @@ def create_task(project_id, created, num_answers, priority, year):
     """
     columns_values = dict(
         created=created,
-        project_id=project_id, state="complete",
+        project_id=project_id, state="completed",
         info=json.dumps({"company": "bberg", "earning_year": year}),
         exported=True, n_answers=num_answers, priority_0=priority,
         quorum=0, calibration=0
@@ -139,9 +139,7 @@ def setup_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--numtasks", dest="num_tasks", type=int, required=True, help="number of tasks to create")
     parser.add_argument("-p", "--projectid", dest="project_id", type=int, required=True, help="project id under which tasks to create")
-    parser.add_argument("--random-year", dest="random_year", action="store_true", help="generate tasks with random year for task created date")
-    parser.add_argument("--no-random-year", dest="random_year", action="store_false", help="generate tasks with current year for task created date; no random year")
-    parser.set_defaults(random_year=True) # create tasks with created date having random year number
+    parser.add_argument("--random-year", dest="random_year", action="store_true", help="create tasks with random year with parameter passed, else current year")
     args = parser.parse_args()
     return args
 

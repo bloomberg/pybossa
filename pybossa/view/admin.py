@@ -50,7 +50,7 @@ from pybossa.feed import get_update_feed
 from pybossa.forms.admin_view_forms import *
 from pybossa.importers import BulkImportException
 from pybossa.jobs import get_dashboard_jobs, export_all_users, \
-    load_management_dashboard_data
+    load_management_dashboard_data, perform_completed_tasks_cleanup
 from pybossa.jobs import get_management_dashboard_stats
 from pybossa.jobs import send_mail
 from pybossa.model import make_timestamp
@@ -835,3 +835,15 @@ def disable_user(user_id=None):
             return redirect(url_for('.manageusers'))
     msg = "User not found"
     return format_error(msg, 404)
+
+
+@blueprint.route('/cleanuptasks', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def cleanuptasks():
+    """Perform completed tasks cleanup."""
+    current_app.logger.info(f"User {current_user.name} ({current_user.email_addr}) initiated cleanup of completed tasks")
+    perform_completed_tasks_cleanup()
+    markup = Markup(' {} ')
+    flash(markup.format(gettext("Cleanup of completed tasks complete")))
+    return redirect(url_for('.index'))

@@ -763,17 +763,15 @@ def setup_scheduled_jobs(app):  # pragma: no cover
     """Setup scheduled jobs."""
     from datetime import datetime
     from pybossa.jobs import enqueue_periodic_jobs, schedule_job, \
-        get_quarterly_date, get_saturday_4pm_date
+        get_quarterly_date
     from rq_scheduler import Scheduler
     redis_conn = sentinel.master
     scheduler = Scheduler(queue_name='scheduled_jobs', connection=redis_conn)
     MINUTE = 60
     HOUR = 60 * 60
-    WEEK = 7 * (24 * HOUR)
     MONTH = 30 * (24 * HOUR)
 
     first_quaterly_execution = get_quarterly_date(datetime.utcnow())
-    saturday_4pm = get_saturday_4pm_date(datetime.utcnow())
     JOBS = [dict(name=enqueue_periodic_jobs, args=['email'], kwargs={},
                  interval=(1 * MINUTE), timeout=(10 * MINUTE)),
             dict(name=enqueue_periodic_jobs, args=['maintenance'], kwargs={},
@@ -790,10 +788,7 @@ def setup_scheduled_jobs(app):  # pragma: no cover
                  interval=(1 * MONTH), timeout=(30 * MINUTE)),
             dict(name=enqueue_periodic_jobs, args=['quaterly'], kwargs={},
                  interval=(3 * MONTH), timeout=(30 * MINUTE),
-                 scheduled_time=first_quaterly_execution),
-            dict(name=enqueue_periodic_jobs, args=['weekly'], kwargs={},
-                 interval=(WEEK), timeout=(30 * MINUTE),
-                 scheduled_time=saturday_4pm)]
+                 scheduled_time=first_quaterly_execution)]
 
     for job in JOBS:
         schedule_job(job, scheduler)

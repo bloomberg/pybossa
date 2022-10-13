@@ -1480,3 +1480,12 @@ class TestAdmin(web.Helper):
         assert data['status'] == 'success'
         announcements = announcement_repo.get_all_announcements()
         assert len(announcements) == 0, announcements
+
+    @with_context
+    @patch('pybossa.view.admin.perform_completed_tasks_cleanup')
+    def test_admin_cleanuptasks(self, mock_cleanuptasks):
+        """Test ADMIN JSON index page works"""
+        self.register()
+        self.signin()
+        res = self.app_get_json("/admin/cleanuptasks")
+        mock_cleanuptasks.assert_called()
