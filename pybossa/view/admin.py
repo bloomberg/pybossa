@@ -803,6 +803,8 @@ def enable_user(user_id=None):
             user.enabled = True
             user.last_login = make_timestamp()
             user_repo.update(user)
+            current_app.logger.info("%s(%s) enabled user %s(%s)",
+                current_user.name, current_user.email_addr, user.name, user.email_addr)
             msg = generate_manage_user_email(user, "enable")
             if msg:
                 mail_queue.enqueue(send_mail, msg)
@@ -825,6 +827,8 @@ def disable_user(user_id=None):
 
             user.enabled = False
             user_repo.update(user)
+            current_app.logger.info("%s(%s) disabled user %s(%s)",
+                current_user.name, current_user.email_addr, user.name, user.email_addr)
             msg = generate_manage_user_email(user, "disable")
             if msg:
                 mail_queue.enqueue(send_mail, msg)
