@@ -20,6 +20,7 @@ import sys
 
 from accessdb import AccessDatabase
 import psycopg2
+from pybossa.core import db, create_app
 
 root_logger = logging.getLogger()
 hdlr = TimedRotatingFileHandler("databulk.log", when="D", backupCount=10)
@@ -37,6 +38,8 @@ root_logger.addHandler(handler)
 logger = logging.getLogger("datapurge")
 current_year = datetime.today().year
 
+app = create_app(run_as_server=False)
+
 def create_task(project_id, created, num_answers, priority, year):
     sql = """
         INSERT INTO task
@@ -47,7 +50,7 @@ def create_task(project_id, created, num_answers, priority, year):
     """
     columns_values = dict(
         created=created,
-        project_id=project_id, state="complete",
+        project_id=project_id, state="completed",
         info=json.dumps({"company": "bberg", "earning_year": year}),
         exported=True, n_answers=num_answers, priority_0=priority,
         quorum=0, calibration=0
@@ -122,21 +125,21 @@ def create_bulk_data(project_id, num_records, random_year):
         created = f"{year}-{month}-{day}T{hour}:{min}:01.604603"
         user_ids = [4, 5, 6]
 
+        with app.app_context():
+            task_id = create_task(project_id, created, num_answers, priority, year)
+            print("Task created: ", task_id)
 
-        task_id = create_task(project_id, created, num_answers, priority, year)
-        print("Task created: ", task_id)
+            task_run_ids = [create_task_run(project_id, task_id, user_ids[i], created) for i in range(num_answers)]
+            print("Taskruns created: ", str(task_run_ids))
 
-        task_run_ids = [create_task_run(project_id, task_id, user_ids[i], created) for i in range(num_answers)]
-        print("Taskruns created: ", str(task_run_ids))
-
-        result_id = [create_result(project_id, task_id, task_run_ids, created) for _ in range(randrange(1, 5))]
-        print("Result created: ", result_id)
+            result_id = [create_result(project_id, task_id, task_run_ids, created) for _ in range(randrange(1, 5))]
+            print("Result created: ", result_id)
 
 def setup_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--numtasks", dest="num_tasks", type=int, required=True, help="number of tasks to create")
     parser.add_argument("-p", "--projectid", dest="project_id", type=int, required=True, help="project id under which tasks to create")
-    parser.add_argument("-y", "--no-random-year", dest="random_year", default=True, help="generate tasks by current year; disable random create year range", action="store_false")
+    parser.add_argument("--random-year", dest="random_year", action="store_true", help="create tasks with random year with parameter passed, else current year")
     args = parser.parse_args()
     return args
 
