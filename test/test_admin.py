@@ -1487,5 +1487,5 @@ class TestAdmin(web.Helper):
         """Test ADMIN JSON index page works"""
         self.register()
         self.signin()
-        res = self.app_get_json("/admin/cleanuptasks")
-        mock_cleanuptasks.assert_called()
+        res = self.app_post_json("/admin/cleanuptasks")
+        assert res.status_code == 200 and res.json["message"] == "Successfully finished cleanup of completed tasks"

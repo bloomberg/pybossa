@@ -64,6 +64,7 @@ from pybossa.util import generate_invitation_email_for_admins_subadmins
 from pybossa.util import generate_manage_user_email
 from pybossa.util import generate_notification_email_for_admins
 from pybossa.util import redirect_content_type
+from pybossa.core import csrf
 
 blueprint = Blueprint('admin', __name__)
 DASHBOARD_TIMEOUT = 30 * 60
@@ -837,13 +838,17 @@ def disable_user(user_id=None):
     return format_error(msg, 404)
 
 
-@blueprint.route('/cleanuptasks', methods=['GET', 'POST'])
+@csrf.exempt
+@blueprint.route('/cleanuptasks', methods=['POST'])
 @login_required
 @admin_required
 def cleanuptasks():
     """Perform completed tasks cleanup."""
     current_app.logger.info(f"User {current_user.name} ({current_user.email_addr}) initiated cleanup of completed tasks")
     perform_completed_tasks_cleanup()
-    markup = Markup(' {} ')
-    flash(markup.format(gettext("Cleanup of completed tasks complete")))
-    return redirect(url_for('.index'))
+    response = { "message": "Successfully finished cleanup of completed tasks", "success": True}
+    current_app.logger.info(response["message"])
+    return Response(
+        json.dumps(response),
+        status=200, mimetype='application/json'
+    )
