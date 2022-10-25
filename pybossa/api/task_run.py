@@ -44,6 +44,8 @@ from pybossa.contributions_guard import ContributionsGuard
 from pybossa.auth import jwt_authorize_project
 from pybossa.sched import can_post
 from pybossa.model.completion_event import mark_if_complete
+from pybossa.cache import delete_memoized
+from pybossa.cache.helpers import n_available_tasks_for_user
 from pybossa.cloud_store_api.s3 import upload_json_data
 from pybossa.model.performance_stats import StatType, PerformanceStats
 from pybossa.stats.gold import ConfusionMatrix, RightWrongCount
@@ -149,7 +151,8 @@ class TaskRunAPI(APIBase):
         guard._remove_task_stamped(task, get_user_id_or_ip())
 
     def _after_save(self, original_data, instance):
-        mark_if_complete(instance.task_id, instance.project_id)
+        if mark_if_complete(instance.task_id, instance.project_id):
+            delete_memoized(n_available_tasks_for_user)
         task = task_repo.get_task(instance.task_id)
         gold_answers = get_gold_answers(task)
         update_gold_stats(instance.user_id, instance.task_id, original_data, gold_answers)
