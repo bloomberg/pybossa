@@ -9,6 +9,7 @@ def mark_if_complete(task_id, project_id):
 
     if is_task_completed(task_id):
         update_task_state(task_id)
+        return True
 
 
 def is_task_completed(task_id):
