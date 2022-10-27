@@ -187,7 +187,7 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     scheduler = project_info.get('sched', 'default')
     project_id = project['id'] if type(project) == dict else project.id
     if scheduler == Schedulers.task_queue:
-        return 999998  # Temporarily to return a magic number for reserved category project
+        return 10  # Temporarily to return a magic number for reserved category project
     if scheduler not in [Schedulers.user_pref, Schedulers.task_queue]:
         sql = '''
                SELECT COUNT(*) AS n_tasks FROM task
