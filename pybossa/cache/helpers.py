@@ -186,8 +186,12 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     project_info = project["info"] if type(project) == dict else project.info
     scheduler = project_info.get('sched', 'default')
     project_id = project['id'] if type(project) == dict else project.id
-    if scheduler == Schedulers.task_queue:
-        return 10  # Temporarily to return a magic number for reserved category project
+    reserve_task_config = project_info.get("reserve_tasks", {}).get("category", [])
+
+    # Temporarily return magic number to prevent heavy db load with reserved category
+    if scheduler == Schedulers.task_queue and reserve_task_config:
+        return 10
+
     if scheduler not in [Schedulers.user_pref, Schedulers.task_queue]:
         sql = '''
                SELECT COUNT(*) AS n_tasks FROM task
@@ -200,7 +204,7 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     else:
         user_pref_list = cached_users.get_user_preferences(user_id)
         user_filter_list = cached_users.get_user_filters(user_id)
-        reserve_task_config = project_info.get("reserve_tasks", {}).get("category", [])
+
         timeout = project_info.get("timeout", TIMEOUT)
         reserve_task_filter, _ = get_reserve_task_category_info(reserve_task_config, project_id, timeout, user_id, True)
         sql = '''
