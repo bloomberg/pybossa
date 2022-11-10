@@ -1,4 +1,6 @@
+from pybossa.redis_stats import set_project_stats_in_redis
 from pybossa.core import db, project_repo, task_repo
+
 
 def mark_if_complete(task_id, project_id):
     project = project_repo.get(project_id)
@@ -8,7 +10,7 @@ def mark_if_complete(task_id, project_id):
         return
 
     if is_task_completed(task_id):
-        update_task_state(task_id)
+        update_task_state(task_id, project_id)
         return True
 
 
@@ -22,8 +24,11 @@ def is_task_completed(task_id):
     return n_answers >= task_n_answers
 
 
-def update_task_state(task_id):
+def update_task_state(task_id, project_id):
     sql_query = ("UPDATE task SET state='completed' \
                  where id = :task_id")
     db.session.execute(sql_query, dict(task_id=task_id))
     db.session.commit()
+
+    # We do not need to decrease project stats in Redis as it is handled in
+    # @event.listens_for(TaskRun, 'after_insert')

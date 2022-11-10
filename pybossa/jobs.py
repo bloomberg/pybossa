@@ -39,6 +39,7 @@ import pybossa.dashboard.jobs as dashboard
 from pybossa.auditlogger import AuditLogger
 from pybossa.cache import site_stats
 from pybossa.cache.helpers import n_available_tasks
+from pybossa.redis_stats import set_project_stats_in_redis
 from pybossa.cache.users import get_users_for_report
 from pybossa.cloud_store_api.connection import create_connection
 from pybossa.core import mail, task_repo, importer
@@ -628,7 +629,7 @@ def send_mail(message_dict, mail_all=False):
 def delete_bulk_tasks(data):
     """Delete tasks in bulk from project."""
     from sqlalchemy.sql import text
-    from pybossa.core import db
+    from pybossa.core import db, sentinel
     import pybossa.cache.projects as cached_projects
     from pybossa.cache.task_browse_helpers import get_task_filters
 
@@ -721,6 +722,10 @@ def delete_bulk_tasks(data):
                "deleted from project {0} on {1} as requested by {2}"
                .format(project_name, url, current_user_fullname))
     db.bulkdel_session.execute(sql, dict(project_id=project_id, **params))
+
+    # set project stats in Redis using the SQL count statement
+    set_project_stats_in_redis(project_id, operation="batch_delete")
+
     cached_projects.clean_project(project_id)
     subject = 'Tasks deletion from %s' % project_name
     body = 'Hello,\n\n' + msg + '\n\nThe %s team.'\

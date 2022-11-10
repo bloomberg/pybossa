@@ -36,6 +36,7 @@ from rq import Queue
 from werkzeug.datastructures import MultiDict
 
 import pybossa.sched as sched
+from pybossa.redis_stats import set_project_stats_in_redis
 from pybossa.core import (uploader, signer, sentinel, json_exporter,
                           csv_exporter, importer, db, task_json_exporter,
                           task_csv_exporter, anonymizer)
@@ -1968,11 +1969,15 @@ def _update_task_redundancy(project_id, task_ids, n_answers):
                     else:
                         t.exported = False
                 t.n_answers = n_answers
+                old_task_state = t.state
                 t.state = 'ongoing'
                 if len(t.task_runs) >= n_answers:
                     t.state = 'completed'
                 task_repo.update(t)
                 tasks_updated = True
+
+                # set project stats in Redis
+                set_project_stats_in_redis(project_id, operation="redundancy_update", old_task_state=old_task_state, new_task_state=t.state)
     return tasks_updated
 
 @crossdomain(origin='*', headers=cors_headers)
@@ -1980,6 +1985,7 @@ def _update_task_redundancy(project_id, task_ids, n_answers):
 @login_required
 @admin_or_subadmin_required
 def delete_selected_tasks(short_name):
+    # breakpoint()
     try:
         # reset cache / memoized
         delete_memoized(get_searchable_columns)

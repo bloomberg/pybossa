@@ -23,6 +23,7 @@ from sqlalchemy import event
 
 from flask import url_for
 
+from pybossa.redis_stats import set_project_stats_in_redis
 from pybossa.feed import update_feed
 from pybossa.model import update_project_timestamp, update_target_timestamp
 from pybossa.model import make_timestamp
@@ -139,6 +140,9 @@ def add_task_event(mapper, conn, target):
     obj.update(tmp)
     update_feed(obj)
 
+    # Set project:{project_id}:stats in the Redis using bitfield data structure
+    set_project_stats_in_redis(target.project_id, operation="insert")
+
 
 @event.listens_for(Task, 'after_update')
 @event.listens_for(Task, 'after_delete')
@@ -195,6 +199,9 @@ def update_task_state(conn, task_id):
     sql_query = ("UPDATE task SET state=\'completed\', exported=False \
                  WHERE id=%s") % task_id
     conn.execute(sql_query)
+
+    # decrease project stats in Redis
+    set_project_stats_in_redis(task.project_id, operation="complete_task_update")
 
 
 def push_webhook(project_obj, task_id, result_id):

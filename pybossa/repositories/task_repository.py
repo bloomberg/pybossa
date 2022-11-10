@@ -15,10 +15,12 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
+import copy
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import cast, Date
 
+from pybossa.redis_stats import set_project_stats_in_redis
 from pybossa.repositories import Repository
 from pybossa.model.task import Task
 from pybossa.model.task_run import TaskRun
@@ -197,14 +199,22 @@ class TaskRepository(Repository):
             raise DBIntegrityError(e)
 
     def delete(self, element):
+        task = copy.deepcopy(self.get_task(element.id))
+
         self._delete(element)
         project = element.project
         self.db.session.commit()
+
+        # decrease project stats in Redis
+        set_project_stats_in_redis(project.id, operation="delete", task=task)
+
         cached_projects.clean_project(element.project_id)
         self._delete_zip_files_from_store(project)
 
     def delete_task_by_id(self, project_id, task_id):
         from pybossa.jobs import check_and_send_task_notifications
+
+        task = copy.deepcopy(self.get_task(task_id))
 
         args = dict(project_id=project_id, task_id=task_id)
         self.db.session.execute(text('''
@@ -216,7 +226,12 @@ class TaskRepository(Repository):
         self.db.session.execute(text('''
                    DELETE FROM task WHERE project_id=:project_id
                                     AND id=:task_id;'''), args)
+
         self.db.session.commit()
+
+        # decrease project stats in Redis
+        set_project_stats_in_redis(project_id, operation="delete", task=task)
+
         cached_projects.clean_project(project_id)
         check_and_send_task_notifications(project_id)
 
@@ -267,6 +282,10 @@ class TaskRepository(Repository):
                 '''.format(sql_session_repl, conditions))
         self.db.bulkdel_session.execute(sql, dict(project_id=project.id, **params))
         self.db.bulkdel_session.commit()
+
+        # set project stats in Redis using the SQL count statement
+        set_project_stats_in_redis(project.id, operation="batch_delete")
+
         cached_projects.clean_project(project.id)
         self._delete_zip_files_from_store(project)
 
@@ -278,6 +297,10 @@ class TaskRepository(Repository):
                    ''')
         self.db.session.execute(sql, dict(project_id=project.id))
         self.db.session.commit()
+
+        # set redis
+        set_project_stats_in_redis(project.id, operation="batch_delete")
+
         cached_projects.clean_project(project.id)
         self._delete_zip_files_from_store(project)
 
@@ -354,6 +377,10 @@ class TaskRepository(Repository):
                                           **params))
         self.update_task_state(project.id)
         self.db.session.commit()
+
+        # update redis using SQL count statement
+        set_project_stats_in_redis(project.id, operation="bulk_redundancy_update")
+
         cached_projects.clean_project(project.id)
         check_and_send_task_notifications(project.id)
         return tasks_not_updated

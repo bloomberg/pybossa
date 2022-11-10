@@ -259,6 +259,7 @@ def n_unexpired_gold_tasks(project_id):
     result = session.execute(query, dict(project_id=project_id))
     return result.scalar()
 
+
 def n_priority_x_tasks(project_id, priority=1.0, include_gold_task=False):
     """Return the number of ongoing tasks with a given priority for a given project."""
     if include_gold_task:
