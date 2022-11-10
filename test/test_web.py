@@ -9602,9 +9602,9 @@ class TestWeb(web.Helper):
                 )
             )
         )
-        get_task_category_lock.side_effect = [[
+        get_task_category_lock.return_value = [], [], [
             "reserve_task:project:{}:category:field_1:value1:field_2:value2:user:{}:task:454".format(project.id, admin.id)
-        ], []]
+        ]
 
         task = TaskFactory.create_batch(3, project=project, info=dict(x=1, y=2))
         res = self.app.get('api/project/%s/newtask' % project.id)
