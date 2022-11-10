@@ -31,7 +31,8 @@ from pybossa.sched import (
     acquire_reserve_task_lock,
     release_reserve_task_lock_by_keys,
     release_reserve_task_lock_by_id,
-    get_reserve_task_key
+    get_reserve_task_key,
+    get_reserved_categories_cache_keys
 )
 from pybossa.util import (
     cached_keys_to_reserved_categories,
@@ -333,6 +334,32 @@ class TestReserveTaskCategory(sched.Helper):
         )[0]
         reserve_key = get_reserve_task_key(task.id)
         assert reserve_key == expected_key, "reserve key expected to be {}".format(expected_key)
+
+    @with_context
+    @patch("pybossa.redis_lock.LockManager.get_task_category_lock")
+    def test_get_reserved_categories_cache_keys(self, mock_get_task_category_lock):
+        """Test get_reserved_categories_cache_keys returns reserved categories from cache"""
+        from flask import current_app
+
+        reserved_task_config = ["name1", "name2"]
+        project_id = 1
+        timeout = 30
+        user_id = 1
+
+        # ensure reserved task category disabled for private instance
+        current_app.config["PRIVATE_INSTANCE"] = True
+        user_category_keys, other_user_category_keys, all_user_category_keys = get_reserved_categories_cache_keys(
+            reserved_task_config, project_id, timeout, user_id)
+        assert not (user_category_keys or other_user_category_keys or all_user_category_keys)
+
+        current_app.config["PRIVATE_INSTANCE"] = False
+        category = "name1:*:name2:*"
+        mock_get_task_category_lock.return_value = [], [], []
+        user_category_keys, other_user_category_keys, all_user_category_keys = get_reserved_categories_cache_keys(
+            reserved_task_config, project_id, timeout, user_id)
+        mock_get_task_category_lock.assert_called_once_with(project_id, user_id, category)
+
+
 
     @with_context
     def test_cached_keys_to_reserved_categories(self):
