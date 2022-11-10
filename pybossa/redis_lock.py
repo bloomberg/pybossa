@@ -249,43 +249,41 @@ class LockManager(object):
     def seconds_remaining(expiration):
         return float(expiration) - time()
 
-    def get_task_category_lock(self, project_id, user_id=None, category=None, exclude_user=False, task_id=None):
+    def get_task_category_lock(self, project_id, user_id=None, category=None, task_id=None):
         """
-        Returns True when task category for a given user
-        can be reserved or its already reserved, False otherwise.
+        Returns:
+            1. task categories reserved for a given user.
+            2. task categories reserved by users other than current user.
+            3. task categories reserved for a given user and other users.
         To fetch task category for all users who've reserved the category, pass user_id = None
         To fetch task category for all tasks reserved, pass task_id = None
         To fetch task category other than user_id, pass exclude_user = True
         """
-
+        user_category_keys, other_users_category_keys, all_users_category_keys = [], [], []
         if not project_id:
             raise BadRequest('Missing required parameters')
-
-        # with exclude_user set to True, user_id is to be excluded from list of
-        # task category found for all users. raise error if user_id not passed
-        if exclude_user and not user_id:
-            raise BadRequest('Missing user id')
 
         # release expired task reservations
         self._release_expired_reserve_for_project(project_id)
 
-        resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
+        resource_id = "reserve_task:project:{}:category:{}:user:*:task:{}".format(
             project_id,
             "*" if not category else category,
-            "*" if not user_id or exclude_user else user_id,
             "*" if not task_id else task_id
         )
 
-        category_keys = self.get_reservation_keys(resource_id)
+        all_users_category_keys = self.get_reservation_keys(resource_id)
 
         # if key present but for different user, with redundancy = 1, return false
         # TODO: for redundancy > 1, check if additional task run
         # available for this user and if so, return category_key else ""
-        if exclude_user:
-            # exclude user_id from list of keys passed
-            drop_user = ":user:{}:task:".format(user_id)
-            category_keys = [ key for key in category_keys if drop_user not in key ]
-        return category_keys
+        # generate user specific reserved categories
+        if user_id:
+            user_categories = f":user:{user_id}:task:"
+            user_category_keys = [key for key in all_users_category_keys if user_categories in key]
+            other_users_category_keys = [key for key in all_users_category_keys if user_categories not in key]
+
+        return user_category_keys, other_users_category_keys, all_users_category_keys
 
     def acquire_reserve_task_lock(self, project_id, task_id, user_id, category):
         if not(project_id and user_id and task_id and category):

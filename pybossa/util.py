@@ -48,6 +48,7 @@ from flask_wtf.csrf import generate_csrf
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from yacryptopan import CryptoPAn
+from werkzeug.exceptions import BadRequest
 
 from pybossa.cloud_store_api.connection import create_connection
 from pybossa.cloud_store_api.s3 import get_file_from_s3, delete_file_from_s3
@@ -1332,3 +1333,47 @@ def remove_element_attributes(page_element, attribute):
     for attr in attributes:
         if page_element.has_attr(attr):
             del page_element[attr]
+
+def cached_keys_to_reserved_categories(project_id, category_keys):
+    # convert task category redis cache key to list of reserved categories
+    # eg "co_name:IBM:ticker:IBM_US" would be converted to
+    # [{"co_name": "IBM", "ticker": "IBM_US"}]
+
+    reserved_categories = []
+    unique_categories = []
+
+    if not project_id:
+        raise BadRequest("Missing project id")
+
+    regex_key = f"reserve_task:project:{project_id}:category:(.+?):user"
+    for item in category_keys:
+        data = re.search(regex_key, item)
+        if not data:
+            continue
+
+        category = data.group(1)
+        if category in unique_categories:
+            continue
+        unique_categories.append(category)
+
+        category_fv = category.split(":")
+        category_dict = {category_fv[i]: category_fv[i + 1] for i in range(0, len(category_fv), 2)}
+        reserved_categories.append(category_dict)
+    return reserved_categories
+
+def reserved_category_to_dataframe_query(reserved_categories, categories, negate_query=False):
+    df_query = ""
+    if not(reserved_categories and categories):
+        return df_query
+
+    df_filters = []
+    for category in categories:
+        filters = [f"{res_cat} == '{category[res_cat]}'" if isinstance(category[res_cat], str) else f"{res_cat} == {category[res_cat]}" for res_cat in reserved_categories]
+        df_filters.append(" & ".join(filters))
+
+    concat_op = "&" if negate_query else "|"
+    prefix_query = "~" if negate_query else ""
+
+    df_query = f") {concat_op} {prefix_query}(".join(df_filters)
+    df_query = f"{prefix_query}({df_query})"
+    return df_query

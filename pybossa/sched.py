@@ -447,9 +447,17 @@ def get_reserve_task_category_info(reserve_task_config, project_id, timeout, use
             project_id, str(reserve_task_config))
         return sql_filters, category_keys
 
+    # with exclude_user set to True, user_id is to be excluded from list of
+    # task category found for all users. raise error if user_id not passed
+    if exclude_user and not user_id:
+        raise BadRequest('Missing user id')
+
     category = ":".join(["{}:*".format(field) for field in sorted(reserve_task_config)])
     lock_manager = LockManager(sentinel.master, timeout)
-    category_keys = lock_manager.get_task_category_lock(project_id, user_id, category, exclude_user)
+    user_category_keys, other_user_category_keys, all_category_keys = lock_manager.get_task_category_lock(project_id, user_id, category)
+
+    # with exclude_user True and user_id passed, return other users category keys
+    category_keys = other_user_category_keys if exclude_user else all_category_keys
     current_app.logger.info(
         "Project %s, user %s, reserve config %s, exclude %s. reserve task category keys %s",
         project_id, user_id, json.dumps(reserve_task_config), exclude_user, str(category_keys)
@@ -459,6 +467,33 @@ def get_reserve_task_category_info(reserve_task_config, project_id, timeout, use
 
     sql_filters, category_keys = reserve_task_sql_filters(project_id, category_keys, exclude_user)
     return sql_filters, category_keys
+
+
+def get_reserved_categories_cache_keys(reserve_task_config, project_id, timeout, user_id):
+    """Get reserved task categories from cache. Returns redis keys for user categories,
+    redis keys for other users categories and consolidated all categories"""
+
+    timeout = timeout or TIMEOUT
+    current_user_categories, other_users_categories = [], []
+
+    if not reserve_task_config:
+        return current_user_categories, other_users_categories
+
+    if current_app.config.get('PRIVATE_INSTANCE'):
+        current_app.logger.info("Cached categories not found. Reserve task by category disabled for private instance. project_id %s, reserve_task_config %s",
+            project_id, str(reserve_task_config))
+        return current_user_categories, other_users_categories
+
+    category = ":".join(["{}:*".format(field) for field in sorted(reserve_task_config)])
+    lock_manager = LockManager(sentinel.master, timeout)
+    user_category_keys, other_user_category_keys, all_user_category_keys = lock_manager.get_task_category_lock(
+        project_id, user_id, category)
+
+    current_app.logger.info("get_reserved_categories_cache_keys. project %s, user %s, reserve task config %s",project_id, user_id, json.dumps(reserve_task_config))
+    current_app.logger.info("user_category_keys: %s", str(user_category_keys))
+    current_app.logger.info("other_user_category_keys: %s", str(other_user_category_keys))
+    current_app.logger.info("all_user_category_keys: %s", str(all_user_category_keys))
+    return user_category_keys, other_user_category_keys, all_user_category_keys
 
 
 def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=False,

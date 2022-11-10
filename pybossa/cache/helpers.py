@@ -27,6 +27,13 @@ from pybossa.cache import users as cached_users
 from pybossa.cache import task_browse_helpers as cached_task_browse_helpers
 from pybossa.sched import Schedulers, get_reserve_task_category_info
 from pybossa.contributions_guard import ContributionsGuard
+import pandas as pd
+from pybossa.sched import get_reserved_categories_cache_keys
+from pybossa.util import (
+    cached_keys_to_reserved_categories,
+    reserved_category_to_dataframe_query
+)
+
 
 session = db.slave_session
 TIMEOUT = ContributionsGuard.STAMP_TTL
@@ -187,10 +194,9 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     scheduler = project_info.get('sched', 'default')
     project_id = project['id'] if type(project) == dict else project.id
     reserve_task_config = project_info.get("reserve_tasks", {}).get("category", [])
-
-    # Temporarily return magic number to prevent heavy db load with reserved category
-    if scheduler == Schedulers.task_queue and reserve_task_config:
-        return 10
+    res_category_fields = [f"task.info->>'{field}' AS {field}" for field in reserve_task_config]
+    res_category_fields = ", ".join(res_category_fields)
+    category_fields = f", {res_category_fields}" if res_category_fields else ""
 
     if scheduler not in [Schedulers.user_pref, Schedulers.task_queue]:
         sql = '''
@@ -204,23 +210,20 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     else:
         user_pref_list = cached_users.get_user_preferences(user_id)
         user_filter_list = cached_users.get_user_filters(user_id)
-
         timeout = project_info.get("timeout", TIMEOUT)
-        reserve_task_filter, _ = get_reserve_task_category_info(reserve_task_config, project_id, timeout, user_id, True)
-        sql = '''
-               SELECT task.id, worker_filter FROM task
+        sql = f'''
+               SELECT task.id as task_id, worker_filter, user_pref {category_fields}
+               FROM task
                WHERE project_id=:project_id AND state !='completed'
                AND state !='enrich'
-               {}
                AND id NOT IN
                (SELECT task_id FROM task_run WHERE
                project_id=:project_id AND user_id=:user_id)
-               AND ({})
-               AND ({})
-               ;'''.format(reserve_task_filter, user_pref_list, user_filter_list)
+               ;'''
     sqltext = text(sql)
     try:
-        result = session.execute(sqltext, dict(project_id=project_id, user_id=user_id, assign_user=assign_user))
+        params = dict(project_id=project_id, user_id=user_id)
+        result = session.execute(sqltext, params)
         current_app.logger.info("n_available_tasks_for_user making db request for project_id %d. user_id %d", project_id, user_id)
         if scheduler not in [Schedulers.user_pref, Schedulers.task_queue]:
             for row in result:
@@ -228,10 +231,28 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
                 return n_tasks
         else:
             num_available_tasks = 0
+            _, other_users_category_keys, _ = get_reserved_categories_cache_keys(reserve_task_config, project_id, timeout, user_id)
+            other_users_categories = cached_keys_to_reserved_categories(project_id, other_users_category_keys)
+
             user_profile = cached_users.get_user_profile_metadata(user_id)
             user_profile = json.loads(user_profile) if user_profile else {}
-            for task_id, w_filter in result:
-                w_filter = w_filter or {}
+
+            if not result:
+                return 0
+
+            headers = list(result.keys())
+            rows = result.fetchall()
+            df = pd.DataFrame(rows, columns=headers)
+            # exclude tasks reserved by users other than current user.
+            # this will cover all tasks that are reserved by current user
+            # plus all available tasks not reserved by any other user.
+            exclude_query = reserved_category_to_dataframe_query(reserve_task_config, other_users_categories, negate_query=True)
+            filtered_data = df.query(exclude_query)
+
+            # filter records by worker_filter, user_pref
+            for _, row in filtered_data.iterrows():
+                task_id = row["task_id"]
+                w_filter = row["worker_filter"] or {}
                 num_available_tasks += int(
                     cached_task_browse_helpers.user_meet_task_requirement(task_id, w_filter, user_profile)
                 )

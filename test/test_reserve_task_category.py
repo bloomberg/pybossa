@@ -17,9 +17,12 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 from unittest.mock import patch
+import time
+from nose.tools import assert_raises
+from werkzeug.exceptions import BadRequest
 from test import with_context
 from test.helper import sched
-from test.factories import TaskFactory, ProjectFactory, UserFactory
+from test.factories import TaskFactory, ProjectFactory, UserFactory, TaskRunFactory
 from pybossa.core import project_repo, sentinel
 from pybossa.sched import (
     Schedulers,
@@ -30,9 +33,13 @@ from pybossa.sched import (
     release_reserve_task_lock_by_id,
     get_reserve_task_key
 )
-import time
-from nose.tools import assert_raises
-from werkzeug.exceptions import BadRequest
+from pybossa.util import (
+    cached_keys_to_reserved_categories,
+    reserved_category_to_dataframe_query
+)
+from pybossa.cache import helpers
+from pybossa.core import task_repo
+import pandas as pd
 
 
 class TestReserveTaskCategory(sched.Helper):
@@ -82,7 +89,9 @@ class TestReserveTaskCategory(sched.Helper):
 
     @with_context
     @patch('pybossa.redis_lock.LockManager.get_task_category_lock')
-    def test_get_reserve_task_category_info(self, get_task_category_lock):
+    def test_get_reserve_task_category_info(self, mock_get_task_category_lock):
+        mock_get_task_category_lock.return_value = [], [], []
+
         owner = UserFactory.create(id=500)
         project = ProjectFactory.create(owner=owner)
         reserve_task_config = ["field_a", "field_b"]
@@ -115,7 +124,6 @@ class TestReserveTaskCategory(sched.Helper):
             "category": reserve_task_config
         }
         project_repo.save(project)
-        get_task_category_lock.return_value = []
         sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project.id, timeout, owner.id)
         assert sql_filters == "" and category_keys == [], "sql_filters, category_keys must be '', []"
 
@@ -135,7 +143,7 @@ class TestReserveTaskCategory(sched.Helper):
             "reserve_task:project:{}:category:{}:user:1008:task:454".format(project.id, expected_key),
             "reserve_task:project:{}:category:{}:user:1008:task:2344".format(project.id, expected_key_2)
         ]
-        get_task_category_lock.return_value = expected_category_keys
+        mock_get_task_category_lock.return_value = [], [], expected_category_keys
         sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project.id, timeout, owner.id)
         expected_sql_filter_1 = ["task.info->>'{}' = '{}'".format(field, task_info[field]) for field in sorted(task_info)]
         expected_sql_filter_2 = ["task.info->>'{}' = '{}'".format(field, task_info_2[field]) for field in sorted(task_info_2)]
@@ -325,3 +333,180 @@ class TestReserveTaskCategory(sched.Helper):
         )[0]
         reserve_key = get_reserve_task_key(task.id)
         assert reserve_key == expected_key, "reserve key expected to be {}".format(expected_key)
+
+    @with_context
+    def test_cached_keys_to_reserved_categories(self):
+        """Test cached_keys_to_reserved_categories returns correct reserved categories from cached keys"""
+        # default behavior; returns null filters, category_keys for no category_keys passed
+        project_id, reserve_task_keys, reserved_categories = "", "", []
+        with assert_raises(BadRequest):
+            reserved_categories = cached_keys_to_reserved_categories(project_id, reserve_task_keys)
+        assert not reserved_categories, "reserved_categories expected to be []"
+
+        # passing garbage category returns null filters, category_keys
+        project_id, reserve_task_keys = "202", ["bad-category-key"]
+        reserved_categories = cached_keys_to_reserved_categories(project_id, reserve_task_keys)
+        assert not reserved_categories, "reserved_categories expected to be [] with key not part of cache"
+
+        # task category key exists, returns list of associated reserved categories in key,value pair
+        project_id = "202"
+        expected_reserved_categories = [{"name1": "value1", "name2": "value2"}, {"abc": "123", "def": "456"}]
+        reserve_task_keys = [
+            "reserve_task:project:202:category:name1:value1:name2:value2:user:1008:task:111",
+            "reserve_task:project:202:category:abc:123:def:456:user:1008:task:222"
+        ]
+        reserved_categories = cached_keys_to_reserved_categories(project_id, reserve_task_keys)
+        assert reserved_categories == expected_reserved_categories
+
+        # duplicate task category key exists under different task ids,
+        # returns list of associated unique reserved categories in key,value pair
+        expected_reserved_categories = [{"name1": "value1", "name2": "value2"}, {"name1": "123", "name2": "456"}]
+        reserve_task_keys = [
+            "reserve_task:project:202:category:name1:value1:name2:value2:user:1008:task:111",
+            "reserve_task:project:202:category:name1:123:name2:456:user:1008:task:222",
+            "reserve_task:project:202:category:name1:value1:name2:value2:user:1008:task:333",   # different task with same reserved category
+        ]
+        reserved_categories = cached_keys_to_reserved_categories(project_id, reserve_task_keys)
+        assert len(reserved_categories) == 2, "only two unique reserved categories should be returned"
+        assert reserved_categories == expected_reserved_categories
+
+    @with_context
+    def test_reserved_category_to_dataframe_query(self):
+        """Test dataframe queries are generated correctly from categories"""
+        reserved_categories = ["subject", "score"]
+        categories = [{"subject": "physics", "score": 62}, {"subject": "math", "score": 47}]
+
+        expected_query = "(subject == 'physics' & score == 62) | (subject == 'math' & score == 47)"
+        df_query = reserved_category_to_dataframe_query(reserved_categories, categories)
+        assert df_query == expected_query, df_query
+
+        negate_query = True
+        expected_negate_query = "~(subject == 'physics' & score == 62) & ~(subject == 'math' & score == 47)"
+        df_query = reserved_category_to_dataframe_query(reserved_categories, categories, negate_query)
+        assert df_query == expected_negate_query, df_query
+
+    @with_context
+    def test_filtered_data_with_reserved_category_to_dataframe_query(self):
+        """Test dataframe data is filtered correctly using dataframe queries"""
+        # create a dataFrame
+        data = {
+            "subject": ["physics", "math", "literature", "calculus", "physics", "math", "literature", "math"],
+            "score":[62, 47, 55, 74, 31, 77, 85, 47]
+        }
+        df = pd.DataFrame(data, columns=['subject','score'])
+        # All records
+		# subject	score
+		# 0	semester1	62
+		# 1	semester2	47
+		# 2	semester3	55
+		# 3	semester4	74
+		# 4	semester1	31
+		# 5	semester2	77
+		# 6	semester3	85
+		# 7	semester2	47
+
+        reserved_categories = ["subject", "score"]
+        categories = [{"subject": "physics", "score": 62}, {"subject": "math", "score": 47}]
+
+        # expected data
+        #    subject  score
+        # 0  physics     62
+        # 1     math     47
+        # 7     math     47
+        df_query = reserved_category_to_dataframe_query(reserved_categories, categories)
+        filtered_data = df.query(df_query)
+        assert filtered_data.shape == (3, 2), "Only 3 filtered rows to be present"
+        assert filtered_data.iloc[0][0] == "physics" and filtered_data.iloc[0][1] == 62, filtered_data.iloc[0]
+        assert filtered_data.iloc[1][0] == "math" and filtered_data.iloc[1][1] == 47, filtered_data.iloc[1]
+        assert filtered_data.iloc[2][0] == "math" and filtered_data.iloc[2][1] == 47, filtered_data.iloc[2]
+
+    @with_context
+    def test_filtered_data_with_reserved_category_to_dataframe_negate_query(self):
+        """Test dataframe data is filtered correctly using dataframe queries"""
+        # create a dataFrame
+        data = {
+            "subject": ["physics", "math", "literature", "calculus", "physics", "math", "literature", "math"],
+            "score":[62, 47, 55, 74, 31, 77, 85, 47]
+        }
+        df = pd.DataFrame(data, columns=['subject','score'])
+        # All records
+        #       subject  score
+        # 0     physics     62
+        # 1        math     47
+        # 2  literature     55
+        # 3    calculus     74
+        # 4     physics     31
+        # 5        math     77
+        # 6  literature     85
+        # 7        math     47
+
+        reserved_categories = ["subject", "score"]
+        categories = [{"subject": "physics", "score": 31}, {"subject": "math", "score": 47}]
+
+        # exclude data for (subject == 'physics' & score == 31) & (subject == 'math' & score == 47)
+        # expected data
+        #   subject	    score
+        # 0	physics	    62
+        # 2	literature	55
+        # 3	calculus	74
+        # 5	math	    77
+        # 6	literature	85
+        df_query = reserved_category_to_dataframe_query(reserved_categories, categories, negate_query=True)
+        filtered_data = df.query(df_query)
+        assert filtered_data.shape == (5, 2), "Only 5 filtered rows to be present"
+        assert filtered_data.iloc[0][0] == "physics" and filtered_data.iloc[0][1] == 62, filtered_data.iloc[0]
+        assert filtered_data.iloc[1][0] == "literature" and filtered_data.iloc[1][1] == 55, filtered_data.iloc[1]
+        assert filtered_data.iloc[2][0] == "calculus" and filtered_data.iloc[2][1] == 74, filtered_data.iloc[2]
+        assert filtered_data.iloc[3][0] == "math" and filtered_data.iloc[3][1] == 77, filtered_data.iloc[3]
+        assert filtered_data.iloc[4][0] == "literature" and filtered_data.iloc[4][1] == 85, filtered_data.iloc[4]
+
+    @with_context
+    @patch("pybossa.cache.helpers.get_reserved_categories_cache_keys")
+    def test_n_available_tasks_reserved_category(self, mock_reserved_cache_keys):
+        """Test n_available_tasks_for_user with reserved categories"""
+
+        project_info = {
+            "reserve_tasks": {
+                "category": ["subject", "score"]
+            },
+            "sched": Schedulers.task_queue
+        }
+        project = ProjectFactory.create(info=project_info)
+        # mock reserved cache keys so that n_available_for_tasks gives correct values
+        # based on different reserved cache keys in the cache.
+        # first time, return cache key so that 2 tasks for the category are reserved out of 8
+        # second time, return cache so that 5 tasks for different categories are reserved out of 8
+        other_user_reserved_categories_keys = [
+            f"reserve_task:project:{project.id}:category:subject:math:score:47:user:1008:task:111",
+        ]
+        expected_available_tasks_first_call = 6
+
+        other_user_reserved_categories_keys_2 = [
+            f"reserve_task:project:{project.id}:category:subject:physics:score:62:user:1008:task:111",
+            f"reserve_task:project:{project.id}:category:subject:math:score:47:user:1008:task:222",
+            f"reserve_task:project:{project.id}:category:subject:literature:score:55:user:1008:task:333",
+            f"reserve_task:project:{project.id}:category:subject:calculus:score:74:user:1008:task:444",
+        ]
+        mock_reserved_cache_keys.side_effect = [
+            (None, other_user_reserved_categories_keys, None),
+            (None, other_user_reserved_categories_keys_2, None)
+        ]
+        expected_available_tasks_second_call = 3
+
+        TaskFactory.create(project=project, info=dict(subject="physics", score=62), worker_filter={})
+        TaskFactory.create(project=project, info=dict(subject="math", score=47), worker_filter={})
+        TaskFactory.create(project=project, info=dict(subject="literature", score=55), worker_filter={})
+        TaskFactory.create(project=project, info=dict(subject="calculus", score=74), worker_filter={})
+        TaskFactory.create(project=project, info=dict(subject="physics", score=31), worker_filter={})
+        TaskFactory.create(project=project, info=dict(subject="math", score=77), worker_filter={})
+        TaskFactory.create(project=project, info=dict(subject="literature", score=85), worker_filter={})
+        TaskFactory.create(project=project, info=dict(subject="math", score=47), worker_filter={})
+        user = UserFactory.create()
+
+        # two tasks out of total 8 tasks expected to be excluded as they're reserved by other user
+        n_available_tasks = helpers.n_available_tasks_for_user(project, user_id=user.id)
+        assert n_available_tasks == expected_available_tasks_first_call, n_available_tasks
+
+
+        n_available_tasks = helpers.n_available_tasks_for_user(project, user_id=user.id)
+        assert n_available_tasks == expected_available_tasks_second_call, n_available_tasks
