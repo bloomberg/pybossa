@@ -219,10 +219,12 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
                AND id NOT IN
                (SELECT task_id FROM task_run WHERE
                project_id=:project_id AND user_id=:user_id)
+               AND ({user_pref_list})
+               AND ({user_filter_list})
                ;'''
     sqltext = text(sql)
     try:
-        params = dict(project_id=project_id, user_id=user_id)
+        params = dict(project_id=project_id, user_id=user_id, assign_user=assign_user)
         result = session.execute(sqltext, params)
         current_app.logger.info("n_available_tasks_for_user making db request for project_id %d. user_id %d", project_id, user_id)
         if scheduler not in [Schedulers.user_pref, Schedulers.task_queue]:
@@ -242,15 +244,16 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
 
             headers = list(result.keys())
             rows = result.fetchall()
-            df = pd.DataFrame(rows, columns=headers)
+            data = pd.DataFrame(rows, columns=headers)
             # exclude tasks reserved by users other than current user.
             # this will cover all tasks that are reserved by current user
             # plus all available tasks not reserved by any other user.
             exclude_query = reserved_category_to_dataframe_query(reserve_task_config, other_users_categories, negate_query=True)
-            filtered_data = df.query(exclude_query)
+            if exclude_query:
+                data = data.query(exclude_query)
 
             # filter records by worker_filter, user_pref
-            for _, row in filtered_data.iterrows():
+            for _, row in data.iterrows():
                 task_id = row["task_id"]
                 w_filter = row["worker_filter"] or {}
                 num_available_tasks += int(

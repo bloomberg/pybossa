@@ -474,15 +474,15 @@ def get_reserved_categories_cache_keys(reserve_task_config, project_id, timeout,
     redis keys for other users categories and consolidated all categories"""
 
     timeout = timeout or TIMEOUT
-    current_user_categories, other_users_categories = [], []
+    user_category_keys, other_user_category_keys, all_user_category_keys = [], [], []
 
     if not reserve_task_config:
-        return current_user_categories, other_users_categories
+        return user_category_keys, other_user_category_keys, all_user_category_keys
 
     if current_app.config.get('PRIVATE_INSTANCE'):
         current_app.logger.info("Cached categories not found. Reserve task by category disabled for private instance. project_id %s, reserve_task_config %s",
             project_id, str(reserve_task_config))
-        return current_user_categories, other_users_categories
+        return user_category_keys, other_user_category_keys, all_user_category_keys
 
     category = ":".join(["{}:*".format(field) for field in sorted(reserve_task_config)])
     lock_manager = LockManager(sentinel.master, timeout)
