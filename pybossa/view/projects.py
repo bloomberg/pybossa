@@ -1665,6 +1665,24 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                         current_app.logger.info("Locked user does not have valid user id: %s", user_id)
                 task['lock_users'] = ", ".join(users)
 
+        if 'completed_by' in args['display_columns']:
+            user_info = {}
+            for task in page_tasks:
+                task_obj = task_repo.get_task(task['id'])
+                users_completed = [tr.user_id for tr in task_obj.task_runs]
+                users = []
+                for user_id in users_completed:
+                    try:
+                        # show fullname for users
+                        user_id = int(user_id)
+                        if not user_info.get(user_id):
+                            user_info[user_id] = cached_users.get_user_by_id(user_id).fullname
+                        users.append(user_info[user_id])
+                    except ValueError:
+                        # show ip address for anonymous users
+                        current_app.logger.info("Completed user does not have valid user id: %s", user_id)
+                task['completed_users'] = ", ".join(users)
+
         valid_user_preferences = app_settings.upref_mdata.get_valid_user_preferences() \
             if app_settings.upref_mdata else {}
         language_options = valid_user_preferences.get('languages')
