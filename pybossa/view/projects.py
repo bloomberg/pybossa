@@ -1650,38 +1650,19 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                     task['info'][col] = task_info.get(col, '')
 
         if 'lock_status' in args['display_columns']:
-            user_info = {}
-            for task in page_tasks:
-                users = []
-                for user_id in task['lock_users']:
-                    try:
-                        # show fullname for users
-                        user_id = int(user_id)
-                        if not user_info.get(user_id):
-                            user_info[user_id] = cached_users.get_user_by_id(user_id).fullname
-                        users.append(user_info[user_id])
-                    except ValueError:
-                        # show ip address for anonymous users
-                        current_app.logger.info("Locked user does not have valid user id: %s", user_id)
-                task['lock_users'] = ", ".join(users)
+            def get_users_completed(task):
+                return task['lock_users']
+            # Populate list of user names for "Active Users" column.
+            get_users_fullname(page_tasks, lambda task: get_users_completed(task), 'lock_users')
 
         if 'completed_by' in args['display_columns']:
-            user_info = {}
-            for task in page_tasks:
+            def get_users_completed(task):
+                # Load task object.
                 task_obj = task_repo.get_task(task['id'])
-                users_completed = [tr.user_id for tr in task_obj.task_runs]
-                users = []
-                for user_id in users_completed:
-                    try:
-                        # show fullname for users
-                        user_id = int(user_id)
-                        if not user_info.get(user_id):
-                            user_info[user_id] = cached_users.get_user_by_id(user_id).fullname
-                        users.append(user_info[user_id])
-                    except ValueError:
-                        # show ip address for anonymous users
-                        current_app.logger.info("Completed user does not have valid user id: %s", user_id)
-                task['completed_users'] = ", ".join(users)
+                # Return task run worker names.
+                return [str(tr.user_id) for tr in task_obj.task_runs]
+            # Populate list of user names for "Completed By" column.
+            get_users_fullname(page_tasks, lambda task: get_users_completed(task), 'completed_users')
 
         valid_user_preferences = app_settings.upref_mdata.get_valid_user_preferences() \
             if app_settings.upref_mdata else {}
@@ -1714,6 +1695,28 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                     can_know_task_is_gold=can_know_task_is_gold)
 
         return handle_content_type(data)
+
+    def get_users_fullname(page_tasks, get_users_func, result_field):
+        user_info = {}
+        # Enumerate all tasks in the page.
+        for task in page_tasks:
+            users = []
+            # Retrieve the list of user ids to obtain names for (from either the task or task_run, selectable by calling func).
+            users_list = get_users_func(task)
+            # For each user id, load the fullname.
+            for user_id in users_list:
+                try:
+                    # show fullname for users
+                    user_id = int(user_id)
+                    if not user_info.get(user_id):
+                        # Load from cache.
+                        user_info[user_id] = cached_users.get_user_by_id(user_id).fullname
+                    users.append(user_info[user_id])
+                except ValueError:
+                    # Error locating user id.
+                    current_app.logger.info("User does not have valid user id in get_users_fullname(): %s", user_id)
+            task[result_field] = ", ".join(users)
+        return user_info
 
     def respond_export(download_type, args):
         download_specs = download_type.split('-')
