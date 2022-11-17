@@ -9648,12 +9648,11 @@ class TestWeb(web.Helper):
         res = self.signin(email=user.email_addr, password='1234', csrf=csrf)
 
         # Load the task browse page with specific displayable columns.
-        res = self.app.get('project/%s/tasks/browse?display_columns=["task_id","priority","pcomplete","completed_by"]' % (project.short_name), follow_redirects=True)
+        res = self.app.get('project/%s/tasks/browse?display_columns=["task_id","priority","pcomplete","lock_status","completed_by"]' % (project.short_name), follow_redirects=True)
 
         # Confirm the correct columns are displayed.
         assert "Active Users" in str(res.data), "Missing text 'Active Users' in task browse table."
         assert "Completed By" in str(res.data), "Missing text 'Completed By' in task browse description."
-        assert "<th>Completed By</th>" in str(res.data), "Missing column 'Completed By' in task browse table."
         assert "<th>Completed By</th>" in str(res.data), "Missing column 'Completed By' in task browse table."
         assert "T Tester," in str(res.data), "Missing Completed By values in task browse table."
 
