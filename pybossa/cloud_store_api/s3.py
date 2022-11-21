@@ -162,7 +162,7 @@ def s3_upload_file(s3_bucket, source_file, target_file_name,
 
     if return_key_only:
         return key.name
-    url = key.generate_url(0, query_auth=False)
+    url = key.generate_url(0, query_auth=True)
     return url
 
 
