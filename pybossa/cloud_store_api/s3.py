@@ -163,7 +163,7 @@ def s3_upload_file(s3_bucket, source_file, target_file_name,
     if return_key_only:
         return key.name
     url = key.generate_url(0, query_auth=False)
-    return url.split('?')[0]
+    return url
 
 
 def get_s3_bucket_key(s3_bucket, s3_url, conn_name=DEFAULT_CONN):
