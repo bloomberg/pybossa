@@ -66,9 +66,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
     """Cache browse tasks view for a project."""
 
     sorting = {"lock_status asc": "(coalesce(ct, 0)/float4(task.n_answers)) desc",
-               "lock_status desc": "(coalesce(ct, 0)/float4(task.n_answers)) asc",
-               "completed_by asc": "(coalesce(ct, 0)/float4(task.n_answers)) asc",
-               "completed_by desc": "(coalesce(ct, 0)/float4(task.n_answers)) desc"}
+               "lock_status desc": "(coalesce(ct, 0)/float4(task.n_answers)) asc"}
 
     # TODO: use Jinja filters to format date
     def format_date(date):
@@ -143,14 +141,14 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
     def search_completed_by_sorting_result():
         tasks = []
-        sql_order_by = sorting[order_by]
 
+        sql_order_by = order_by
         sql_query = sql + sql_order.format(sql_order_by) + sql_limit_offset
 
         # Modify SQL to sort by the task_run user name, by querying for the task_run.user_id and
         # finally joining with user.id and retrieving user.name for sorting. Example:
         """
-         SELECT task.id,
+        SELECT task.id,
             coalesce(ct, 0) as n_task_runs, task.n_answers, ft, completed_by_id, usr.name
             priority_0, task.created, task.calibration,
             task.user_pref, task.worker_filter, task.worker_pref
@@ -166,7 +164,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         sql_query = sql_query.replace('MAX(finish_time) as ft FROM task_run',
                 'MAX(finish_time) as ft, user_id as completed_by_id FROM task_run')
         sql_query = sql_query.replace('GROUP BY task_id', 'GROUP BY task_id, completed_by_id')
-        sql_query = sql_query.replace('ORDER BY (coalesce(ct, 0)/float4(task.n_answers))',
+        sql_query = sql_query.replace('ORDER BY completed_by',
                 'AND usr.id = completed_by_id ORDER BY usr.name')
         sql_query = sql_query.replace('FROM task', 'FROM "user" as usr, task')
         sql_query = sql_query.replace("COUNT(id)", "COUNT(task_run.id)")
