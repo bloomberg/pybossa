@@ -147,13 +147,30 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
         sql_query = sql + sql_order.format(sql_order_by) + sql_limit_offset
 
-        # Append column for completed_by_id (task_run.user_id).
+        # Modify SQL to sort by the task_run user name, by querying for the task_run.user_id and
+        # finally joining with user.id and retrieving user.name for sorting. Example:
+        """
+         SELECT task.id,
+            coalesce(ct, 0) as n_task_runs, task.n_answers, ft, completed_by_id, usr.name
+            priority_0, task.created, task.calibration,
+            task.user_pref, task.worker_filter, task.worker_pref
+            FROM "user" as usr, task
+            LEFT OUTER JOIN
+            (SELECT task_id, COUNT(task_run.id) AS ct,
+            MAX(finish_time) as ft, user_id as completed_by_id FROM "user" as usr, task_run
+            WHERE project_id=:project_id GROUP BY task_id, completed_by_id) AS log_counts
+            ON task.id=log_counts.task_id
+            WHERE task.project_id=:project_id AND usr.id = completed_by_id ORDER BY usr.name asc  LIMIT :limit OFFSET :offset
+        """
         sql_query = sql_query.replace(', ft,', ', ft, completed_by_id, usr.name')
-        sql_query = sql_query.replace('MAX(finish_time) as ft FROM task_run', 'MAX(finish_time) as ft, user_id as completed_by_id FROM task_run')
+        sql_query = sql_query.replace('MAX(finish_time) as ft FROM task_run',
+                'MAX(finish_time) as ft, user_id as completed_by_id FROM task_run')
         sql_query = sql_query.replace('GROUP BY task_id', 'GROUP BY task_id, completed_by_id')
-        sql_query = sql_query.replace('ORDER BY (coalesce(ct, 0)/float4(task.n_answers))', 'AND usr.id = completed_by_id ORDER BY usr.name')
+        sql_query = sql_query.replace('ORDER BY (coalesce(ct, 0)/float4(task.n_answers))',
+                'AND usr.id = completed_by_id ORDER BY usr.name')
         sql_query = sql_query.replace('FROM task', 'FROM "user" as usr, task')
         sql_query = sql_query.replace("COUNT(id)", "COUNT(task_run.id)")
+
         params["offset"] = max(params["offset"], 0)
         params["limit"] -= len(tasks)
 
