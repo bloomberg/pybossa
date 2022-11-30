@@ -67,8 +67,8 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
     sorting = {"lock_status asc": "(coalesce(ct, 0)/float4(task.n_answers)) desc",
                "lock_status desc": "(coalesce(ct, 0)/float4(task.n_answers)) asc",
-               "completed_by asc": "(coalesce(ct, 0)/float4(task.n_answers)) desc",
-               "completed_by desc": "(coalesce(ct, 0)/float4(task.n_answers)) asc"}
+               "completed_by asc": "(coalesce(ct, 0)/float4(task.n_answers)) asc",
+               "completed_by desc": "(coalesce(ct, 0)/float4(task.n_answers)) desc"}
 
     # TODO: use Jinja filters to format date
     def format_date(date):
