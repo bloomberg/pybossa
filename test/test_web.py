@@ -9653,7 +9653,7 @@ class TestWeb(web.Helper):
         # Confirm the correct columns are displayed.
         assert "Active Users" in str(res.data), "Missing text 'Active Users' in task browse table."
         assert "Completed By" in str(res.data), "Missing text 'Completed By' in task browse description."
-        assert "<th>Completed By</th>" in str(res.data), "Missing column 'Completed By' in task browse table."
+        assert "Completed By</th>" in str(res.data), "Missing column 'Completed By' in task browse table."
         assert "T Tester," in str(res.data), "Missing Completed By values in task browse table."
 
 class TestWebUserMetadataUpdate(web.Helper):
