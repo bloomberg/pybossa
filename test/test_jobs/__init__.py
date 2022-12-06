@@ -250,7 +250,7 @@ class TestJobs(Test):
             assert job['queue'] == "weekly"
 
     @with_context
-    @patch('pybossa.jobs.purge_task_data')
+    @patch('pybossa.purge_data.purge_task_data')
     def test_completed_tasks_cleanup(self, mock_purge_tasks):
         """Test completed_tasks_cleanup deletes tasks qualify for deletion."""
 
@@ -299,7 +299,7 @@ class TestJobs(Test):
         assert saturday.strftime("%Y-%m-%d %H:%M:%S") == "2026-01-31 16:00:00"
 
     @with_context
-    @patch('pybossa.jobs.purge_task_data')
+    @patch('pybossa.purge_data.purge_task_data')
     def test_completed_tasks_cleanup_bad_config(self, mock_purge_tasks):
         """Test completed_tasks_cleanup deletes tasks qualify for deletion."""
 
@@ -309,7 +309,7 @@ class TestJobs(Test):
         assert not mock_purge_tasks.called
 
     @with_context
-    @patch('pybossa.jobs.purge_task_data')
+    @patch('pybossa.purge_data.purge_task_data')
     def test_completed_tasks_cleanup_bad_project_config(self, mock_purge_tasks):
         """Test completed_tasks_cleanup deletes tasks qualify for deletion."""
 
@@ -325,7 +325,7 @@ class TestJobs(Test):
     # archive tables from test db upon testing complete for future test runs to be successful
     # mock_purge_tasks can be removed with task data cleanup and archive happening in actual
     # @with_context
-    # @patch('pybossa.jobs.purge_task_data')
+    # @patch('pybossa.purge_data.purge_task_data')
     # def test_completed_tasks_cleanup(self, mock_purge_tasks):
     #     """Test completed_tasks_cleanup deletes tasks qualify for deletion."""
 
