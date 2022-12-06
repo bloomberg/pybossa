@@ -256,7 +256,7 @@ def parse_tasks_browse_args(args):
     if not isinstance(parsed_args.get('display_columns'), list):
         parsed_args['display_columns'] = ['task_id', 'priority', 'pcomplete',
                                           'created', 'finish_time', 'gold_task',
-                                          'actions', 'lock_status', 'completed_by']
+                                          'actions', 'lock_status']
     if 'display_info_columns' in args:
         display_info_columns = args['display_info_columns']
 
