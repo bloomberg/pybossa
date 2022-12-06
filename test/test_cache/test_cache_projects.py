@@ -898,19 +898,19 @@ class TestProjectsCache(Test):
 
         args = dict(task_id=12345, gold_task='1')
         valid_args = dict(task_id=12345, gold_task='1', order_by_dict={},
-            display_columns=['task_id', 'priority', 'pcomplete', 'created', 'finish_time', 'gold_task', 'actions', 'lock_status', 'completed_by'])
+            display_columns=['task_id', 'priority', 'pcomplete', 'created', 'finish_time', 'gold_task', 'actions', 'lock_status'])
         pargs = parse_tasks_browse_args(args)
         assert pargs == valid_args, pargs
 
         args = dict(task_id=12345, gold_task='0')
         valid_args = dict(task_id=12345, gold_task='0', order_by_dict={},
-            display_columns=['task_id', 'priority', 'pcomplete', 'created', 'finish_time', 'gold_task', 'actions', 'lock_status', 'completed_by'])
+            display_columns=['task_id', 'priority', 'pcomplete', 'created', 'finish_time', 'gold_task', 'actions', 'lock_status'])
         pargs = parse_tasks_browse_args(args)
         assert pargs == valid_args, pargs
 
         args = dict(task_id=12345, gold_task='All')
         valid_args = dict(task_id=12345, order_by_dict={},
-            display_columns=['task_id', 'priority', 'pcomplete', 'created', 'finish_time', 'gold_task', 'actions', 'lock_status', 'completed_by'])
+            display_columns=['task_id', 'priority', 'pcomplete', 'created', 'finish_time', 'gold_task', 'actions', 'lock_status'])
         pargs = parse_tasks_browse_args(args)
         assert pargs == valid_args, pargs
 
