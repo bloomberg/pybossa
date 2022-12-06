@@ -24,8 +24,6 @@ from unittest.mock import patch
 from nose.tools import assert_raises
 from test import with_context, Test
 from test.factories import ProjectFactory, TaskFactory, TaskRunFactory
-from accessdb import AccessDatabase
-from sqlalchemy.sql import text
 
 
 def jobs():

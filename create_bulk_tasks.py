@@ -9,18 +9,16 @@ task create date ranges.
 """
 
 import argparse
-import pandas as pd
 import json
 from datetime import datetime
-import numpy as np
 from random import randrange
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import sys
 
-from accessdb import AccessDatabase
+from pybossa.accessdb import AccessDatabase
 import psycopg2
-from pybossa.core import db, create_app
+from pybossa.core import create_app
 
 root_logger = logging.getLogger()
 hdlr = TimedRotatingFileHandler("databulk.log", when="D", backupCount=10)
