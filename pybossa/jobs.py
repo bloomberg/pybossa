@@ -47,7 +47,6 @@ from pybossa.leaderboard.jobs import leaderboard
 from pybossa.model.webhook import Webhook
 from pybossa.util import with_cache_disabled, publish_channel, \
     mail_with_enabled_users
-from purge_data import purge_task_data
 
 MINUTE = 60
 IMPORT_TASKS_TIMEOUT = (20 * MINUTE)
@@ -233,7 +232,6 @@ def project_export(_id):
 
 def get_project_jobs(queue):
     """Return a list of jobs based on user type."""
-    from pybossa.core import project_repo
     from pybossa.cache import projects as cached_projects
     timeout = current_app.config.get('TIMEOUT')
     if queue == 'super':
@@ -448,7 +446,6 @@ def warm_cache():  # pragma: no cover
     with app.request_context(DUMMY_ENVIRON):
         import pybossa.cache.projects as cached_projects
         import pybossa.cache.categories as cached_cat
-        import pybossa.cache.project_stats as stats
         from pybossa.util import rank
         from pybossa.core import user_repo
 
@@ -1555,6 +1552,7 @@ def export_all_users(fmt, email_addr):
 def perform_completed_tasks_cleanup():
     from sqlalchemy.sql import text
     from pybossa.core import db
+    from pybossa.purge_data import purge_task_data
 
     valid_days = [days[0] for days in current_app.config.get('COMPLETED_TASK_CLEANUP_DAYS', [(None, None)]) if days[0]]
     if not valid_days:

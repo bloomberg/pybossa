@@ -8,10 +8,10 @@ from logging.handlers import TimedRotatingFileHandler
 import sys
 import psycopg2
 
-from accessdb import AccessDatabase
+from pybossa.accessdb import AccessDatabase
 
 root_logger = logging.getLogger()
-hdlr = TimedRotatingFileHandler("purgedata.log", when="D", backupCount=10)
+hdlr = TimedRotatingFileHandler("../purgedata.log", when="D", backupCount=10)
 formatter = logging.Formatter(
     "%(asctime)s %(levelname)s : %(message)s %(module)s %(lineno)s", "%Y-%m-%d %H:%M:%S"
 )
