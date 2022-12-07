@@ -198,3 +198,9 @@ class TestSendTaskNotification(Test):
         email_addr = ['user@user.com']
         notify_task_progress(info, email_addr)
         assert mock.called
+
+    @with_context
+    def test_check_and_send_task_notifications_invalid_project(self):
+        """Verify check_and_send_task_notifications returns None for invalid project."""
+        result = check_and_send_task_notifications(-1)
+        assert result is None
