@@ -198,7 +198,8 @@ allowed_fields = {
     'pcomplete': '(coalesce(ct, 0)/float4(task.n_answers))',
     'created': 'task.created',
     'filter_by_field': 'filter_by_field',
-    'lock_status': 'lock_status'
+    'lock_status': 'lock_status',
+    'completed_by': 'completed_by'
 }
 
 

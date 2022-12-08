@@ -17,9 +17,9 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 from test import Test, with_context, flask_app
 from test.factories import ProjectFactory, UserFactory, TaskFactory, TaskRunFactory
-from pybossa.jobs import get_export_task_jobs, project_export, export_tasks
+from pybossa.jobs import get_export_task_jobs, project_export, export_tasks, export_all_users
 from unittest.mock import patch
-
+from nose.tools import assert_raises
 
 class TestExport(Test):
 
@@ -124,3 +124,9 @@ class TestExport(Test):
         ty = "task"
         task_csv_exporter.response_zip(project, ty)
         task_csv_exporter.response_zip.assert_called()
+
+    @with_context
+    def test_export_all_users_exception(self):
+        """Test export_all_users exception handled."""
+        with assert_raises(KeyError) as exec:
+            export_all_users(None, 'test@test.com')
