@@ -149,7 +149,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         # finally joining with user.id and retrieving user.name for sorting. Example:
         """
         SELECT task.id,
-            coalesce(ct, 0) as n_task_runs, task.n_answers, ft, completed_by_id, usr.name
+            coalesce(ct, 0) as n_task_runs, task.n_answers, ft, completed_by_id, usr.name,
             priority_0, task.created, task.calibration,
             task.user_pref, task.worker_filter, task.worker_pref
             FROM "user" as usr, task
@@ -160,7 +160,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
             ON task.id=log_counts.task_id
             WHERE task.project_id=:project_id AND usr.id = completed_by_id ORDER BY usr.name asc  LIMIT :limit OFFSET :offset
         """
-        sql_query = sql_query.replace(', ft,', ', ft, completed_by_id, usr.name')
+        sql_query = sql_query.replace(', ft,', ', ft, completed_by_id, usr.name,')
         sql_query = sql_query.replace('MAX(finish_time) as ft FROM task_run',
                 'MAX(finish_time) as ft, user_id as completed_by_id FROM task_run')
         sql_query = sql_query.replace('GROUP BY task_id', 'GROUP BY task_id, completed_by_id')
