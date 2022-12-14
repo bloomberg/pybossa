@@ -9657,47 +9657,6 @@ class TestWeb(web.Helper):
         assert "T Tester," in str(res.data), "Missing Completed By values in task browse table."
 
     @with_context
-    def test_browse_task_display_info_columns_sort_completed_by(self):
-        """Test browse task with display info columns sorted by completed_by column."""
-        # Initialize a project.
-        self.create()
-        self.delete_task_runs()
-
-        # Set the user password and admin.
-        user = db.session.query(User).get(2)
-        user.set_password('1234')
-        user.admin = True
-        user_repo.save(user)
-
-        # Create a project and task.
-        project = db.session.query(Project).first()
-        project.allow_anonymous_contributors = True
-        db.session.add(project)
-        db.session.commit()
-
-        # Retrieve the first task.
-        task = db.session.query(Task).filter(Project.id == project.id).first()
-
-        # Add task results.
-        for i in range(10):
-            task_run = TaskRun(project_id=project.id, task_id=task.id,
-                               user_id=user.id,
-                               info={'answer': i})
-            db.session.add(task_run)
-            db.session.commit()
-            res = self.app.get('api/project/%s/newtask' % project.id)
-
-        # Sign-in as an admin user.
-        csrf = self.get_csrf('/account/signin')
-        res = self.signin(email=user.email_addr, password='1234', csrf=csrf)
-
-        # Load the task browse page with specific displayable columns.
-        res = self.app.get('project/%s/tasks/browse?display_columns=["task_id","priority","pcomplete","lock_status","completed_by"]&order_by=completed_by+desc' % (project.short_name), follow_redirects=True)
-
-        # Confirm the correct columns are displayed.
-        assert "class=\" sort-desc sortable\" data-sort=\"completed_by\"" in str(res.data), "Missing sorted column indicator (sort-desc) on Completed By."
-
-    @with_context
     def test_browse_task_display_info_columns_sort_priority(self):
         """Test browse task with display info columns sorted by priority column."""
         # Initialize a project.
