@@ -139,45 +139,6 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
         return tasks
 
-    def search_completed_by_sorting_result():
-        tasks = []
-
-        sql_order_by = order_by
-        sql_query = sql + sql_order.format(sql_order_by) + sql_limit_offset
-
-        # Modify SQL to sort by the task_run user name, by querying for the task_run.user_id and
-        # finally joining with user.id and retrieving user.name for sorting. Example:
-        """
-        SELECT task.id,
-            coalesce(ct, 0) as n_task_runs, task.n_answers, ft, completed_by_id, usr.name,
-            priority_0, task.created, task.calibration,
-            task.user_pref, task.worker_filter, task.worker_pref
-            FROM "user" as usr, task
-            LEFT OUTER JOIN
-            (SELECT task_id, COUNT(task_run.id) AS ct,
-            MAX(finish_time) as ft, user_id as completed_by_id FROM "user" as usr, task_run
-            WHERE project_id=:project_id GROUP BY task_id, completed_by_id) AS log_counts
-            ON task.id=log_counts.task_id
-            WHERE task.project_id=:project_id AND usr.id = completed_by_id ORDER BY usr.name asc  LIMIT :limit OFFSET :offset
-        """
-        sql_query = sql_query.replace(', ft,', ', ft, completed_by_id, usr.name,')
-        sql_query = sql_query.replace('MAX(finish_time) as ft FROM task_run',
-                'MAX(finish_time) as ft, user_id as completed_by_id FROM task_run')
-        sql_query = sql_query.replace('GROUP BY task_id', 'GROUP BY task_id, completed_by_id')
-        sql_query = sql_query.replace('ORDER BY completed_by',
-                'AND usr.id = completed_by_id ORDER BY usr.name')
-        sql_query = sql_query.replace('FROM task', 'FROM "user" as usr, task')
-        sql_query = sql_query.replace("COUNT(id)", "COUNT(task_run.id)")
-
-        params["offset"] = max(params["offset"], 0)
-        params["limit"] -= len(tasks)
-
-        results = session.execute(text(sql_query), params)
-
-        tasks.extend([format_task(row) for row in results])
-
-        return tasks
-
     order_by = args.get('order_by') or ""
     tasks = []
     total_count = task_count(project_id, args)
@@ -286,8 +247,6 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
         if "lock_status" in order_by and locked_tasks_in_project:
             tasks = search_lock_status_sorting_result()
-        elif "completed_by" in order_by:
-            tasks = search_completed_by_sorting_result()
         else:
             # if not sort by lock_status or locked_tasks_in_project is empty/None,
             # sort by the column "order_by"
