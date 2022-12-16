@@ -27,6 +27,7 @@ from pybossa.cache.task_browse_helpers import get_task_filters, allowed_fields, 
 import pybossa.app_settings as app_settings
 from pybossa.redis_lock import get_locked_tasks_project
 from pybossa.util import get_taskrun_date_range_sql_clause_params
+from pybossa.cache.task_browse_helpers import get_users_fullnames_from_emails
 
 import heapq
 
@@ -85,15 +86,21 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     lock_users=lock_users,
                     available=False)
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
+        if args and "display_columns" in args and "assigned_users" in args["display_columns"] and row.user_pref:
+            task["assigned_users"] = row.user_pref.get("assign_user", [])
         return task
 
-    def format_task_dates(task):
-        """convert created and finish date utc to est."""
+    def format_current_page(task):
+        # format current page. convert created and finish date utc to est.
+        # convert assign users from email address to full names.
         task["created"] = format_date(task["created"])
         task["finish_time"] = format_date(task["finish_time"])
+        if "assigned_users" in task:
+            task["assigned_users"] = get_users_fullnames_from_emails(task["assigned_users"])
 
     def search_lock_status_sorting_result():
         tasks = []
+        sql_order = " ORDER BY {} "
         sql_order_by = sorting[order_by]
 
 
@@ -182,8 +189,11 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
         params["assign_user"] = args["sql_params"]["assign_user"]
 
-        all_available_tasks_sql = sql + filters +\
-                " ORDER BY %s" % (args.get('order_by') or 'priority_0 desc')
+        order_by =  args.get('order_by') or "priority_0 DESC"
+        order_by = order_by.replace("assigned_users", "task.user_pref->>'assign_user'")
+        sql_order = f" ORDER BY {order_by} "
+
+        all_available_tasks_sql = sql + filters + sql_order
         all_available_tasks = [row for row in session.execute(text(all_available_tasks_sql), params)]
 
         task_reserve_filter = args.get("filter_by_wfilter_upref", {}).get("reserve_filter", "")
@@ -220,7 +230,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         # format current page task dates utc to est
         # this is to obtain 10x better response time
         for task in tasks:
-            format_task_dates(task)
+            format_current_page(task)
 
     else:
         # construct task browse page for owners/admins
@@ -240,7 +250,6 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         locked_task_ids = [lock["task_id"] for lock in get_locked_tasks_project(project_id)]
         sql_lock_filter = " AND id IN ({})".format(",".join(locked_task_ids))
         sql_unlock_filter = " AND id NOT IN ({})".format(",".join(locked_task_ids))
-        sql_order = " ORDER BY {} "
         sql_limit_offset = " LIMIT :limit OFFSET :offset "
         params["limit"] = limit
         params["offset"] = offset
@@ -250,9 +259,10 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         else:
             # if not sort by lock_status or locked_tasks_in_project is empty/None,
             # sort by the column "order_by"
-            order_by =  args.get('order_by')
-            sql_order_by = order_by or 'id ASC'
-            sql_query = sql + sql_order.format(sql_order_by) + sql_limit_offset
+            order_by =  args.get('order_by') or "id ASC"
+            order_by = order_by.replace("assigned_users", "task.user_pref->>'assign_user'")
+            sql_order = f" ORDER BY {order_by} "
+            sql_query = sql + sql_order + sql_limit_offset
 
             results = session.execute(text(sql_query), params)
             tasks = [format_task(row, locked_tasks_in_project.get(row.id, [])) for row in results]
@@ -261,7 +271,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         # this is to obtain 10x better response time
         num_tasks = min(len(tasks), 100)
         for i in range(num_tasks):
-            format_task_dates(tasks[i])
+            format_current_page(tasks[i])
         session.execute("RESET enable_indexscan;")
 
     return total_count, tasks
