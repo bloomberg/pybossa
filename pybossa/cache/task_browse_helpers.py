@@ -27,6 +27,7 @@ comparator_func = {
     "!=": operator.ne,
 }
 
+users_emails_to_fullnames = {}
 
 def get_task_filters(args):
     """
@@ -199,7 +200,8 @@ allowed_fields = {
     'created': 'task.created',
     'filter_by_field': 'filter_by_field',
     'lock_status': 'lock_status',
-    'completed_by': 'completed_by'
+    'completed_by': 'completed_by',
+    'assigned_users': 'assigned_users'
 }
 
 
@@ -293,6 +295,7 @@ def parse_tasks_browse_args(args):
 
     return parsed_args
 
+
 def parse_tasks_browse_order_by_args(order_by, display_info_columns):
     order_by_result = None
     order_by_dict = dict()
@@ -322,6 +325,7 @@ def parse_tasks_browse_order_by_args(order_by, display_info_columns):
             order_by_result = re.sub(r',\s{0,1}' + key + ' ', ', ' + value + ' ', order_by_result)
 
     return (order_by_result, order_by_dict)
+
 
 def validate_user_preferences(user_pref):
     if not isinstance(user_pref, dict) or \
@@ -373,6 +377,7 @@ def user_meet_task_requirement(task_id, user_filter, user_profile):
             return False
     return True
 
+
 def get_task_preference_score(task_pref, user_profile):
     score = 0
     for key, value in task_pref.items():
@@ -384,3 +389,34 @@ def get_task_preference_score(task_pref, user_profile):
             # TODO: when user profile is not number, we need another method to calculate score
             pass
     return score
+
+
+def get_user_fullname_from_email(email_addr):
+    # search user by email address in local
+    # cache users_emails_to_fullnames first
+    # look for user in db if not found in cache
+    # with user not found in db, return their email address
+    # that would be useful for correcting wrong email addresses.
+    from pybossa.core import user_repo
+
+    if email_addr in users_emails_to_fullnames:
+        return users_emails_to_fullnames[email_addr]
+
+    user_fullname = email_addr  # missing user info will replace fullname with their email address
+    user = user_repo.get_by(email_addr=email_addr)
+    if user:
+        user_fullname = user.fullname
+        users_emails_to_fullnames[email_addr] = user_fullname
+    return user_fullname
+
+
+def get_users_fullnames_from_emails(emails):
+    # given list of user emails as an input,
+    # obtain user full names, sort and return
+    # full names as comma separated string
+    users_fullnames = []
+    for email_addr in emails:
+        user_fullname = get_user_fullname_from_email(email_addr)
+        users_fullnames.append(user_fullname)
+    users_fullnames.sort()
+    return ", ".join(users_fullnames)

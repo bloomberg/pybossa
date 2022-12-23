@@ -19,7 +19,7 @@
 from test import Test, with_context, with_request_context
 from pybossa.cache import projects as cached_projects
 from test.factories import UserFactory, ProjectFactory, TaskFactory, \
-    TaskRunFactory, AnonymousTaskRunFactory
+    TaskRunFactory, AnonymousTaskRunFactory, UserFactory
 from unittest.mock import patch
 import datetime
 import json
@@ -929,3 +929,22 @@ class TestProjectsCache(Test):
 
         assert count == 1
         assert cached_tasks[0]['id'] == task.id
+
+    @with_context
+    def test_browse_task_assigned_users(self):
+        project = ProjectFactory.create()
+        user_pref = dict(assign_user=["y@def.com", "z@ijk.com", "x@abc.com"])
+        tasks = TaskFactory.create_batch(1, project=project, info={}, n_answers=2, user_pref=user_pref)
+        TaskRunFactory.create_batch(3, task=tasks[0])
+        user_x = UserFactory.create(email_addr="x@abc.com", fullname="user_x at_abc")
+        user_y = UserFactory.create(email_addr="y@def.com", fullname="user_y at_def")
+
+        count, cached_tasks = cached_projects.browse_tasks(project.id, {
+            "display_columns": ["assigned_users"]
+        })
+
+        assert count == 1
+        assert cached_tasks[0]["id"] == tasks[0].id
+        assert "assigned_users" in cached_tasks[0], "assigned_users column selected. assigned users should be part of task."
+        assert "z@ijk.com" in cached_tasks[0]["assigned_users"], "user email to be present for user email not found in the system."
+        assert cached_tasks[0]["assigned_users"] == "user_x at_abc, user_y at_def, z@ijk.com", "assigned users full names to be present in sorted order."
