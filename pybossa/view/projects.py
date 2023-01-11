@@ -38,7 +38,7 @@ from werkzeug.datastructures import MultiDict
 import pybossa.sched as sched
 from pybossa.core import (uploader, signer, sentinel, json_exporter,
                           csv_exporter, importer, db, task_json_exporter,
-                          task_csv_exporter, anonymizer)
+                          task_csv_exporter, anonymizer, csrf)
 from pybossa.model import make_uuid
 from pybossa.model.project import Project
 from pybossa.model.category import Category
@@ -516,6 +516,16 @@ def clone(short_name):
         form=form,
         project=project_sanitized
     ))
+
+@blueprint.route('/<short_name>/tasks/taskpresenterimageupload', methods=['GET', 'POST'])
+@login_required
+@admin_or_subadmin_required
+@csrf.exempt
+def upload_task_guidelines_image(short_name):
+    # upload image here
+
+    # dummy response
+    return jsonify({"status":"UPLOADED IMAGE"})
 
 @blueprint.route('/<short_name>/tasks/taskpresentereditor', methods=['GET', 'POST'])
 @login_required
