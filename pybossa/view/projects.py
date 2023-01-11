@@ -522,10 +522,34 @@ def clone(short_name):
 @admin_or_subadmin_required
 @csrf.exempt
 def upload_task_guidelines_image(short_name):
-    # upload image here
+    errors = False
+    project, owner, ps = project_by_shortname(short_name)
 
-    # dummy response
-    return jsonify({"status":"UPLOADED IMAGE"})
+    disable_editor = (not current_user.admin and
+                      current_app.config.get(
+                          'DISABLE_TASK_PRESENTER_EDITOR'))
+
+    is_admin_or_owner = (
+        current_user.admin or
+        (project.owner_id == current_user.id or
+            current_user.id in project.owners_ids))
+
+    if disable_editor:
+        flash(gettext('Task presenter editor disabled!'), 'error')
+
+    if request.method == 'POST':
+        if disable_editor:
+            flash(gettext('Task presenter editor disabled!'), 'error')
+            errors = True
+        elif not is_admin_or_owner:
+            flash(gettext('Ooops! Only project owners can update.'),
+                  'error')
+            errors = True
+
+    for file in request.files.getlist("image"):
+        print(file)
+
+    return jsonify({"imgurl":"https://i.ibb.co/SX9YBGz/IMG-0126.jpg"})
 
 @blueprint.route('/<short_name>/tasks/taskpresentereditor', methods=['GET', 'POST'])
 @login_required
