@@ -536,20 +536,19 @@ def upload_task_guidelines_image(short_name):
 
     if disable_editor:
         flash(gettext('Task presenter editor disabled!'), 'error')
-
-    if request.method == 'POST':
-        if disable_editor:
-            flash(gettext('Task presenter editor disabled!'), 'error')
-            errors = True
-        elif not is_admin_or_owner:
-            flash(gettext('Ooops! Only project owners can update.'),
-                  'error')
-            errors = True
+        errors = True
+    elif not is_admin_or_owner:
+        flash(gettext('Ooops! Only project owners can update.'), 'error')
+        errors = True
 
     for file in request.files.getlist("image"):
         print(file)
 
-    return jsonify({"imgurl":"https://i.ibb.co/SX9YBGz/IMG-0126.jpg"})
+    response = {
+        "imgurls" : ["https://i.ibb.co/SX9YBGz/IMG-0126.jpg"],
+        "errors": errors
+    }
+    return jsonify(response)
 
 @blueprint.route('/<short_name>/tasks/taskpresentereditor', methods=['GET', 'POST'])
 @login_required
