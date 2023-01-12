@@ -522,8 +522,9 @@ def clone(short_name):
 @admin_or_subadmin_required
 @csrf.exempt
 def upload_task_guidelines_image(short_name):
+    flash(gettext("THIS IS A TEST FLASH!!!!!"))
     errors = False
-    project, owner, ps = project_by_shortname(short_name)
+    project = project_by_shortname(short_name)
 
     disable_editor = (not current_user.admin and
                       current_app.config.get(
@@ -538,14 +539,28 @@ def upload_task_guidelines_image(short_name):
         flash(gettext('Task presenter editor disabled!'), 'error')
         errors = True
     elif not is_admin_or_owner:
-        flash(gettext('Ooops! Only project owners can update.'), 'error')
+        flash(gettext('Ooops! Only project owners can upload files.'), 'error')
         errors = True
 
+    imgurls = []
     for file in request.files.getlist("image"):
-        print(file)
+        file_size_mb = file.seek(0, os.SEEK_END) / 1024 / 1024
+        file.seek(0, os.SEEK_SET)
+        if file_size_mb < 5:
+            container = "user_%s" % current_user.id
+            uploader.upload_file(file, container=container)
+            imgurls.append(get_avatar_url(
+                current_app.config.get('UPLOAD_METHOD'),
+                file.filename,
+                container,
+                current_app.config.get('AVATAR_ABSOLUTE')
+            ))
+        else:
+            flash(gettext('File must be smaller than 5 MB.'))
+            errors = True
 
     response = {
-        "imgurls" : ["https://i.ibb.co/SX9YBGz/IMG-0126.jpg"],
+        "imgurls" : imgurls,
         "errors": errors
     }
     return jsonify(response)
