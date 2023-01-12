@@ -522,7 +522,6 @@ def clone(short_name):
 @admin_or_subadmin_required
 @csrf.exempt
 def upload_task_guidelines_image(short_name):
-    flash(gettext("THIS IS A TEST FLASH!!!!!"))
     errors = False
     project = project_by_shortname(short_name)
 
