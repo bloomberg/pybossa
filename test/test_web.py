@@ -4696,7 +4696,7 @@ class TestWeb(web.Helper):
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
     def test_task_presenter_large_image_upload(self, mock):
-        """Test API /tasks/taskpresenterimageupload to upload a large task presenter guidelines image"""
+        """Test API /tasks/taskpresenterimageupload should not upload images with size > 5 MB"""
         print("running test_task_presenter_image_upload...")
         user = UserFactory.create(id=500)
         project = ProjectFactory.create(
@@ -4739,13 +4739,44 @@ class TestWeb(web.Helper):
             },
             owner=user)
         headers = [('Authorization', user.api_key)]
-        with open('./test/files/small-image.jpg', 'rb') as img:
+        with open('./test/files/small-image1.jpg', 'rb') as img:
             imgStringIO = BytesIO(img.read())
         # Call API method to upload image.
         res = self.app.post('/project/{}/tasks/taskpresenterimageupload'.format(project.short_name), headers=headers, data={'image': (imgStringIO, 'large-image.jpg')})
         res_data = json.loads(res.data)
         assert res.status_code == 200, "POST image upload should be successful"
         assert len(res_data['imgurls']) == 1, "Successful count of uploaded images 1."
+
+    @with_context
+    @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
+    def test_task_presenter_multiple_image_upload(self, mock):
+        """Test API /tasks/taskpresenterimageupload to upload multiple task presenter guidelines images"""
+        print("running test_task_presenter_image_upload...")
+        user = UserFactory.create(id=500)
+        project = ProjectFactory.create(
+            short_name='test_project',
+            name='Test Project',
+            info={
+                'total': 150,
+                'task_presenter': 'foo',
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
+                'kpi': 0.5,
+                'product': 'abc',
+                'subproduct': 'def',
+            },
+            owner=user)
+        headers = [('Authorization', user.api_key)]
+        with open('./test/files/small-image1.jpg', 'rb') as img1:
+            imgStringIO1 = BytesIO(img1.read())
+        with open('./test/files/small-image2.jpg', 'rb') as img2:
+            imgStringIO2 = BytesIO(img2.read())
+        # Call API method to upload image.
+        res = self.app.post('/project/{}/tasks/taskpresenterimageupload'.format(project.short_name), headers=headers, data={'image':
+            [(imgStringIO1, 'img1.jpg'), (imgStringIO2, 'img2.jpg')]
+        })
+        res_data = json.loads(res.data)
+        assert res.status_code == 200, "POST image upload should be successful"
+        assert len(res_data['imgurls']) == 2, "Successful count of uploaded images 2."
 
 
     @with_context
