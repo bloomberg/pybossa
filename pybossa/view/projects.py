@@ -543,6 +543,7 @@ def upload_task_guidelines_image(short_name):
         errors = True
 
     imgurls = []
+    large_file = False
     for file in request.files.getlist("image"):
         file_size_mb = file.seek(0, os.SEEK_END) / 1024 / 1024
         file.seek(0, os.SEEK_SET)
@@ -558,13 +559,15 @@ def upload_task_guidelines_image(short_name):
             ))
         else:
             flash(gettext('File must be smaller than 5 MB.'))
+            large_file = True
             errors = True
 
     response = {
         "imgurls" : imgurls,
         "errors": errors
     }
-    return jsonify(response)
+
+    return jsonify(response), 200 if large_file == False else 413
 
 @blueprint.route('/<short_name>/tasks/taskpresentereditor', methods=['GET', 'POST'])
 @login_required
