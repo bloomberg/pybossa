@@ -523,7 +523,7 @@ def clone(short_name):
 @admin_or_subadmin_required
 @csrf.exempt
 def upload_task_guidelines_image(short_name):
-    errors = False
+    error = False
     project = project_by_shortname(short_name)
 
     disable_editor = (not current_user.admin and
@@ -537,10 +537,10 @@ def upload_task_guidelines_image(short_name):
 
     if disable_editor:
         flash(gettext('Task presenter editor disabled!'), 'error')
-        errors = True
+        error = True
     elif not is_admin_or_owner:
         flash(gettext('Ooops! Only project owners can upload files.'), 'error')
-        errors = True
+        error = True
 
     imgurls = []
     large_file = False
@@ -560,11 +560,11 @@ def upload_task_guidelines_image(short_name):
         else:
             flash(gettext('File must be smaller than 5 MB.'))
             large_file = True
-            errors = True
+            error = True
 
     response = {
         "imgurls" : imgurls,
-        "errors": errors
+        "error": error
     }
 
     return jsonify(response), 200 if large_file == False else 413

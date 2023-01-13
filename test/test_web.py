@@ -4719,7 +4719,7 @@ class TestWeb(web.Helper):
         res_data = json.loads(res.data)
         assert res.status_code == 413, "POST image upload should be successful"
         assert len(res_data['imgurls']) == 0, "Successful count of uploaded images 0."
-        assert res_data['errors'] == True, "There should be an error for a file larger than 5 MB."
+        assert res_data['error'] == True, "There should be an error for a file larger than 5 MB."
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -4747,7 +4747,7 @@ class TestWeb(web.Helper):
         res_data = json.loads(res.data)
         assert res.status_code == 200, "POST image upload should be successful"
         assert len(res_data['imgurls']) == 1, "Successful count of uploaded images 1."
-        assert res_data['errors'] == False, "There should be no errors for normal file upload"
+        assert res_data['error'] == False, "There should be no errors for normal file upload"
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -4779,7 +4779,7 @@ class TestWeb(web.Helper):
         res_data = json.loads(res.data)
         assert res.status_code == 200, "POST image upload should be successful"
         assert len(res_data['imgurls']) == 2, "Successful count of uploaded images 2."
-        assert res_data['errors'] == False, "There should be no errors for normal file upload"
+        assert res_data['error'] == False, "There should be no errors for normal file upload"
 
 
     @with_context
