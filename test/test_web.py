@@ -4692,10 +4692,11 @@ class TestWeb(web.Helper):
         assert data['form']['editor'] == 'Some HTML code!', data
         assert data['form']['guidelines'] == 'Some guidelines!', data
 
+
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
     def test_task_presenter_large_image_upload(self, mock):
-        """Test API /tasks/taskpresenterimageupload to upload a large task presenter guidelines"""
+        """Test API /tasks/taskpresenterimageupload to upload a large task presenter guidelines image"""
         print("running test_task_presenter_image_upload...")
         user = UserFactory.create(id=500)
         project = ProjectFactory.create(
@@ -4745,6 +4746,7 @@ class TestWeb(web.Helper):
         res_data = json.loads(res.data)
         assert res.status_code == 200, "POST image upload should be successful"
         assert len(res_data['imgurls']) == 1, "Successful count of uploaded images 1."
+
 
     @with_context
     @patch('pybossa.ckan.requests.get')
