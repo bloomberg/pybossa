@@ -4692,6 +4692,59 @@ class TestWeb(web.Helper):
         assert data['form']['editor'] == 'Some HTML code!', data
         assert data['form']['guidelines'] == 'Some guidelines!', data
 
+    @with_context
+    @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
+    def test_task_presenter_large_image_upload(self, mock):
+        """Test API /tasks/taskpresenterimageupload to upload a large task presenter guidelines"""
+        print("running test_task_presenter_image_upload...")
+        user = UserFactory.create(id=500)
+        project = ProjectFactory.create(
+            short_name='test_project',
+            name='Test Project',
+            info={
+                'total': 150,
+                'task_presenter': 'foo',
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
+                'kpi': 0.5,
+                'product': 'abc',
+                'subproduct': 'def',
+            },
+            owner=user)
+        headers = [('Authorization', user.api_key)]
+        with open('./test/files/large-image.jpg', 'rb') as img:
+            imgStringIO = BytesIO(img.read())
+        # Call API method to upload image.
+        res = self.app.post('/project/{}/tasks/taskpresenterimageupload'.format(project.short_name), headers=headers, data={'image': (imgStringIO, 'large-image.jpg')})
+        res_data = json.loads(res.data)
+        assert res.status_code == 200, "POST image upload should be successful"
+        assert len(res_data['imgurls']) == 0, "Successful count of uploaded images 0."
+
+    @with_context
+    @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
+    def test_task_presenter_image_upload(self, mock):
+        """Test API /tasks/taskpresenterimageupload to upload a task presenter guidelines image"""
+        print("running test_task_presenter_image_upload...")
+        user = UserFactory.create(id=500)
+        project = ProjectFactory.create(
+            short_name='test_project',
+            name='Test Project',
+            info={
+                'total': 150,
+                'task_presenter': 'foo',
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
+                'kpi': 0.5,
+                'product': 'abc',
+                'subproduct': 'def',
+            },
+            owner=user)
+        headers = [('Authorization', user.api_key)]
+        with open('./test/files/small-image.jpg', 'rb') as img:
+            imgStringIO = BytesIO(img.read())
+        # Call API method to upload image.
+        res = self.app.post('/project/{}/tasks/taskpresenterimageupload'.format(project.short_name), headers=headers, data={'image': (imgStringIO, 'large-image.jpg')})
+        res_data = json.loads(res.data)
+        assert res.status_code == 200, "POST image upload should be successful"
+        assert len(res_data['imgurls']) == 1, "Successful count of uploaded images 1."
 
     @with_context
     @patch('pybossa.ckan.requests.get')

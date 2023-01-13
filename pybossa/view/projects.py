@@ -34,6 +34,7 @@ from flask_wtf.csrf import generate_csrf
 import urllib.parse
 from rq import Queue
 from werkzeug.datastructures import MultiDict
+from werkzeug.utils import secure_filename
 
 import pybossa.sched as sched
 from pybossa.core import (uploader, signer, sentinel, json_exporter,
@@ -545,6 +546,7 @@ def upload_task_guidelines_image(short_name):
     for file in request.files.getlist("image"):
         file_size_mb = file.seek(0, os.SEEK_END) / 1024 / 1024
         file.seek(0, os.SEEK_SET)
+        file.filename = secure_filename(file.filename)
         if file_size_mb < 5:
             container = "user_%s" % current_user.id
             uploader.upload_file(file, container=container)
