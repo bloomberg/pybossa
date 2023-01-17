@@ -4712,10 +4712,11 @@ class TestWeb(web.Helper):
             },
             owner=user)
         headers = [('Authorization', user.api_key)]
-        with open('./test/files/large-image.jpg', 'rb') as img:
+        with open('./test/files/small-image1.jpg', 'rb') as img:
             imgStringIO = BytesIO(img.read())
+        with patch.dict(self.flask_app.config, {'MAX_IMAGE_UPLOAD_SIZE_MB': 0}):
         # Call API method to upload image.
-        res = self.app.post('/project/{}/tasks/taskpresenterimageupload'.format(project.short_name), headers=headers, data={'image': (imgStringIO, 'large-image.jpg')})
+            res = self.app.post('/project/{}/tasks/taskpresenterimageupload'.format(project.short_name), headers=headers, data={'image': (imgStringIO, 'large-image.jpg')})
         res_data = json.loads(res.data)
         assert res.status_code == 413, "POST image upload should yield 413"
         assert len(res_data['imgurls']) == 0, "Successful count of uploaded images 0."
