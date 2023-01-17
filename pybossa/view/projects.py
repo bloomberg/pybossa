@@ -548,7 +548,7 @@ def upload_task_guidelines_image(short_name):
         file_size_mb = file.seek(0, os.SEEK_END) / 1024 / 1024
         file.seek(0, os.SEEK_SET)
         file.filename = secure_filename(file.filename)
-        if file_size_mb < current_app.config.get('MAX_IMAGE_UPLOAD_SIZE_MB'):
+        if file_size_mb < current_app.config.get('MAX_IMAGE_UPLOAD_SIZE_MB', 5):
             container = "user_%s" % current_user.id
             uploader.upload_file(file, container=container)
             imgurls.append(get_avatar_url(
@@ -558,7 +558,7 @@ def upload_task_guidelines_image(short_name):
                 current_app.config.get('AVATAR_ABSOLUTE')
             ))
         else:
-            flash(gettext('File must be smaller than ' + str(current_app.config.get('MAX_IMAGE_UPLOAD_SIZE_MB')) + ' MB.'))
+            flash(gettext('File must be smaller than ' + str(current_app.config.get('MAX_IMAGE_UPLOAD_SIZE_MB', 5)) + ' MB.'))
             large_file = True
             error = True
 
