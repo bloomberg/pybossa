@@ -4717,7 +4717,7 @@ class TestWeb(web.Helper):
         # Call API method to upload image.
         res = self.app.post('/project/{}/tasks/taskpresenterimageupload'.format(project.short_name), headers=headers, data={'image': (imgStringIO, 'large-image.jpg')})
         res_data = json.loads(res.data)
-        assert res.status_code == 413, "POST image upload should be successful"
+        assert res.status_code == 413, "POST image upload should yield 413"
         assert len(res_data['imgurls']) == 0, "Successful count of uploaded images 0."
         assert res_data['error'] == True, "There should be an error for a file larger than 5 MB."
 
