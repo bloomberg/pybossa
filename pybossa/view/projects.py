@@ -525,7 +525,6 @@ def clone(short_name):
 def upload_task_guidelines_image(short_name):
     error = False
     project = project_by_shortname(short_name)
-
     disable_editor = (not current_user.admin and
                       current_app.config.get(
                           'DISABLE_TASK_PRESENTER_EDITOR'))
@@ -534,33 +533,32 @@ def upload_task_guidelines_image(short_name):
         current_user.admin or
         (project.owner_id == current_user.id or
             current_user.id in project.owners_ids))
-
+    imgurls = []
     if disable_editor:
         flash(gettext('Task presenter editor disabled!'), 'error')
         error = True
     elif not is_admin_or_owner:
         flash(gettext('Ooops! Only project owners can upload files.'), 'error')
         error = True
-
-    imgurls = []
-    large_file = False
-    for file in request.files.getlist("image"):
-        file_size_mb = file.seek(0, os.SEEK_END) / 1024 / 1024
-        file.seek(0, os.SEEK_SET)
-        file.filename = secure_filename(file.filename)
-        if file_size_mb < current_app.config.get('MAX_IMAGE_UPLOAD_SIZE_MB', 5):
-            container = "user_%s" % current_user.id
-            uploader.upload_file(file, container=container)
-            imgurls.append(get_avatar_url(
-                current_app.config.get('UPLOAD_METHOD'),
-                file.filename,
-                container,
-                current_app.config.get('AVATAR_ABSOLUTE')
-            ))
-        else:
-            flash(gettext('File must be smaller than ' + str(current_app.config.get('MAX_IMAGE_UPLOAD_SIZE_MB', 5)) + ' MB.'))
-            large_file = True
-            error = True
+    else:
+        large_file = False
+        for file in request.files.getlist("image"):
+            file_size_mb = file.seek(0, os.SEEK_END) / 1024 / 1024
+            file.seek(0, os.SEEK_SET)
+            file.filename = secure_filename(file.filename)
+            if file_size_mb < current_app.config.get('MAX_IMAGE_UPLOAD_SIZE_MB', 5):
+                container = "user_%s" % current_user.id
+                uploader.upload_file(file, container=container)
+                imgurls.append(get_avatar_url(
+                    current_app.config.get('UPLOAD_METHOD'),
+                    file.filename,
+                    container,
+                    current_app.config.get('AVATAR_ABSOLUTE')
+                ))
+            else:
+                flash(gettext('File must be smaller than ' + str(current_app.config.get('MAX_IMAGE_UPLOAD_SIZE_MB', 5)) + ' MB.'))
+                large_file = True
+                error = True
 
     response = {
         "imgurls" : imgurls,
