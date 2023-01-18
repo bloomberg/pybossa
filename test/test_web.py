@@ -4784,7 +4784,7 @@ class TestWeb(web.Helper):
         assert res_data['error'] == False, "There should be no errors for normal file upload"
 
     @with_context
-    @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
+    @patch('pybossa.view.projects.is_admin_or_owner', return_value=False)
     def test_task_presenter_image_upload_user_not_owner_or_admin(self, mock):
         """Test API /tasks/taskpresenterimageupload to upload a task presenter guidelines image"""
         print("running test_task_presenter_image_upload_user_not_owner_or_admin...")
@@ -4801,23 +4801,22 @@ class TestWeb(web.Helper):
                 'subproduct': 'def',
             },
             owner=user)
-        user2 = UserFactory.create(id=505)
-        headers = [('Authorization', user2.api_key)]
+        headers = [('Authorization', user.api_key)]
         with open('./test/files/small-image1.jpg', 'rb') as img:
             imgStringIO = BytesIO(img.read())
         # Call API method to upload image.
         res = self.app.post('/project/{}/tasks/taskpresenterimageupload'.format(project.short_name), headers=headers, data={'image': (imgStringIO, 'large-image.jpg')})
         res_data = json.loads(res.data)
-        assert res.status_code == 200, "POST image upload should be successful"
+        assert res.status_code == 400, "POST image upload should be successful"
         assert len(res_data['imgurls']) == 0, "Image should not be uploaded."
         assert res_data['error'] == True, "There should be an error since the user is not owner or admin"
 
     mock_authenticated=mock_current_user(anonymous=False, admin=False, id=2)
 
     @with_context
-    @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    @patch('flask_login.current_user', admin=False)
-    def test_task_presenter_image_upload_task_presenter_disabled(self, mock, mock_user):
+    @patch('pybossa.view.projects.is_editor_disabled', return_value=True)
+    def test_task_presenter_image_upload_task_presenter_disabled(self, disable_editor):
+
         """Test API /tasks/taskpresenterimageupload to upload a task presenter guidelines image"""
         print("running test_task_presenter_image_upload_task_presenter_disabled...")
         user = UserFactory.create(id=2, admin=False)
@@ -4841,8 +4840,7 @@ class TestWeb(web.Helper):
             # Call API method to upload image.
             res = self.app.post('/project/{}/tasks/taskpresenterimageupload'.format(project.short_name), headers=headers, data={'image': (imgStringIO, 'large-image.jpg')})
         res_data = json.loads(res.data)
-        print(res_data)
-        assert res.status_code == 200, "POST image upload should be successful"
+        assert res.status_code == 400, "POST image upload should be successful"
         assert len(res_data['imgurls']) == 0, "Image should not be uploaded."
         assert res_data['error'] == True, "There should be an error since the task presenter is disabled"
 

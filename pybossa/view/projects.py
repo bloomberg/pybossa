@@ -518,30 +518,35 @@ def clone(short_name):
         project=project_sanitized
     ))
 
+def is_editor_disabled():
+    return (not current_user.admin and
+                    current_app.config.get(
+                        'DISABLE_TASK_PRESENTER_EDITOR'))
+
+def is_admin_or_owner(project):
+    return (current_user.admin or
+           (project.owner_id == current_user.id or
+            current_user.id in project.owners_ids))
+
 @blueprint.route('/<short_name>/tasks/taskpresenterimageupload', methods=['GET', 'POST'])
 @login_required
 @admin_or_subadmin_required
 @csrf.exempt
 def upload_task_guidelines_image(short_name):
     error = False
+    return_code = 200
     project = project_by_shortname(short_name)
-    disable_editor = (not current_user.admin and
-                      current_app.config.get(
-                          'DISABLE_TASK_PRESENTER_EDITOR'))
 
-    is_admin_or_owner = (
-        current_user.admin or
-        (project.owner_id == current_user.id or
-            current_user.id in project.owners_ids))
     imgurls = []
-    if disable_editor:
+    if is_editor_disabled():
         flash(gettext('Task presenter editor disabled!'), 'error')
         error = True
-    elif not is_admin_or_owner:
+        return_code = 400
+    elif not is_admin_or_owner(project):
         flash(gettext('Ooops! Only project owners can upload files.'), 'error')
         error = True
+        return_code = 400
     else:
-        large_file = False
         for file in request.files.getlist("image"):
             file_size_mb = file.seek(0, os.SEEK_END) / 1024 / 1024
             file.seek(0, os.SEEK_SET)
@@ -557,15 +562,15 @@ def upload_task_guidelines_image(short_name):
                 ))
             else:
                 flash(gettext('File must be smaller than ' + str(current_app.config.get('MAX_IMAGE_UPLOAD_SIZE_MB', 5)) + ' MB.'))
-                large_file = True
                 error = True
+                return_code = 413
 
     response = {
         "imgurls" : imgurls,
         "error": error
     }
 
-    return jsonify(response), 200 if large_file == False else 413
+    return jsonify(response), return_code
 
 @blueprint.route('/<short_name>/tasks/taskpresentereditor', methods=['GET', 'POST'])
 @login_required
