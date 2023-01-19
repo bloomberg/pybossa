@@ -34,11 +34,12 @@ from flask_wtf.csrf import generate_csrf
 import urllib.parse
 from rq import Queue
 from werkzeug.datastructures import MultiDict
+from werkzeug.utils import secure_filename
 
 import pybossa.sched as sched
 from pybossa.core import (uploader, signer, sentinel, json_exporter,
                           csv_exporter, importer, db, task_json_exporter,
-                          task_csv_exporter, anonymizer)
+                          task_csv_exporter, anonymizer, csrf)
 from pybossa.model import make_uuid
 from pybossa.model.project import Project
 from pybossa.model.category import Category
@@ -516,6 +517,60 @@ def clone(short_name):
         form=form,
         project=project_sanitized
     ))
+
+def is_editor_disabled():
+    return (not current_user.admin and
+                    current_app.config.get(
+                        'DISABLE_TASK_PRESENTER_EDITOR'))
+
+def is_admin_or_owner(project):
+    return (current_user.admin or
+           (project.owner_id == current_user.id or
+            current_user.id in project.owners_ids))
+
+@blueprint.route('/<short_name>/tasks/taskpresenterimageupload', methods=['GET', 'POST'])
+@login_required
+@admin_or_subadmin_required
+@csrf.exempt
+def upload_task_guidelines_image(short_name):
+    error = False
+    return_code = 200
+    project = project_by_shortname(short_name)
+
+    imgurls = []
+    if is_editor_disabled():
+        flash(gettext('Task presenter editor disabled!'), 'error')
+        error = True
+        return_code = 400
+    elif not is_admin_or_owner(project):
+        flash(gettext('Ooops! Only project owners can upload files.'), 'error')
+        error = True
+        return_code = 400
+    else:
+        for file in request.files.getlist("image"):
+            file_size_mb = file.seek(0, os.SEEK_END) / 1024 / 1024
+            file.seek(0, os.SEEK_SET)
+            file.filename = secure_filename(file.filename)
+            if file_size_mb < current_app.config.get('MAX_IMAGE_UPLOAD_SIZE_MB', 5):
+                container = "user_%s" % current_user.id
+                uploader.upload_file(file, container=container)
+                imgurls.append(get_avatar_url(
+                    current_app.config.get('UPLOAD_METHOD'),
+                    file.filename,
+                    container,
+                    current_app.config.get('AVATAR_ABSOLUTE')
+                ))
+            else:
+                flash(gettext('File must be smaller than ' + str(current_app.config.get('MAX_IMAGE_UPLOAD_SIZE_MB', 5)) + ' MB.'))
+                error = True
+                return_code = 413
+
+    response = {
+        "imgurls" : imgurls,
+        "error": error
+    }
+
+    return jsonify(response), return_code
 
 @blueprint.route('/<short_name>/tasks/taskpresentereditor', methods=['GET', 'POST'])
 @login_required
