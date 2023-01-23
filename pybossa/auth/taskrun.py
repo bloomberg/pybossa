@@ -67,7 +67,11 @@ class TaskRunAuth(object):
         return user.is_authenticated
 
     def _update(self, user, taskrun):
-        return self._delete(user, taskrun)
+        if taskrun.user_id is None:
+            return user.admin
+        project = self.project_repo.get(taskrun.project_id)
+        allow_taskrun_edit = project.info.get("allow_taskrun_edit") or False
+        return user.admin or (allow_taskrun_edit and taskrun.user_id == user.id)
 
     def _delete(self, user, taskrun):
         if user.is_anonymous:
