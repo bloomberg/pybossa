@@ -765,9 +765,9 @@ class TestTaskrunAPI(TestAPI):
         project = ProjectFactory.create(owner=owner)
         task = TaskFactory.create(project=project, n_answers=2)
         anonymous_taskrun = AnonymousTaskRunFactory.create(task=task, info='my task result')
-        user_taskrun = TaskRunFactory.create(task=task, user=owner, info='my task result')
+        user_taskrun = TaskRunFactory.create(task=task, user=owner, info=dict(x='my task result'))
 
-        task_run = dict(project_id=project.id, task_id=task.id, info='another result')
+        task_run = dict(project_id=project.id, task_id=task.id, info=dict(x='another result'))
         datajson = json.dumps(task_run)
 
         # anonymous user
@@ -817,7 +817,7 @@ class TestTaskrunAPI(TestAPI):
         # root user
         url = '/api/taskrun/%s?api_key=%s' % (user_taskrun.id, admin.api_key)
         res = self.app.put(url, data=datajson)
-        assert_equal(res.status, '403 FORBIDDEN', error_msg)
+        assert_equal(res.status, '200 OK', error_msg)
 
 
     @with_context
@@ -829,9 +829,9 @@ class TestTaskrunAPI(TestAPI):
         project = ProjectFactory.create(owner=owner)
         task = TaskFactory.create(project=project)
         anonymous_taskrun = AnonymousTaskRunFactory.create(task=task, info='my task result')
-        user_taskrun = TaskRunFactory.create(task=task, user=owner, info='my task result')
+        user_taskrun = TaskRunFactory.create(task=task, user=owner, info=dict(x='my task result'))
 
-        task_run = dict(project_id=project.id, task_id=task.id, info='another result')
+        task_run = dict(project_id=project.id, task_id=task.id, info=dict(x='another result'))
         datajson = json.dumps(task_run)
 
         # anonymous user
@@ -860,10 +860,16 @@ class TestTaskrunAPI(TestAPI):
         datajson = json.dumps(datajson)
         url = '/api/taskrun/%s?api_key=%s' % (user_taskrun.id, owner.api_key)
         res = self.app.put(url, data=datajson)
+        assert_equal(res.status, '403 FORBIDDEN', res.data)
+
+        # project configured to allow editing of taskruns
+        # admin and taskrun submitter can edit taskruns
+        project.info["allow_taskrun_edit"] = True
+        project_repo.save(project)
+        res = self.app.put(url, data=datajson)
         out = json.loads(res.data)
         assert res.status_code == 200
-        assert out['info'] == 'another result'
-        # assert_equal(res.status, '403 FORBIDDEN', res.data)
+        assert out['info'] == {'x': 'another result'}
 
         # PUT with not JSON data
         res = self.app.put(url, data=task_run)
