@@ -63,8 +63,7 @@ class TaskAPI(APIBase):
 
     def _update_attribute(self, new, old):
         for key, value in old.info.items():
-            if not new.info.get(key):
-                new.info[key] = value
+            new.info.setdefault(key, value)
 
         gold_task = bool(new.gold_answers)
         n_taskruns = len(new.task_runs)

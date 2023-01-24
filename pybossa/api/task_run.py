@@ -116,8 +116,7 @@ class TaskRunAPI(APIBase):
 
     def _update_attribute(self, new, old):
         for key, value in old.info.items():
-            if not new.info.get(key):
-                new.info[key] = value
+            new.info.setdefault(key, value)
 
     def _forbidden_attributes(self, data):
         for key in data.keys():

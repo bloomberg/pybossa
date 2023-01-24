@@ -75,7 +75,6 @@ class TaskRunAuth(object):
         project = self.project_repo.get(taskrun.project_id)
         allow_taskrun_edit = project.info.get("allow_taskrun_edit") or False
         return user.admin or (allow_taskrun_edit and taskrun.user_id == user.id)
-        return user.admin or taskrun.user_id == user.id
 
 
     def _delete(self, user, taskrun):
