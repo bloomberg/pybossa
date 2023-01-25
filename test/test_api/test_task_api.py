@@ -680,7 +680,7 @@ class TestTaskAPI(TestAPI):
         assert_equal(out.info, 'my root task data'), out
         assert_equal(out.project_id, project.id)
 
-        # test user_pref 
+        # test user_pref
         root_data = dict(project_id=project.id, info='my root task data')
         root_data['user_pref'] = dict(languages=["Traditional Chinese"], locations=["United States"], assign_user=["email@domain.com"])
         res = self.app.post('/api/task?api_key=' + admin.api_key,
@@ -787,8 +787,8 @@ class TestTaskAPI(TestAPI):
         make_subadmin(user)
         non_owner = UserFactory.create()
         project = ProjectFactory.create(owner=user)
-        task = TaskFactory.create(project=project)
-        root_task = TaskFactory.create(project=project)
+        task = TaskFactory.create(project=project, info=dict(x=1))
+        root_task = TaskFactory.create(project=project, info=dict(x=1))
         data = {'n_answers': 1}
         datajson = json.dumps(data)
         root_data = {'n_answers': 4}
@@ -852,7 +852,7 @@ class TestTaskAPI(TestAPI):
         user = UserFactory.create()
         project = ProjectFactory.create(owner=user)
         task = TaskFactory.create(project=project, n_answers=1,
-                                  state='ongoing')
+                                  state='ongoing', info=dict(x=1))
         data = {'n_answers': 2}
         datajson = json.dumps(data)
 

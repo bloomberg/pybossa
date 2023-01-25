@@ -114,6 +114,10 @@ class TaskRunAPI(APIBase):
         self._add_user_info(taskrun)
         self._add_timestamps(taskrun, task, guard)
 
+    def _update_attribute(self, new, old):
+        for key, value in old.info.items():
+            new.info.setdefault(key, value)
+
     def _forbidden_attributes(self, data):
         for key in data.keys():
             if key in self.reserved_keys:

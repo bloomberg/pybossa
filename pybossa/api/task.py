@@ -62,6 +62,9 @@ class TaskAPI(APIBase):
                 raise BadRequest("Reserved keys in payload")
 
     def _update_attribute(self, new, old):
+        for key, value in old.info.items():
+            new.info.setdefault(key, value)
+
         gold_task = bool(new.gold_answers)
         n_taskruns = len(new.task_runs)
         if new.state == 'completed':
