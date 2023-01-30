@@ -136,6 +136,7 @@ class ProjectUpdateForm(ProjectForm):
     short_name = TextField(label=None, widget=HiddenInput())
     long_description = TextAreaField(lazy_gettext('Long Description'))
     allow_anonymous_contributors = BooleanField(lazy_gettext('Allow Anonymous Contributors'))
+    allow_taskrun_edit = BooleanField(lazy_gettext('Allow Editing of Task Submissions'))
     zip_download = BooleanField(lazy_gettext('Allow ZIP data download'))
     category_id = SelectField(lazy_gettext('Category'), coerce=int)
     hidden = BooleanField(lazy_gettext('Hide?'))

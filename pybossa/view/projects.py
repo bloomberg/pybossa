@@ -400,7 +400,9 @@ def new():
         'data_classification': {
             'input_data': form.input_data_class.data,
             'output_data': form.output_data_class.data
-        }
+        },
+        "allow_taskrun_edit": False,
+        "allow_anonymous_contributors": False
     }
     category_by_default = cached_cat.get_all()[0]
 
@@ -821,6 +823,7 @@ def update(short_name):
             'input_data': form.input_data_class.data,
             'output_data': form.output_data_class.data
         }
+        new_project.info["allow_taskrun_edit"] = form.allow_taskrun_edit.data
 
         project_repo.update(new_project)
         auditlogger.add_log_entry(old_project, new_project, current_user)
@@ -851,6 +854,7 @@ def update(short_name):
         project.kpi = project.info.get('kpi')
         project.input_data_class = project.info.get('data_classification', {}).get('input_data')
         project.output_data_class = project.info.get('data_classification', {}).get('output_data')
+        project.allow_taskrun_edit = project.info.get("allow_taskrun_edit")
         ensure_amp_config_applied_to_project(project, project.info.get('annotation_config', {}))
         form = dynamic_project_form(ProjectUpdateForm, None, data_access_levels, obj=project,
                                     products=prodsubprods, data_classes=data_classes)
@@ -3628,6 +3632,7 @@ def project_config(short_name):
                 # for private gigwork
                 project.info['data_access'] = data.get('data_access')
             project.info['completed_tasks_cleanup_days'] = data.get('completed_tasks_cleanup_days')
+            project.info["allow_taskrun_edit"] = data.get("allow_taskrun_edit")
             project_repo.save(project)
             flash(gettext('Configuration updated successfully'), 'success')
         except Exception as e:
@@ -3640,13 +3645,15 @@ def project_config(short_name):
     input_forms, ext_config_dict = generate_input_forms_and_external_config_dict()
     data_access = project.info.get('data_access') or []
     completed_tasks_cleanup_days = project.info.get('completed_tasks_cleanup_days')
+    allow_taskrun_edit = project.info.get("allow_taskrun_edit") or False
     response = dict(template='/projects/summary.html',
                     external_config_dict=json.dumps(ext_config_dict),
                     forms=input_forms,
                     data_access=json.dumps(data_access),
                     valid_access_levels=data_access_levels.get('valid_access_levels'),
                     csrf=generate_csrf(),
-                    completed_tasks_cleanup_days=completed_tasks_cleanup_days
+                    completed_tasks_cleanup_days=completed_tasks_cleanup_days,
+                    allow_taskrun_edit=allow_taskrun_edit
                     )
 
     return handle_content_type(response)
