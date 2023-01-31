@@ -713,3 +713,36 @@ def _get_valid_service(task_id, service_name, payload, proxy_service_config):
         'Task {} loaded for user {} failed calling {} service with payload {}'.format(task_id, current_user.id, service_name, payload))
 
     return abort(403, 'The request data failed validation')
+
+
+@jsonpify
+@login_required
+@csrf.exempt
+@blueprint.route('/task/<int:task_id>/assign', methods=['POST'])
+@ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+def assign_task(task_id=None):
+    """Assign task to users for locked, user_pref and task_queue schedulers."""
+    if not current_user.is_authenticated:
+        return abort(401)
+
+    projectname = request.json.get('projectname', None)
+    a_project = project_repo.get_by_shortname(projectname)
+    if not a_project:
+        return abort(400)
+
+    # only assign the user to the task for user_pref and task_queue scheduler
+    scheduler, _ = get_scheduler_and_timeout(a_project)
+    if scheduler in (Schedulers.user_pref, Schedulers.task_queue):
+        t = task_repo.get_task_by(project_id=a_project.id, id=int(task_id))
+        user_pref = t.user_pref or {}
+        assign_user = user_pref.get("assign_user", [])
+
+        user_email = current_user.email_addr
+        if user_email not in assign_user:
+            assign_user.append(user_email)
+            user_pref["assign_user"] = assign_user
+            t.user_pref = user_pref
+            flag_modified(t, "user_pref")
+            task_repo.update(t)
+
+    return Response(json.dumps({'success': True}), 200, mimetype="application/json")
