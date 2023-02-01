@@ -10163,17 +10163,6 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert release_reserve_task_lock_by_id.call_count == 1, release_reserve_task_lock_by_id.call_count
 
     @with_context
-    def test_assign_task_without_auth(self):
-        """Test assign task without auth"""
-
-        url = "/api/task/1/assign"
-
-        data = {}
-        res = self.app_post_json(url, data=data, follow_redirects=False)
-        data = json.loads(res.data)
-        assert data.get('status_code') == 401, data
-
-    @with_context
     def test_assign_task_wrong_payload(self):
         """Test assign task with wrong payload"""
 
@@ -10190,10 +10179,37 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert data.get('status_code') == 400, data
 
     @with_context
-    def test_assign_task_succeed(self):
+    def test_assign_task_without_lock(self):
         """Test assign a task to a user """
 
         url = "/api/task/1/assign"
+
+        user = UserFactory.create()
+        self.signin_user(user)
+        project = ProjectFactory.create(
+            info={
+                'sched': 'user_pref_scheduler',
+                'timeout': 60 * 60,
+                'data_classification': dict(input_data="L4 - public",
+                                            output_data="L4 - public")
+            },
+            owner=user
+        )
+        _ = TaskFactory.create(project=project)
+        data = {'projectname': project.short_name}
+
+        res = self.app_post_json(url, data=data, follow_redirects=False)
+        data = json.loads(res.data)
+        assert data.get('status_code') == 403, data
+
+    @with_context
+    @patch('pybossa.api.fetch_lock_for_user')
+    def test_assign_task_succeed(self, fetch_lock):
+        """Test assign a task to a user """
+
+        url = "/api/task/1/assign"
+
+        fetch_lock.return_value = (3600, 100000)
 
         user = UserFactory.create()
         self.signin_user(user)

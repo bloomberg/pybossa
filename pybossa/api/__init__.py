@@ -722,13 +722,14 @@ def _get_valid_service(task_id, service_name, payload, proxy_service_config):
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def assign_task(task_id=None):
     """Assign task to users for locked, user_pref and task_queue schedulers."""
-    if not current_user.is_authenticated:
-        return abort(401)
-
     projectname = request.json.get('projectname', None)
     a_project = project_repo.get_by_shortname(projectname)
     if not a_project:
         return abort(400)
+
+    _, ttl = fetch_lock_for_user(a_project.id, task_id, current_user.id)
+    if not ttl:
+        return abort(403, 'A lock is required for assigning a task to a user.')
 
     # only assign the user to the task for user_pref and task_queue scheduler
     scheduler, _ = get_scheduler_and_timeout(a_project)
