@@ -9850,6 +9850,7 @@ class TestWeb(web.Helper):
         assert "class=\" sort-asc sortable\" data-sort=\"completed_by\"" not in str(res.data), "Unexpected sorted column (sort-asc) indicator on Completed By."
         assert "class=\" sort-asc sortable\" data-sort=\"priority\"" not in str(res.data), "Missing sorted column indicator (sort-asc) on Priority."
 
+
 class TestWebUserMetadataUpdate(web.Helper):
 
     original = {
@@ -10180,7 +10181,7 @@ class TestWebUserMetadataUpdate(web.Helper):
 
     @with_context
     def test_assign_task_without_lock(self):
-        """Test assign a task to a user """
+        """Test assign a task to a user without lock """
 
         url = "/api/task/1/assign"
 
@@ -10189,6 +10190,33 @@ class TestWebUserMetadataUpdate(web.Helper):
         project = ProjectFactory.create(
             info={
                 'sched': 'user_pref_scheduler',
+                'timeout': 60 * 60,
+                'data_classification': dict(input_data="L4 - public",
+                                            output_data="L4 - public")
+            },
+            owner=user
+        )
+        _ = TaskFactory.create(project=project)
+        data = {'projectname': project.short_name}
+
+        res = self.app_post_json(url, data=data, follow_redirects=False)
+        data = json.loads(res.data)
+        assert data.get('status_code') == 403, data
+
+    @with_context
+    @patch('pybossa.api.fetch_lock_for_user')
+    def test_assign_task_failed(self, fetch_lock):
+        """Test assign a task to a user failed due to schedules not allowed """
+
+        url = "/api/task/1/assign"
+
+        fetch_lock.return_value = (3600, 100000)
+
+        user = UserFactory.create()
+        self.signin_user(user)
+        project = ProjectFactory.create(
+            info={
+                'sched': 'locked',
                 'timeout': 60 * 60,
                 'data_classification': dict(input_data="L4 - public",
                                             output_data="L4 - public")
