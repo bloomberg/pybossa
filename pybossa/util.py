@@ -1192,15 +1192,16 @@ def process_annex_load(tp_code, response_value):
     regex = r"(\w+)\.(loadDocument|loadDocumentLite)\s*\(\s*.*\s*(\))"
     matches = re.finditer(regex, tp_code)
     count = 0
-    for match in matches:  # maching for pure javascript Annex code
+    for match in matches:  # matching docx Annex code
         annex_tab = match[1]  # the first group: (\w+)
         code_to_append = f".then(() => {annex_tab}.loadAnnotationFromJson('{odfoa}'))"
         right_parenthesis_end = match.end(3) + len(code_to_append) * count  # the 3rd group: (\)) - exclusive
         tp_code = tp_code[:right_parenthesis_end] + code_to_append + tp_code[right_parenthesis_end:]
         count += 1
 
-    # Looking for code snippet like shell.setAttribute("hash", "abc");
-    regex = r"(\w+)\.setAttribute\(\"hash\",\s*\"\w+\"\);"
+    # Looking for code snippet like shell = document.getElementById("annex-viewer"); or
+    # shell = document.getElementById("shell-container");
+    regex = r"(\w+)\s*=\s*document\.getElementById\s*\(\s*('|\")?(annex-viewer|shell-container)('|\")?\s*\)\s*;"
     matches = re.finditer(regex, tp_code)
     count = 0
     for match in matches:
@@ -1273,7 +1274,17 @@ def process_table_component(tp_code, user_response, task):
                     break
                 existing_data = request_fields
             elif initial_data_str.strip().startswith("["):  # if it is a list
-                existing_data = json.loads(initial_data_str)
+                try:
+                    pattern = r"task\.info(\.\w+)+"
+                    for m in re.finditer(pattern, initial_data_str):
+                        old_str = m.group(0)
+                        new_str = extract_task_info_data(task, old_str)
+                        initial_data_str = initial_data_str.replace(old_str, new_str)
+                    existing_data = json.loads(initial_data_str)
+                except Exception as e:
+                    current_app.logger.error(
+                        'parsing initial_data_str: {} error: {}'.format(
+                            initial_data_str, str(e)))
 
             # merge existing_data into response_value
             for i in range(min(len(existing_data), len(response_values))):
@@ -1332,3 +1343,19 @@ def remove_element_attributes(page_element, attribute):
     for attr in attributes:
         if page_element.has_attr(attr):
             del page_element[attr]
+
+
+def extract_task_info_data(task, task_info_str):
+    """
+    Extract data from javascript string.
+    e.g. task.info.a.b -> task.info.get('a').get('b')
+
+    :param task: task object
+    :param task_info_str: javascript task info string
+    :return: JSON string
+    """
+    attributes = task_info_str.split(".")
+    request_fields = task.info
+    for attribute in attributes[2:]:  # skip "task" and "info"
+        request_fields = request_fields.get(attribute, {})
+    return json.dumps(request_fields)

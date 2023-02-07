@@ -1155,6 +1155,27 @@ class TestPybossaUtil(Test):
                     </div>
                 
                 </table-element>
+                    <table-element
+                      :key='task.id'
+                      :data='[{"cusip":task.info.CUSIP,"refix_date":task.info.FLT_REFIX_DT,"c":task.info.c.d,"e":task.info.c.e}]'
+                      :columns='["cusip","refix_date","nested_data","c","e"]'
+                      :options='{
+                        "headings": {
+                            "cusip": "Report CUSIP",
+                            "refix_date": "Refix Date",
+                            "nested_data": "Nested Data",
+                            "c": "CCC",
+                            "e": "EEE"
+                        }
+                      }'
+                      column-id='__col_id'
+                      >
+                    </table-element>
+                    <table-element
+                      :key='task.id'
+                      :data='[{"cusip":bad_string}]'
+                      >
+                    </table-element>
                   <task-timer>2</task-timer>
                   </task-presenter>
                 </div>
@@ -1204,6 +1225,12 @@ class TestPybossaUtil(Test):
                               'hgrt_variable_type': 'MONEY'}
                          ]
                      },
+                     'CUSIP': 'Test Cusip',
+                     'FLT_REFIX_DT': ['test1', 'test2'],
+                     'c': {
+                         'd': 'nested d',
+                         "e": 123
+                     },
                      'ruleset_name': 'SR_Q1',
                      'work_item_completion_date': '3/24/2020'}
         result = util.process_table_component(tp_code, user_response, task)
@@ -1216,6 +1243,10 @@ class TestPybossaUtil(Test):
         assert expected_result in result
         assert ':initial-value="props.row.QC_Reason"' in result
         assert ':initial-value="props.row.QC_Notes"' in result
+        assert '"Test Cusip"' in result, result
+        assert '["test1", "test2"]' in result, result
+        assert '"nested d"' in result, result
+        assert '123' in result, result
 
     def test_get_first_existing_data(self):
         tag = BeautifulSoup('<b id="boldest">bold</b>', 'html.parser').b
@@ -1244,6 +1275,33 @@ class TestPybossaUtil(Test):
         util.remove_element_attributes(tag, "id")
         assert not tag.has_attr(":id")
         assert not tag.has_attr("id")
+
+    @with_request_context
+    def test_extract_task_info_data(self):
+        project = ProjectFactory.create(published=True, id=1)
+        task = TaskFactory.create(id=101, project=project)
+
+        task.info = {'a': {'b': 'answer1'},
+                     'c': 'answer2',
+                     'd': ['hello', 'world'],
+                     'e': 123
+                     }
+
+        task_info_str = 'task.info.a.b'
+        res = util.extract_task_info_data(task, task_info_str)
+        assert res == '"answer1"', res
+
+        task_info_str = 'task.info.c'
+        res = util.extract_task_info_data(task, task_info_str)
+        assert res == '"answer2"', res
+
+        task_info_str = 'task.info.d'
+        res = util.extract_task_info_data(task, task_info_str)
+        assert res == '["hello", "world"]', res
+
+        task_info_str = 'task.info.e'
+        res = util.extract_task_info_data(task, task_info_str)
+        assert res == '123', res
 
 
 class TestIsReservedName(object):
