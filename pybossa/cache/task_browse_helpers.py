@@ -71,7 +71,7 @@ def get_task_filters(args):
         datestring = convert_est_to_utc(args['ftime_to']).isoformat()
         params['ftime_to'] = datestring
         filters += " AND ft <= :ftime_to"
-    if args.get('state'):
+    if not args.get("allow_taskrun_edit") and args.get('state'):
         params['state'] = args['state']
         filters += " AND state = :state"
     if 'gold_task' in args:
@@ -91,15 +91,20 @@ def get_task_filters(args):
             user_pref_db_clause = get_user_pref_db_clause(user_pref)
             filters += " AND ( {} )".format(user_pref_db_clause)
 
-    # for task queue
-    if args.get("filter_by_wfilter_upref"):
+    # for regular user, only include tasks that user has worked on
+    if args.get("allow_taskrun_edit"):
+        filters += ''' AND EXISTS
+        (SELECT 1 FROM task_run WHERE project_id=:project_id AND
+        user_id=:user_id AND task_id=task.id)'''
+        params["user_id"] = args.get('user_id')
+    elif args.get("filter_by_wfilter_upref"):   # for task queue
         # task queue exclude completed tasks
         filters += " AND state!='completed'"
-
         # exclude tasks that the current worker has worked on before
         filters += ''' AND NOT EXISTS
-           (SELECT 1 FROM task_run WHERE project_id=:project_id AND
-           user_id=:user_id AND task_id=task.id)'''
+        (SELECT 1 FROM task_run WHERE project_id=:project_id AND
+        user_id=:user_id AND task_id=task.id)'''
+
         params["user_id"] = args.get('user_id')
 
         # include additional filters
