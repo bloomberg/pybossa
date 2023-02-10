@@ -882,6 +882,21 @@ class TestProjectsCache(Test):
         assert filters == expected_filter_query, filters
         assert params == expected_params, params
 
+        # with allow_taskrun_edit, user submitted responses to be returned
+        user_submitted_responses = "(SELECT 1 FROM task_run WHERE project_id=:project_id AND\n        user_id=:user_id AND task_id=task.id)"
+        expected_user_id = 239
+        filters = dict(task_id=1, allow_taskrun_edit=True, order_by='task_id', user_id=expected_user_id)
+        filters, params = get_task_filters(filters)
+        assert filters.find(user_submitted_responses) > -1, "only user submitted responses to be returned by the query"
+        assert params["user_id"] == expected_user_id, "user id to be present to filter user responses by id"
+
+        filters = dict(task_id=1, allow_taskrun_edit=False, order_by='task_id', user_id=239)
+        filters, params = get_task_filters(filters)
+        assert filters.find(user_submitted_responses) == -1, "user submitted responses NOT to be returned by the query"
+        assert "user_id" not in params
+
+
+
     def test_task_browse_gold_task_filters(self):
         filters = dict(task_id=1,hide_completed=True, gold_task='1', order_by='task_id')
         expected_filter_query = " AND task.id = :task_id AND task.state='ongoing' AND task.calibration = :calibration"

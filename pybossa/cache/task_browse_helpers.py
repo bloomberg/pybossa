@@ -71,7 +71,7 @@ def get_task_filters(args):
         datestring = convert_est_to_utc(args['ftime_to']).isoformat()
         params['ftime_to'] = datestring
         filters += " AND ft <= :ftime_to"
-    if not args.get("allow_taskrun_edit") and args.get('state'):
+    if args.get('state'):
         params['state'] = args['state']
         filters += " AND state = :state"
     if 'gold_task' in args:
