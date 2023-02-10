@@ -3401,6 +3401,67 @@ class TestWeb(web.Helper):
         assert b'TaskPresenter' in res.data
 
     @with_context
+    def test_task_presenter_with_allow_taskrun_edit_works(self):
+        """Test WEB with taskrun edit permitted, get expected task based on user access"""
+        self.register()
+        self.signin()
+        self.create()
+        project = db.session.query(Project).get(1)
+        project.info = dict(allow_taskrun_edit=True)
+        db.session.commit()
+        self.new_task(project.id)
+        project_short_name = project.short_name
+
+        task = db.session.query(Task).filter(Task.project_id == 1).first()
+
+        regular_user = UserFactory.create(id=999, subadmin=False, admin=False)
+        regular_user.set_password('1234')
+        user_repo.save(regular_user)
+        self.signin(email=regular_user.email_addr, password='1234')
+        task_run = TaskRun(project_id=project.id, task_id=task.id,
+                           info={'answer': 1,
+                                 'odfoa': {'version': 1, 'source-uri': 'http://fake.com', 'odf': {}, 'oa': {}},
+                                 'fake': {'b': 27}},
+                           user_id=regular_user.id)
+        db.session.add(task_run)
+        db.session.commit()
+
+        # passing task_submitter_id, task response retrieved and no 403
+        res = self.app.get('/project/%s/task/%s/%s' % (project_short_name, task.id, regular_user.id))
+        assert res.status_code == 200, res.status_code
+
+    @with_context
+    def test_task_presenter_with_allow_taskrun_edit_raises_forbidden(self):
+        """Test WEB with taskrun edit permitted, task_submitter_id not passed raises 403"""
+        self.register()
+        self.signin()
+        self.create()
+        project = db.session.query(Project).get(1)
+        project.info = dict(allow_taskrun_edit=True)
+        db.session.commit()
+        self.new_task(project.id)
+        project_short_name = project.short_name
+
+        task = db.session.query(Task).filter(Task.project_id == 1).first()
+        user = db.session.query(User).first()
+        task_run = TaskRun(project_id=project.id, task_id=task.id,
+                           info={'answer': 1,
+                                 'odfoa': {'version': 1, 'source-uri': 'http://fake.com', 'odf': {}, 'oa': {}},
+                                 'fake': {'b': 27}},
+                           user_id=user.id)
+        db.session.add(task_run)
+        db.session.commit()
+
+        # task_submitter_id is passed to fetch task response recorded by the user
+        # 403 is returned when not passing task_submitter_id
+        regular_user = UserFactory.create(id=999, subadmin=False, admin=False)
+        regular_user.set_password('1234')
+        user_repo.save(regular_user)
+        self.signin(email=regular_user.email_addr, password='1234')
+        res = self.app.get('/project/%s/task/%s' % (project_short_name, task.id))
+        assert res.status_code == 403, res.status_code
+
+    @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
     def test_25_get_wrong_task_app(self, mock):
         """Test WEB get wrong task.id for a project works"""
@@ -9300,6 +9361,28 @@ class TestWeb(web.Helper):
                 % (project.short_name, user.api_key)
         res = self.app.get(url, follow_redirects=True)
         assert res.status_code == 403, res.status_code
+
+    @with_context
+    @patch('pybossa.view.projects._check_if_redirect_to_password')
+    def test_tasks_browse_allow_taskrun_edit_works(self, check_password):
+        """Test tasks browse with edit submission permitted works for regular user."""
+        check_password.return_value = None
+        admin, owner, user = UserFactory.create_batch(3)
+        project = ProjectFactory.create(zip_download=True, owner=owner, info={"sched": "default", "allow_taskrun_edit": True})
+        task = TaskFactory.create_batch(20, project=project)
+        url = '/project/%s/tasks/browse?api_key=%s' \
+                % (project.short_name, user.api_key)
+        res = self.app.get(url, follow_redirects=True)
+        assert res.status_code == 200, res.status_code
+        dom = BeautifulSoup(res.data)
+        # confirm that only "Tash #, Priority and Created are listed"
+        th_tags = dom.findAll("th", {"class": "sortable"})
+        expected_columns = ["Task #", "Priority", "Created"]
+        assert len(th_tags) == len(expected_columns), th_tags
+        th_tag_1, th_tag_2, th_tag_3 = th_tags[0].text.strip(), th_tags[1].text.strip(), th_tags[2].text.strip()
+        assert th_tag_1 == expected_columns[0], f"found column {th_tag_1}, expected column {expected_columns[0]} not present"
+        assert th_tag_2 == expected_columns[1], f"found column {th_tag_3}, expected column {expected_columns[1]} not present"
+        assert th_tag_3 == expected_columns[2], f"found column {th_tag_3}, expected column {expected_columns[2]} not present"
 
     @with_context
     def test_projects_account(self):

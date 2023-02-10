@@ -1309,6 +1309,10 @@ def task_presenter(short_name, task_id, task_submitter_id=None):
         # Allow lock when scheduler is task_queue and user is a worker or user is admin/subadminm/coowner in task view.
         if scheduler == sched.Schedulers.task_queue and mode == "cherry_pick":
             lock_task_for_user(task_id, project.id, current_user.id)
+        elif project.info.get("allow_taskrun_edit") and task_submitter_id:
+            # with project with edit submissions enabled and task_submitter_id passed
+            # task response would be displayed later
+            pass
         elif not sched.can_read_task(task, current_user):
             raise abort(403)
 
@@ -1601,6 +1605,9 @@ def tasks_browse(short_name, page=1, records_per_page=None):
     title = project_title(project, "Tasks")
     pro = pro_features()
     allowed_records_per_page = [10, 20, 30, 50, 70, 100]
+    admin_subadmin_coowner = current_user.subadmin or current_user.admin or current_user.id in project.owners_ids
+    regular_user = not admin_subadmin_coowner
+    allow_taskrun_edit = project.info.get("allow_taskrun_edit") or False
 
     try:
         columns = get_searchable_columns(project.id)
@@ -1615,11 +1622,24 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         view_type = request.args.get('view')
         task_browse_default_records_per_page = 10
         task_list_default_records_per_page = 30
-        if view_type != 'tasklist' and (current_user.subadmin or current_user.admin or current_user.id in project.owners_ids):
+        if view_type != 'tasklist' and admin_subadmin_coowner:
             # owners and (sub)admin have full access, default size page for owner view is 10
             per_page = records_per_page if records_per_page in allowed_records_per_page else task_browse_default_records_per_page
             # parse args
             args = parse_tasks_browse_args(request.args.to_dict())
+        elif view_type != 'tasklist' and allow_taskrun_edit and regular_user:
+            # browse tasks for a regular user to be available when
+            # 1. project is configured to allow editing of task runs
+            # 2. browse task request is not for task list
+            dict_args = request.args.to_dict()
+            # show columns that are permitted for regular users
+            dict_args["display_columns"] = ["task_id", "priority", "created"]
+            # show task.info columns that are configured under tasklist_columns
+            dict_args["display_info_columns"] = project.info.get('tasklist_columns', [])
+            args = parse_tasks_browse_args(dict_args)
+            args["user_id"] = current_user.id
+            args["allow_taskrun_edit"] = True
+            per_page = records_per_page if records_per_page in allowed_records_per_page else task_browse_default_records_per_page
         elif scheduler == Schedulers.task_queue:
             # worker can access limited tasks only when task_queue_scheduler is selected
             user = cached_users.get_user_by_id(current_user.id)
@@ -1647,6 +1667,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
             args["display_columns"] = ['task_id', 'priority', 'created']
             args["view"] = view_type
+            args["regular_user"] = regular_user
             # default page size for worker view is 100
             per_page = records_per_page if records_per_page in allowed_records_per_page else task_list_default_records_per_page
         else:
@@ -1751,7 +1772,9 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                     location_options=location_options,
                     reserved_options=RESERVED_TASKLIST_COLUMNS,
                     rdancy_upd_exp=rdancy_upd_exp,
-                    can_know_task_is_gold=can_know_task_is_gold)
+                    can_know_task_is_gold=can_know_task_is_gold,
+                    allow_taskrun_edit=allow_taskrun_edit,
+                    regular_user=regular_user)
 
         return handle_content_type(data)
 
