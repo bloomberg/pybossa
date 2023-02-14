@@ -39,7 +39,7 @@ class ProjectSearchAuth(object):
         if not user.is_authenticated:
             return False
         if user.admin or user.subadmin:
-            return True
+            return False
         if project_id:
             project = self.project_repo.get(project_id)
             return ProjectAuth().can(user, 'read', project)

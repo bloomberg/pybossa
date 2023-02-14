@@ -16,45 +16,60 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from flask import request
-from werkzeug.exceptions import NotFound, BadRequest
+import json
+from flask import request, abort
+from flask_login import current_user
+from werkzeug.exceptions import BadRequest
 from pybossa.cache import memoize
 from pybossa.core import project_repo, timeouts
 from pybossa.error import ErrorStatus
-from pybossa.api.project import ProjectAPI
+from pybossa.api.api_base import APIBase
+from pybossa.model.project import Project
+from pybossa.model import DomainObject
+from pybossa.auth import ensure_authorized_to
+from pybossa.util import fuzzyboolean
 
+class ProjectByProductAPI(APIBase):
 
-error = ErrorStatus()
+    __class__ = Project
 
+    def _filter_query(self, repo_info, limit, offset, orderby):
+        if 'info' not in request.args.keys():
+            raise BadRequest("info required")
+        if len(request.args['info']) == 0:
+            return []
+        filters = {'info':request.args['info']}
 
-def methodview_altkey(key_to_oid):
-    def decorator(cls):
+        repo = repo_info['repo']
+        filters = self.api_context(all_arg=request.args.get('all'), **filters)
+        query_func = repo_info['filter']
+        filters = self._custom_filter(filters)
+        last_id = request.args.get('last_id')
+        desc = request.args.get('desc') if request.args.get('desc') else False
+        desc = fuzzyboolean(desc)
 
-        def rt_handler(self, key):
-            method = request.method
-            if not key:
-                return error.format_exception(BadRequest('Invalid Key'),
-                                              cls.__name__.lower(), method)
-            oid = key_to_oid(key)
-            if not oid:
-                return error.format_exception(NotFound('Object not found'),
-                                              cls.__name__.lower(), method)
-            return getattr(super(cls, self), method.lower())(oid)
+        if last_id:
+            results = getattr(repo, query_func)(limit=limit, last_id=last_id,
+                                                desc=False,
+                                                orderby=orderby,
+                                                **filters)
+        else:
+            results = getattr(repo, query_func)(limit=limit, offset=offset,
+                                                desc=desc,
+                                                orderby=orderby,
+                                                **filters)
+        return results
 
-        for action in ('get', 'put', 'delete'):
-            setattr(cls, action, rt_handler)
-        return cls
+    def _select_attributes(self, data):
+        if (current_user.is_authenticated and
+            (current_user.admin or current_user.subadmin)):
+            return self._get_project_metadata(data)
+        else:
+            return []
 
-    return decorator
-
-
-@memoize(timeout=timeouts.get('APP_TIMEOUT'))
-def project_name_to_oid(shortname):
-    project = project_repo.get_by_shortname(shortname)
-    return project.id if project else None
-
-
-@methodview_altkey(project_name_to_oid)
-class ProjectByProductAPI(ProjectAPI):
-
-    pass
+    def _get_project_metadata(self, data):
+        tmp = {}
+        tmp['product'] = data['info']['product']
+        tmp['subproduct'] = data['info']['subproduct']
+        tmp['id'] = data['id']
+        return tmp
