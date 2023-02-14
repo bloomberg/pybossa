@@ -10340,6 +10340,60 @@ class TestWebUserMetadataUpdate(web.Helper):
         data = json.loads(res.data)
         assert data.get('success'), data
 
+    @with_context
+    @patch('pybossa.api.fetch_lock_for_user')
+    def test_unassign_task_succeed(self, fetch_lock):
+        """Test un-assign a task from a user """
+        fetch_lock.return_value = (3600, 100000)
+
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+        self.signin_user(user)
+        project = ProjectFactory.create(
+            info={
+                'sched': 'user_pref_scheduler',
+                'timeout': 60 * 60,
+                'data_classification': dict(input_data="L4 - public",
+                                            output_data="L4 - public")
+            },
+            owner=user
+        )
+
+        task1 = TaskFactory.create(project=project,
+                                   user_pref={'assign_user': [user.email_addr]})
+
+        # Verify the user has been assigned to the task.
+        assert user.email_addr in task1.user_pref.get('assign_user')
+
+        data = {'projectname': project.short_name, 'undo': True}
+        url = f"/api/task/{task1.id}/assign"
+        res = self.app_post_json(url, data=data, follow_redirects=False)
+        data = json.loads(res.data)
+        assert data.get('success'), data
+
+        # Load the task and verify the key 'assign_user' has been removed.
+        task1_modified = task_repo.get_task(task1.id)
+        assert 'assign_user' not in task1_modified.user_pref
+
+        other_email = 'other@test.com';
+        task2 = TaskFactory.create(project=project,
+                                   user_pref={'assign_user': [user.email_addr, other_email]})
+
+        # Verify the user and other_email have been assigned to the task.
+        assert user.email_addr in task2.user_pref.get('assign_user')
+        assert other_email in task2.user_pref.get('assign_user')
+
+        data = {'projectname': project.short_name, 'undo': True}
+        url = f"/api/task/{task2.id}/assign"
+        res = self.app_post_json(url, data=data, follow_redirects=False)
+        data = json.loads(res.data)
+        assert data.get('success'), data
+
+        # Load the task and verify the key 'assign_user' has been removed.
+        task2_modified = task_repo.get_task(task2.id)
+        assert 'assign_user' in task2_modified.user_pref
+        assert user.email_addr not in task2_modified.user_pref.get('assign_user')
+        assert other_email in task2_modified.user_pref.get('assign_user')
+
 
 class TestWebQuizModeUpdate(web.Helper):
 
