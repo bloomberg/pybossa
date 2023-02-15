@@ -20,17 +20,15 @@ import json
 from flask import request, abort
 from flask_login import current_user
 from werkzeug.exceptions import BadRequest, Unauthorized, Forbidden
-from pybossa.cache import memoize
-from pybossa.core import project_repo, timeouts
-from pybossa.error import ErrorStatus
 from pybossa.api.api_base import APIBase
 from pybossa.model.project import Project
 from pybossa.model import DomainObject
-from pybossa.auth import ensure_authorized_to
-from pybossa.util import fuzzyboolean
 
 class ProjectDetailsAPI(APIBase):
+    """
+    Class for retreiving details about projects.
 
+    """
     __class__ = Project
 
     def _filter_query(self, repo_info, limit, offset, orderby):
@@ -38,10 +36,9 @@ class ProjectDetailsAPI(APIBase):
             raise BadRequest("info required")
         if len(request.args['info']) == 0:
             return []
-
         if (not current_user.is_authenticated or
              (not current_user.admin and not current_user.subadmin)):
-             raise Unauthorized("User not authorized for request")
+            raise Unauthorized("User not authorized for request")
 
         return APIBase._filter_query(self, repo_info, limit, offset, orderby)
 
