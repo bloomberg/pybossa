@@ -721,8 +721,11 @@ def _get_valid_service(task_id, service_name, payload, proxy_service_config):
 @blueprint.route('/task/<int:task_id>/assign', methods=['POST'])
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def assign_task(task_id=None):
-    """Assign task to users for locked, user_pref and task_queue schedulers."""
+    """Assign/Un-assign task to users for locked, user_pref and task_queue schedulers."""
     projectname = request.json.get('projectname', None)
+    unassgin = request.json.get('unassgin', False)
+    action = "un-assign" if unassgin else "assign"
+
     a_project = project_repo.get_by_shortname(projectname)
     if not a_project:
         return abort(400, f"Invalid project name {projectname}")
@@ -730,29 +733,45 @@ def assign_task(task_id=None):
     _, ttl = fetch_lock_for_user(a_project.id, task_id, current_user.id)
     if not ttl:
         current_app.logger.warn(
-            "User %s requested for assigning task %s that has not been locked by the user.",
-            current_user.fullname, task_id)
-        return abort(403, 'A lock is required for assigning a task to a user.')
+            "User %s requested for %sing task %s that has not been locked by the user.",
+            current_user.fullname, action, task_id)
+        return abort(403, f'A lock is required for {action} a task to a user.')
 
-    # only assign the user to the task for user_pref and task_queue scheduler
+    # only assign/un-assign the user to the task for user_pref and task_queue scheduler
     scheduler, _ = get_scheduler_and_timeout(a_project)
     if scheduler not in (Schedulers.user_pref, Schedulers.task_queue):
         current_app.logger.warn(
-            "Task scheduler for project is set to %s. Cannot assign users %s for task %s",
-            scheduler, current_user.fullname, task_id)
-        return abort(403, 'Project scheduler not configured for assigning a task to a user.')
+            "Task scheduler for project is set to %s. Cannot %s users %s for task %s",
+            scheduler, action, current_user.fullname, task_id)
+        return abort(403, f'Project scheduler not configured for {action}ing a task to a user.')
 
     t = task_repo.get_task_by(project_id=a_project.id, id=int(task_id))
     user_pref = t.user_pref or {}
     assign_user = user_pref.get("assign_user", [])
 
     user_email = current_user.email_addr
-    if user_email not in assign_user:
-        assign_user.append(user_email)
-        user_pref["assign_user"] = assign_user
-        t.user_pref = user_pref
-        flag_modified(t, "user_pref")
-        task_repo.update(t)
-        current_app.logger.info("User %s assigned to task %s", current_user.fullname, task_id)
+
+    if unassgin:  # un-assign the user
+        if user_email in assign_user:
+            assign_user.remove(user_email)
+
+            if assign_user:
+                user_pref["assign_user"] = assign_user
+            else:  # assign_user list is empty, delete the key "assign_user"
+                del user_pref["assign_user"]
+
+            t.user_pref = user_pref
+            flag_modified(t, "user_pref")
+            task_repo.update(t)
+            current_app.logger.info("User %s un-assigned from task %s",
+                                    current_user.fullname, task_id)
+    else:  # assign the user
+        if user_email not in assign_user:
+            assign_user.append(user_email)
+            user_pref["assign_user"] = assign_user
+            t.user_pref = user_pref
+            flag_modified(t, "user_pref")
+            task_repo.update(t)
+            current_app.logger.info("User %s assigned to task %s", current_user.fullname, task_id)
 
     return Response(json.dumps({'success': True}), 200, mimetype="application/json")
