@@ -39,7 +39,6 @@ from . import auditlog
 from . import webhook
 from . import result
 from . import helpingmaterial
-from . import projectsearch
 
 from pybossa.auth import performancestats
 assert project
@@ -70,8 +69,7 @@ _auth_classes = {'project': project.ProjectAuth,
                  'webhook': webhook.WebhookAuth,
                  'result': result.ResultAuth,
                  'helpingmaterial': helpingmaterial.HelpingMaterialAuth,
-                 'performancestats': performancestats.PerformanceStatsAuth,
-                 'projectbyproductapi': projectsearch.ProjectSearchAuth }
+                 'performancestats': performancestats.PerformanceStatsAuth }
 
 
 def is_authorized(user, action, resource, **kwargs):
