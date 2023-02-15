@@ -10364,7 +10364,7 @@ class TestWebUserMetadataUpdate(web.Helper):
         # Verify the user has been assigned to the task.
         assert user.email_addr in task1.user_pref.get('assign_user')
 
-        data = {'projectname': project.short_name, 'undo': True}
+        data = {'projectname': project.short_name, 'unassgin': True}
         url = f"/api/task/{task1.id}/assign"
         res = self.app_post_json(url, data=data, follow_redirects=False)
         data = json.loads(res.data)
@@ -10382,7 +10382,7 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert user.email_addr in task2.user_pref.get('assign_user')
         assert other_email in task2.user_pref.get('assign_user')
 
-        data = {'projectname': project.short_name, 'undo': True}
+        data = {'projectname': project.short_name, 'unassgin': True}
         url = f"/api/task/{task2.id}/assign"
         res = self.app_post_json(url, data=data, follow_redirects=False)
         data = json.loads(res.data)

@@ -723,8 +723,8 @@ def _get_valid_service(task_id, service_name, payload, proxy_service_config):
 def assign_task(task_id=None):
     """Assign/Un-assign task to users for locked, user_pref and task_queue schedulers."""
     projectname = request.json.get('projectname', None)
-    undo = request.json.get('undo', False)
-    action = "un-assign" if undo else "assign"
+    unassgin = request.json.get('unassgin', False)
+    action = "un-assign" if unassgin else "assign"
 
     a_project = project_repo.get_by_shortname(projectname)
     if not a_project:
@@ -751,7 +751,7 @@ def assign_task(task_id=None):
 
     user_email = current_user.email_addr
 
-    if undo:  # un-assign the user
+    if unassgin:  # un-assign the user
         if user_email in assign_user:
             assign_user.remove(user_email)
 
