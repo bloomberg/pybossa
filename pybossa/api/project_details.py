@@ -32,7 +32,7 @@ class ProjectDetailsAPI(APIBase):
     __class__ = Project
 
     def _filter_query(self, repo_info, limit, offset, orderby):
-        if len(request.args.keys()) == 0:
+        if len(request.args.keys()) == 0 or (len(request.args.keys()) == 1 and "api_key" in request.args.keys()):
             return []
         if (not current_user.is_authenticated or
              (not current_user.admin and not current_user.subadmin)):
@@ -45,33 +45,13 @@ class ProjectDetailsAPI(APIBase):
             raise abort(404)
         items = []
         for result in query_result:
-            # This is for n_favs orderby case
-            if not isinstance(result, DomainObject):
-                if 'n_favs' in result.keys():
-                    result = result[0]
             try:
-                if (result.__class__ != self.__class__):
-                    (item, headline, rank) = result
-                else:
-                    item = result
-                    headline = None
-                    rank = None
-                if not self._verify_auth(item):
-                    continue
+                item = result
                 datum = self._create_dict_from_model(item)
-                if headline:
-                    datum['headline'] = headline
-                if rank:
-                    datum['rank'] = rank
                 items.append(datum)
-            except (Forbidden, Unauthorized):
-                # pass as it is 401 or 403
-                pass
             except Exception:  # pragma: no cover
                 raise
         if oid is not None:
-            if not items:
-                raise Forbidden('Forbidden')
             self._sign_item(items[0])
             items = items[0]
         return json.dumps(items)

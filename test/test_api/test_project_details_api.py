@@ -119,6 +119,13 @@ class TestProjectAPI(TestAPI):
         assert data[0]['product'] == 'test_product', data
         assert data[0]['short_name'] == 'test-app1', data
 
+        # Test get by id
+        res = self.app.get('/api/project/details/' + str(project1.id) + '?api_key=' + admin.api_key)
+        data = json.loads(res.data)
+        assert res.status_code == 200, data
+        assert data['product'] == 'test_product', data
+        assert data['short_name'] == 'test-app1', data
+
         # Test get by product
         res = self.app.get('/api/project/details?info=product::' + project1.info['product'] + '&api_key=' + admin.api_key + '&all=1')
         data = json.loads(res.data)
