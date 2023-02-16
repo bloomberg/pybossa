@@ -160,7 +160,7 @@ register_api(TokenAPI, 'api_token', '/token', pk='token', pk_type='string')
 register_api(CompletedTaskAPI, 'api_completedtask', '/completedtask', pk='oid', pk_type='int')
 register_api(CompletedTaskRunAPI, 'api_completedtaskrun', '/completedtaskrun', pk='oid', pk_type='int')
 register_api(ProjectByNameAPI, 'api_projectbyname', '/projectbyname', pk='key', pk_type='string')
-register_api(ProjectDetailsAPI, 'api_projectdetails', '/project/details', pk='oid', pk_type='int')
+register_api(ProjectDetailsAPI, 'api_projectdetails', '/projectdetails', pk='oid', pk_type='int')
 register_api(PerformanceStatsAPI, 'api_performancestats', '/performancestats', pk='oid', pk_type='int')
 register_api(BulkTasksAPI, 'api_bulktasks', '/bulktasks', pk='oid', pk_type='int')
 

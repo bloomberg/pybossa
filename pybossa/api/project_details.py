@@ -32,7 +32,8 @@ class ProjectDetailsAPI(APIBase):
     __class__ = Project
 
     def _filter_query(self, repo_info, limit, offset, orderby):
-        if len(request.args.keys()) == 0 or (len(request.args.keys()) == 1 and "api_key" in request.args.keys()):
+        if (len(request.args.keys()) == 0 or
+            (len(request.args.keys()) == 1 and "api_key" in request.args.keys())):
             return []
         if (not current_user.is_authenticated or
              (not current_user.admin and not current_user.subadmin)):
@@ -59,10 +60,10 @@ class ProjectDetailsAPI(APIBase):
 
     def _select_attributes(self, data):
         tmp = {}
-        tmp['id'] = data['id']
-        tmp['short_name'] = data['short_name']
-        tmp['product'] = data['info']['product']
-        tmp['subproduct'] = data['info']['subproduct']
-        tmp['created'] = data['created']
+        tmp['id'] = data.get('id')
+        tmp['short_name'] = data.get('short_name')
+        tmp['product'] = data.get('info', {}).get('product')
+        tmp['subproduct'] = data.get('info', {}).get('subproduct')
+        tmp['created'] = data.get('created')
 
         return tmp
