@@ -606,11 +606,21 @@ def task_presenter_editor(short_name):
         flash(gettext(disabled_msg), 'error')
 
     if request.method == 'POST':
+        # Limit maximum post data size.
+        content_length = request.content_length
+        max_length_mb = current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB', 2)
+        max_length_bytes = max_length_mb * 1024 * 1024 # 2 MB maximum POST data size
+
         if disable_editor:
             flash(gettext(disabled_msg), 'error')
             errors = True
         elif not is_admin_or_owner:
             flash(gettext('Ooops! Only project owners can update.'),
+                  'error')
+            errors = True
+        elif content_length is not None and content_length > max_length_bytes:
+            flash(gettext('The task presenter/guidelines content exceeds ' + str(max_length_mb) +
+                  ' MB. Please move large content to an external file.'),
                   'error')
             errors = True
         elif form.validate():
