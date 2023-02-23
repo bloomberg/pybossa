@@ -61,6 +61,7 @@ ONE_MINUTE = 60
 L2_CACHE_TIMEOUT = ONE_DAY
 MUTEX_LOCK_TIMEOUT = ONE_MINUTE
 TWO_WEEKS = 14 * ONE_DAY
+ONE_MONTH = 30 * ONE_DAY
 
 management_dashboard_stats = [
     'project_chart', 'category_chart', 'task_chart',
