@@ -787,9 +787,9 @@ def assign_task(task_id=None):
 def partial_answer(task_id=None):
     """Save/Get/Delete partial answer to Redis - this API might be called heavily.
     Make sure no PostgreSQL DB calls"""
-    partial_answer_key = f"partial_answer:task:{task_id}:user:{current_user.id}"
     response = {'success': True}
     try:
+        partial_answer_key = f"partial_answer:task:{task_id}:user:{current_user.id}"
         if request.method == 'POST':
             answer = json.dumps(request.json)
             sentinel.master.setex(partial_answer_key, ONE_MONTH, answer)
