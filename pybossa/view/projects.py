@@ -855,7 +855,7 @@ def update(short_name):
         project.kpi = project.info.get('kpi')
         project.input_data_class = project.info.get('data_classification', {}).get('input_data')
         project.output_data_class = project.info.get('data_classification', {}).get('output_data')
-        project.allow_taskrun_edit = project.info.get("allow_taskrun_edit") or False
+        project.allow_taskrun_edit = project.info.get("allow_taskrun_edit", False)
         ensure_amp_config_applied_to_project(project, project.info.get('annotation_config', {}))
         form = dynamic_project_form(ProjectUpdateForm, None, data_access_levels, obj=project,
                                     products=prodsubprods, data_classes=data_classes)
