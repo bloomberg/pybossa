@@ -10394,6 +10394,30 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert user.email_addr not in task2_modified.user_pref.get('assign_user')
         assert other_email in task2_modified.user_pref.get('assign_user')
 
+    @with_context
+    def test_partial_answer_exception(self):
+        """Test partial answer API with exception as user doesn't sign in """
+        url = f"/api/task/123/partial_answer"
+        resp = self.app_get_json(url)
+        assert resp.status_code == 415
+
+    @with_context
+    def test_partial_answer(self):
+        """Test partial answer API """
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+        self.signin_user(user)
+
+        url = f"/api/task/123/partial_answer"
+        data = {"my_answer": {"k1: ": "test", "k2": [1, 2, "abc"]}}
+        resp = self.app_post_json(url, data=data, follow_redirects=False)
+        assert json.loads(resp.data).get('success')
+
+        resp = self.app_get_json(url)
+        assert json.dumps(resp.json.get('data')) == json.dumps(data)
+
+        resp = self.app.delete(url)
+        assert json.loads(resp.data).get('success')
+
 
 class TestWebQuizModeUpdate(web.Helper):
 

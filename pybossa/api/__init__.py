@@ -85,7 +85,7 @@ import requests
 from sqlalchemy.sql import text
 from sqlalchemy.orm.attributes import flag_modified
 from pybossa.core import db
-from pybossa.cache import users as cached_users
+from pybossa.cache import users as cached_users, ONE_MONTH
 from pybossa.cache.task_browse_helpers import get_searchable_columns
 from pybossa.cache.users import get_user_pref_metadata
 from pybossa.view.projects import get_locked_tasks
@@ -777,3 +777,27 @@ def assign_task(task_id=None):
             current_app.logger.info("User %s assigned to task %s", current_user.fullname, task_id)
 
     return Response(json.dumps({'success': True}), 200, mimetype="application/json")
+
+
+@jsonpify
+@login_required
+@csrf.exempt
+@blueprint.route('/task/<int:task_id>/partial_answer', methods=['POST', 'GET', 'DELETE'])
+@ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+def partial_answer(task_id=None):
+    """Save/Get/Delete partial answer to Redis - this API might be called heavily.
+    Make sure no PostgreSQL DB calls"""
+    partial_answer_key = f"partial_answer:task:{task_id}:user:{current_user.id}"
+    response = {'success': True}
+    try:
+        if request.method == 'POST':
+            answer = json.dumps(request.json)
+            sentinel.master.setex(partial_answer_key, ONE_MONTH, answer)
+        elif request.method == 'GET':
+            data = sentinel.master.get(partial_answer_key)
+            response['data'] = json.loads(data.decode('utf-8'))
+        elif request.method == 'DELETE':
+            sentinel.master.delete(partial_answer_key)
+    except Exception as e:
+        return error.format_exception(e, target='partial_answer', action=request.method)
+    return Response(json.dumps(response), status=200, mimetype="application/json")
