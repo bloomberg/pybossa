@@ -2277,3 +2277,145 @@ class TestProjectAPI(TestAPI):
 
         assert res.status_code == 404, "POST project locks api should return 404"
         assert res_data == [], "POST project locks api should return empty array"
+
+
+    @with_context
+    @patch('pybossa.model.project.signer')
+    def test_project_create_task_presenter_too_large(self, hasher_mock):
+        """Test API project task presenter on PUT and POST with too large payload"""
+        from flask import current_app
+        from pybossa.core import setup_task_presenter_editor
+
+        current_app.config['DISABLE_TASK_PRESENTER_EDITOR'] = True
+        current_app.config['TASK_PRESENTER_MAX_SIZE_MB'] = 0.001
+        setup_task_presenter_editor(current_app)
+
+        [admin, subadmin] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadmin)
+        CategoryFactory.create()
+
+        hasher_mock.generate_password_hash.return_value = "hashedpwd"
+
+        # Admin can create project with task presenter
+        too_large = '1_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_1'
+        name='XXXX Project 2'
+        data = dict(
+            name=name,
+            short_name='xxxx-project-2',
+            description='description',
+            owner_id=admin.id,
+            long_description='Long Description\n================',
+            password='hello',
+            info=dict(
+                task_presenter=too_large,
+                data_classification=dict(input_data="L4 - public", output_data="L4 - public"),
+                kpi=0.5,
+                product="abc",
+                subproduct="def",
+            ))
+
+        newdata = json.dumps(data)
+        res = self.app.post('/api/project?api_key=' + admin.api_key,
+                            data=newdata)
+        res_data = json.loads(res.data)
+        project = project_repo.get_by(name=name)
+
+        # Verify failed to update.
+        assert res.status_code == 400, "BadRequest"
+        assert res_data['action'] == 'POST', res_data
+        assert "content exceeds " + str(current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB')) + " MB" in res_data['exception_msg'], res_data
+        assert project is None
+
+
+    @with_context
+    @patch('pybossa.model.project.signer')
+    def test_project_update_task_presenter_too_large(self, hasher_mock):
+        """Test API project task presenter on PUT and POST with too large payload"""
+        from flask import current_app
+        from pybossa.core import setup_task_presenter_editor
+
+        current_app.config['DISABLE_TASK_PRESENTER_EDITOR'] = True
+        current_app.config['TASK_PRESENTER_MAX_SIZE_MB'] = 0.001
+        setup_task_presenter_editor(current_app)
+
+        [admin, subadmin] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadmin)
+        CategoryFactory.create()
+
+        hasher_mock.generate_password_hash.return_value = "hashedpwd"
+
+        # Admin can create project with task presenter
+        name='XXXX Project 2'
+        data = dict(
+            name=name,
+            short_name='xxxx-project-2',
+            description='description',
+            owner_id=admin.id,
+            long_description='Long Description\n================',
+            password='hello',
+            info=dict(
+                task_presenter='test123',
+                data_classification=dict(input_data="L4 - public", output_data="L4 - public"),
+                kpi=0.5,
+                product="abc",
+                subproduct="def",
+            ))
+
+        newdata = json.dumps(data)
+        res = self.app.post('/api/project?api_key=' + admin.api_key,
+                            data=newdata)
+        project = project_repo.get_by(name=name)
+        assert res.status_code == 200, "Project created"
+
+         # Admin can not update project task presenter with too large payload
+        too_large = '1_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_1'
+        data = dict(info=dict(task_presenter=too_large))
+        newdata = json.dumps(data)
+        res = self.app.put(
+            '/api/project/{}?api_key={}'.format(project.id, admin.api_key),
+            data=newdata)
+        res_data = json.loads(res.data)
+
+        # Verify failed to update.
+        assert res.status_code == 400, "BadRequest"
+        assert res_data['action'] == 'PUT', res_data
+        assert "content exceeds " + str(current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB')) + " MB" in res_data['exception_msg'], res_data
+
+
+    @with_context
+    def test_project_update_api_too_large(self):
+        """Test API project task presenter on PUT with too large payload"""
+        from flask import current_app
+        current_app.config['TASK_PRESENTER_MAX_SIZE_MB'] = 0.001
+        user = UserFactory.create(id=500)
+        project = ProjectFactory.create(
+            short_name='test_project',
+            name='Test Project',
+            info={
+                'total': 150,
+                'task_presenter': 'foo',
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
+                'kpi': 0.5,
+                'product': 'abc',
+                'subproduct': 'def',
+            },
+            owner=user)
+        tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
+        headers = [('Authorization', user.api_key)]
+
+        too_large = '1_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_1'
+        data = dict(
+            info=dict(task_presenter=too_large)
+        )
+        datajson = json.dumps(data)
+
+        # Call API method to update the project task presenter.
+        res = self.app.put('/api/project/{}'.format(project.id), data=datajson, headers=headers, follow_redirects=True)
+        res_data = json.loads(res.data)
+
+        # Verify failed to update.
+        assert res.status_code == 400, "BadRequest"
+        assert res_data['action'] == 'PUT', res_data
+        assert "content exceeds " + str(current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB')) + " MB" in res_data['exception_msg'], res_data
