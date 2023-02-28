@@ -398,7 +398,7 @@ class TestProjectAPI(TestAPI):
     @with_context
     def test_project_post(self):
         """Test API project creation and auth"""
-        delete current_app.config['TASK_PRESENTER_MAX_SIZE_MB'] = 2
+        current_app.config['TASK_PRESENTER_MAX_SIZE_MB'] = 2
         users = UserFactory.create_batch(2)
         make_subadmin(users[1])
         cat1 = CategoryFactory.create()
