@@ -369,7 +369,7 @@ class APIBase(MethodView):
         perform preprocessing on the POST data"""
         pass
 
-    def _preprocess_request(self, request):
+    def _preprocess_request(self, request, max_length_mb):
         """Method to be overridden by inheriting classes that will
         perform preprocessong on the POST request"""
         pass
