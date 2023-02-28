@@ -51,10 +51,9 @@ class ProjectAPI(APIBase):
     private_keys = set(['secret_key'])
     restricted_keys = set()
 
-    def _preprocess_request(self, request):
+    def _preprocess_request(self, request, max_length_mb):
         # Limit maximum post data size.
         content_length = request.content_length
-        max_length_mb = current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB', 2)
         max_length_bytes = max_length_mb * 1024 * 1024 # 2 MB maximum POST data size
         if content_length is not None and content_length > max_length_bytes:
             raise BadRequest('The task presenter/guidelines content exceeds ' +
