@@ -53,7 +53,7 @@ class ProjectAPI(APIBase):
 
     def _preprocess_request(self, request, max_length_mb):
         # Limit maximum post data size.
-        content_length = request.content_length
+        content_length = request.content_length if request else None
         max_length_bytes = max_length_mb * 1024 * 1024 # 2 MB maximum POST data size
         if content_length is not None and content_length > max_length_bytes:
             raise BadRequest('The task presenter/guidelines content exceeds ' +
