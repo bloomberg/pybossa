@@ -325,8 +325,7 @@ class APIBase(MethodView):
             cls_name = self.__class__.__name__
             data = None
             self.valid_args()
-            max_length_mb = current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB', 2)
-            self._preprocess_request(request, max_length_mb)
+            self._preprocess_request(request)
             data = self._file_upload(request)
             if data is None:
                 data = self._parse_request_data()
@@ -369,7 +368,7 @@ class APIBase(MethodView):
         perform preprocessing on the POST data"""
         pass
 
-    def _preprocess_request(self, request, max_length_mb):
+    def _preprocess_request(self, request):
         """Method to be overridden by inheriting classes that will
         perform preprocessong on the POST request"""
         pass
@@ -435,8 +434,7 @@ class APIBase(MethodView):
         """
         try:
             self.valid_args()
-            max_length_mb = current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB', 2)
-            self._preprocess_request(request, max_length_mb)
+            self._preprocess_request(request)
             cls_name = self.__class__.__name__
             repo = repos[cls_name]['repo']
             query_func = repos[cls_name]['get']

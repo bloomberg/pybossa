@@ -2282,11 +2282,10 @@ class TestProjectAPI(TestAPI):
     @with_context
     @patch('pybossa.model.project.signer')
     def test_project_create_task_presenter_too_large(self, hasher_mock):
-        """Test API project task presenter on PUT and POST with too large payload"""
+        """Test API project task presenter on PUT and POST with too large payload create"""
         from flask import current_app
         from pybossa.core import setup_task_presenter_editor
 
-        current_app.config['DISABLE_TASK_PRESENTER_EDITOR'] = True
         current_app.config['TASK_PRESENTER_MAX_SIZE_MB'] = 0.001
         setup_task_presenter_editor(current_app)
 
@@ -2331,11 +2330,10 @@ class TestProjectAPI(TestAPI):
     @with_context
     @patch('pybossa.model.project.signer')
     def test_project_update_task_presenter_too_large(self, hasher_mock):
-        """Test API project task presenter on PUT and POST with too large payload"""
+        """Test API project task presenter on PUT and POST with too large payload update"""
         from flask import current_app
         from pybossa.core import setup_task_presenter_editor
 
-        current_app.config['DISABLE_TASK_PRESENTER_EDITOR'] = True
         current_app.config['TASK_PRESENTER_MAX_SIZE_MB'] = 0.001
         setup_task_presenter_editor(current_app)
 
