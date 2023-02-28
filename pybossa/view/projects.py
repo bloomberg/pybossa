@@ -833,7 +833,8 @@ def update(short_name):
             'input_data': form.input_data_class.data,
             'output_data': form.output_data_class.data
         }
-        new_project.info["allow_taskrun_edit"] = form.allow_taskrun_edit.data
+        if "allow_taskrun_edit" in form:
+            new_project.info["allow_taskrun_edit"] = form.allow_taskrun_edit.data
 
         project_repo.update(new_project)
         auditlogger.add_log_entry(old_project, new_project, current_user)
@@ -864,7 +865,7 @@ def update(short_name):
         project.kpi = project.info.get('kpi')
         project.input_data_class = project.info.get('data_classification', {}).get('input_data')
         project.output_data_class = project.info.get('data_classification', {}).get('output_data')
-        project.allow_taskrun_edit = project.info.get("allow_taskrun_edit")
+        project.allow_taskrun_edit = project.info.get("allow_taskrun_edit", False)
         ensure_amp_config_applied_to_project(project, project.info.get('annotation_config', {}))
         form = dynamic_project_form(ProjectUpdateForm, None, data_access_levels, obj=project,
                                     products=prodsubprods, data_classes=data_classes)
@@ -1359,6 +1360,11 @@ def task_presenter(short_name, task_id, task_submitter_id=None):
         tp_code = process_table_component(tp_code, user_response, task)
         template_args["project"]["info"]["task_presenter"] = tp_code
 
+        # with edit submission, pass task run id so that taskrun can be updated
+        if request.args.get("mode") == "edit_submission":
+            template_args["taskrun_id"] = taskruns[0].id
+            template_args["taskrun_user_id"] = taskruns[0].user_id
+
     def respond(tmpl):
         response = dict(template=tmpl, **template_args)
         return handle_content_type(response)
@@ -1366,33 +1372,39 @@ def task_presenter(short_name, task_id, task_submitter_id=None):
     if not (task.project_id == project.id):
         return respond('/projects/task/wrong.html')
 
-    guard = ContributionsGuard(sentinel.master,
-                               timeout=project.info.get('timeout'))
-    guard.stamp(task, get_user_id_or_ip())
+    # bypass lock check for the submitter when submitter can edit their response
+    bypass_lock_check = request.args.get("mode") == "edit_submission" and \
+        project.info.get("allow_taskrun_edit") and \
+        current_user.id == task_submitter_id
 
-    # Verify the worker has an unexpired lock on the task. Otherwise, task will fail to submit.
-    timeout, ttl = fetch_lock_for_user(task.project_id, task_id, user_id)
-    remaining_time = float(ttl) - time.time() if ttl else None
-    if (not remaining_time or remaining_time <= 0) and mode != 'read_only':
-        current_app.logger.info("unable to lock task or task expired. \
-                                project %s, task %s, user %s, remaining time %s, mode %s",
-                                task.project_id, task_id, user_id, remaining_time, mode)
-        flash(gettext("Unable to lock task or task expired. Please cancel and begin a new task."), "error")
-    else:
-        if mode != 'read_only':
-            # Set the original timeout seconds to display in the message.
-            template_args['project']['original_timeout'] = timeout
-            # Set the seconds remaining to display in the message.
-            template_args['project']['timeout'] = remaining_time
-            current_app.logger.info("User %s present task %s, remaining time %s, original timeout %s",
-                                    user_id, task_id, remaining_time, timeout)
+    if not bypass_lock_check:
+        guard = ContributionsGuard(sentinel.master,
+                                timeout=project.info.get('timeout'))
+        guard.stamp(task, get_user_id_or_ip())
 
-        if not guard.check_task_presented_timestamp(task, get_user_id_or_ip()):
-            guard.stamp_presented_time(task, get_user_id_or_ip())
+        # Verify the worker has an unexpired lock on the task. Otherwise, task will fail to submit.
+        timeout, ttl = fetch_lock_for_user(task.project_id, task_id, user_id)
+        remaining_time = float(ttl) - time.time() if ttl else None
+        if (not remaining_time or remaining_time <= 0) and mode != 'read_only':
+            current_app.logger.info("unable to lock task or task expired. \
+                                    project %s, task %s, user %s, remaining time %s, mode %s",
+                                    task.project_id, task_id, user_id, remaining_time, mode)
+            flash(gettext("Unable to lock task or task expired. Please cancel and begin a new task."), "error")
+        else:
+            if mode != 'read_only':
+                # Set the original timeout seconds to display in the message.
+                template_args['project']['original_timeout'] = timeout
+                # Set the seconds remaining to display in the message.
+                template_args['project']['timeout'] = remaining_time
+                current_app.logger.info("User %s present task %s, remaining time %s, original timeout %s",
+                                        user_id, task_id, remaining_time, timeout)
 
-        if has_no_presenter(project):
-            flash(gettext("Sorry, but this project is still a draft and does "
-                          "not have a task presenter."), "error")
+            if not guard.check_task_presented_timestamp(task, get_user_id_or_ip()):
+                guard.stamp_presented_time(task, get_user_id_or_ip())
+
+            if has_no_presenter(project):
+                flash(gettext("Sorry, but this project is still a draft and does "
+                            "not have a task presenter."), "error")
 
     return respond('/projects/presenter.html')
 

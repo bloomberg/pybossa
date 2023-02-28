@@ -3462,6 +3462,36 @@ class TestWeb(web.Helper):
         assert res.status_code == 403, res.status_code
 
     @with_context
+    def test_task_presenter_with_allow_taskrun_edit_allows_submission(self):
+        """Test WEB with taskrun edit is permitted with task_submitter_id passed"""
+        self.register()
+        self.signin()
+        self.create()
+        project = db.session.query(Project).get(1)
+        project.info = dict(allow_taskrun_edit=True)
+        db.session.commit()
+        self.new_task(project.id)
+        project_short_name = project.short_name
+
+        task = db.session.query(Task).filter(Task.project_id == 1).first()
+        # user = db.session.query(User).first()
+        regular_user = UserFactory.create(id=999, subadmin=False, admin=False)
+        regular_user.set_password('1234')
+        user_repo.save(regular_user)
+        self.signin(email=regular_user.email_addr, password='1234')
+        task_run = TaskRun(project_id=project.id, task_id=task.id,
+                           info={'answer': 1,
+                                 'odfoa': {'version': 1, 'source-uri': 'http://fake.com', 'odf': {}, 'oa': {}},
+                                 'fake': {'b': 27}},
+                           user_id=regular_user.id)
+        db.session.add(task_run)
+        db.session.commit()
+
+        # task_submitter_id is passed to fetch task response recorded by the user
+        res = self.app.get('/project/%s/task/%s/%s?mode=edit_submission' % (project_short_name, task.id, regular_user.id))
+        assert res.status_code == 200, res.status_code
+
+    @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
     def test_25_get_wrong_task_app(self, mock):
         """Test WEB get wrong task.id for a project works"""
@@ -10393,6 +10423,30 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert 'assign_user' in task2_modified.user_pref
         assert user.email_addr not in task2_modified.user_pref.get('assign_user')
         assert other_email in task2_modified.user_pref.get('assign_user')
+
+    @with_context
+    def test_partial_answer_exception(self):
+        """Test partial answer API with exception as user doesn't sign in """
+        url = f"/api/task/123/partial_answer"
+        resp = self.app_get_json(url)
+        assert resp.status_code == 415
+
+    @with_context
+    def test_partial_answer(self):
+        """Test partial answer API """
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+        self.signin_user(user)
+
+        url = f"/api/task/123/partial_answer"
+        data = {"my_answer": {"k1: ": "test", "k2": [1, 2, "abc"]}}
+        resp = self.app_post_json(url, data=data, follow_redirects=False)
+        assert json.loads(resp.data).get('success')
+
+        resp = self.app_get_json(url)
+        assert json.dumps(resp.json.get('data')) == json.dumps(data)
+
+        resp = self.app.delete(url)
+        assert json.loads(resp.data).get('success')
 
 
 class TestWebQuizModeUpdate(web.Helper):
