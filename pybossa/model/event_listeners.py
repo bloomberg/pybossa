@@ -19,7 +19,7 @@ from datetime import datetime
 from flask import current_app
 
 from rq import Queue
-from sqlalchemy import event
+from sqlalchemy import event, text
 
 from flask import url_for
 
@@ -292,6 +292,13 @@ def on_taskrun_submit(mapper, conn, target):
         project_private.update(project_public)
         project_private['webhook'] = _webhook
         push_webhook(project_private, target.task_id, result_id)
+
+
+@event.listens_for(TaskRun, 'after_update')
+def on_taskrun_resubmit(mapper, conn, target):
+    """Reset task exported flag when taskrun is modified."""
+    sql_query = text("UPDATE task SET exported = False where id=:task_id")
+    conn.execute(sql_query, dict(task_id=target.task_id))
 
 
 @event.listens_for(Blogpost, 'after_insert')
