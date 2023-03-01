@@ -795,7 +795,7 @@ def partial_answer(task_id=None):
             sentinel.master.setex(partial_answer_key, ONE_MONTH, answer)
         elif request.method == 'GET':
             data = sentinel.master.get(partial_answer_key)
-            response['data'] = json.loads(data.decode('utf-8'))
+            response['data'] = json.loads(data.decode('utf-8')) if data else ''
         elif request.method == 'DELETE':
             sentinel.master.delete(partial_answer_key)
     except Exception as e:
