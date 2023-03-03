@@ -618,7 +618,7 @@ def task_presenter_editor(short_name):
             flash(gettext('Ooops! Only project owners can update.'),
                   'error')
             errors = True
-        elif content_length is not None and content_length > max_length_bytes:
+        elif content_length and content_length > max_length_bytes:
             flash(gettext('The task presenter/guidelines content exceeds ' + str(max_length_mb) +
                   ' MB. Please move large content to an external file.'),
                   'error')
