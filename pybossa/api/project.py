@@ -54,9 +54,9 @@ class ProjectAPI(APIBase):
     def _preprocess_request(self, request):
         # Limit maximum post data size.
         content_length = request.content_length if request else 0
-        max_length_mb = current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB', 2) if current_app and current_app.config else 0
+        max_length_mb = current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB', 2)
         max_length_bytes = max_length_mb * 1024 * 1024 # Maximum POST data size (MB)
-        if content_length and max_length_bytes and content_length > max_length_bytes:
+        if content_length > max_length_bytes:
             raise BadRequest('The task presenter/guidelines content exceeds ' +
                 str(max_length_mb) +
                 ' MB. Please move large content to an external file.')
