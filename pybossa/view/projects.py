@@ -1628,7 +1628,8 @@ def tasks_browse(short_name, page=1, records_per_page=None):
     pro = pro_features()
     allowed_records_per_page = [10, 20, 30, 50, 70, 100]
     admin_subadmin_coowner = current_user.subadmin or current_user.admin or current_user.id in project.owners_ids
-    regular_user = not admin_subadmin_coowner
+    # regular user who's either not admin, subadmin or a subadmin who's not coowner to the project
+    regular_user = not (current_user.admin or current_user.subadmin) or (current_user.subadmin and current_user.id not in project.owners_ids)
     allow_taskrun_edit = project.info.get("allow_taskrun_edit") or False
 
     try:
@@ -1639,17 +1640,18 @@ def tasks_browse(short_name, page=1, records_per_page=None):
 
     scheduler = project.info.get('sched', "default")
 
+
     try:
         args = {}
         view_type = request.args.get('view')
         task_browse_default_records_per_page = 10
         task_list_default_records_per_page = 30
-        if view_type != 'tasklist' and admin_subadmin_coowner:
+        if view_type not in ["tasklist", "edit_submission"] and admin_subadmin_coowner:
             # owners and (sub)admin have full access, default size page for owner view is 10
             per_page = records_per_page if records_per_page in allowed_records_per_page else task_browse_default_records_per_page
             # parse args
             args = parse_tasks_browse_args(request.args.to_dict())
-        elif view_type != 'tasklist' and allow_taskrun_edit and regular_user:
+        elif (view_type != 'tasklist' and allow_taskrun_edit and regular_user) or (view_type == "edit_submission" and admin_subadmin_coowner):
             # browse tasks for a regular user to be available when
             # 1. project is configured to allow editing of task runs
             # 2. browse task request is not for task list
@@ -1796,7 +1798,8 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                     rdancy_upd_exp=rdancy_upd_exp,
                     can_know_task_is_gold=can_know_task_is_gold,
                     allow_taskrun_edit=allow_taskrun_edit,
-                    regular_user=regular_user)
+                    regular_user=regular_user,
+                    admin_subadmin_coowner=admin_subadmin_coowner)
 
         return handle_content_type(data)
 
