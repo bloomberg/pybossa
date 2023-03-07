@@ -3401,6 +3401,53 @@ class TestWeb(web.Helper):
         assert b'TaskPresenter' in res.data
 
     @with_context
+    @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
+    def test_task_presenter_editor_too_large(self, mock):
+        """Test WEB task presenter editor fails on too large task presenter html"""
+        from flask import current_app
+        current_app.config['TASK_PRESENTER_MAX_SIZE_MB'] = 0.001
+        too_large = '1_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_1'
+
+        # Initialize a project.
+        self.create()
+        self.delete_task_runs()
+
+        # Set the user password and admin.
+        user = db.session.query(User).get(2)
+        user.set_password('1234')
+        user.admin = True
+        user_repo.save(user)
+
+        # Create a project and task.
+        project = db.session.query(Project).first()
+        project.allow_anonymous_contributors = True
+        db.session.add(project)
+        db.session.commit()
+
+        # Sign-in as an admin user.
+        csrf = self.get_csrf('/account/signin')
+        res = self.signin(email=user.email_addr, password='1234', csrf=csrf)
+
+
+
+        res = self.app.post('/project/' + project.short_name + '/tasks/taskpresentereditor',
+                            data={'editor': too_large, 'task-presenter': ''},
+                            headers={'X-CSRFToken': csrf},
+                            follow_redirects=True)
+
+        # Verify failed to update.
+        assert "content exceeds " + str(current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB')) + " MB" in str(res.data), res.data
+
+        res = self.app.post('/project/' + project.short_name + '/tasks/taskpresentereditor',
+                            data={'guidelines': too_large, 'task-guidelines': ''},
+                            headers={'X-CSRFToken': csrf},
+                            follow_redirects=True)
+
+        # Verify failed to update.
+        assert "content exceeds " + str(current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB')) + " MB" in str(res.data), res.data
+
+
+    @with_context
     def test_task_presenter_with_allow_taskrun_edit_works(self):
         """Test WEB with taskrun edit permitted, get expected task based on user access"""
         self.register()

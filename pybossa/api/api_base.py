@@ -325,6 +325,7 @@ class APIBase(MethodView):
             cls_name = self.__class__.__name__
             data = None
             self.valid_args()
+            self._preprocess_request(request)
             data = self._file_upload(request)
             if data is None:
                 data = self._parse_request_data()
@@ -363,8 +364,13 @@ class APIBase(MethodView):
         return data
 
     def _preprocess_post_data(self, data):
-        """Method to be overriden by inheriting classes that will
+        """Method to be overridden by inheriting classes that will
         perform preprocessing on the POST data"""
+        pass
+
+    def _preprocess_request(self, request):
+        """Method to be overridden by inheriting classes that will
+        perform preprocessong on the POST and PUT request"""
         pass
 
     def _create_instance_from_request(self, data):
@@ -428,6 +434,7 @@ class APIBase(MethodView):
         """
         try:
             self.valid_args()
+            self._preprocess_request(request)
             cls_name = self.__class__.__name__
             repo = repos[cls_name]['repo']
             query_func = repos[cls_name]['get']

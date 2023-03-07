@@ -51,6 +51,16 @@ class ProjectAPI(APIBase):
     private_keys = set(['secret_key'])
     restricted_keys = set()
 
+    def _preprocess_request(self, request):
+        # Limit maximum post data size.
+        content_length = request.content_length if request else 0
+        max_length_mb = current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB', 2)
+        max_length_bytes = max_length_mb * 1024 * 1024 # Maximum POST data size (MB)
+        if content_length > max_length_bytes:
+            raise BadRequest('The task presenter/guidelines content exceeds ' +
+                str(max_length_mb) +
+                ' MB. Please move large content to an external file.')
+
     def _preprocess_post_data(self, data):
         # set amp_store default as true when not passed as input param
         amp_config = data.get('info', {}).get('annotation_config', {}).get('amp_store')
