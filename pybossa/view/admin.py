@@ -50,7 +50,9 @@ from pybossa.feed import get_update_feed
 from pybossa.forms.admin_view_forms import *
 from pybossa.importers import BulkImportException
 from pybossa.jobs import get_dashboard_jobs, export_all_users, \
-    load_management_dashboard_data, perform_completed_tasks_cleanup
+    load_management_dashboard_data, \
+    load_usage_dashboard_data, \
+    perform_completed_tasks_cleanup
 from pybossa.jobs import get_management_dashboard_stats
 from pybossa.jobs import send_mail
 from pybossa.model import make_timestamp
@@ -576,6 +578,23 @@ def management_dashboard():
                            category_chart=category_chart,
                            task_chart=task_chart,
                            submission_chart=submission_chart)
+
+
+@blueprint.route('/usage_dashboard/')
+@login_required
+@admin_required
+def usage_dashboard():
+    days = str(request.args.get('days'))
+    if days == 'all':
+        pass
+    elif not days.isnumeric():
+        return redirect(url_for('admin.usage_dashboard', days=365))
+    else:
+        days = int(days)
+
+    stats = load_usage_dashboard_data(days)
+    return render_template('admin/usage_dashboard.html',
+                           stats=stats)
 
 
 @blueprint.route('/subadminusers', methods=['GET', 'POST'])

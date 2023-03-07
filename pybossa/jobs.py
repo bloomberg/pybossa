@@ -1355,6 +1355,23 @@ def delete_file(fname, container):
     from pybossa.core import uploader
     return uploader.delete_file(fname, container)
 
+def load_usage_dashboard_data(days):
+    timed_stats_funcs = [
+        (site_stats.number_of_created_jobs, "Projects"),
+        (site_stats.n_tasks_site, "Tasks"),
+        (site_stats.n_task_runs_site, "Taskruns"),
+    ]
+
+    # total tasks, taskruns, projects over a specified amount of time.
+    stats = OrderedDict()
+    for func, title in timed_stats_funcs:
+        stats[title] = func(days)
+
+    # component usage
+    for name, tag in current_app.config.get("USAGE_DASHBOARD_COMPONENTS", {}).items():
+        stats[name] = site_stats.n_projects_using_component(days=days, component=tag)
+
+    return stats
 
 def load_management_dashboard_data():
     # charts
