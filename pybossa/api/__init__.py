@@ -37,7 +37,9 @@ from flask_login import current_user, login_required
 from time import time
 from datetime import datetime, timedelta
 from werkzeug.exceptions import NotFound
-from pybossa.util import jsonpify, get_user_id_or_ip, fuzzyboolean
+from pybossa.util import jsonpify, get_user_id_or_ip, fuzzyboolean, \
+    PARTIAL_ANSWER_KEY, SavedTaskPositionEnum, PARTIAL_ANSWER_POSITION_KEY, \
+    PARTIAL_ANSWER_TASKS, get_user_saved_partial_tasks
 from pybossa.util import get_disqus_sso_payload, grant_access_with_api_key
 import dateutil.parser
 import pybossa.model as model
@@ -74,7 +76,7 @@ from pybossa.cache.helpers import (n_available_tasks, n_available_tasks_for_user
 from pybossa.sched import (get_scheduler_and_timeout, has_lock, release_lock, Schedulers,
                            fetch_lock_for_user, release_reserve_task_lock_by_id)
 from pybossa.jobs import send_mail
-from pybossa.api.project_by_name import ProjectByNameAPI
+from pybossa.api.project_by_name import ProjectByNameAPI, project_name_to_oid
 from pybossa.api.project_details import ProjectDetailsAPI
 from pybossa.api.pwd_manager import get_pwd_manager
 from pybossa.data_access import data_access_levels
@@ -176,9 +178,19 @@ def add_task_signature(tasks):
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def new_task(project_id, task_id=None):
     """Return a new task for a project."""
+    # Check the value of saved_task_position from Redis:
+    saved_task_position = None
+    if not current_user.is_anonymous:
+        position_key = PARTIAL_ANSWER_POSITION_KEY.format(project_id=project_id, user_id=current_user.id)
+        saved_task_position = sentinel.master.get(position_key)
+        if saved_task_position:
+            try:
+                saved_task_position = SavedTaskPositionEnum(saved_task_position.decode('utf-8'))
+            except ValueError as e: pass
+
     # Check if the request has an arg:
     try:
-        tasks, timeout, cookie_handler = _retrieve_new_task(project_id, task_id)
+        tasks, timeout, cookie_handler = _retrieve_new_task(project_id, task_id, saved_task_position)
 
         if type(tasks) is Response:
             return tasks
@@ -213,7 +225,7 @@ def new_task(project_id, task_id=None):
         return error.format_exception(e, target='project', action='GET')
 
 
-def _retrieve_new_task(project_id, task_id=None):
+def _retrieve_new_task(project_id, task_id=None, saved_task_position=None):
     project = project_repo.get(project_id)
     if project is None or not(project.published or current_user.admin
         or current_user.id in project.owners_ids):
@@ -301,7 +313,8 @@ def _retrieve_new_task(project_id, task_id=None):
                           desc=desc,
                           rand_within_priority=sched_rand_within_priority,
                           gold_only=quiz_mode_enabled,
-                          task_id=task_id)
+                          task_id=task_id,
+                          saved_task_position=saved_task_position)
 
     handler = partial(pwd_manager.update_response, project=project,
                       user=user_id_or_ip)
@@ -782,22 +795,59 @@ def assign_task(task_id=None):
 @jsonpify
 @login_required
 @csrf.exempt
-@blueprint.route('/task/<int:task_id>/partial_answer', methods=['POST', 'GET', 'DELETE'])
+@blueprint.route('/project/<short_name>/task/<int:task_id>/partial_answer', methods=['POST', 'GET', 'DELETE'])
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
-def partial_answer(task_id=None):
+def partial_answer(task_id=None, short_name=None):
     """Save/Get/Delete partial answer to Redis - this API might be called heavily.
-    Make sure no PostgreSQL DB calls"""
+    Try to avoid PostgreSQL DB calls as much as possible"""
+
+    # A DB call but with cache
+    project_id = project_name_to_oid(short_name)
+
+    if not project_id:
+        return abort(400, f"Invalid project name {short_name}")
+
     response = {'success': True}
     try:
-        partial_answer_key = f"partial_answer:task:{task_id}:user:{current_user.id}"
+        partial_answer_key = PARTIAL_ANSWER_KEY.format(project_id=project_id,
+                                                       user_id=current_user.id,
+                                                       task_id=task_id)
+        partial_answer_tasks = PARTIAL_ANSWER_TASKS.format(project_id=project_id,
+                                                           user_id=current_user.id)
+        now_timestamp = int(time())
         if request.method == 'POST':
+            ttl = ONE_MONTH
             answer = json.dumps(request.json)
-            sentinel.master.setex(partial_answer_key, ONE_MONTH, answer)
+            sentinel.master.setex(partial_answer_key, ttl, answer)
+            # The sorted set is to keep all user saved tasks
+            sentinel.master.zadd(partial_answer_tasks, {task_id: now_timestamp + ttl})
         elif request.method == 'GET':
             data = sentinel.master.get(partial_answer_key)
             response['data'] = json.loads(data.decode('utf-8')) if data else ''
         elif request.method == 'DELETE':
             sentinel.master.delete(partial_answer_key)
+            # Remove the corresponding task ID from the sorted set
+            sentinel.master.zrem(partial_answer_tasks, task_id)
+
+        # Clean up expired tasks in the sorted set
+        sentinel.master.zremrangebyscore(partial_answer_tasks, min=float('-inf'), max=now_timestamp)
     except Exception as e:
         return error.format_exception(e, target='partial_answer', action=request.method)
+    return Response(json.dumps(response), status=200, mimetype="application/json")
+
+
+@jsonpify
+@login_required
+@blueprint.route('/project/<short_name>/has_partial_answer')
+@ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+def user_has_partial_answer(short_name=None):
+    """Check whether the user has any saved partial answer for the project
+    by checking the Redis sorted set if values are within the non-expiration range
+    """
+    if not current_user.is_authenticated:
+        return abort(401)
+
+    project_id = project_name_to_oid(short_name)
+    task_id_map = get_user_saved_partial_tasks(sentinel, project_id, current_user.id)
+    response = {"has_answer": bool(task_id_map)}
     return Response(json.dumps(response), status=200, mimetype="application/json")

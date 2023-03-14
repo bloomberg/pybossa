@@ -1303,6 +1303,19 @@ class TestPybossaUtil(Test):
         res = util.extract_task_info_data(task, task_info_str)
         assert res == '123', res
 
+    @with_request_context
+    def test_get_user_saved_partial_tasks(self):
+        sentinel = MagicMock()
+        master = MagicMock()
+        sentinel.master = master
+        master.zrangebyscore.return_value = [(b'000','not a number' ), (b'123', 666666.0), (b'456', 777777.1)]
+
+        project_id = 1
+        user_id = 1
+        result = util.get_user_saved_partial_tasks(sentinel, project_id, user_id)
+
+        assert result == {123: 666666, 456: 777777}
+
 
 class TestIsReservedName(object):
     from test import flask_app as app

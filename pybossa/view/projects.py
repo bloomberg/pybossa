@@ -57,9 +57,10 @@ from pybossa.util import (Pagination, admin_required, get_user_id_or_ip, rank,
                           description_from_long_description,
                           check_annex_response,
                           process_annex_load, process_tp_components,
-                          process_table_component)
+                          process_table_component, PARTIAL_ANSWER_POSITION_KEY,
+                          SavedTaskPositionEnum)
 from pybossa.auth import ensure_authorized_to
-from pybossa.cache import projects as cached_projects
+from pybossa.cache import projects as cached_projects, ONE_DAY
 from pybossa.cache import users as cached_users
 from pybossa.cache import categories as cached_cat
 from pybossa.cache import project_stats as stats
@@ -1476,6 +1477,14 @@ def presenter(short_name):
         current_app.logger.info("User %s present task %s, remaining time %s, original timeout %s",
                                 user_id, task_id, template_args['project'].timeout,
                                 template_args['project'].original_timeout)
+
+        # Save saved_task_position (either "last" or "first" to Redis)
+        saved_task_position = request.args.get('saved_task_position')
+        if saved_task_position:
+            saved_task_position = saved_task_position.lower()
+            if saved_task_position in list(SavedTaskPositionEnum):
+                position_key = PARTIAL_ANSWER_POSITION_KEY.format(project_id=project.id, user_id=user_id)
+                sentinel.master.setex(position_key, ONE_DAY, saved_task_position)
 
         return respond('/projects/presenter.html')
 
