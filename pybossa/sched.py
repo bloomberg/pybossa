@@ -369,6 +369,8 @@ def locked_scheduler(query_factory):
                 if meet_requirement:
                     score = cached_task_browse_helpers.get_task_preference_score(w_pref, user_profile)
                     task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
+            else:  # Default/locker schedulers
+                task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
         rows = sorted(task_rank_info, key=lambda tup: tup[4], reverse=True)
 
         # Iterate a list of tasks but only lock one task and return the locked task
