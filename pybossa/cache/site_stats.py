@@ -30,6 +30,15 @@ from pybossa.core import db
 
 session = db.slave_session
 
+def allow_all_time(func):
+    @wraps(func)
+    def wrapper(days=30):
+        if days == 'all':
+            days = 999999
+        return func(days=days)
+
+    return wrapper
+
 
 @memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
                        key_prefix="site_n_auth_users")
@@ -66,13 +75,16 @@ def n_anon_users():
 
 @memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
                        key_prefix="site_n_tasks")
-def n_tasks_site():
+def n_tasks_site(days='all'):
     """Return number of tasks in the server."""
-    sql = text('''SELECT COUNT(task.id) AS n_tasks FROM task''')
-    results = session.execute(sql)
-    for row in results:
-        n_tasks = row.n_tasks
-    return n_tasks or 0
+    sql = '''SELECT COUNT(task.id) AS n_tasks FROM task'''
+    if days != 'all':
+        sql += '''
+            WHERE
+                to_timestamp(task.created, 'YYYY-MM-DD"T"HH24:MI:SS.US') > current_timestamp - interval ':days days'
+        '''
+    data = {'days' : days}
+    return session.execute(text(sql), data).scalar()
 
 
 @memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
@@ -90,13 +102,15 @@ def n_total_tasks_site():
 
 @memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
                        key_prefix="site_n_task_runs")
-def n_task_runs_site():
+def n_task_runs_site(days="all"):
     """Return number of task runs in the server."""
-    sql = text('''SELECT COUNT(task_run.id) AS n_task_runs FROM task_run''')
-    results = session.execute(sql)
-    for row in results:
-        n_task_runs = row.n_task_runs
-    return n_task_runs or 0
+    sql = '''SELECT COUNT(task_run.id) AS n_task_runs FROM task_run'''
+    if days != 'all':
+        sql += '''
+            WHERE to_timestamp(task_run.finish_time, 'YYYY-MM-DD"T"HH24:MI:SS.US') > current_timestamp - interval ':days days'
+        '''
+    data = {'days' : days}
+    return session.execute(text(sql), data).scalar()
 
 
 @memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
@@ -157,28 +171,20 @@ def get_top5_users_24_hours():
     return top5_users_24_hours
 
 
-def allow_all_time(func):
-    @wraps(func)
-    def wrapper(days=30):
-        if days == 'all':
-            days = 999999
-        return func(days=days)
-
-    return wrapper
-
-
 @memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
                        cache_group_keys=['number_of_created_jobs'])
-@allow_all_time
 def number_of_created_jobs(days=30):
-    """Number of created jobs"""
-    sql = text('''
-        SELECT COUNT(id) FROM project
-        WHERE
-        clock_timestamp() - to_timestamp(created, 'YYYY-MM-DD"T"HH24:MI:SS.US')
-            < interval ':days days';
-    ''')
-    return session.execute(sql, dict(days=days)).scalar()
+    """Number of created jobs by interval"""
+    sql = '''SELECT COUNT(id) FROM project'''
+    if days != 'all':
+        sql += '''
+            WHERE
+                clock_timestamp() - to_timestamp(created, 'YYYY-MM-DD"T"HH24:MI:SS.US')
+                < interval ':days days'
+                '''
+    data = {'days': days}
+
+    return session.execute(text(sql), data).scalar()
 
 
 @memoize_with_l2_cache(timeout=ONE_WEEK, timeout_l2=TWO_WEEKS,
@@ -237,7 +243,7 @@ def number_of_active_users(days=30):
     # TODO - revisit the SQL performance with index on finish_time in
     #  task_run table after DB engine upgrade
     sql = text('''
-        SELECT COUNT(DISTINCT(user_id)) as id 
+        SELECT COUNT(DISTINCT(user_id)) as id
         FROM task_run
         WHERE task_run.finish_time > CAST(CURRENT_DATE - INTERVAL ':days days' AS TEXT);
     ''')
@@ -305,11 +311,11 @@ def tasks_per_category():
     sql = text('''
         WITH tasks AS (
             SELECT SUM(n_tasks) AS n_tasks FROM project_stats ps
-            JOIN project p ON p.id = ps.project_id 
+            JOIN project p ON p.id = ps.project_id
             JOIN category c ON c.id = p.category_id
             WHERE n_tasks > 0
             GROUP BY c.id
-        ) 
+        )
         SELECT AVG(n_tasks) FROM tasks;
     ''')
     return session.execute(sql).scalar() or 'N/A'
@@ -411,6 +417,27 @@ def submission_chart():
     labels.reverse()
     series.reverse()
     return dict(labels=labels, series=[series])
+
+
+@memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
+                       key_prefix="n_projects_using_component")
+def n_projects_using_component(days='all', component=None):
+    """
+    Fetch total projects using component
+    """
+    component = '%' + component + '%'
+    sql = '''
+            SELECT count(project.id) AS n_projects
+            FROM project
+            LEFT JOIN "user" ON project.owner_id = "user".id
+            WHERE project.info->>'task_presenter' like :component
+        '''
+    if days != 'all':
+        sql += '''
+            AND to_timestamp(project.updated, 'YYYY-MM-DD"T"HH24:MI:SS.US') > current_timestamp - interval ':days days'
+        '''
+    data = {'days' : days, 'component' : component}
+    return session.execute(text(sql), data).scalar()
 
 
 def management_dashboard_stats_cached():

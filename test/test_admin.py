@@ -1338,6 +1338,33 @@ class TestAdmin(web.Helper):
             assert key in data.keys(), data
 
     @with_context
+    def test_usage_dashboard(self):
+        url = '/admin/usage_dashboard/?days=30'
+        self.register()
+        self.signin()
+        res = self.app.get(url, follow_redirects=True)
+        assert res.status_code == 200, 'expected 200 status code'
+        assert '1 Month' in str(res.data), 'expected 1 month in response html'
+
+    @with_context
+    def test_usage_dashboard_redirect_empty_params(self):
+        url = '/admin/usage_dashboard/'
+        self.register()
+        self.signin()
+        res = self.app.get(url, follow_redirects=True)
+        assert res.history and res.history[0], 'expected redirect'
+        assert 'admin/usage_dashboard/?days=365' in str(res.history[0].data)
+
+    @with_context
+    def test_usage_dashboard_redirect_bad_params(self):
+        url = '/admin/usage_dashboard/?months=some_nonsense'
+        self.register()
+        self.signin()
+        res = self.app.get(url, follow_redirects=True)
+        assert res.history and res.history[0], 'expected redirect'
+        assert 'admin/usage_dashboard/?days=365' in str(res.history[0].data)
+
+    @with_context
     def test_announcement_json(self):
         """Test ADMIN JSON announcement"""
         url = '/admin/announcement'

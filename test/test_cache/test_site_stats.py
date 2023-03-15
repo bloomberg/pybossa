@@ -24,7 +24,7 @@ from test.factories import (UserFactory, ProjectFactory, AnonymousTaskRunFactory
 from pybossa.repositories import ResultRepository
 from unittest.mock import patch
 from pybossa.cache import management_dashboard_stats, delete_cache_group
-from pybossa.jobs import get_management_dashboard_stats
+from pybossa.jobs import get_management_dashboard_stats, load_usage_dashboard_data
 from flask import current_app
 import pybossa.cache.project_stats as project_stats
 
@@ -73,12 +73,36 @@ class TestSiteStatsCache(Test):
         assert anonymous_users == 0, anonymous_users
 
     @with_context
-    def test_n_tasks_site_returns_number_of_total_tasks(self):
+    def test_n_tasks_site_returns_number_of_total_tasks_default(self):
         TaskFactory.create_batch(2)
 
         tasks = stats.n_tasks_site()
-
         assert tasks == 2, tasks
+
+    @with_context
+    def test_n_tasks_site_with_parameter(self):
+        """Test total tasks"""
+        date_20_mo = (datetime.datetime.utcnow() -  datetime.timedelta(600)).isoformat()
+        date_8_mo = (datetime.datetime.utcnow() -  datetime.timedelta(240)).isoformat()
+        date_2_mo = (datetime.datetime.utcnow() -  datetime.timedelta(60)).isoformat()
+        date_1_mo = (datetime.datetime.utcnow() -  datetime.timedelta(30)).isoformat()
+
+        ProjectFactory.create()
+
+        TaskFactory.create(created=date_1_mo)
+        TaskFactory.create(created=date_2_mo)
+        TaskFactory.create(created=date_8_mo)
+        TaskFactory.create(created=date_20_mo)
+
+        expected_tasks_6_mo = 2
+        total_tasks_6_mo = stats.n_tasks_site(days=183)
+        assert total_tasks_6_mo == expected_tasks_6_mo, \
+                f"{total_tasks_6_mo} active tasks in last 6 months, expected {expected_tasks_6_mo}"
+
+        expected_tasks_12_mo = 3
+        total_tasks_12_mo = stats.n_tasks_site(days=365)
+        assert total_tasks_12_mo == expected_tasks_12_mo, \
+                f"{total_tasks_12_mo} active tasks in last 12 months, expected {expected_tasks_12_mo}"
 
     @with_context
     def test_n_total_tasks_site_returns_aggregated_number_of_required_tasks(self):
@@ -229,6 +253,30 @@ class TestSiteStatsCache(Test):
         old_project = ProjectFactory.create(created=date_60_days_old)
         total_projects = stats.number_of_created_jobs()
         assert total_projects == 5, "Total number of projects created in last 30 days should be 5"
+
+    @with_context
+    def test_number_of_created_jobs(self):
+        """Test total projects by interval"""
+        date_20_mo = (datetime.datetime.utcnow() -  datetime.timedelta(600)).isoformat()
+        date_8_mo = (datetime.datetime.utcnow() -  datetime.timedelta(240)).isoformat()
+        date_2_mo = (datetime.datetime.utcnow() -  datetime.timedelta(60)).isoformat()
+        date_1_mo = (datetime.datetime.utcnow() -  datetime.timedelta(30)).isoformat()
+
+        ProjectFactory.create(created=date_1_mo, updated=date_1_mo)
+        ProjectFactory.create(created=date_2_mo, updated=date_2_mo)
+        ProjectFactory.create(created=date_8_mo, updated=date_8_mo)
+        ProjectFactory.create(created=date_20_mo, updated=date_20_mo)
+
+        expected_projects_6_mo = 2
+        total_active_projects_6_mo = stats.number_of_created_jobs(days=183)
+        assert total_active_projects_6_mo == expected_projects_6_mo, \
+                f"{total_active_projects_6_mo} active projects in last 6 months, expected {expected_projects_6_mo}"
+
+        expected_projects_12_mo = 3
+        total_active_projects_12_mo = stats.number_of_created_jobs(days=365)
+        assert total_active_projects_12_mo == expected_projects_12_mo, \
+                f"{total_active_projects_12_mo} active projects in last 12 months, expected {expected_projects_12_mo}"
+
 
     @with_request_context
     def test_number_of_active_jobs(self):
@@ -430,6 +478,34 @@ class TestSiteStatsCache(Test):
         taskruns = stats.submission_chart()
         assert taskruns['series'][0][24] == expected_taskruns, "{} taskruns created in last 24 months".format(expected_taskruns)
 
+
+    @with_context
+    def test_n_task_runs_site_with_interval(self):
+        """Test total taskruns"""
+        date_20_mo = (datetime.datetime.utcnow() -  datetime.timedelta(600)).isoformat()
+        date_8_mo = (datetime.datetime.utcnow() -  datetime.timedelta(240)).isoformat()
+        date_2_mo = (datetime.datetime.utcnow() -  datetime.timedelta(60)).isoformat()
+        date_1_mo = (datetime.datetime.utcnow() -  datetime.timedelta(30)).isoformat()
+
+        ProjectFactory.create()
+        TaskFactory.create()
+
+        TaskRunFactory.create(finish_time=date_1_mo)
+        TaskRunFactory.create(finish_time=date_2_mo)
+        TaskRunFactory.create(finish_time=date_8_mo)
+        TaskRunFactory.create(finish_time=date_20_mo)
+
+        expected_taskruns_6_mo = 2
+        total_taskruns_6_mo = stats.n_task_runs_site(days=183)
+        assert total_taskruns_6_mo == expected_taskruns_6_mo, \
+                f"{total_taskruns_6_mo} active taskruns in last 6 months, expected {expected_taskruns_6_mo}"
+
+        expected_taskruns_12_mo = 3
+        total_taskruns_12_mo = stats.n_task_runs_site(days=365)
+        assert total_taskruns_12_mo == expected_taskruns_12_mo, \
+                f"{total_taskruns_12_mo} active taskruns in last 12 months, expected {expected_taskruns_12_mo}"
+
+
     @with_context
     @patch('pybossa.jobs.send_mail')
     def test_management_dashboard_stats(self, mail):
@@ -459,3 +535,41 @@ class TestSiteStatsCache(Test):
                     .format(msg, current_app.config.get('BRAND')))
             mail_dict = dict(recipients=[user_email], subject=subject, body=body)
             mail.assert_called_with(mail_dict)
+
+    @with_context
+    def test_load_usage_dashboard_data(self):
+        """Test load usage dashboard data"""
+        with patch.dict(self.flask_app.config, {'USAGE_DASHBOARD_COMPONENTS':
+            {
+                'Annex' : 'annex-shell',
+                'DocX' : 'loadDocument',
+                'NLP Component' : 'text-tagging'
+            }
+        }):
+
+            stats = load_usage_dashboard_data(days='all')
+            assert 'Projects' in stats.keys() ,"Expected 'Projects' key in stats"
+            assert 'Tasks' in stats.keys(), "Expected 'Tasks' key in stats"
+            assert 'Taskruns' in stats.keys(), "Expected 'Taskruns' key in stats"
+            assert 'Annex' in stats.keys(), "Expected 'Annex' key in stats"
+            assert 'DocX' in stats.keys(), "Expected 'DocX' key in stats"
+            assert 'NLP Component' in stats.keys(), "Expected 'NLP Component' key in stats"
+
+    @with_context
+    def test_n_projects_using_component(self):
+        """Test number of projects using component works correctly"""
+        date_1_mo = (datetime.datetime.utcnow() -  datetime.timedelta(30)).isoformat()
+        date_12_mo = (datetime.datetime.utcnow() -  datetime.timedelta(360)).isoformat()
+
+        project_info = {"task_presenter" : "<text-tagging></text-tagging>"}
+
+        ProjectFactory.create_batch(5)
+        ProjectFactory.create(created=date_1_mo, updated=date_1_mo, info=project_info)
+        ProjectFactory.create(created=date_1_mo, updated=date_1_mo)
+        ProjectFactory.create(created=date_12_mo, updated=date_12_mo, info=project_info)
+
+        res = stats.n_projects_using_component(days=183, component='text-tagging')
+        assert res == 1, "Expected 1 project in last 6 months using text-tagging"
+
+        res = stats.n_projects_using_component(days='all', component='text-tagging')
+        assert res == 2, "Expected 2 projects in all time using text-tagging"
