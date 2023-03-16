@@ -186,7 +186,8 @@ def new_task(project_id, task_id=None):
         if saved_task_position:
             try:
                 saved_task_position = SavedTaskPositionEnum(saved_task_position.decode('utf-8'))
-            except ValueError as e: pass
+            except ValueError as e:
+                pass
 
     # Check if the request has an arg:
     try:

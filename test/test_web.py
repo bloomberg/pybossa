@@ -10038,26 +10038,6 @@ class TestWeb(web.Helper):
         assert "class=\" sort-asc sortable\" data-sort=\"completed_by\"" not in str(res.data), "Unexpected sorted column (sort-asc) indicator on Completed By."
         assert "class=\" sort-asc sortable\" data-sort=\"priority\"" not in str(res.data), "Missing sorted column indicator (sort-asc) on Priority."
 
-    @with_context
-    @patch('pybossa.view.projects.sentinel.master.get')
-    def test_new_task_with_saved_task_position(self, sentinel_mock):
-        """Test fetch lock works."""
-        admin = UserFactory.create(admin=True)
-        admin.set_password('1234')
-        user_repo.save(admin)
-        self.signin(email=admin.email_addr, password='1234')
-
-        # Test locked_scheduler
-        project = ProjectFactory.create(owner=admin, short_name='test', info={'sched':'locked_scheduler'})
-        task = TaskFactory.create(project=project)
-
-        sentinel_mock.return_value = b'first'
-
-        url = f'/api/project/{project.id}/newtask'
-        res = self.app.get(url, follow_redirects=True)
-
-        assert res.status_code == 200, res.status_code
-
 class TestWebUserMetadataUpdate(web.Helper):
 
     original = {

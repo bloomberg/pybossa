@@ -464,6 +464,28 @@ class TestProjectsCache(Test):
 
 
     @with_context
+    @patch('pybossa.cache.projects.get_user_saved_partial_tasks')
+    def test_browse_tasks_sort_by_saved_tasks(self, task_id_map_mock):
+        """Test CACHE PROJECTS browse_tasks returns tasks sorted by earliest saved tasks"""
+
+        owner = UserFactory.create(id=500)
+        project = ProjectFactory.create(owner=owner, short_name="testproject")
+        tasks = TaskFactory.create_batch(2, project=project, n_answers=2)
+
+        task_id_map_mock.return_value = {tasks[1].id : 1001}  # return task1 first
+
+        user_profile = {"finance": 0.6}
+        args = dict(filter_by_wfilter_upref={"current_user_pref": {},
+                                             "current_user_email": "user@user.com",
+                                             "current_user_profile": user_profile},
+                    sql_params=dict(assign_user=json.dumps(
+                        {'assign_user': ["user@user.com"]})))
+        count, cached_tasks = cached_projects.browse_tasks(project.id, args, filter_user_prefs=True)
+        assert count == 2
+        assert cached_tasks[0]["id"] == tasks[1].id
+
+
+    @with_context
     def test_browse_tasks_returns_filtered_tasks_for_workers_0(self):
         """Test CACHE PROJECTS browse_tasks returns a subset of tasks
         from a given project"""
