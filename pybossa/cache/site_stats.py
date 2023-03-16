@@ -74,7 +74,7 @@ def n_anon_users():
 
 
 @memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
-                       key_prefix="site_n_tasks")
+                       cache_group_keys=["site_n_tasks"])
 def n_tasks_site(days='all'):
     """Return number of tasks in the server."""
     sql = '''SELECT COUNT(task.id) AS n_tasks FROM task'''
@@ -101,7 +101,7 @@ def n_total_tasks_site():
 
 
 @memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
-                       key_prefix="site_n_task_runs")
+                       cache_group_keys=["site_n_task_runs"])
 def n_task_runs_site(days="all"):
     """Return number of task runs in the server."""
     sql = '''SELECT COUNT(task_run.id) AS n_task_runs FROM task_run'''
@@ -420,7 +420,7 @@ def submission_chart():
 
 
 @memoize_with_l2_cache(timeout=ONE_DAY, timeout_l2=TWO_WEEKS,
-                       key_prefix="n_projects_using_component")
+                       cache_group_keys=["n_projects_using_component"])
 def n_projects_using_component(days='all', component=None):
     """
     Fetch total projects using component
