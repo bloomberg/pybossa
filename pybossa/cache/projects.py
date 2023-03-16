@@ -16,10 +16,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Cache module for projects."""
+import sys
+
 from sqlalchemy.sql import text
-from pybossa.core import db, timeouts
+from pybossa.core import db, timeouts, sentinel
 from pybossa.model.project import Project
-from pybossa.util import pretty_date, static_vars, convert_utc_to_est
+from pybossa.util import pretty_date, static_vars, convert_utc_to_est, \
+    get_user_saved_partial_tasks
 from pybossa.cache import memoize, cache, delete_memoized, delete_cached, \
     memoize_essentials, delete_memoized_essential, delete_cache_group, ONE_DAY, \
     ONE_HOUR, memoize_with_l2_cache, delete_memoize_with_l2_cache
@@ -207,16 +210,23 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         task_rank_info = []
         user_profile = args.get("filter_by_wfilter_upref", {}).get("current_user_profile", {})
 
+        # Get all saved task IDs from Redis for the current user
+        task_id_map = get_user_saved_partial_tasks(sentinel, project_id, user_id)
+
         for row in all_available_tasks:
             score = 0
-            w_pref = row.worker_pref or {}
-            w_filter = row.worker_filter or {}
-            # validate worker_filter and compute preference score
-            if not user_meet_task_requirement(row.id, w_filter, user_profile):
-                continue
-            if not args.get('order_by'):
-                # if there is no sort defined, sort task by preference scores
-                score = get_task_preference_score(w_pref, user_profile)
+
+            if task_id_map and row.id in task_id_map:
+                score = sys.maxsize - task_id_map.get(row.id)  # earliest timestamp first
+            else:
+                w_pref = row.worker_pref or {}
+                w_filter = row.worker_filter or {}
+                # validate worker_filter and compute preference score
+                if not user_meet_task_requirement(row.id, w_filter, user_profile):
+                    continue
+                if not args.get('order_by'):
+                    # if there is no sort defined, sort task by preference scores
+                    score = get_task_preference_score(w_pref, user_profile)
 
             task = format_task(row)
             task_rank_info.append((task, score))

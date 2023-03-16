@@ -3334,6 +3334,34 @@ class TestWeb(web.Helper):
         assert 'setup_task_timeout_display(3600, 3600)' in str(res.data), "Incorrect timeout value"
 
     @with_context
+    @patch('pybossa.view.projects.get_task_id_and_duration_for_project_user')
+    def test_get_next_task_with_saved_task_position(self, get_task_id_and_duration_for_project_user):
+        self.create()
+        self.delete_task_runs()
+        self.register()
+
+        # Sign-in as user.
+        email_addr = 'johndoe@example.com'
+        make_subadmin_by(email_addr=email_addr)
+        csrf = self.get_csrf('/account/signin')
+        self.signin(email=email_addr, csrf=csrf)
+
+        # Get the project, task, and user.
+        project = db.session.query(Project).first()
+        task = db.session.query(Task)\
+                 .filter(Project.id == project.id)\
+                 .first()
+        user = db.session.query(User).filter(User.email_addr == email_addr).first()
+
+        # Mock a redis lock return value.
+        get_task_id_and_duration_for_project_user.return_value = (task.id, 11)
+
+        # Simulate user closing tab and clicking Start Contributing Now, should receive already locked task.
+        url = f'project/{project.short_name}/newtask?saved_task_position=first'
+        res = self.app.get(url, follow_redirects=True, headers={'X-CSRFToken': csrf})
+        assert res.status_code == 200, res
+
+    @with_context
     @patch('pybossa.view.projects.has_no_presenter')
     @patch('pybossa.view.projects.fetch_lock_for_user')
     @patch('pybossa.view.projects.time')
@@ -10010,7 +10038,6 @@ class TestWeb(web.Helper):
         assert "class=\" sort-asc sortable\" data-sort=\"completed_by\"" not in str(res.data), "Unexpected sorted column (sort-asc) indicator on Completed By."
         assert "class=\" sort-asc sortable\" data-sort=\"priority\"" not in str(res.data), "Missing sorted column indicator (sort-asc) on Priority."
 
-
 class TestWebUserMetadataUpdate(web.Helper):
 
     original = {
@@ -10472,19 +10499,47 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert other_email in task2_modified.user_pref.get('assign_user')
 
     @with_context
-    def test_partial_answer_exception(self):
+    def test_partial_answer_user_exception(self):
         """Test partial answer API with exception as user doesn't sign in """
-        url = f"/api/task/123/partial_answer"
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+        project = ProjectFactory.create(
+            info={
+                'sched': 'user_pref_scheduler',
+                'timeout': 60 * 60,
+                'data_classification': dict(input_data="L4 - public",
+                                            output_data="L4 - public")
+            },
+            owner=user
+        )
+        url = f"/api/project/{project.short_name}/task/123/partial_answer"
         resp = self.app_get_json(url)
         assert resp.status_code == 415
+
+    @with_context
+    def test_partial_answer_project_exception(self):
+        """Test partial answer API with exception as project short name invalid """
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+        self.signin_user(user)
+        url = f"/api/project/invalid_shortname/task/123/partial_answer"
+        resp = self.app_get_json(url)
+        assert resp.status_code == 400
 
     @with_context
     def test_partial_answer(self):
         """Test partial answer API """
         user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
         self.signin_user(user)
+        project = ProjectFactory.create(
+            info={
+                'sched': 'user_pref_scheduler',
+                'timeout': 60 * 60,
+                'data_classification': dict(input_data="L4 - public",
+                                            output_data="L4 - public")
+            },
+            owner=user
+        )
 
-        url = f"/api/task/123/partial_answer"
+        url = f"/api/project/{project.short_name}/task/123/partial_answer"
         data = {"my_answer": {"k1: ": "test", "k2": [1, 2, "abc"]}}
         resp = self.app_post_json(url, data=data, follow_redirects=False)
         assert json.loads(resp.data).get('success')
@@ -10494,6 +10549,44 @@ class TestWebUserMetadataUpdate(web.Helper):
 
         resp = self.app.delete(url)
         assert json.loads(resp.data).get('success')
+
+    @with_context
+    def test_user_has_partial_answer(self):
+        """Test user_has_partial_answer API """
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+        self.signin_user(user)
+        project = ProjectFactory.create(
+            info={
+                'sched': 'user_pref_scheduler',
+                'timeout': 60 * 60,
+                'data_classification': dict(input_data="L4 - public",
+                                            output_data="L4 - public")
+            },
+            owner=user
+        )
+
+        url = f"/api/project/{project.short_name}/has_partial_answer"
+        resp = self.app_get_json(url)
+        assert resp.json.get('has_answer') == False, resp.status_code == 200
+
+    @with_context
+    def test_user_has_partial_answer_without_auth(self):
+        """Test user_has_partial_answer without auth"""
+
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+        project = ProjectFactory.create(
+            info={
+                'sched': 'user_pref_scheduler',
+                'timeout': 60 * 60,
+                'data_classification': dict(input_data="L4 - public",
+                                            output_data="L4 - public")
+            },
+            owner=user
+        )
+
+        url = f"/api/project/{project.short_name}/has_partial_answer"
+        resp = self.app_get_json(url)
+        assert resp.status_code == 401, resp
 
 
 class TestWebQuizModeUpdate(web.Helper):

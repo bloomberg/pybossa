@@ -20,7 +20,7 @@ import json
 from unittest.mock import patch
 
 import pybossa
-from pybossa.core import task_repo, project_repo
+from pybossa.core import task_repo, project_repo, user_repo
 from pybossa.model.task import Task
 from pybossa.model.task_run import TaskRun
 from pybossa.sched import release_user_locks_for_project, has_lock, TIMEOUT
@@ -731,6 +731,41 @@ class TestSched(sched.Helper):
             assert t['id'] == tasks[i].id, (err_msg, t, tasks[i].id)
             i += 1
 
+    @with_context
+    @patch('pybossa.sched.get_user_saved_partial_tasks')
+    @patch('pybossa.view.projects.sentinel.master.get')
+    def test_new_task_with_saved_task_position(self, sentinel_mock, task_id_map_mock):
+        admin = UserFactory.create(admin=True)
+        admin.set_password('1234')
+        user_repo.save(admin)
+        self.signin(email=admin.email_addr, password='1234')
+
+        # Test locked_scheduler
+        project = ProjectFactory.create(owner=admin, short_name='test', info={'sched':'locked_scheduler'})
+        task1 = TaskFactory.create(project=project)
+        task2 = TaskFactory.create(project=project)
+        task3 = TaskFactory.create(project=project)
+        task4 = TaskFactory.create(project=project)
+        task5 = TaskFactory.create(project=project)
+
+        # Simulate saved tasks
+        task_id_map_mock.return_value = {task2.id: 1002, task4.id: 1004}
+
+        url = f'/api/project/{project.id}/newtask'
+
+        sentinel_mock.return_value = b'bad-value'
+        res = self.app.get(url, follow_redirects=True)
+        assert res.status_code == 200, res.status_code
+
+        sentinel_mock.return_value = b'first'
+        res = self.app.get(url, follow_redirects=True)
+        assert res.status_code == 200, res.status_code
+        assert res.json['id'] == task2.id
+
+        sentinel_mock.return_value = b'last'
+        res = self.app.get(url, follow_redirects=True)
+        assert res.status_code == 200, res.status_code
+        assert res.json['id'] == task1.id
 
 class TestGetBreadthFirst(Test):
 

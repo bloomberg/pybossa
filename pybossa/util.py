@@ -29,6 +29,7 @@ import re
 import time
 from collections import OrderedDict
 from datetime import timedelta, datetime, date
+from enum import Enum
 from functools import update_wrapper
 from functools import wraps
 from math import ceil
@@ -59,6 +60,13 @@ misaka = Misaka()
 TP_COMPONENT_TAGS = ["text-input", "dropdown-input", "radio-group-input",
                      "checkbox-input", "multi-select-input", "input-text-area"]
 
+PARTIAL_ANSWER_KEY = "partial_answer:project:{project_id}:user:{user_id}:task:{task_id}"
+PARTIAL_ANSWER_TASKS = "partial_answer:project:{project_id}:user:{user_id}:tasks"
+PARTIAL_ANSWER_POSITION_KEY = "partial_answer:project:{project_id}:user:{user_id}:position"
+
+class SavedTaskPositionEnum(str, Enum):
+    FIRST = "first"
+    LAST = "last"
 
 def last_flashed_message():
     """Return last flashed message by flask."""
@@ -1359,3 +1367,27 @@ def extract_task_info_data(task, task_info_str):
     for attribute in attributes[2:]:  # skip "task" and "info"
         request_fields = request_fields.get(attribute, {})
     return json.dumps(request_fields)
+
+
+def get_user_saved_partial_tasks(sentinel, project_id, user_id):
+    """
+    Get the user saved task id list from Redis sorted set
+    """
+    partial_answer_tasks = PARTIAL_ANSWER_TASKS.format(project_id=project_id,
+                                                       user_id=user_id)
+    now_timestamp = int(time.time())
+    task_ids = sentinel.master.zrangebyscore(partial_answer_tasks,
+                                             min=now_timestamp,
+                                             max=float('inf'),
+                                             withscores=True)
+
+    result = dict()
+    for task_id_str, score in task_ids:
+        try:
+            task_id = int(task_id_str.decode('utf-8'))
+            ttl = int(score)
+            result[task_id] = ttl
+        except Exception as e:
+            current_app.logger.error('parsing get_user_saved_partial_tasks error: {}'.format(str(e)))
+
+    return result

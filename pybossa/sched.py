@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Scheduler module for PYBOSSA tasks."""
+import sys
 from functools import wraps
 from sqlalchemy.sql import func, desc, text
 from sqlalchemy.sql import and_, or_
@@ -40,6 +41,7 @@ from pybossa import data_access
 from datetime import datetime
 import re
 
+from pybossa.util import SavedTaskPositionEnum, get_user_saved_partial_tasks
 
 session = db.slave_session
 
@@ -58,7 +60,7 @@ TIMEOUT = ContributionsGuard.STAMP_TTL
 def new_task(project_id, sched, user_id=None, user_ip=None,
              external_uid=None, offset=0, limit=1, orderby='priority_0',
              desc=True, rand_within_priority=False,
-             gold_only=False, task_id=None):
+             gold_only=False, task_id=None, saved_task_position=None):
     """Get a new task by calling the appropriate scheduler function."""
     sched_map = {
         'default': get_locked_task,
@@ -94,7 +96,8 @@ def new_task(project_id, sched, user_id=None, user_ip=None,
                      rand_within_priority=rand_within_priority,
                      filter_user_prefs=(sched in [Schedulers.user_pref, Schedulers.task_queue]),
                      task_type=task_type,
-                     task_id=task_id if sched in [Schedulers.task_queue] else None)
+                     task_id=task_id if sched in [Schedulers.task_queue] else None,
+                     saved_task_position=saved_task_position)
 
 
 def is_locking_scheduler(sched):
@@ -262,7 +265,8 @@ def locked_scheduler(query_factory):
                                  rand_within_priority=False, task_type='gold_last',
                                  filter_user_prefs=False,
                                  task_category_filters="",
-                                 task_id=None):
+                                 task_id=None,
+                                 saved_task_position=None):
         if task_id:
             task = session.query(Task).get(task_id)
             if task:
@@ -276,12 +280,14 @@ def locked_scheduler(query_factory):
         timeout = project.info.get('timeout', TIMEOUT)
         task_queue_scheduler = project.info.get("sched", "default") in [Schedulers.task_queue]
         reserve_task_config = project.info.get("reserve_tasks", {}).get("category", [])
-        task_id, lock_seconds = get_task_id_and_duration_for_project_user(project_id, user_id)
+
+        # "first" or "last" value of saved_task_position will result tasks retrieving from DB
+        task_id, lock_seconds = (None, 0) if saved_task_position else get_task_id_and_duration_for_project_user(project_id, user_id)
+
         if lock_seconds > 10:
             task = session.query(Task).get(task_id)
             if task:
                 return [task]
-        task_id = None
         user_count = get_active_user_count(project_id, sentinel.master)
         assign_user = json.dumps({'assign_user': [cached_users.get_user_email(user_id)]}) if user_id else None
         current_app.logger.info(
@@ -338,21 +344,36 @@ def locked_scheduler(query_factory):
 
         user_profile = cached_users.get_user_profile_metadata(user_id)
 
-        if filter_user_prefs:
-            # validate user qualification and calculate task preference score
-            user_profile = json.loads(user_profile) if user_profile else {}
-            task_rank_info = []
-            for task_id, taskcount, n_answers, calibration, w_filter, w_pref, timeout in rows:
+        # Get all saved task IDs from Redis for the current user
+        task_id_map = None
+        if saved_task_position:
+            task_id_map = get_user_saved_partial_tasks(sentinel, project_id, user_id)
+
+        # validate user qualification and calculate task preference score
+        user_profile = json.loads(user_profile) if user_profile else {}
+        task_rank_info = []
+        for task_id, taskcount, n_answers, calibration, w_filter, w_pref, timeout in rows:
+            score = 0
+            # Check the dictionary task_id_map for the saved task and set the score for sorting
+            if task_id_map:
+                ttl = task_id_map.get(task_id, -1)
+                if ttl > 0 and saved_task_position == SavedTaskPositionEnum.LAST:
+                    score = -ttl  # Saved tasks sink to the bottom, but with earliest saved task first
+                elif ttl > 0 and saved_task_position == SavedTaskPositionEnum.FIRST:
+                    score = sys.maxsize - ttl  # Earliest saved task first
+                task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
+            elif filter_user_prefs:  # Only include when filter requirement is met
                 w_pref = w_pref or {}
                 w_filter = w_filter or {}
                 meet_requirement = cached_task_browse_helpers.user_meet_task_requirement(task_id, w_filter, user_profile)
                 if meet_requirement:
                     score = cached_task_browse_helpers.get_task_preference_score(w_pref, user_profile)
                     task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
-            rows = sorted(task_rank_info, key=lambda tup: tup[4], reverse=True)
-        else:
-            rows = [r for r in rows]
+            else:  # Default/locker schedulers
+                task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
+        rows = sorted(task_rank_info, key=lambda tup: tup[4], reverse=True)
 
+        # Iterate a list of tasks but only lock one task and return the locked task
         for task_id, taskcount, n_answers, calibration, _, _, timeout in rows:
             timeout = timeout or TIMEOUT
             remaining = float('inf') if calibration else n_answers - taskcount
@@ -540,7 +561,7 @@ def select_task_for_gold_mode(project, user_id):
 
 @locked_scheduler
 def get_locked_task(project_id, user_id=None, limit=1, rand_within_priority=False,
-                    task_type='gold_last', task_category_filters=""):
+                    task_type='gold_last', task_category_filters="", saved_task_position=None):
     return locked_task_sql(project_id, user_id=user_id, limit=limit,
                            rand_within_priority=rand_within_priority, task_type=task_type,
                            filter_user_prefs=False, task_category_filters=task_category_filters)
@@ -548,7 +569,7 @@ def get_locked_task(project_id, user_id=None, limit=1, rand_within_priority=Fals
 
 @locked_scheduler
 def get_user_pref_task(project_id, user_id=None, limit=1, rand_within_priority=False,
-                       task_type='gold_last', filter_user_prefs=True, task_category_filters=""):
+                       task_type='gold_last', filter_user_prefs=True, task_category_filters="", saved_task_position=None):
     """ Select a new task based on user preference set under user profile.
 
     For each incomplete task, check if the number of users working on the task
