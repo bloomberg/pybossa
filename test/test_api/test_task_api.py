@@ -31,6 +31,7 @@ from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, \
     UserFactory
 from test.helper.gig_helper import make_subadmin, make_admin
 from test.test_api import TestAPI
+import datetime
 
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)
@@ -763,6 +764,45 @@ class TestTaskAPI(TestAPI):
         assert res.status_code == 400, res.status_code
         error = json.loads(res.data)
         assert error['exception_msg'] == "Reserved keys in payload", error
+
+
+    @with_context
+    def test_task_put_with_expiration_within_bound(self):
+        admin = UserFactory.create()
+        project = ProjectFactory.create(owner=admin)
+        task = TaskFactory.create(project=project, info=dict(x=1))
+        expiration = (datetime.datetime.utcnow() +  datetime.timedelta(30)).isoformat()
+        datajson = json.dumps({'expiration': expiration})
+
+        url = '/api/task/%s?api_key=%s' % (task.id, admin.api_key)
+        with patch.dict(self.flask_app.config, {'TASK_EXPIRATION': 60}):
+            res = self.app.put(url, data=datajson)
+        out = json.loads(res.data)
+        assert_equal(res.status, '200 OK', res.data)
+        assert_equal(expiration, out['expiration'])
+        assert_equal(task.state, 'ongoing')
+        assert task.id == out['id'], out
+
+
+    @with_context
+    def test_task_put_with_expiration_out_of_bounds(self):
+        admin = UserFactory.create()
+        project = ProjectFactory.create(owner=admin)
+        task = TaskFactory.create(project=project, info=dict(x=1))
+        expiration = (datetime.datetime.utcnow() +  datetime.timedelta(1000)).isoformat()
+        max_expiration = (datetime.datetime.utcnow() +  datetime.timedelta(60)).isoformat()
+        datajson = json.dumps({'expiration': expiration})
+
+        url = '/api/task/%s?api_key=%s' % (task.id, admin.api_key)
+        with patch.dict(self.flask_app.config, {'TASK_EXPIRATION': 60}):
+            res = self.app.put(url, data=datajson)
+        out = json.loads(res.data)
+        assert_equal(res.status, '200 OK', res.data)
+        # ignore time, only compare date
+        assert_equal(max_expiration[0:10], out['expiration'][0:10])
+        assert_equal(task.state, 'ongoing')
+        assert task.id == out['id'], out
+
 
     @with_context
     def test_task_put_with_fav_user_ids_fields_returns_error(self):

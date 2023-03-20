@@ -79,6 +79,8 @@ class TaskAPI(APIBase):
                                 "old exported: %s, new exported: %s",
                                 new.id, old.state, new.state,
                                 str(old.exported), str(new.exported))
+        if new.expiration is not None:
+            new.expiration = get_task_expiration(new.expiration)
 
     def _preprocess_post_data(self, data):
         project_id = data["project_id"]
@@ -133,6 +135,9 @@ class TaskAPI(APIBase):
 
     def _select_attributes(self, data):
         return TaskAuth.apply_access_control(data, user=current_user, project_data=get_project_data(data['project_id']))
+
+    def _preprocess_update_data(self, data):
+        data['expiration'] = get_task_expiration(data.get('expiration'))
 
     def put(self, oid):
         # reset cache / memoized

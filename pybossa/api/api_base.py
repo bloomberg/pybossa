@@ -368,6 +368,11 @@ class APIBase(MethodView):
         perform preprocessing on the POST data"""
         pass
 
+    def _preprocess_update_data(self, data):
+        """Method to be overridden by inheriting classes that will
+        perform preprocessing on the PUT data"""
+        pass
+
     def _preprocess_request(self, request):
         """Method to be overridden by inheriting classes that will
         perform preprocessong on the POST and PUT request"""
@@ -460,6 +465,7 @@ class APIBase(MethodView):
         if new_upload is None:
             data = json.loads(request.data)
             new_data = data
+            # self._preprocess_update_data(new_data)
         else:
             new_data = request.form
         self._forbidden_attributes(new_data)
