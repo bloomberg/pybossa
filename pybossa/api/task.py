@@ -136,9 +136,6 @@ class TaskAPI(APIBase):
     def _select_attributes(self, data):
         return TaskAuth.apply_access_control(data, user=current_user, project_data=get_project_data(data['project_id']))
 
-    def _preprocess_update_data(self, data):
-        data['expiration'] = get_task_expiration(data.get('expiration'))
-
     def put(self, oid):
         # reset cache / memoized
         delete_memoized(get_searchable_columns)
