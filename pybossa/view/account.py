@@ -31,7 +31,7 @@ import json
 from itsdangerous import BadData
 from markdown import markdown
 
-from flask import Blueprint, request, url_for, flash, redirect, abort
+from flask import Blueprint, request, url_for, flash, redirect, abort, Response
 from flask import render_template, current_app
 from flask_login import login_required, login_user, logout_user, \
     current_user
@@ -1150,6 +1150,52 @@ def add_metadata(name):
     cached_users.delete_user_pref_metadata(user)
     flash("Input saved successfully", "info")
     return redirect(url_for('account.profile', name=name))
+
+
+@blueprint.route('/<name>/taskbrowse_bookmarks', methods=['GET', 'POST'])
+@login_required
+def taskbrowse_bookmarks(name):
+    user = user_repo.get_by_name(name=name)
+    bookmarks = user.info.get('taskbrowse_bookmarks', [])
+    # get all bookmarks
+    if request.method == 'GET':
+        return jsonify(bookmarks)
+    # add a bookmark
+    if request.method == 'POST':
+        (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
+        if not can_update:
+            abort(403)
+        url = request.body.get('url', None)
+        name = request.body.get('name', None)
+        if name is None or len(name) > 100 or \
+            url is None or len(url) > 150:
+            abort(400)
+        bookmarks.append((name, url))
+        user.info['taskbrowse_bookmarks'] = bookmarks
+        user_repo.update(user)
+        return Response(json.dumps(bookmarks), 200, mimetype='application/json')
+
+
+@blueprint.route('/<name>/taskbrowse_bookmarks/<index>', methods=['DELETE'])
+@login_required
+def delete_taskbrowse_bookmarks(name, index):
+    user = user_repo.get_by_name(name=name)
+    bookmarks = user.info.get('taskbrowse_bookmarks', [])
+    (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
+    if not can_update:
+        abort(403)
+    try:
+        i = int(index)
+    except:
+        abort(400)
+    if i >= len(bookmarks) or i < 0:
+        abort(400)
+    del bookmarks[i]
+
+    user.info['taskbrowse_bookmarks'] = bookmarks
+    user_repo.update(user)
+    return Response(json.dumps(bookmarks), 200, mimetype='application/json')
+
 
 # This is only called if can_update is True.
 def get_form_data(request, user, disabled_fields):
