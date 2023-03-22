@@ -1156,7 +1156,6 @@ def add_metadata(name):
 @login_required
 def taskbrowse_bookmarks(name, short_name):
     user = user_repo.get_by_name(name=name)
-    print(user.info)
     all_bookmarks = user.info.get('taskbrowse_bookmarks', {})
     proj_bookmarks = all_bookmarks.get(short_name, [])
     # get all bookmarks for project
@@ -1182,11 +1181,7 @@ def taskbrowse_bookmarks(name, short_name):
 @blueprint.route('/<name>/taskbrowse_bookmarks/<short_name>/<index>', methods=['DELETE'])
 @login_required
 def delete_taskbrowse_bookmarks(name, short_name, index):
-
-
     user = user_repo.get_by_name(name=name)
-    del user.info['taskbrowse_bookmarks']
-    user_repo.update(user)
     all_bookmarks = user.info.get('taskbrowse_bookmarks', {})
     proj_bookmarks = all_bookmarks.get(short_name, [])
     (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
