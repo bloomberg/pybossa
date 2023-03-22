@@ -1649,7 +1649,6 @@ def tasks_browse(short_name, page=1, records_per_page=None):
 
     scheduler = project.info.get('sched', "default")
 
-
     try:
         args = {}
         view_type = request.args.get('view')
@@ -1665,10 +1664,14 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             # 1. project is configured to allow editing of task runs
             # 2. browse task request is not for task list
             dict_args = request.args.to_dict()
+
             # show columns that are permitted for regular users
-            dict_args["display_columns"] = ["task_id", "priority", "created"]
-            # show task.info columns that are configured under tasklist_columns
-            dict_args["display_info_columns"] = project.info.get('tasklist_columns', [])
+            if regular_user:
+                dict_args["display_columns"] = ["task_id", "priority", "created"]
+                # show task.info columns that are configured under tasklist_columns
+                dict_args["display_info_columns"] = project.info.get('tasklist_columns', [])
+                # restrict filter columns to the columns configured under project settings
+                columns = dict_args["display_info_columns"]
             args = parse_tasks_browse_args(dict_args)
             args["user_id"] = current_user.id
             args["allow_taskrun_edit"] = True
