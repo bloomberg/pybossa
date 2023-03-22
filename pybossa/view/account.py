@@ -1152,15 +1152,16 @@ def add_metadata(name):
     return redirect(url_for('account.profile', name=name))
 
 
-@blueprint.route('/<name>/taskbrowse_bookmarks', methods=['GET', 'POST'])
+@blueprint.route('/<name>/taskbrowse_bookmarks/<short_name>', methods=['GET', 'POST'])
 @login_required
-def taskbrowse_bookmarks(name):
+def taskbrowse_bookmarks(name, short_name):
     user = user_repo.get_by_name(name=name)
     print(user.info)
-    bookmarks = user.info.get('taskbrowse_bookmarks', [])
-    # get all bookmarks
+    all_bookmarks = user.info.get('taskbrowse_bookmarks', {})
+    proj_bookmarks = all_bookmarks.get(short_name, [])
+    # get all bookmarks for project
     if request.method == 'GET':
-        return jsonify(bookmarks)
+        return jsonify(proj_bookmarks)
     # add a bookmark
     if request.method == 'POST':
         (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
@@ -1171,17 +1172,23 @@ def taskbrowse_bookmarks(name):
         if name is None or len(name) > 100 or \
             url is None or len(url) > 500:
             abort(400)
-        bookmarks.append((name, url))
-        user.info['taskbrowse_bookmarks'] = bookmarks
+        proj_bookmarks.append((name, url))
+        all_bookmarks[short_name] = proj_bookmarks
+        user.info['taskbrowse_bookmarks'] = all_bookmarks
         user_repo.update(user)
-        return Response(json.dumps(bookmarks), 200, mimetype='application/json')
+        return Response(json.dumps(proj_bookmarks), 200, mimetype='application/json')
 
 
-@blueprint.route('/<name>/taskbrowse_bookmarks/<index>', methods=['DELETE'])
+@blueprint.route('/<name>/taskbrowse_bookmarks/<short_name>/<index>', methods=['DELETE'])
 @login_required
-def delete_taskbrowse_bookmarks(name, index):
+def delete_taskbrowse_bookmarks(name, short_name, index):
+
+
     user = user_repo.get_by_name(name=name)
-    bookmarks = user.info.get('taskbrowse_bookmarks', [])
+    del user.info['taskbrowse_bookmarks']
+    user_repo.update(user)
+    all_bookmarks = user.info.get('taskbrowse_bookmarks', {})
+    proj_bookmarks = all_bookmarks.get(short_name, [])
     (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
     if not can_update:
         abort(403)
@@ -1189,13 +1196,19 @@ def delete_taskbrowse_bookmarks(name, index):
         i = int(index)
     except:
         abort(400)
-    if i >= len(bookmarks) or i < 0:
+    if i >= len(proj_bookmarks) or i < 0:
         abort(400)
-    del bookmarks[i]
+    del proj_bookmarks[i]
 
-    user.info['taskbrowse_bookmarks'] = bookmarks
+    # if no bookmarks left for this project, delete the mapping entry
+    if len(proj_bookmarks) == 0:
+        del all_bookmarks[short_name]
+    else:
+        all_bookmarks[short_name] = proj_bookmarks
+
+    user.info['taskbrowse_bookmarks'] = all_bookmarks
     user_repo.update(user)
-    return Response(json.dumps(bookmarks), 200, mimetype='application/json')
+    return Response(json.dumps(proj_bookmarks), 200, mimetype='application/json')
 
 
 # This is only called if can_update is True.
