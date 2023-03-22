@@ -1156,6 +1156,7 @@ def add_metadata(name):
 @login_required
 def taskbrowse_bookmarks(name):
     user = user_repo.get_by_name(name=name)
+    print(user.info)
     bookmarks = user.info.get('taskbrowse_bookmarks', [])
     # get all bookmarks
     if request.method == 'GET':
@@ -1168,7 +1169,7 @@ def taskbrowse_bookmarks(name):
         url = request.body.get('url', None)
         name = request.body.get('name', None)
         if name is None or len(name) > 100 or \
-            url is None or len(url) > 150:
+            url is None or len(url) > 500:
             abort(400)
         bookmarks.append((name, url))
         user.info['taskbrowse_bookmarks'] = bookmarks

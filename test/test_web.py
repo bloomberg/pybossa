@@ -1748,6 +1748,7 @@ class TestWeb(web.Helper):
         res = self.app.get(url)
         assert res.status_code == 403
 
+
     @with_context
     def test_05a_get_nonexistant_app(self):
         """Test WEB get not existant project should return 404"""
@@ -10587,6 +10588,62 @@ class TestWebUserMetadataUpdate(web.Helper):
         url = f"/api/project/{project.short_name}/has_partial_answer"
         resp = self.app_get_json(url)
         assert resp.status_code == 401, resp
+
+
+    @with_context
+    def test_get_taskbrowse_bookmarks(self):
+        data = self.original
+        bookmarks = [
+                        [
+                            "bookmark 1",
+                            "https://gigwork.net/project/testproject66/tasks/browse/1/10?changed=true&display_columns=%5B%22task_id%22%2C%22priority%22%2C%22pcomplete%22%2C%22created%22%2C%22finish_time%22%2C%22gold_task%22%2C%22actions%22%2C%22lock_status%22%5D&order_by=task_id+asc&pcomplete_from=46&pcomplete_to=100&priority_from=0.45&priority_to=1.00&display_info_columns=%5B%5D"
+                        ],
+                        [
+                            "bookmark 2",
+                            "https://gigwork.net/project/testproject66/tasks/browse"
+                        ]
+        ]
+        info = {
+                'metadata':{
+                    'user_type':data['user_type'],
+                    'work_hours_from':data['work_hours_from'],
+                    'work_hours_to':data['work_hours_to'],
+                    'timezone':data['timezone'],
+                    'review':data['review']
+                },
+                'taskbrowse_bookmarks' : bookmarks
+            }
+        user = UserFactory.create(info=info)
+        self.signin_user(user)
+        url = f"/account/{user.name}/taskbrowse_bookmarks/"
+        res = self.app.get(url)
+
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert str(data) == str(bookmarks)
+
+
+    @with_context
+    def test_post_taskbrowse_bookmarks(self):
+        pass
+
+    @with_context
+    def test_post_taskbrowse_bookmarks_missing_arguments(self):
+        pass
+
+    @with_context
+    def test_delete_taskbrowse_bookmarks(self):
+        pass
+
+    @with_context
+    def test_delete_taskbrowse_bookmarks_index_outofbounds(self):
+        pass
+
+    @with_context
+    def test_delete_taskbrowse_bookmarks_non_integer_index(self):
+        pass
+
+
 
 
 class TestWebQuizModeUpdate(web.Helper):
