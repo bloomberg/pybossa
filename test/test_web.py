@@ -10592,58 +10592,195 @@ class TestWebUserMetadataUpdate(web.Helper):
 
     @with_context
     def test_get_taskbrowse_bookmarks(self):
+        """Test get taskbrowse_bookmark works"""
         data = self.original
-        bookmarks = [
-                        [
-                            "bookmark 1",
-                            "https://gigwork.net/project/testproject66/tasks/browse/1/10?changed=true&display_columns=%5B%22task_id%22%2C%22priority%22%2C%22pcomplete%22%2C%22created%22%2C%22finish_time%22%2C%22gold_task%22%2C%22actions%22%2C%22lock_status%22%5D&order_by=task_id+asc&pcomplete_from=46&pcomplete_to=100&priority_from=0.45&priority_to=1.00&display_info_columns=%5B%5D"
-                        ],
-                        [
-                            "bookmark 2",
-                            "https://gigwork.net/project/testproject66/tasks/browse"
-                        ]
-        ]
+        target_project = "project1"
+        bookmarks = {
+                    target_project : {
+                                "bookmark 1" : "https://gigwork.net/project/testproject66/tasks/browse/1/10?changed=true&display_columns=%5B%22task_id%22%2C%22priority%22%2C%22pcomplete%22%2C%22created%22%2C%22finish_time%22%2C%22gold_task%22%2C%22actions%22%2C%22lock_status%22%5D&order_by=task_id+asc&pcomplete_from=46&pcomplete_to=100&priority_from=0.45&priority_to=1.00&display_info_columns=%5B%5D",
+                                "bookmark 2" : "https://gigwork.net/project/testproject66/tasks/browse"
+                                },
+                    "project2" : {
+                        "bookmark 3" : "https://gigwork.net/project/project2/tasks/browse"
+                    }
+
+        }
         info = {
-                'metadata':{
-                    'user_type':data['user_type'],
-                    'work_hours_from':data['work_hours_from'],
-                    'work_hours_to':data['work_hours_to'],
-                    'timezone':data['timezone'],
-                    'review':data['review']
-                },
                 'taskbrowse_bookmarks' : bookmarks
             }
         user = UserFactory.create(info=info)
         self.signin_user(user)
-        url = f"/account/{user.name}/taskbrowse_bookmarks/"
+        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}"
         res = self.app.get(url)
 
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
-        assert str(data) == str(bookmarks)
+        assert str(data) == str(bookmarks[target_project])
+
+
+    @with_context
+    def test_get_taskbrowse_bookmarks_no_bookmarks(self):
+        """Test get taskbrowse_bookmark works when there are no saved bookmarks"""
+        data = self.original
+        target_project = "project1"
+
+        user = UserFactory.create()
+        self.signin_user(user)
+        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}"
+        res = self.app.get(url)
+
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert str(data) == str({})
+
+
+    @with_context
+    def test_get_taskbrowse_bookmarks_no_saved_bookmarks_for_project(self):
+        """Test get taskbrowse_bookmark works when no saved bookmarks for project"""
+        data = self.original
+        target_project = "project1"
+        bookmarks = {
+                    "project600" : {
+                                "bookmark 1" : "https://gigwork.net/project/testproject66/tasks/browse/1/10?changed=true&display_columns=%5B%22task_id%22%2C%22priority%22%2C%22pcomplete%22%2C%22created%22%2C%22finish_time%22%2C%22gold_task%22%2C%22actions%22%2C%22lock_status%22%5D&order_by=task_id+asc&pcomplete_from=46&pcomplete_to=100&priority_from=0.45&priority_to=1.00&display_info_columns=%5B%5D",
+                                "bookmark 2" : "https://gigwork.net/project/testproject66/tasks/browse"
+                                },
+                    "project2" : {
+                        "bookmark 3" : "https://gigwork.net/project/project2/tasks/browse"
+                    }
+
+        }
+        info = {
+                'taskbrowse_bookmarks' : bookmarks
+            }
+        user = UserFactory.create(info=info)
+        self.signin_user(user)
+        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}"
+        res = self.app.get(url)
+
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert str(data) == str({})
 
 
     @with_context
     def test_post_taskbrowse_bookmarks(self):
-        pass
+        """Test create and retrive taskbrowse bookmarks"""
+        data = self.original
+        target_project = "project1"
+
+        url1 = "https://gigwork.net/project/testproject66/tasks/browse"
+        url2 = "https://gigwork.net/project/testproject66/tasks/browse/1/10?changed=true&display_columns=%5B%22task_id%22%2C%22priority%22%2C%22pcomplete%22%2C%22created%22%2C%22finish_time%22%2C%22gold_task%22%2C%22actions%22%2C%22lock_status%22%5D&order_by=task_id+asc&pcomplete_from=46&pcomplete_to=100&priority_from=0.45&priority_to=1.00&display_info_columns=%5B%5D"
+        name1 = "bookmark1"
+        name2 = "bookmark2"
+
+        user = UserFactory.create()
+        self.signin_user(user)
+        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}"
+
+        # test first time insertion
+        res = self.app.post(url, data={"name":name1, "url":url1})
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert str(data) == str({name1:url1})
+
+        # test if new url is appended correctly
+        res = self.app.post(url, data={"name":name2, "url":url2})
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert str(data) == str({name1:url1, name2:url2})
+
+        # test if data is saved in db
+        res = self.app.get(url)
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert str(data) == str({name1:url1, name2:url2})
+
+        # test adding bookmark for a different project
+        new_url = f"/account/{user.name}/taskbrowse_bookmarks/project2"
+        res = self.app.post(new_url, data={"name":name2, "url":url2})
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert str(data) == str({name2:url2})
+
+        # test new post does not affect old data
+        res = self.app.get(url)
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert str(data) == str({name1:url1, name2:url2})
 
     @with_context
     def test_post_taskbrowse_bookmarks_missing_arguments(self):
-        pass
+        """Test error not thrown when POST endpoint is called with bad message body"""
+        data = self.original
+        target_project = "project1"
+
+        url1 = "https://gigwork.net/project/testproject66/tasks/browse"
+        name1 = "bookmark1"
+
+        user = UserFactory.create()
+        self.signin_user(user)
+        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}"
+
+        # test no name
+        res = self.app.post(url, data={"url":url1})
+        assert res.status_code == 400, res.status_code
+
+        # test no url
+        res = self.app.post(url, data={"name":name1})
+        assert res.status_code == 400, res.status_code
 
     @with_context
     def test_delete_taskbrowse_bookmarks(self):
-        pass
+        """Test deleting taskbrowse bookmarks"""
+        data = self.original
+        target_project = "project1"
+        bookmarks = {
+                    target_project : {
+                                "bookmark1" : "https://gigwork.net/project/testproject66/tasks/browse/1/10?changed=true&display_columns=%5B%22task_id%22%2C%22priority%22%2C%22pcomplete%22%2C%22created%22%2C%22finish_time%22%2C%22gold_task%22%2C%22actions%22%2C%22lock_status%22%5D&order_by=task_id+asc&pcomplete_from=46&pcomplete_to=100&priority_from=0.45&priority_to=1.00&display_info_columns=%5B%5D",
+                                "bookmark2" : "https://gigwork.net/project/testproject66/tasks/browse"
+                                },
+                    "project2" : {
+                        "bookmark3" : "https://gigwork.net/project/project2/tasks/browse"
+                    }
+
+        }
+        info = {
+                'taskbrowse_bookmarks' : bookmarks
+            }
+        user = UserFactory.create(info=info)
+        self.signin_user(user)
+        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}/bookmark1"
+        res = self.app.delete(url)
+
+        expected_res = {"bookmark2" : "https://gigwork.net/project/testproject66/tasks/browse"}
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert str(data) == str(expected_res)
+
 
     @with_context
-    def test_delete_taskbrowse_bookmarks_index_outofbounds(self):
-        pass
+    def test_delete_taskbrowse_bookmarks_invalid_bookmark_name(self):
+        """Test calling delete taskbrowse bookmarks with an invalid bookmark name"""
+        data = self.original
+        target_project = "project1"
+        bookmarks = {
+                    target_project : {
+                                "bookmark1" : "https://gigwork.net/project/testproject66/tasks/browse/1/10?changed=true&display_columns=%5B%22task_id%22%2C%22priority%22%2C%22pcomplete%22%2C%22created%22%2C%22finish_time%22%2C%22gold_task%22%2C%22actions%22%2C%22lock_status%22%5D&order_by=task_id+asc&pcomplete_from=46&pcomplete_to=100&priority_from=0.45&priority_to=1.00&display_info_columns=%5B%5D",
+                                "bookmark2" : "https://gigwork.net/project/testproject66/tasks/browse"
+                                },
+                    "project2" : {
+                        "bookmark3" : "https://gigwork.net/project/project2/tasks/browse"
+                    }
 
-    @with_context
-    def test_delete_taskbrowse_bookmarks_non_integer_index(self):
-        pass
-
-
+        }
+        info = {
+                'taskbrowse_bookmarks' : bookmarks
+            }
+        user = UserFactory.create(info=info)
+        self.signin_user(user)
+        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}/thisbookmarkdoesnotexist"
+        res = self.app.delete(url)
+        assert res.status_code == 400, res.status_code
 
 
 class TestWebQuizModeUpdate(web.Helper):
