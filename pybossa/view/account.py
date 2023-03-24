@@ -1157,7 +1157,6 @@ def add_metadata(name):
 def taskbrowse_bookmarks(user_name, short_name):
     user = user_repo.get_by_name(name=user_name)
     all_bookmarks = user.info.get('taskbrowse_bookmarks', {})
-    # TODO: validate short_name?
     proj_bookmarks = all_bookmarks.get(short_name, {})
     # get all bookmarks for project
     if request.method == 'GET':
@@ -1167,7 +1166,6 @@ def taskbrowse_bookmarks(user_name, short_name):
         (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
         if not can_update:
             abort(403)
-        # TODO: validate url?
         url = request.body.get('url', None)
         name = request.body.get('name', None)
         if name is None or len(name) > 100 or \
