@@ -10736,8 +10736,8 @@ class TestWebUserMetadataUpdate(web.Helper):
         target_project = "project1"
         bookmarks = {
                     target_project : {
-                                "bookmark1" : "https://gigwork.net/project/testproject66/tasks/browse/1/10?changed=true&display_columns=%5B%22task_id%22%2C%22priority%22%2C%22pcomplete%22%2C%22created%22%2C%22finish_time%22%2C%22gold_task%22%2C%22actions%22%2C%22lock_status%22%5D&order_by=task_id+asc&pcomplete_from=46&pcomplete_to=100&priority_from=0.45&priority_to=1.00&display_info_columns=%5B%5D",
-                                "bookmark2" : "https://gigwork.net/project/testproject66/tasks/browse"
+                        "bookmark1" : "https://gigwork.net/project/testproject66/tasks/browse/1/10?changed=true&display_columns=%5B%22task_id%22%2C%22priority%22%2C%22pcomplete%22%2C%22created%22%2C%22finish_time%22%2C%22gold_task%22%2C%22actions%22%2C%22lock_status%22%5D&order_by=task_id+asc&pcomplete_from=46&pcomplete_to=100&priority_from=0.45&priority_to=1.00&display_info_columns=%5B%5D",
+                        "bookmark2" : "https://gigwork.net/project/testproject66/tasks/browse"
                                 },
                     "project2" : {
                         "bookmark3" : "https://gigwork.net/project/project2/tasks/browse"
@@ -10747,6 +10747,7 @@ class TestWebUserMetadataUpdate(web.Helper):
         info = {
                 'taskbrowse_bookmarks' : bookmarks
             }
+
         user = UserFactory.create(info=info)
         self.signin_user(user)
         url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}/bookmark1"
@@ -10757,6 +10758,14 @@ class TestWebUserMetadataUpdate(web.Helper):
         data = json.loads(res.data)
         assert str(data) == str(expected_res)
 
+        # ensure deleting last bookmark does not result in error
+        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}/bookmark2"
+        res = self.app.delete(url)
+
+        expected_res = {}
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert str(data) == str(expected_res)
 
     @with_context
     def test_delete_taskbrowse_bookmarks_invalid_bookmark_name(self):
@@ -10781,6 +10790,38 @@ class TestWebUserMetadataUpdate(web.Helper):
         url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}/thisbookmarkdoesnotexist"
         res = self.app.delete(url)
         assert res.status_code == 400, res.status_code
+
+
+    @with_context
+    def test_get_taskbrowse_bookmarks_user_errors(self):
+        """Test create and retrive taskbrowse bookmarks"""
+        data = self.original
+        target_project = "project1"
+
+        url1 = "https://gigwork.net/project/testproject66/tasks/browse"
+        name1 = "bookmark1"
+
+        user1 = UserFactory.create(name="user1")
+        user2 = UserFactory.create(name="user2")
+
+        self.signin_user(user1)
+        # try to access another user's bookmarks
+        url = f"/account/{user2.name}/taskbrowse_bookmarks/{target_project}"
+
+        res = self.app.post(url, data={"name":name1, "url":url1})
+        assert res.status_code == 403, res.status_code
+        res = self.app.delete(f"{url}/bookmark_name")
+        assert res.status_code == 403, res.status_code
+
+        # try to access bookmarks of a user that does not exist
+        url = f"/account/somefakeuser/taskbrowse_bookmarks/{target_project}"
+
+        res = self.app.post(url, data={"name":name1, "url":url1})
+        assert res.status_code == 404, res.status_code
+        res = self.app.delete(f"{url}/bookmark_name")
+        assert res.status_code == 404, res.status_code
+
+
 
 
 class TestWebQuizModeUpdate(web.Helper):

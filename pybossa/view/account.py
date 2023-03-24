@@ -1156,6 +1156,11 @@ def add_metadata(name):
 @login_required
 def taskbrowse_bookmarks(user_name, short_name):
     user = user_repo.get_by_name(name=user_name)
+    if user is None:
+        return abort(404)
+    if current_user.name != user_name:
+        return abort(403)
+
     all_bookmarks = user.info.get('taskbrowse_bookmarks', {})
     proj_bookmarks = all_bookmarks.get(short_name, {})
     # get all bookmarks for project
@@ -1163,9 +1168,6 @@ def taskbrowse_bookmarks(user_name, short_name):
         return jsonify(proj_bookmarks)
     # add a bookmark
     if request.method == 'POST':
-        (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
-        if not can_update:
-            abort(403)
         url = request.body.get('url', None)
         name = request.body.get('name', None)
         if name is None or len(name) > 100 or \
@@ -1182,13 +1184,13 @@ def taskbrowse_bookmarks(user_name, short_name):
 @login_required
 def delete_taskbrowse_bookmarks(user_name, short_name, bookmark_name):
     user = user_repo.get_by_name(name=user_name)
-    #del user.info['taskbrowse_bookmarks']
-    #user_repo.update(user)
+    if user is None:
+        return abort(404)
+    if current_user.name != user_name:
+        return abort(403)
+
     all_bookmarks = user.info.get('taskbrowse_bookmarks', {})
     proj_bookmarks = all_bookmarks.get(short_name, {})
-    (can_update, disabled_fields, hidden_fields) = can_update_user_info(current_user, user)
-    if not can_update:
-        abort(403)
     if bookmark_name not in proj_bookmarks:
         abort(400)
     del proj_bookmarks[bookmark_name]
