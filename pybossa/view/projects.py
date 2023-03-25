@@ -58,7 +58,8 @@ from pybossa.util import (Pagination, admin_required, get_user_id_or_ip, rank,
                           check_annex_response,
                           process_annex_load, process_tp_components,
                           process_table_component, PARTIAL_ANSWER_POSITION_KEY,
-                          SavedTaskPositionEnum)
+                          SavedTaskPositionEnum, delete_redis_keys,
+                          PARTIAL_ANSWER_PREFIX, PARTIAL_ANSWER_KEY)
 from pybossa.auth import ensure_authorized_to
 from pybossa.cache import projects as cached_projects, ONE_DAY
 from pybossa.cache import users as cached_users
@@ -1701,7 +1702,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                                                 current_user_profile=user_profile,
                                                 reserve_filter=reserve_task_filter)
             args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
-            args["display_columns"] = ['task_id', 'priority', 'created']
+            args["display_columns"] = ['task_id', 'priority', 'created', 'in_progress']
             args["view"] = view_type
             args["regular_user"] = regular_user
             # default page size for worker view is 100
@@ -2133,6 +2134,11 @@ def delete_selected_tasks(short_name):
         if task_ids:
             for task_id in task_ids:
                 task_repo.delete_task_by_id(project.id, task_id)
+                # delete saved tasks in the project for all users in Redis
+                pattern = PARTIAL_ANSWER_KEY.format(project_id=project.id,
+                                                    user_id='*',
+                                                    task_id=task_id)
+                delete_redis_keys(sentinel=sentinel, pattern=pattern)
             new_value = json.dumps({
                 'task_ids': task_ids,
             })
@@ -2199,6 +2205,10 @@ def delete_tasks(short_name):
         # reset cache / memoized
         delete_memoized(get_searchable_columns)
         delete_memoized(n_available_tasks_for_user)
+
+        # delete all user saved tasks for the project in Redis
+        pattern = PARTIAL_ANSWER_PREFIX.format(project_id=project.id, user_id='*')
+        delete_redis_keys(sentinel=sentinel, pattern=pattern)
 
         force_reset = request.form.get("force_reset") == 'true'
         if ps.n_tasks <= MAX_NUM_SYNCHRONOUS_TASKS_DELETE:

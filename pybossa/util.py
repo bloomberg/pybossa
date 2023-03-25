@@ -60,9 +60,9 @@ misaka = Misaka()
 TP_COMPONENT_TAGS = ["text-input", "dropdown-input", "radio-group-input",
                      "checkbox-input", "multi-select-input", "input-text-area"]
 
-PARTIAL_ANSWER_KEY = "partial_answer:project:{project_id}:user:{user_id}:task:{task_id}"
-PARTIAL_ANSWER_TASKS = "partial_answer:project:{project_id}:user:{user_id}:tasks"
-PARTIAL_ANSWER_POSITION_KEY = "partial_answer:project:{project_id}:user:{user_id}:position"
+PARTIAL_ANSWER_PREFIX = "partial_answer:project:{project_id}:user:{user_id}"
+PARTIAL_ANSWER_KEY = PARTIAL_ANSWER_PREFIX + ":task:{task_id}"
+PARTIAL_ANSWER_POSITION_KEY = PARTIAL_ANSWER_PREFIX + ":position"
 
 class SavedTaskPositionEnum(str, Enum):
     FIRST = "first"
@@ -1368,26 +1368,43 @@ def extract_task_info_data(task, task_info_str):
         request_fields = request_fields.get(attribute, {})
     return json.dumps(request_fields)
 
-
-def get_user_saved_partial_tasks(sentinel, project_id, user_id):
+def get_user_saved_partial_tasks(sentinel, project_id, user_id, task_repo=None):
     """
-    Get the user saved task id list from Redis sorted set
+    Get the user saved task id list from Redis keys;
+    When "task_repo" is passed, it will do a cleanup of keys if tasks
+    have been deleted
     """
-    partial_answer_tasks = PARTIAL_ANSWER_TASKS.format(project_id=project_id,
-                                                       user_id=user_id)
-    now_timestamp = int(time.time())
-    task_ids = sentinel.master.zrangebyscore(partial_answer_tasks,
-                                             min=now_timestamp,
-                                             max=float('inf'),
-                                             withscores=True)
+    pattern = PARTIAL_ANSWER_KEY.format(project_id=project_id,
+                                        user_id=user_id,
+                                        task_id="*")
+    batch_size = 10000
+    keys = list(sentinel.slave.scan_iter(match=pattern, count=batch_size))
 
     result = dict()
-    for task_id_str, score in task_ids:
+    for k in keys:
         try:
-            task_id = int(task_id_str.decode('utf-8'))
-            ttl = int(score)
-            result[task_id] = ttl
+            k = k.decode('utf-8')
+            task_id = int(k.split(':')[-1])
+            ttl = sentinel.slave.ttl(k)
+            if task_repo:
+                task = task_repo.get_task(task_id)
+                if task:
+                    result[task_id] = ttl
+                else: # task is deleted, do a cleanup
+                    sentinel.master.delete(k)
+            else:
+                result[task_id] = ttl
         except Exception as e:
-            current_app.logger.error('parsing get_user_saved_partial_tasks error: {}'.format(str(e)))
-
+            error_msg = 'Parsing get_user_saved_partial_tasks error: {}'
+            current_app.logger.error(error_msg.format(str(e)))
     return result
+
+def delete_redis_keys(sentinel, pattern):
+    """
+    Delete keys in Redis per pattern passed
+    """
+    batch_size = 10000
+    keys_to_delete = list(sentinel.slave.scan_iter(match=pattern, count=batch_size))
+    if not keys_to_delete:
+        return False
+    return bool(sentinel.master.delete(*keys_to_delete))

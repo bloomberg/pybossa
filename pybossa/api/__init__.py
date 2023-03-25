@@ -39,7 +39,7 @@ from datetime import datetime, timedelta
 from werkzeug.exceptions import NotFound
 from pybossa.util import jsonpify, get_user_id_or_ip, fuzzyboolean, \
     PARTIAL_ANSWER_KEY, SavedTaskPositionEnum, PARTIAL_ANSWER_POSITION_KEY, \
-    PARTIAL_ANSWER_TASKS, get_user_saved_partial_tasks
+    get_user_saved_partial_tasks
 from pybossa.util import get_disqus_sso_payload, grant_access_with_api_key
 import dateutil.parser
 import pybossa.model as model
@@ -813,25 +813,15 @@ def partial_answer(task_id=None, short_name=None):
         partial_answer_key = PARTIAL_ANSWER_KEY.format(project_id=project_id,
                                                        user_id=current_user.id,
                                                        task_id=task_id)
-        partial_answer_tasks = PARTIAL_ANSWER_TASKS.format(project_id=project_id,
-                                                           user_id=current_user.id)
-        now_timestamp = int(time())
         if request.method == 'POST':
             ttl = ONE_MONTH
             answer = json.dumps(request.json)
             sentinel.master.setex(partial_answer_key, ttl, answer)
-            # The sorted set is to keep all user saved tasks
-            sentinel.master.zadd(partial_answer_tasks, {task_id: now_timestamp + ttl})
         elif request.method == 'GET':
             data = sentinel.master.get(partial_answer_key)
             response['data'] = json.loads(data.decode('utf-8')) if data else ''
         elif request.method == 'DELETE':
             sentinel.master.delete(partial_answer_key)
-            # Remove the corresponding task ID from the sorted set
-            sentinel.master.zrem(partial_answer_tasks, task_id)
-
-        # Clean up expired tasks in the sorted set
-        sentinel.master.zremrangebyscore(partial_answer_tasks, min=float('-inf'), max=now_timestamp)
     except Exception as e:
         return error.format_exception(e, target='partial_answer', action=request.method)
     return Response(json.dumps(response), status=200, mimetype="application/json")
@@ -849,6 +839,6 @@ def user_has_partial_answer(short_name=None):
         return abort(401)
 
     project_id = project_name_to_oid(short_name)
-    task_id_map = get_user_saved_partial_tasks(sentinel, project_id, current_user.id)
+    task_id_map = get_user_saved_partial_tasks(sentinel, project_id, current_user.id, task_repo)
     response = {"has_answer": bool(task_id_map)}
     return Response(json.dumps(response), status=200, mimetype="application/json")

@@ -206,7 +206,8 @@ allowed_fields = {
     'filter_by_field': 'filter_by_field',
     'lock_status': 'lock_status',
     'completed_by': 'completed_by',
-    'assigned_users': 'assigned_users'
+    'assigned_users': 'assigned_users',
+    'in_progress': 'in_progress'
 }
 
 
@@ -297,6 +298,13 @@ def parse_tasks_browse_args(args):
             parsed_args['gold_task'] = gold_task
         else:
             raise ValueError('invalid gold value')
+
+    in_progress = args.get('in_progress')
+    if in_progress and in_progress != 'All':
+        if in_progress in ['Yes', 'No']:
+            parsed_args['in_progress'] = in_progress
+        else:
+            raise ValueError('invalid in progress value')
 
     return parsed_args
 
