@@ -10817,11 +10817,9 @@ class TestWebUserMetadataUpdate(web.Helper):
         url = f"/account/somefakeuser/taskbrowse_bookmarks/{target_project}"
 
         res = self.app.post(url, data={"name":name1, "url":url1})
-        assert res.status_code == 404, res.status_code
+        assert res.status_code == 403, res.status_code
         res = self.app.delete(f"{url}/bookmark_name")
-        assert res.status_code == 404, res.status_code
-
-
+        assert res.status_code == 403, res.status_code
 
 
 class TestWebQuizModeUpdate(web.Helper):

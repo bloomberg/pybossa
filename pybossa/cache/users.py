@@ -350,6 +350,22 @@ def delete_user_pref_metadata(user):
     delete_memoized(get_user_by_id, user.id)
 
 
+@memoize(timeout=timeouts.get('APP_TIMEOUT'))
+def get_taskbrowse_bookmarks(name):
+    sql = text("""
+    SELECT info->'taskbrowse_bookmarks' FROM "user" WHERE name=:name;
+    """)
+    cursor = session.execute(sql, dict(name=name))
+    row = cursor.fetchone()
+    taskbrowse_bookmarks = row[0] or {}
+    return taskbrowse_bookmarks
+
+
+def delete_taskbrowse_bookmarks(user):
+    delete_memoized(get_taskbrowse_bookmarks, user.name)
+    delete_memoized(get_user_by_id, user.id)
+
+
 def get_user_preferences(user_id):
     user = get_user_by_id(user_id)
     user_pref = user.user_pref or {} if user else {}

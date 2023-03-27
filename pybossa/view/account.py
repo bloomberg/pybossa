@@ -1155,19 +1155,18 @@ def add_metadata(name):
 @blueprint.route('/<user_name>/taskbrowse_bookmarks/<short_name>', methods=['GET', 'POST'])
 @login_required
 def taskbrowse_bookmarks(user_name, short_name):
-    user = user_repo.get_by_name(name=user_name)
-    if user is None:
-        return abort(404)
     if current_user.name != user_name:
         return abort(403)
 
-    taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
+    taskbrowse_bookmarks = cached_users.get_taskbrowse_bookmarks(user_name)
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
+
     # get all bookmarks for project
     if request.method == 'GET':
         return jsonify(proj_bookmarks)
     # add a bookmark
     if request.method == 'POST':
+        user = user_repo.get_by_name(name=user_name)
         MAX_BOOKMARK_NAME_LEN = 100
         MAX_BOOKMARK_URL_LEN = 500
 
@@ -1187,6 +1186,7 @@ def taskbrowse_bookmarks(user_name, short_name):
         taskbrowse_bookmarks[short_name] = proj_bookmarks
         user.info['taskbrowse_bookmarks'] = taskbrowse_bookmarks
         user_repo.update(user)
+        cached_users.delete_taskbrowse_bookmarks(user)
         return Response(json.dumps(proj_bookmarks), 200, mimetype='application/json')
 
 
@@ -1194,8 +1194,6 @@ def taskbrowse_bookmarks(user_name, short_name):
 @login_required
 def delete_taskbrowse_bookmarks(user_name, short_name, bookmark_name):
     user = user_repo.get_by_name(name=user_name)
-    if user is None:
-        return abort(404)
     if current_user.name != user_name:
         return abort(403)
 
@@ -1214,6 +1212,7 @@ def delete_taskbrowse_bookmarks(user_name, short_name, bookmark_name):
 
     user.info['taskbrowse_bookmarks'] = taskbrowse_bookmarks
     user_repo.update(user)
+    cached_users.delete_taskbrowse_bookmarks(user)
     return Response(json.dumps(proj_bookmarks), 200, mimetype='application/json')
 
 
