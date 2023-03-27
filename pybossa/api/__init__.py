@@ -814,6 +814,11 @@ def partial_answer(task_id=None, short_name=None):
                                                        user_id=current_user.id,
                                                        task_id=task_id)
         if request.method == 'POST':
+            task_id_map = get_user_saved_partial_tasks(sentinel, project_id, current_user.id, task_repo)
+            max_saved_answers = current_app.config.get('MAX_SAVED_ANSWERS', 30)
+            if len(task_id_map) >= max_saved_answers:
+                return abort(400, f"Saved Tasks Limit Reached. Task Saved to Browser Only.")
+
             ttl = ONE_MONTH
             answer = json.dumps(request.json)
             sentinel.master.setex(partial_answer_key, ttl, answer)
