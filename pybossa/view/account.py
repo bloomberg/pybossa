@@ -1158,15 +1158,17 @@ def taskbrowse_bookmarks(user_name, short_name):
     if current_user.name != user_name:
         return abort(403)
 
-    taskbrowse_bookmarks = cached_users.get_taskbrowse_bookmarks(user_name)
-    proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
-
     # get all bookmarks for project
     if request.method == 'GET':
+        taskbrowse_bookmarks = cached_users.get_taskbrowse_bookmarks(user_name)
+        proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
         return jsonify(proj_bookmarks)
     # add a bookmark
     if request.method == 'POST':
         user = user_repo.get_by_name(name=user_name)
+        taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
+        proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
+
         MAX_BOOKMARK_NAME_LEN = 100
         MAX_BOOKMARK_URL_LEN = 500
 
