@@ -1176,11 +1176,11 @@ def taskbrowse_bookmarks(user_name, short_name):
 
         if name is None or len(name) > MAX_BOOKMARK_NAME_LEN:
             error = f'Bookmark name must be between 1-{MAX_BOOKMARK_NAME_LEN} characters.'
-            current_app.logger.exception(f'Bad request: {error},  project: {short_name}, name:{name}')
+            current_app.logger.exception(f'Bad request: {error},  project: {short_name}, bookmark_name:{name}')
             return Response(json.dumps({"description": error}), 400, mimetype='application/json')
         if url is None or len(url) > MAX_BOOKMARK_URL_LEN:
             error = 'Bookmark URL must be between 1-100 characters.'
-            current_app.logger.exception(f'Bad request: {error}, project: {short_name}, url:{url}')
+            current_app.logger.exception(f'Bad request: {error}, project: {short_name}, bookmark_url:{url}')
             return Response(json.dumps({"description": error}), 400, mimetype='application/json')
 
         proj_bookmarks[name] =  url
@@ -1202,7 +1202,7 @@ def delete_taskbrowse_bookmarks(user_name, short_name, bookmark_name):
     taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
     if bookmark_name not in proj_bookmarks:
-        current_app.logger.exception(f'Bookmark not found. project: {short_name}, bookmark: {bookmark_name}')
+        current_app.logger.exception(f'Bookmark not found. project: {short_name}, bookmark_name: {bookmark_name}')
         return Response(json.dumps({"description":"Bookmark not found."}), 400, mimetype='application/json')
     del proj_bookmarks[bookmark_name]
 
