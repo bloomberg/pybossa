@@ -76,6 +76,8 @@ mail_queue = Queue('email', connection=sentinel.master)
 export_queue = Queue('high', connection=sentinel.master)
 super_queue = Queue('super', connection=sentinel.master)
 
+MAX_BOOKMARK_NAME_LEN = 100
+MAX_BOOKMARK_URL_LEN = 500
 
 @blueprint.route('/')
 @blueprint.route('/page/<int:page>')
@@ -1168,9 +1170,6 @@ def taskbrowse_bookmarks(user_name, short_name):
         user = user_repo.get_by_name(name=user_name)
         taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
         proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
-
-        MAX_BOOKMARK_NAME_LEN = 100
-        MAX_BOOKMARK_URL_LEN = 500
 
         url = request.body.get('url', None)
         name = request.body.get('name', None)
