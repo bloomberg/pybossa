@@ -10678,13 +10678,13 @@ class TestWebUserMetadataUpdate(web.Helper):
         url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}"
 
         # test first time insertion
-        res = self.app.post(url, data={"name":name1, "url":url1})
+        res = self.app.post(url, json={"name":name1, "url":url1})
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
         assert str(data) == str({name1:url1})
 
         # test if new url is appended correctly
-        res = self.app.post(url, data={"name":name2, "url":url2})
+        res = self.app.post(url, json={"name":name2, "url":url2})
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
         assert str(data) == str({name1:url1, name2:url2})
@@ -10697,7 +10697,7 @@ class TestWebUserMetadataUpdate(web.Helper):
 
         # test adding bookmark for a different project
         new_url = f"/account/{user.name}/taskbrowse_bookmarks/project2"
-        res = self.app.post(new_url, data={"name":name2, "url":url2})
+        res = self.app.post(new_url, json={"name":name2, "url":url2})
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
         assert str(data) == str({name2:url2})
@@ -10722,12 +10722,13 @@ class TestWebUserMetadataUpdate(web.Helper):
         url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}"
 
         # test no name
-        res = self.app.post(url, data={"url":url1})
+        res = self.app.post(url, json={"url":url1})
         assert res.status_code == 400, res.status_code
 
         # test no url
-        res = self.app.post(url, data={"name":name1})
+        res = self.app.post(url, json={"name":name1})
         assert res.status_code == 400, res.status_code
+
 
     @with_context
     def test_delete_taskbrowse_bookmarks(self):
@@ -10750,8 +10751,9 @@ class TestWebUserMetadataUpdate(web.Helper):
 
         user = UserFactory.create(info=info)
         self.signin_user(user)
-        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}/bookmark1"
-        res = self.app.delete(url)
+        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}"
+        data = {"name": "bookmark1"}
+        res = self.app.delete(url, json=data)
 
         expected_res = {"bookmark2" : "https://gigwork.net/project/testproject66/tasks/browse"}
         assert res.status_code == 200, res.status_code
@@ -10759,8 +10761,9 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert str(data) == str(expected_res)
 
         # ensure deleting last bookmark does not result in error
-        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}/bookmark2"
-        res = self.app.delete(url)
+        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}"
+        data = {"name" : "bookmark2"}
+        res = self.app.delete(url, json=data)
 
         expected_res = {}
         assert res.status_code == 200, res.status_code
@@ -10787,14 +10790,15 @@ class TestWebUserMetadataUpdate(web.Helper):
             }
         user = UserFactory.create(info=info)
         self.signin_user(user)
-        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}/thisbookmarkdoesnotexist"
-        res = self.app.delete(url)
+        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}"
+        data = {"name": "thisbookmarkdoesnotexist"}
+        res = self.app.delete(url, json=data)
         assert res.status_code == 400, res.status_code
 
 
     @with_context
     def test_get_taskbrowse_bookmarks_user_errors(self):
-        """Test create and retrive taskbrowse bookmarks"""
+        """Test retrive taskbrowse bookmarks returns errors"""
         data = self.original
         target_project = "project1"
 
@@ -10809,17 +10813,17 @@ class TestWebUserMetadataUpdate(web.Helper):
         url = f"/account/{user2.name}/taskbrowse_bookmarks/{target_project}"
 
         res = self.app.post(url, data={"name":name1, "url":url1})
-        assert res.status_code == 403, res.status_code
-        res = self.app.delete(f"{url}/bookmark_name")
-        assert res.status_code == 403, res.status_code
+        assert res.status_code == 404, res.status_code
+        res = self.app.delete(url, data={"name":name1})
+        assert res.status_code == 404, res.status_code
 
         # try to access bookmarks of a user that does not exist
         url = f"/account/somefakeuser/taskbrowse_bookmarks/{target_project}"
 
         res = self.app.post(url, data={"name":name1, "url":url1})
-        assert res.status_code == 403, res.status_code
-        res = self.app.delete(f"{url}/bookmark_name")
-        assert res.status_code == 403, res.status_code
+        assert res.status_code == 404, res.status_code
+        res = self.app.delete(url, data={"name":name1})
+        assert res.status_code == 404, res.status_code
 
 
 class TestWebQuizModeUpdate(web.Helper):
