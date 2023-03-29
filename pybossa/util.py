@@ -1381,25 +1381,26 @@ def get_user_saved_partial_tasks(sentinel, project_id, user_id, task_repo=None):
     keys = list(sentinel.slave.scan_iter(match=pattern, count=batch_size))
 
     result = dict()
+    redis_key_map = dict()
     for k in keys:
         try:
             k = k.decode('utf-8')
             task_id = int(k.split(':')[-1])
             ttl = sentinel.slave.ttl(k)
-            if task_repo:
-                # Query DB by primary key. At most the number of saved tasks
-                # permitted by the configuration (currently 30). In case
-                # performance is a consideration here, bulk query can be implemented
-                task = task_repo.get_task(task_id)
-                if task:
-                    result[task_id] = ttl
-                else: # task is deleted, do a cleanup
-                    sentinel.master.delete(k)
-            else:
-                result[task_id] = ttl
+            result[task_id] = ttl
+            redis_key_map[task_id] = k
         except Exception as e:
             error_msg = 'Parsing get_user_saved_partial_tasks error: {}'
             current_app.logger.error(error_msg.format(str(e)))
+
+    # Filter existing tasks
+    if task_repo:
+        task_ids = task_repo.bulk_query(list(result.keys()), return_only_task_id=True)
+        result = {task_id : ttl for task_id, ttl in result.items() if task_id in task_ids}
+        for task_id, k in redis_key_map.items():
+            if task_id not in task_ids:
+                sentinel.master.delete(k)
+
     return result
 
 def delete_redis_keys(sentinel, pattern):

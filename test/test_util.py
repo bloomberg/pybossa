@@ -1335,18 +1335,21 @@ class TestPybossaUtil(Test):
                                         b'partial_answer:project:1:user:1:task:3',
                                         b'partial_answer:project:1:user:1:task:NAN']
         slave.ttl.return_value = 111111
-        task_repo.get_task.return_value = True
-
         project_id = 1
         user_id = 1
 
         result = util.get_user_saved_partial_tasks(sentinel, project_id, user_id)
         assert result == {1: 111111, 2: 111111, 3: 111111}
 
+        task_repo.bulk_query.return_value = [1, 2, 3]
         result = util.get_user_saved_partial_tasks(sentinel, project_id, user_id, task_repo)
         assert result == {1: 111111, 2: 111111, 3: 111111}
 
-        task_repo.get_task.return_value = False
+        task_repo.bulk_query.return_value = [1, 2]
+        result = util.get_user_saved_partial_tasks(sentinel, project_id, user_id, task_repo)
+        assert result == {1: 111111, 2: 111111}
+
+        task_repo.bulk_query.return_value = [4, 5, 6]
         result = util.get_user_saved_partial_tasks(sentinel, project_id, user_id, task_repo)
         assert result == {}
 
