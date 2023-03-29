@@ -1205,7 +1205,7 @@ def taskbrowse_bookmarks(user_name, short_name):
     if current_user.name != user_name:
         return abort(404)
 
-    # get all bookmarks for project from cache
+    # get bookmarks for project from cache
     if request.method == 'GET':
         res_bookmarks = _get_bookmarks(user_name, short_name)
 
