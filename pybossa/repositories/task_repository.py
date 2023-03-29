@@ -567,5 +567,13 @@ class TaskRepository(Repository):
         cached_projects.clean_project(project_id)
 
 
-
-
+    def bulk_query(self, task_ids, return_only_task_id=False):
+        """
+        bulk query task based on the task id list
+        """
+        if return_only_task_id:
+            tasks = self.db.session.query(Task).with_entities(Task.id).filter(Task.id.in_(task_ids)).all()
+            tasks = [t[0] for t in tasks]
+        else:
+            tasks = self.db.session.query(Task).filter(Task.id.in_(task_ids)).all()
+        return tasks

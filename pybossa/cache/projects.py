@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Cache module for projects."""
+import re
 import sys
 
 from sqlalchemy.sql import text
@@ -77,7 +78,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         if date is not None:
             return convert_utc_to_est(date).strftime('%m-%d-%y %H:%M')
 
-    def format_task(row, lock_users=[]):
+    def format_task(row, lock_users=[], in_progress=False):
         """convert database record to task dictionary and format data."""
         user_pref = row.user_pref or {}
         task = dict(id=row.id, n_task_runs=row.n_task_runs,
@@ -87,7 +88,8 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     userPrefLang=", ".join(user_pref.get("languages", [])),
                     userPrefLoc=", ".join(user_pref.get("locations", [])),
                     lock_users=lock_users,
-                    available=False)
+                    available=False,
+                    in_progress="Yes" if in_progress else "No")
         task['pct_status'] = _pct_status(row.n_task_runs, row.n_answers)
         if args and "display_columns" in args and "assigned_users" in args["display_columns"] and row.user_pref:
             task["assigned_users"] = row.user_pref.get("assign_user", [])
@@ -193,6 +195,18 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         params["assign_user"] = args["sql_params"]["assign_user"]
 
         order_by =  args.get('order_by') or "priority_0 DESC"
+
+        # in_progress in not a column in DB. We need to remove it (it could appear
+        # in the beginning, middle or the end of "order_by") so that the DB
+        # execution is not affected. The actual sorting happens when the data is
+        # retrieved from the DB - select_available_tasks function
+        if 'in_progress' in order_by:
+            if args.get('order_by') == 'in_progress asc' or args.get('order_by') == 'in_progress desc':
+                order_by = "priority_0 DESC"  # Use priority as default if no other sorting appears
+            else:  # multiple conditions - need remove clause "in_progress asc"
+                order_by = re.sub(r"(in_progress (desc|asc)\,?\s*)", "", order_by)
+                order_by = order_by.rstrip().rstrip(',')
+
         order_by = order_by.replace("assigned_users", "task.user_pref->>'assign_user'")
         sql_order = f" ORDER BY {order_by} "
 
@@ -216,8 +230,10 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
         for row in all_available_tasks:
             score = 0
 
+            has_saved_answer = False
             if task_id_map and row.id in task_id_map:
                 score = sys.maxsize - task_id_map.get(row.id)  # earliest timestamp first
+                has_saved_answer = True
             else:
                 w_pref = row.worker_pref or {}
                 w_filter = row.worker_filter or {}
@@ -228,7 +244,12 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                     # if there is no sort defined, sort task by preference scores
                     score = get_task_preference_score(w_pref, user_profile)
 
-            task = format_task(row)
+            task = format_task(row, in_progress=has_saved_answer)
+
+            # filtering in_progress in tasks. Possible values 'Yes', 'No' or None
+            if args.get('in_progress') not in [None, task.get('in_progress')]:
+                continue
+
             task_rank_info.append((task, score))
 
         # get a list of available tasks for current worker
@@ -310,6 +331,10 @@ def select_available_tasks(task_rank_info, locked_tasks, user_id, num_tasks_need
         if t["id"] in eligible_tasks and (str(user_id) in locked_users or len(locked_users) < remaining):
             t["available"] = True
         result.append(t)
+
+    # Sort in_progress column in the task list page
+    if sort_by and "in_progress" in sort_by:
+        result.sort(key=lambda d: d.get('in_progress', ''), reverse=sort_by!="in_progress asc")
 
     return result
 

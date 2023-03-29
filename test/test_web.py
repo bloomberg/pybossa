@@ -10526,6 +10526,29 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert resp.status_code == 400
 
     @with_context
+    @patch('pybossa.api.get_user_saved_partial_tasks')
+    def test_partial_answer_exceeds_the_limit(self, task_id_map_mock):
+        """Test partial answer exceeds the limit """
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+        self.signin_user(user)
+        project = ProjectFactory.create(
+            info={
+                'sched': 'user_pref_scheduler',
+                'timeout': 60 * 60,
+                'data_classification': dict(input_data="L4 - public",
+                                            output_data="L4 - public")
+            },
+            owner=user
+        )
+
+        task_id_map_mock.return_value = {123: 1002, 456: 1004}
+
+        url = f"/api/project/{project.short_name}/task/123/partial_answer"
+        data = {"my_answer": {"k1: ": "test", "k2": [1, 2, "abc"]}}
+        resp = self.app_post_json(url, data=data, follow_redirects=False)
+        assert resp.status_code == 400
+
+    @with_context
     def test_partial_answer(self):
         """Test partial answer API """
         user = UserFactory.create(email_addr='a@a.com', fullname="test_user")

@@ -41,6 +41,9 @@ from unittest.mock import Mock
 from werkzeug.exceptions import Forbidden
 from pybossa.util import admin_or_project_owner
 
+from pybossa.sentinel import Sentinel
+import pybossa.settings_test as settings_test
+
 
 def myjsonify(data):
     return data
@@ -49,6 +52,21 @@ def myjsonify(data):
 def myrender(template, **data):
     return template, data
 
+class FakeApp(object):
+    def __init__(self):
+        pwd = getattr(settings_test, 'REDIS_PWD', None)
+        if all(hasattr(settings_test, attr) for attr in
+            ['REDIS_MASTER_DNS', 'REDIS_SLAVE_DNS', 'REDIS_PORT']):
+            self.config = dict(REDIS_MASTER_DNS=settings_test.REDIS_MASTER_DNS,
+                REDIS_SLAVE_DNS=settings_test.REDIS_SLAVE_DNS,
+                REDIS_PORT=settings_test.REDIS_PORT,
+                REDIS_PWD=pwd)
+        else:
+            self.config = { 'REDIS_SENTINEL': settings_test.REDIS_SENTINEL,
+                'REDIS_PWD': pwd }
+
+
+test_sentinel = Sentinel(app=FakeApp())
 
 class TestPybossaUtil(Test):
 
@@ -1307,14 +1325,50 @@ class TestPybossaUtil(Test):
     def test_get_user_saved_partial_tasks(self):
         sentinel = MagicMock()
         master = MagicMock()
-        sentinel.master = master
-        master.zrangebyscore.return_value = [(b'000','not a number' ), (b'123', 666666.0), (b'456', 777777.1)]
+        slave = MagicMock()
+        task_repo = MagicMock()
 
+        sentinel.master = master
+        sentinel.slave = slave
+        slave.scan_iter.return_value = [b'partial_answer:project:1:user:1:task:1',
+                                        b'partial_answer:project:1:user:1:task:2',
+                                        b'partial_answer:project:1:user:1:task:3',
+                                        b'partial_answer:project:1:user:1:task:NAN']
+        slave.ttl.return_value = 111111
         project_id = 1
         user_id = 1
-        result = util.get_user_saved_partial_tasks(sentinel, project_id, user_id)
 
-        assert result == {123: 666666, 456: 777777}
+        result = util.get_user_saved_partial_tasks(sentinel, project_id, user_id)
+        assert result == {1: 111111, 2: 111111, 3: 111111}
+
+        task_repo.bulk_query.return_value = [1, 2, 3]
+        result = util.get_user_saved_partial_tasks(sentinel, project_id, user_id, task_repo)
+        assert result == {1: 111111, 2: 111111, 3: 111111}
+
+        task_repo.bulk_query.return_value = [1, 2]
+        result = util.get_user_saved_partial_tasks(sentinel, project_id, user_id, task_repo)
+        assert result == {1: 111111, 2: 111111}
+
+        task_repo.bulk_query.return_value = [4, 5, 6]
+        result = util.get_user_saved_partial_tasks(sentinel, project_id, user_id, task_repo)
+        assert result == {}
+
+    @with_request_context
+    def test_delete_redis_keys(self):
+        test_sentinel.master.set("test:partial_keys_project:1:user:1", "abc")
+        test_sentinel.master.set("test:partial_keys_project:1:user:2", "zzz")
+        test_sentinel.master.zadd("test:partial_keys_project:1:user1:tasks", {101: 11111})
+        test_sentinel.master.zadd("test:partial_keys_project:1:user1:tasks", {102: 22222})
+
+        bad_pattern = "bad_test:partial_keys_project:1*"
+        result = util.delete_redis_keys(test_sentinel, bad_pattern)
+        assert result == False
+
+        pattern = "test:partial_keys_project:1*"
+        assert len(list(test_sentinel.slave.keys(pattern))) == 3
+        result = util.delete_redis_keys(test_sentinel, pattern)
+        assert result == True
+        assert len(list(test_sentinel.slave.keys(pattern))) == 0
 
 
 class TestIsReservedName(object):

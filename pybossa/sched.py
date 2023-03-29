@@ -310,7 +310,7 @@ def locked_scheduler(query_factory):
                 )
                 current_app.logger.info("SQL filter excuding task categories reserved by other users. sql filter %s", sql_filters)
 
-        limit = current_app.config.get('DB_MAXIMUM_BATCH_SIZE') if filter_user_prefs else user_count + 5
+        limit = current_app.config.get('DB_MAXIMUM_BATCH_SIZE') if filter_user_prefs else user_count + 5 + current_app.config.get('MAX_SAVED_ANSWERS', 30)
         sql = query_factory(project_id, user_id=user_id, limit=limit,
                             rand_within_priority=rand_within_priority,
                             task_type=task_type, task_category_filters=sql_filters)

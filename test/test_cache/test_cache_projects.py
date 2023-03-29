@@ -478,11 +478,93 @@ class TestProjectsCache(Test):
         args = dict(filter_by_wfilter_upref={"current_user_pref": {},
                                              "current_user_email": "user@user.com",
                                              "current_user_profile": user_profile},
-                    sql_params=dict(assign_user=json.dumps(
-                        {'assign_user': ["user@user.com"]})))
+                    sql_params=dict(assign_user=json.dumps({'assign_user': ["user@user.com"]})))
         count, cached_tasks = cached_projects.browse_tasks(project.id, args, filter_user_prefs=True)
         assert count == 2
         assert cached_tasks[0]["id"] == tasks[1].id
+
+
+    @with_context
+    @patch('pybossa.cache.projects.get_user_saved_partial_tasks')
+    def test_browse_tasks_sort_by_in_progress(self, task_id_map_mock):
+        """
+        Test CACHE PROJECTS browse_tasks returns tasks sorted by in
+        progress values("Yes", "No" and "All")
+        """
+
+        owner = UserFactory.create(id=500)
+        project = ProjectFactory.create(owner=owner, short_name="testproject")
+        tasks = TaskFactory.create_batch(3, project=project, n_answers=2)
+        tasks[2].priority_0 = 1.0
+        task_repo.save(tasks[2])
+
+        task_id_map_mock.return_value = None
+
+        user_profile = {"finance": 0.6}
+        args = dict(filter_by_wfilter_upref={"current_user_pref": {},
+                                             "current_user_email": "user@user.com",
+                                             "current_user_profile": user_profile},
+                    sql_params=dict(assign_user=json.dumps({'assign_user': ["user@user.com"]})))
+
+        args["order_by"] = "in_progress asc"
+        count, cached_tasks = cached_projects.browse_tasks(project.id, args, filter_user_prefs=True)
+        assert count == 3
+        assert cached_tasks[0]["id"] == tasks[2].id # sort by priority - 3rd task first
+
+        args["order_by"] = "in_progress desc"
+        count, cached_tasks = cached_projects.browse_tasks(project.id, args, filter_user_prefs=True)
+        assert count == 3
+        assert cached_tasks[0]["id"] == tasks[2].id  # sort by priority - 3rd task first
+
+        args["order_by"] = "id asc, in_progress desc"
+        count, cached_tasks = cached_projects.browse_tasks(project.id, args, filter_user_prefs=True)
+        assert count == 3
+        assert cached_tasks[0]["id"] == tasks[0].id  # sort by priority - 1st task first
+
+        args["order_by"] = "in_progress desc, id asc"
+        count, cached_tasks = cached_projects.browse_tasks(project.id, args, filter_user_prefs=True)
+        assert count == 3
+        assert cached_tasks[0]["id"] == tasks[0].id  # sort by priority - 1st task first
+
+        args["order_by"] = "id asc, in_progress desc, priority_0 desc"
+        count, cached_tasks = cached_projects.browse_tasks(project.id, args, filter_user_prefs=True)
+        assert count == 3
+        assert cached_tasks[0]["id"] == tasks[0].id  # sort by priority - 1st task first
+
+    @with_context
+    @patch('pybossa.cache.projects.get_user_saved_partial_tasks')
+    def test_browse_tasks_filter_by_in_progress(self, task_id_map_mock):
+        """
+        Test CACHE PROJECTS browse_tasks returns tasks filtered by in
+        progress values("Yes", "No" and "All")
+        """
+
+        owner = UserFactory.create(id=500)
+        project = ProjectFactory.create(owner=owner, short_name="testproject")
+        tasks = TaskFactory.create_batch(5, project=project, n_answers=2)
+
+        task_id_map_mock.return_value = {tasks[2].id: 1002, tasks[4].id: 1004}
+
+        user_profile = {"finance": 0.6}
+        args = dict(filter_by_wfilter_upref={"current_user_pref": {},
+                                             "current_user_email": "user@user.com",
+                                             "current_user_profile": user_profile},
+                    sql_params=dict(assign_user=json.dumps({'assign_user': ["user@user.com"]})))
+
+        # filter the 'Yes' in progress task
+        args["in_progress"] = "Yes"
+        count, cached_tasks = cached_projects.browse_tasks(project.id, args, filter_user_prefs=True)
+        assert count == 2
+        assert cached_tasks[0]["id"] == tasks[2].id
+        assert cached_tasks[1]["id"] == tasks[4].id
+
+        # filter the 'No' in progress task
+        args["in_progress"] = "No"
+        count, cached_tasks = cached_projects.browse_tasks(project.id, args, filter_user_prefs=True)
+        assert count == 3
+        assert cached_tasks[0]["id"] == tasks[0].id
+        assert cached_tasks[1]["id"] == tasks[1].id
+        assert cached_tasks[2]["id"] == tasks[3].id
 
 
     @with_context
@@ -820,11 +902,14 @@ class TestProjectsCache(Test):
 
         assert average_time == expected_average_time.total_seconds(), average_time
 
+    def test_parse_tasks_browse_args_raise_exception(self):
+        """Test parse_tasks_browse_args raise exception"""
+        args = dict(in_progress='Bad')
+        assert_raises(ValueError, parse_tasks_browse_args, args)
+
     @with_context
     def test_task_browse_user_pref_args_no_upref_mdata_config(self):
         """Test task browse user preference without user_pref settings loaded under pybossa.core.upref_mdata_choices"""
-        from pybossa.cache.task_browse_helpers import parse_tasks_browse_args
-
         args = dict(
             task_id=12345, pcomplete_from=0,
             pcomplete_to=50,hide_completed='true',
@@ -834,7 +919,8 @@ class TestProjectsCache(Test):
             ftime_to='2018-01-24T19:49:21.799870',
             priority_from=0, priority_to=0.5,
             display_columns='["task_id", "priority"]',display_info_columns='["co_id"]',
-            filter_by_upref='{"languages": ["English"], "locations": ["Fiji"]}')
+            filter_by_upref='{"languages": ["English"], "locations": ["Fiji"]}',
+            in_progress='Yes')
 
         valid_args = dict(
             task_id=12345,
@@ -848,7 +934,8 @@ class TestProjectsCache(Test):
             priority_from=0.0,
             priority_to=0.5, order_by_dict={},
             display_columns=['task_id', 'priority'], display_info_columns=['co_id'],
-            filter_by_upref={'languages': ['English'], 'locations': ['Fiji']})
+            filter_by_upref={'languages': ['English'], 'locations': ['Fiji']},
+            in_progress='Yes')
 
 
         pargs = parse_tasks_browse_args(args)

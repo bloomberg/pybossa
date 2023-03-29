@@ -348,6 +348,49 @@ class TestTaskRepositoryForTaskQueries(Test):
         assert count == 1, count
 
 
+    @with_context
+    def test_bulk_query_task(self):
+        """Test bulk query task"""
+
+        project = ProjectFactory.create()
+        task_number = 3
+        tasks = TaskFactory.create_batch(task_number, project=project, n_answers=3)
+
+        result = self.task_repo.bulk_query([tasks[0].id])
+        assert len(result) == 1
+        assert result[0].id == tasks[0].id
+
+        result = self.task_repo.bulk_query([tasks[0].id], return_only_task_id=True)
+        assert len(result) == 1
+        assert tasks[0].id in result
+
+        task_ids = [t.id for t in tasks]
+        result = self.task_repo.bulk_query(task_ids)
+        assert len(result) == task_number
+        assert result[0].id == tasks[0].id
+
+        task_ids = [t.id for t in tasks]
+        result = self.task_repo.bulk_query(task_ids, return_only_task_id=True)
+        assert len(result) == task_number
+        assert task_ids == result
+
+        task_ids = [tasks[0].id, 99999, 88888]
+        result = self.task_repo.bulk_query(task_ids)
+        assert len(result) == 1
+        assert result[0].id == tasks[0].id
+
+        task_ids = [tasks[0].id, 99999, 88888]
+        result = self.task_repo.bulk_query(task_ids, return_only_task_id=True)
+        assert len(result) == 1
+        assert tasks[0].id in result
+
+        task_ids = [77777, 99999, 88888]
+        result = self.task_repo.bulk_query(task_ids)
+        assert len(result) == 0
+
+        task_ids = [77777, 99999, 88888]
+        result = self.task_repo.bulk_query(task_ids, return_only_task_id=True)
+        assert len(result) == 0
 
 class TestTaskRepositoryForTaskrunQueries(Test):
 
