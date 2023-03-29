@@ -31,7 +31,7 @@ import json
 from itsdangerous import BadData
 from markdown import markdown
 
-from flask import Blueprint, request, url_for, flash, redirect, abort
+from flask import Blueprint, request, url_for, flash, redirect, abort, Response
 from flask import render_template, current_app
 from flask_login import login_required, login_user, logout_user, \
     current_user
@@ -76,6 +76,8 @@ mail_queue = Queue('email', connection=sentinel.master)
 export_queue = Queue('high', connection=sentinel.master)
 super_queue = Queue('super', connection=sentinel.master)
 
+MAX_BOOKMARK_NAME_LEN = 100
+MAX_BOOKMARK_URL_LEN = 500
 
 @blueprint.route('/')
 @blueprint.route('/page/<int:page>')
@@ -1150,6 +1152,86 @@ def add_metadata(name):
     cached_users.delete_user_pref_metadata(user)
     flash("Input saved successfully", "info")
     return redirect(url_for('account.profile', name=name))
+
+
+def _get_bookmarks(user_name, short_name):
+    taskbrowse_bookmarks = cached_users.get_taskbrowse_bookmarks(user_name)
+    proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
+    return proj_bookmarks
+
+
+def _add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
+    user = user_repo.get_by_name(name=user_name)
+    taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
+    proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
+
+    if bookmark_name is None or len(bookmark_name) > MAX_BOOKMARK_NAME_LEN:
+        raise ValueError(f'Bookmark name must be between 1-{MAX_BOOKMARK_NAME_LEN} characters.')
+    if bookmark_url is None or len(bookmark_url) > MAX_BOOKMARK_URL_LEN:
+        raise ValueError('Bookmark URL must be between 1-100 characters.')
+
+    proj_bookmarks[bookmark_name] =  bookmark_url
+    taskbrowse_bookmarks[short_name] = proj_bookmarks
+    user.info['taskbrowse_bookmarks'] = taskbrowse_bookmarks
+
+    user_repo.update(user)
+    cached_users.delete_taskbrowse_bookmarks(user)
+    return proj_bookmarks
+
+
+def _delete_bookmark(user_name, short_name, bookmark_name):
+    user = user_repo.get_by_name(name=user_name)
+    taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
+    proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
+
+    if bookmark_name not in proj_bookmarks:
+        raise ValueError('Bookmark not found.')
+    del proj_bookmarks[bookmark_name]
+    # if no bookmarks left for this project, delete the mapping entry
+    if len(proj_bookmarks) == 0:
+        del taskbrowse_bookmarks[short_name]
+    else:
+        taskbrowse_bookmarks[short_name] = proj_bookmarks
+
+    user.info['taskbrowse_bookmarks'] = taskbrowse_bookmarks
+    user_repo.update(user)
+    cached_users.delete_taskbrowse_bookmarks(user)
+    return proj_bookmarks
+
+
+@blueprint.route('/<user_name>/taskbrowse_bookmarks/<short_name>', methods=['GET', 'POST', 'DELETE'])
+@login_required
+def taskbrowse_bookmarks(user_name, short_name):
+    if current_user.name != user_name:
+        return abort(404)
+
+    # get bookmarks for project from cache
+    if request.method == 'GET':
+        res_bookmarks = _get_bookmarks(user_name, short_name)
+
+    # add a bookmark
+    elif request.method == 'POST':
+        bookmark_name = request.json.get('name', None)
+        bookmark_url = request.json.get('url', None)
+        try:
+            res_bookmarks = _add_bookmark(user_name, short_name, bookmark_name, bookmark_url)
+        except ValueError as e:
+            error_msg = str(e)
+            current_app.logger.exception(f'Bad request: {error_msg},  project: {short_name}, bookmark_name:{bookmark_name}')
+            return jsonify({"description": error_msg}), 400
+
+    # delete a bookmark
+    elif request.method == 'DELETE':
+        bookmark_name = request.json.get('name', None)
+        try:
+            res_bookmarks = _delete_bookmark(user_name, short_name, bookmark_name)
+        except ValueError as e:
+            error_msg = str(e)
+            current_app.logger.exception(f'Bad request: {error_msg},  project: {short_name}, bookmark_name:{bookmark_name}')
+            return jsonify({"description": error_msg}), 400
+
+    return jsonify(res_bookmarks)
+
 
 # This is only called if can_update is True.
 def get_form_data(request, user, disabled_fields):
