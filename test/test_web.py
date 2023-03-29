@@ -10592,7 +10592,7 @@ class TestWebUserMetadataUpdate(web.Helper):
 
     @with_context
     def test_get_taskbrowse_bookmarks(self):
-        """Test get taskbrowse_bookmark works"""
+        """Test get taskbrowse_bookmark works."""
         data = self.original
         target_project = "project1"
         bookmarks = {
