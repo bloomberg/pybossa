@@ -304,7 +304,7 @@ def parse_tasks_browse_args(args):
         if in_progress in ['Yes', 'No']:
             parsed_args['in_progress'] = in_progress
         else:
-            raise ValueError('invalid in progress value')
+            raise ValueError("Invalid in progress value. Only 'Yes' and 'No' are supported")
 
     return parsed_args
 

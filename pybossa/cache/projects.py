@@ -196,9 +196,13 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
         order_by =  args.get('order_by') or "priority_0 DESC"
 
+        # in_progress in not a column in DB. We need to remove it (it could appear
+        # in the beginning, middle or the end of "order_by") so that the DB
+        # execution is not affected. The actual sorting happens when the data is
+        # retrieved from the DB - select_available_tasks function
         if 'in_progress' in order_by:
             if args.get('order_by') == 'in_progress asc' or args.get('order_by') == 'in_progress desc':
-                order_by = "priority_0 DESC"
+                order_by = "priority_0 DESC"  # Use priority as default if no other sorting appears
             else:  # multiple conditions - need remove clause "in_progress asc"
                 order_by = re.sub(r"(in_progress (desc|asc)\,?\s*)", "", order_by)
                 order_by = order_by.rstrip().rstrip(',')

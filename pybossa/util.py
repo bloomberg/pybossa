@@ -1387,6 +1387,9 @@ def get_user_saved_partial_tasks(sentinel, project_id, user_id, task_repo=None):
             task_id = int(k.split(':')[-1])
             ttl = sentinel.slave.ttl(k)
             if task_repo:
+                # Query DB by primary key. At most the number of saved tasks
+                # permitted by the configuration (currently 30). In case
+                # performance is a consideration here, bulk query can be implemented
                 task = task_repo.get_task(task_id)
                 if task:
                     result[task_id] = ttl
