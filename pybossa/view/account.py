@@ -41,7 +41,7 @@ import pybossa.model as model
 from flask_babel import gettext
 from flask_wtf.csrf import generate_csrf
 from flask import jsonify
-from pybossa.core import signer, uploader, sentinel, newsletter
+from pybossa.core import signer, uploader, sentinel, newsletter, csrf
 from pybossa.util import Pagination, handle_content_type, admin_required
 from pybossa.util import admin_or_subadmin_required
 from pybossa.util import get_user_signup_method, generate_invitation_email_for_new_user
@@ -1201,6 +1201,7 @@ def _delete_bookmark(user_name, short_name, bookmark_name):
 
 @blueprint.route('/<user_name>/taskbrowse_bookmarks/<short_name>', methods=['GET', 'POST', 'DELETE'])
 @login_required
+@csrf.exempt
 def taskbrowse_bookmarks(user_name, short_name):
     if current_user.name != user_name:
         return abort(404)
