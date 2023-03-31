@@ -1668,7 +1668,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
 
             # show columns that are permitted for regular users
             if regular_user:
-                dict_args["display_columns"] = ["task_id", "priority", "created"]
+                dict_args["display_columns"] = ["task_id", "priority", "finish_time", "created"]
                 # show task.info columns that are configured under tasklist_columns
                 dict_args["display_info_columns"] = project.info.get('tasklist_columns', [])
                 # restrict filter columns to the columns configured under project settings
