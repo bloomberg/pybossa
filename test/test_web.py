@@ -9481,14 +9481,16 @@ class TestWeb(web.Helper):
         res = self.app.get(url, follow_redirects=True)
         assert res.status_code == 200, res.status_code
         dom = BeautifulSoup(res.data)
-        # confirm that only "Tash #, Priority and Created are listed"
+        # confirm that only "Tash #, Priority, Created, and Completed are listed"
         th_tags = dom.findAll("th", {"class": "sortable"})
-        expected_columns = ["Task #", "Priority", "Created"]
+        expected_columns = ["Task #", "Priority", "Created", "Completed"]
+        print(th_tags)
         assert len(th_tags) == len(expected_columns), th_tags
-        th_tag_1, th_tag_2, th_tag_3 = th_tags[0].text.strip(), th_tags[1].text.strip(), th_tags[2].text.strip()
+        th_tag_1, th_tag_2, th_tag_3, th_tag_4 = th_tags[0].text.strip(), th_tags[1].text.strip(), th_tags[2].text.strip(), th_tags[3].text.strip()
         assert th_tag_1 == expected_columns[0], f"found column {th_tag_1}, expected column {expected_columns[0]} not present"
         assert th_tag_2 == expected_columns[1], f"found column {th_tag_3}, expected column {expected_columns[1]} not present"
         assert th_tag_3 == expected_columns[2], f"found column {th_tag_3}, expected column {expected_columns[2]} not present"
+        assert th_tag_4 == expected_columns[3], f"found column {th_tag_4}, expected column {expected_columns[3]} not present"
 
     @with_context
     def test_projects_account(self):
