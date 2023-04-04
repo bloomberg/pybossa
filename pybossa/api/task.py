@@ -80,7 +80,7 @@ class TaskAPI(APIBase):
                                 new.id, old.state, new.state,
                                 str(old.exported), str(new.exported))
         if new.expiration is not None:
-            new.expiration = get_task_expiration(new.expiration)
+            new.expiration = get_task_expiration(new.expiration, old.created)
 
     def _preprocess_post_data(self, data):
         project_id = data["project_id"]

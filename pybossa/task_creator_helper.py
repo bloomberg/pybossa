@@ -19,7 +19,7 @@
 from flask import current_app
 import hashlib
 from pybossa.cloud_store_api.s3 import upload_json_data, get_content_from_s3
-from pybossa.util import get_now_plus_delta_ts
+from pybossa.util import get_now_plus_delta_ts, get_time_plus_delta_ts
 from flask import url_for
 import json
 from six import string_types
@@ -40,7 +40,7 @@ def s3_conn_type():
     return current_app.config.get('S3_CONN_TYPE')
 
 
-def get_task_expiration(current_expiration):
+def get_task_expiration(current_expiration, create_time=None):
     """
     Find the appropriate expiration to be added to a task with expiring data.
     If no expiration is set, return the data expiration; otherwise, return
@@ -48,11 +48,14 @@ def get_task_expiration(current_expiration):
     current_expiration can be a iso datetime string or a datetime object
     """
     validity = current_app.config.get('TASK_EXPIRATION', 60)
-    return _get_task_expiration(current_expiration, validity)
+    return _get_task_expiration(current_expiration, create_time, validity)
 
 
-def _get_task_expiration(current_expiration, validity):
-    task_exp = get_now_plus_delta_ts(days=validity)
+def _get_task_expiration(current_expiration, create_time, validity):
+    if create_time is None:
+        task_exp = get_now_plus_delta_ts(days=validity)
+    else:
+        task_exp = get_time_plus_delta_ts(create_time, days=validity)
     if isinstance(current_expiration, string_types):
         task_exp = task_exp.isoformat()
     current_expiration = current_expiration or task_exp
