@@ -36,6 +36,7 @@ from flask import render_template, current_app
 from flask_login import login_required, login_user, logout_user, \
     current_user
 from rq import Queue
+from datetime import datetime
 
 import pybossa.model as model
 from flask_babel import gettext
@@ -1154,6 +1155,11 @@ def add_metadata(name):
     return redirect(url_for('account.profile', name=name))
 
 
+def make_timestamp():
+    now = datetime.now()
+    return now.isoformat()
+
+
 def _get_bookmarks(user_name, short_name):
     taskbrowse_bookmarks = cached_users.get_taskbrowse_bookmarks(user_name)
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
@@ -1170,7 +1176,18 @@ def _add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
     if bookmark_url is None or len(bookmark_url) > MAX_BOOKMARK_URL_LEN:
         raise ValueError('Bookmark URL must be between 1-100 characters.')
 
-    proj_bookmarks[bookmark_name] =  bookmark_url
+    old_bookmark = proj_bookmarks.get(bookmark_name, None)
+    if old_bookmark is not None:
+        created_date = old_bookmark['created']
+    else:
+        created_date = make_timestamp()
+    updated_date = make_timestamp()
+    bookmark_payload = {
+        'url': bookmark_url,
+        'created': created_date,
+        'updated': updated_date
+    }
+    proj_bookmarks[bookmark_name] =  bookmark_payload
     taskbrowse_bookmarks[short_name] = proj_bookmarks
     user.info['taskbrowse_bookmarks'] = taskbrowse_bookmarks
 
@@ -1182,6 +1199,7 @@ def _add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
 def _delete_bookmark(user_name, short_name, bookmark_name):
     user = user_repo.get_by_name(name=user_name)
     taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
+    print(taskbrowse_bookmarks)
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
 
     if bookmark_name not in proj_bookmarks:
