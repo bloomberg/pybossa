@@ -27,6 +27,12 @@ class TestGetTaskExpirationDatetime(object):
         exp = _get_task_expiration(current_exp, None, 60)
         assert are_almost_equal(exp, now + timedelta(days=60))
 
+    def test_create_date_is_set(self):
+        now = datetime.utcnow()
+        current_exp = now + timedelta(days=90)
+        exp = _get_task_expiration(current_exp, now, 60)
+        assert are_almost_equal(exp, now + timedelta(days=60))
+
     def test_current_expiration_is_none(self):
         now = datetime.utcnow()
         exp = _get_task_expiration(None, None, 60)
@@ -47,3 +53,9 @@ class TestGetTaskExpirationString(object):
         exp = _get_task_expiration(current_exp.isoformat(), None, 60)
         assert are_almost_equal(
             to_datetime(exp), now + timedelta(days=60))
+
+    def test_create_date_is_set(self):
+        now = datetime.utcnow()
+        current_exp = now + timedelta(days=30)
+        exp = _get_task_expiration(current_exp.isoformat(), now, 60)
+        assert to_datetime(exp) == current_exp
