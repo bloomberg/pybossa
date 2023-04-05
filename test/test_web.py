@@ -10721,8 +10721,8 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
         assert data[name1]['url'] == url1
-        assert 'created' in data
-        assert 'updated' in data
+        assert 'created' in data[name1]
+        assert 'updated' in data[name1]
 
         # test if new url is appended correctly
         res = self.app.post(url, json={"name":name2, "url":url2})
