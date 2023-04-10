@@ -1199,7 +1199,6 @@ def _add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
 def _delete_bookmark(user_name, short_name, bookmark_name):
     user = user_repo.get_by_name(name=user_name)
     taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
-    print(taskbrowse_bookmarks)
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
 
     if bookmark_name not in proj_bookmarks:
