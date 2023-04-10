@@ -44,8 +44,7 @@ def s3_conn_type():
 def get_task_expiration(current_expiration, create_time=None):
     """
     Find the appropriate expiration to be added to a task with expiring data.
-    If no expiration is set, return the data expiration; otherwise, return
-    the smallest between the current expiration and the data expiration.
+    If current_expiration is outside the valid range, return the maximum possible expiration.
     current_expiration can be a iso datetime string or a datetime object
     """
     validity = current_app.config.get('TASK_EXPIRATION', 60)
