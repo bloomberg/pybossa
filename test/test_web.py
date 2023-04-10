@@ -10753,6 +10753,28 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert data[name2]['url'] == url2
 
     @with_context
+    def test_update_taskbrowse_bookmark(self):
+        """Test update taskbrowse_bookmark via POST works"""
+        data = self.original
+        target_project = "project1"
+        bookmark_1_data, _, _, bookmarks = self.generate_sample_bookmarks(target_project)
+        info = {
+                'taskbrowse_bookmarks' : bookmarks
+        }
+        user = UserFactory.create(info=info)
+        self.signin_user(user)
+        url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}"
+
+        # update a bookmark that already exists
+        res = self.app.post(url, json={"name":"bookmark 1", "url":"www.google.com"})
+        assert res.status_code == 200, res.status_code
+        data = json.loads(res.data)
+        assert data["bookmark 1"]["updated"] != bookmark_1_data["updated"]
+        assert data["bookmark 1"]["created"] == bookmark_1_data["created"]
+        assert data["bookmark 1"]["url"] == "www.google.com"
+
+
+    @with_context
     def test_post_taskbrowse_bookmarks_missing_arguments(self):
         """Test error not thrown when POST endpoint is called with bad message body"""
         data = self.original
