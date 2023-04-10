@@ -1110,9 +1110,6 @@ def sign_task(task):
         task['signature'] = signature
 
 
-def get_now_plus_delta_ts(**kwargs):
-    return (datetime.utcnow() + timedelta(**kwargs))
-
 def get_time_plus_delta_ts(time, **kwargs):
     if isinstance(time, string_types):
         time = datetime.fromisoformat(time)

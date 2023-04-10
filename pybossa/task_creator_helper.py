@@ -18,8 +18,9 @@
 """Module with PyBossa create task helper."""
 from flask import current_app
 import hashlib
+import datetime
 from pybossa.cloud_store_api.s3 import upload_json_data, get_content_from_s3
-from pybossa.util import get_now_plus_delta_ts, get_time_plus_delta_ts
+from pybossa.util import get_time_plus_delta_ts
 from flask import url_for
 import json
 from six import string_types
@@ -53,7 +54,7 @@ def get_task_expiration(current_expiration, create_time=None):
 
 def _get_task_expiration(current_expiration, create_time, validity):
     if create_time is None:
-        task_exp = get_now_plus_delta_ts(days=validity)
+        task_exp = get_time_plus_delta_ts(datetime.utcnow(), days=validity)
     else:
         task_exp = get_time_plus_delta_ts(create_time, days=validity)
     if isinstance(current_expiration, string_types):

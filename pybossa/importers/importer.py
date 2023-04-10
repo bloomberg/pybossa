@@ -29,8 +29,7 @@ from .iiif import BulkTaskIIIFImporter
 from .s3 import BulkTaskS3Import
 from .base import BulkImportException
 from .usercsv import BulkUserCSVImport
-from pybossa.util import (check_password_strength, valid_or_no_s3_bucket,
-    get_now_plus_delta_ts)
+from pybossa.util import (check_password_strength, valid_or_no_s3_bucket)
 from flask_login import current_user
 from werkzeug.datastructures import MultiDict
 import copy
