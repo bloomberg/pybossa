@@ -49,6 +49,7 @@ from pybossa.model.auditlog import Auditlog
 from pybossa.model.project_stats import ProjectStats
 from pybossa.model.webhook import Webhook
 from pybossa.model.blogpost import Blogpost
+from pybossa.view.account import _get_bookmarks
 from pybossa.util import (Pagination, admin_required, get_user_id_or_ip, rank,
                           handle_content_type, redirect_content_type,
                           get_avatar_url, admin_or_subadmin_required,
@@ -1787,6 +1788,8 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         location_options = valid_user_preferences.get('locations')
         rdancy_upd_exp = current_app.config.get('TASK_EXPIRATION', 60)
 
+        taskbrowse_bookmarks = _get_bookmarks(current_user.name, project['short_name'])
+
         data = dict(template='/projects/tasks_browse.html',
                     users=[],
                     project=project_sanitized,
@@ -1812,7 +1815,9 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                     can_know_task_is_gold=can_know_task_is_gold,
                     allow_taskrun_edit=allow_taskrun_edit,
                     regular_user=regular_user,
+                    taskbrowse_bookmarks=taskbrowse_bookmarks,
                     admin_subadmin_coowner=admin_subadmin_coowner)
+
 
         return handle_content_type(data)
 
