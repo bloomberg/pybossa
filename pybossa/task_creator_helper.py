@@ -41,25 +41,21 @@ def s3_conn_type():
     return current_app.config.get('S3_CONN_TYPE')
 
 
-def get_task_expiration(current_expiration, create_time=None):
+def get_task_expiration(expiration, create_time):
     """
-    Find the appropriate expiration to be added to a task with expiring data.
-    If current_expiration is outside the valid range, return the maximum possible expiration.
-    current_expiration can be a iso datetime string or a datetime object
+    Given current task expiration, compute new expiration based on
+    1. task creation date and 2. max allowed task expiration
+    do that task expiration cannot be set beyond max task expiration
+    from task creation date
     """
-    validity = current_app.config.get('TASK_EXPIRATION', 60)
-    return _get_task_expiration(current_expiration, create_time, validity)
+    max_expiration_days = current_app.config.get('TASK_EXPIRATION', 60)
+    max_expiration = get_time_plus_delta_ts(create_time, days=max_expiration_days)
 
-
-def _get_task_expiration(current_expiration, create_time, validity):
-    if create_time is None:
-        task_exp = get_time_plus_delta_ts(datetime.utcnow(), days=validity)
-    else:
-        task_exp = get_time_plus_delta_ts(create_time, days=validity)
-    if isinstance(current_expiration, string_types):
-        task_exp = task_exp.isoformat()
-    current_expiration = current_expiration or task_exp
-    return min(current_expiration, task_exp)
+    if not expiration and isinstance(expiration, string_types):
+        expiration = expiration.fromisoformat()
+    expiration = expiration or max_expiration
+    expiration = min(expiration, max_expiration)
+    return expiration.isoformat()
 
 
 def set_gold_answers(task, gold_answers):
