@@ -64,7 +64,6 @@ def set_gold_answers(task, gold_answers):
     if encrypted():
         url = upload_files_priv(task, task.project_id, gold_answers, TASK_PRIVATE_GOLD_ANSWER_FILE_NAME)['externalUrl']
         gold_answers = dict([(TASK_GOLD_ANSWER_URL_KEY, url)])
-        task.expiration = get_task_expiration(task.expiration)
 
     task.gold_answers = gold_answers
     task.calibration = 1

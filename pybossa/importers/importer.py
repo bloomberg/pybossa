@@ -40,6 +40,7 @@ import hashlib
 from flask import url_for
 from pybossa.task_creator_helper import set_gold_answers, upload_files_priv, get_task_expiration
 from pybossa.data_access import data_access_levels
+from pybossa.model import make_timestamp
 
 
 def validate_s3_bucket(task, *args):
@@ -207,7 +208,9 @@ class Importer(object):
         try:
             for task_data in tasks:
                 self.upload_private_data(task_data, project.id)
-                task_data['expiration'] = get_task_expiration(task_data.get('expiration'))
+                # As tasks are getting created, pass current date as create_date
+                create_date = make_timestamp()
+                task_data['expiration'] = get_task_expiration(task_data.get('expiration'), create_date)
 
                 task = Task(project_id=project.id, n_answers=n_answers)
                 [setattr(task, k, v) for k, v in task_data.items()]
