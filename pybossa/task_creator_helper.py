@@ -51,11 +51,11 @@ def get_task_expiration(expiration, create_time):
     max_expiration_days = current_app.config.get('TASK_EXPIRATION', 60)
     max_expiration = get_time_plus_delta_ts(create_time, days=max_expiration_days)
 
-    if not expiration and isinstance(expiration, string_types):
-        expiration = expiration.fromisoformat()
+    if expiration and isinstance(expiration, string_types):
+        max_expiration = max_expiration.isoformat()
+
     expiration = expiration or max_expiration
-    expiration = min(expiration, max_expiration)
-    return expiration.isoformat()
+    return min(expiration, max_expiration)
 
 
 def set_gold_answers(task, gold_answers):
