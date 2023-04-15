@@ -34,6 +34,7 @@ from datetime import datetime, timedelta
 from flask import current_app
 from sqlalchemy import or_
 from sqlalchemy.sql import case as sqlalchemy_case
+from pybossa.task_creator_helper import get_task_expiration
 
 
 class TaskRepository(Repository):
@@ -179,6 +180,9 @@ class TaskRepository(Repository):
     def save(self, element, clean_project=True):
         self._validate_can_be(self.SAVE_ACTION, element)
         try:
+            # set task default expiration
+            if element.__class__.__name__ == "Task":
+                element.expiration = get_task_expiration(element.expiration, make_timestamp())
             self.db.session.add(element)
             self.db.session.commit()
             if clean_project:
