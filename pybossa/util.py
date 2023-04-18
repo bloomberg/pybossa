@@ -56,8 +56,6 @@ from pybossa.cloud_store_api.s3 import s3_upload_file_storage
 
 from bs4 import BeautifulSoup
 
-from six import string_types
-
 misaka = Misaka()
 TP_COMPONENT_TAGS = ["text-input", "dropdown-input", "radio-group-input",
                      "checkbox-input", "multi-select-input", "input-text-area"]
@@ -1111,7 +1109,7 @@ def sign_task(task):
 
 
 def get_time_plus_delta_ts(time, **kwargs):
-    if isinstance(time, string_types):
+    if isinstance(time, str):
         time = datetime.fromisoformat(time)
     return (time + timedelta(**kwargs))
 
