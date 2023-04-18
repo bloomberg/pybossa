@@ -690,7 +690,7 @@ def setup_hooks(app):
             ldap_enabled=ldap_enabled,
             get_wizard_steps=get_wizard_steps,
             server_type=app.config['SERVER_TYPE'],
-            favicon_dir=app.config['FAVICONS'][app.config['SERVER_TYPE']]
+            favicon_dir=app.config['FAVICONS']
         )
 
     @app.errorhandler(CSRFError)
