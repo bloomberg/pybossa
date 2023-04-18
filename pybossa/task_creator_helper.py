@@ -18,8 +18,9 @@
 """Module with PyBossa create task helper."""
 from flask import current_app
 import hashlib
+import datetime
 from pybossa.cloud_store_api.s3 import upload_json_data, get_content_from_s3
-from pybossa.util import get_now_plus_delta_ts
+from pybossa.util import get_time_plus_delta_ts
 from flask import url_for
 import json
 from six import string_types
@@ -40,23 +41,21 @@ def s3_conn_type():
     return current_app.config.get('S3_CONN_TYPE')
 
 
-def get_task_expiration(current_expiration):
+def get_task_expiration(expiration, create_time):
     """
-    Find the appropriate expiration to be added to a task with expiring data.
-    If no expiration is set, return the data expiration; otherwise, return
-    the smallest between the current expiration and the data expiration.
-    current_expiration can be a iso datetime string or a datetime object
+    Given current task expiration, compute new expiration based on
+    1. task creation date and 2. max allowed task expiration
+    do that task expiration cannot be set beyond max task expiration
+    from task creation date
     """
-    validity = current_app.config.get('TASK_EXPIRATION', 60)
-    return _get_task_expiration(current_expiration, validity)
+    max_expiration_days = current_app.config.get('TASK_EXPIRATION', 60)
+    max_expiration = get_time_plus_delta_ts(create_time, days=max_expiration_days)
 
+    if expiration and isinstance(expiration, string_types):
+        max_expiration = max_expiration.isoformat()
 
-def _get_task_expiration(current_expiration, validity):
-    task_exp = get_now_plus_delta_ts(days=validity)
-    if isinstance(current_expiration, string_types):
-        task_exp = task_exp.isoformat()
-    current_expiration = current_expiration or task_exp
-    return min(current_expiration, task_exp)
+    expiration = expiration or max_expiration
+    return min(expiration, max_expiration)
 
 
 def set_gold_answers(task, gold_answers):
@@ -65,7 +64,6 @@ def set_gold_answers(task, gold_answers):
     if encrypted():
         url = upload_files_priv(task, task.project_id, gold_answers, TASK_PRIVATE_GOLD_ANSWER_FILE_NAME)['externalUrl']
         gold_answers = dict([(TASK_GOLD_ANSWER_URL_KEY, url)])
-        task.expiration = get_task_expiration(task.expiration)
 
     task.gold_answers = gold_answers
     task.calibration = 1

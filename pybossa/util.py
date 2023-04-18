@@ -1108,9 +1108,10 @@ def sign_task(task):
         task['signature'] = signature
 
 
-def get_now_plus_delta_ts(**kwargs):
-    return (datetime.utcnow() + timedelta(**kwargs))
-
+def get_time_plus_delta_ts(time, **kwargs):
+    if isinstance(time, str):
+        time = datetime.fromisoformat(time)
+    return (time + timedelta(**kwargs))
 
 def get_taskrun_date_range_sql_clause_params(start_date, end_date):
     """Generate date cause and sql params for queriying db."""

@@ -770,8 +770,13 @@ class TestTaskAPI(TestAPI):
     def test_task_put_with_expiration_within_bound(self):
         admin = UserFactory.create()
         project = ProjectFactory.create(owner=admin)
-        task = TaskFactory.create(project=project, info=dict(x=1))
-        expiration = (datetime.datetime.utcnow() +  datetime.timedelta(30)).isoformat()
+        task = TaskFactory.create(
+            project=project,
+            info=dict(x=1),
+            created='2015-01-01T14:37:30.642119'
+        )
+        # 40 days after creation date
+        expiration = '2015-02-10T14:37:30.642119'
         datajson = json.dumps({'expiration': expiration})
 
         url = '/api/task/%s?api_key=%s' % (task.id, admin.api_key)
@@ -788,9 +793,15 @@ class TestTaskAPI(TestAPI):
     def test_task_put_with_expiration_out_of_bounds(self):
         admin = UserFactory.create()
         project = ProjectFactory.create(owner=admin)
-        task = TaskFactory.create(project=project, info=dict(x=1))
-        expiration = (datetime.datetime.utcnow() +  datetime.timedelta(1000)).isoformat()
-        max_expiration = (datetime.datetime.utcnow() +  datetime.timedelta(60)).isoformat()
+        task = TaskFactory.create(
+            project=project,
+            info=dict(x=1),
+            created='2015-01-01T14:37:30.642119'
+        )
+        # the task expires 60 days after creation date
+        max_expiration = '2015-03-02T14:37:30.642119'
+        # 365 days after creation date
+        expiration = '2016-01-01T14:37:30.642119'
         datajson = json.dumps({'expiration': expiration})
 
         url = '/api/task/%s?api_key=%s' % (task.id, admin.api_key)

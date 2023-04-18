@@ -44,6 +44,7 @@ from pybossa.cache.task_browse_helpers import get_searchable_columns
 import json
 import copy
 from pybossa.task_creator_helper import get_task_expiration
+from pybossa.model import make_timestamp
 
 
 class TaskAPI(APIBase):
@@ -80,7 +81,7 @@ class TaskAPI(APIBase):
                                 new.id, old.state, new.state,
                                 str(old.exported), str(new.exported))
         if new.expiration is not None:
-            new.expiration = get_task_expiration(new.expiration)
+            new.expiration = get_task_expiration(new.expiration, old.created)
 
     def _preprocess_post_data(self, data):
         project_id = data["project_id"]
@@ -116,7 +117,8 @@ class TaskAPI(APIBase):
                     data['exported'] = True
             except Exception as e:
                 raise BadRequest('Invalid gold_answers')
-        data["expiration"] = get_task_expiration(data.get('expiration'))
+        create_time = data.get("created") or make_timestamp()
+        data["expiration"] = get_task_expiration(data.get('expiration'), create_time)
 
     def _verify_auth(self, item):
         if not current_user.is_authenticated:
