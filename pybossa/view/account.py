@@ -1182,12 +1182,12 @@ def _add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
     else:
         created_date = make_timestamp()
     updated_date = make_timestamp()
-    bookmark_payload = {
+    bookmark_data = {
         'url': bookmark_url,
         'created': created_date,
         'updated': updated_date
     }
-    proj_bookmarks[bookmark_name] =  bookmark_payload
+    proj_bookmarks[bookmark_name] =  bookmark_data
     taskbrowse_bookmarks[short_name] = proj_bookmarks
     user.info['taskbrowse_bookmarks'] = taskbrowse_bookmarks
 
