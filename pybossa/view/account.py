@@ -58,6 +58,7 @@ from pybossa.jobs import send_mail, export_userdata, delete_account
 from pybossa.core import user_repo, ldap
 from pybossa.feed import get_update_feed
 from pybossa.messages import *
+from pybossa.model import make_timestamp
 
 from pybossa.forms.forms import UserPrefMetadataForm, RegisterFormWithUserPrefMetadata
 from pybossa.forms.account_view_forms import *
@@ -1155,11 +1156,6 @@ def add_metadata(name):
     return redirect(url_for('account.profile', name=name))
 
 
-def make_timestamp():
-    now = datetime.now()
-    return now.isoformat()
-
-
 def _get_bookmarks(user_name, short_name):
     taskbrowse_bookmarks = cached_users.get_taskbrowse_bookmarks(user_name)
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
@@ -1180,14 +1176,14 @@ def _add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
     if old_bookmark is not None:
         created_date = old_bookmark['created']
     else:
-        created_date = make_timestamp()
-    updated_date = make_timestamp()
-    bookmark_payload = {
+        created_date = model.make_timestamp()
+    updated_date = model.make_timestamp()
+    bookmark_data = {
         'url': bookmark_url,
         'created': created_date,
         'updated': updated_date
     }
-    proj_bookmarks[bookmark_name] =  bookmark_payload
+    proj_bookmarks[bookmark_name] =  bookmark_data
     taskbrowse_bookmarks[short_name] = proj_bookmarks
     user.info['taskbrowse_bookmarks'] = taskbrowse_bookmarks
 
