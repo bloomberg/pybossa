@@ -856,8 +856,8 @@ def user_has_partial_answer(short_name=None):
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def large_language_model(model_name):
     """Large language model endpoint
-    The POST data format can be:
-    data = {
+    The JSON data in the POST request can be one of the following:
+    {
         "instances": [
             {
                 "context": "Identify the company name: Microsoft will release Windows 20 next year.",
@@ -869,7 +869,7 @@ def large_language_model(model_name):
         ]
     }
     or
-    data = {
+    {
         "prompts": "Identify the company name: Microsoft will release Windows 20 next year."
     }
     """
