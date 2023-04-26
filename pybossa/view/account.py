@@ -1156,8 +1156,7 @@ def add_metadata(name):
     return redirect(url_for('account.profile', name=name))
 
 
-def _bookmarks_dict_to_array(bookmarks_dict):
-    print("_bookmarks_dict_to_array:", bookmarks_dict)
+def bookmarks_dict_to_array(bookmarks_dict):
     bookmarks_array = []
     for name, meta in bookmarks_dict.items():
         b = {'name': name}
@@ -1166,13 +1165,13 @@ def _bookmarks_dict_to_array(bookmarks_dict):
     return bookmarks_array
 
 
-def _get_bookmarks(user_name, short_name):
+def get_bookmarks(user_name, short_name):
     taskbrowse_bookmarks = cached_users.get_taskbrowse_bookmarks(user_name)
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
-    return _bookmarks_dict_to_array(proj_bookmarks)
+    return bookmarks_dict_to_array(proj_bookmarks)
 
 
-def _add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
+def add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
     user = user_repo.get_by_name(name=user_name)
     taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
@@ -1199,16 +1198,15 @@ def _add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
 
     user_repo.update(user)
     cached_users.delete_taskbrowse_bookmarks(user)
-    return _bookmarks_dict_to_array(proj_bookmarks)
+    return bookmarks_dict_to_array(proj_bookmarks)
 
 
-def _delete_bookmark(user_name, short_name, bookmark_name):
+def delete_bookmark(user_name, short_name, bookmark_name):
     user = user_repo.get_by_name(name=user_name)
     taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
 
     if bookmark_name not in proj_bookmarks:
-        print("b name:", bookmark_name, "short name:", short_name)
         raise ValueError('Bookmark not found')
     del proj_bookmarks[bookmark_name]
     # if no bookmarks left for this project, delete the mapping entry
@@ -1220,7 +1218,7 @@ def _delete_bookmark(user_name, short_name, bookmark_name):
     user.info['taskbrowse_bookmarks'] = taskbrowse_bookmarks
     user_repo.update(user)
     cached_users.delete_taskbrowse_bookmarks(user)
-    return _bookmarks_dict_to_array(proj_bookmarks)
+    return bookmarks_dict_to_array(proj_bookmarks)
 
 
 @blueprint.route('/<user_name>/taskbrowse_bookmarks/<short_name>', methods=['GET', 'POST', 'DELETE'])
@@ -1232,14 +1230,14 @@ def taskbrowse_bookmarks(user_name, short_name):
 
     # get bookmarks for project from cache
     if request.method == 'GET':
-        res_bookmarks = _get_bookmarks(user_name, short_name)
+        res_bookmarks = get_bookmarks(user_name, short_name)
 
     # add a bookmark
     elif request.method == 'POST':
         bookmark_name = request.json.get('name', None)
         bookmark_url = request.json.get('url', None)
         try:
-            res_bookmarks = _add_bookmark(user_name, short_name, bookmark_name, bookmark_url)
+            res_bookmarks = add_bookmark(user_name, short_name, bookmark_name, bookmark_url)
         except ValueError as e:
             error_msg = str(e)
             current_app.logger.exception(f'Bad request: {error_msg},  project: {short_name}, bookmark_name:{bookmark_name}')
@@ -1249,7 +1247,7 @@ def taskbrowse_bookmarks(user_name, short_name):
     elif request.method == 'DELETE':
         bookmark_name = request.json.get('name', None)
         try:
-            res_bookmarks = _delete_bookmark(user_name, short_name, bookmark_name)
+            res_bookmarks = delete_bookmark(user_name, short_name, bookmark_name)
         except ValueError as e:
             error_msg = str(e)
             current_app.logger.exception(f'Bad request: {error_msg},  project: {short_name}, bookmark_name:{bookmark_name}')
