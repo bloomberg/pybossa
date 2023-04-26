@@ -36,6 +36,7 @@ from flask import render_template, current_app
 from flask_login import login_required, login_user, logout_user, \
     current_user
 from rq import Queue
+from datetime import datetime
 
 import pybossa.model as model
 from flask_babel import gettext
@@ -57,6 +58,7 @@ from pybossa.jobs import send_mail, export_userdata, delete_account
 from pybossa.core import user_repo, ldap
 from pybossa.feed import get_update_feed
 from pybossa.messages import *
+from pybossa.model import make_timestamp
 
 from pybossa.forms.forms import UserPrefMetadataForm, RegisterFormWithUserPrefMetadata
 from pybossa.forms.account_view_forms import *
@@ -1154,13 +1156,22 @@ def add_metadata(name):
     return redirect(url_for('account.profile', name=name))
 
 
-def _get_bookmarks(user_name, short_name):
+def bookmarks_dict_to_array(bookmarks_dict):
+    bookmarks_array = []
+    for name, meta in bookmarks_dict.items():
+        b = {'name': name}
+        b.update(meta)
+        bookmarks_array.append(b)
+    return bookmarks_array
+
+
+def get_bookmarks(user_name, short_name):
     taskbrowse_bookmarks = cached_users.get_taskbrowse_bookmarks(user_name)
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
-    return proj_bookmarks
+    return bookmarks_dict_to_array(proj_bookmarks)
 
 
-def _add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
+def add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
     user = user_repo.get_by_name(name=user_name)
     taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
@@ -1170,22 +1181,33 @@ def _add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
     if bookmark_url is None or len(bookmark_url) > MAX_BOOKMARK_URL_LEN:
         raise ValueError('Bookmark URL must be between 1-100 characters.')
 
-    proj_bookmarks[bookmark_name] =  bookmark_url
+    old_bookmark = proj_bookmarks.get(bookmark_name, None)
+    if old_bookmark is not None:
+        created_date = old_bookmark['created']
+    else:
+        created_date = model.make_timestamp()
+    updated_date = model.make_timestamp()
+    bookmark_data = {
+        'url': bookmark_url,
+        'created': created_date,
+        'updated': updated_date
+    }
+    proj_bookmarks[bookmark_name] =  bookmark_data
     taskbrowse_bookmarks[short_name] = proj_bookmarks
     user.info['taskbrowse_bookmarks'] = taskbrowse_bookmarks
 
     user_repo.update(user)
     cached_users.delete_taskbrowse_bookmarks(user)
-    return proj_bookmarks
+    return bookmarks_dict_to_array(proj_bookmarks)
 
 
-def _delete_bookmark(user_name, short_name, bookmark_name):
+def delete_bookmark(user_name, short_name, bookmark_name):
     user = user_repo.get_by_name(name=user_name)
     taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
 
     if bookmark_name not in proj_bookmarks:
-        raise ValueError('Bookmark not found.')
+        raise ValueError('Bookmark not found')
     del proj_bookmarks[bookmark_name]
     # if no bookmarks left for this project, delete the mapping entry
     if len(proj_bookmarks) == 0:
@@ -1196,7 +1218,7 @@ def _delete_bookmark(user_name, short_name, bookmark_name):
     user.info['taskbrowse_bookmarks'] = taskbrowse_bookmarks
     user_repo.update(user)
     cached_users.delete_taskbrowse_bookmarks(user)
-    return proj_bookmarks
+    return bookmarks_dict_to_array(proj_bookmarks)
 
 
 @blueprint.route('/<user_name>/taskbrowse_bookmarks/<short_name>', methods=['GET', 'POST', 'DELETE'])
@@ -1208,14 +1230,14 @@ def taskbrowse_bookmarks(user_name, short_name):
 
     # get bookmarks for project from cache
     if request.method == 'GET':
-        res_bookmarks = _get_bookmarks(user_name, short_name)
+        res_bookmarks = get_bookmarks(user_name, short_name)
 
     # add a bookmark
     elif request.method == 'POST':
         bookmark_name = request.json.get('name', None)
         bookmark_url = request.json.get('url', None)
         try:
-            res_bookmarks = _add_bookmark(user_name, short_name, bookmark_name, bookmark_url)
+            res_bookmarks = add_bookmark(user_name, short_name, bookmark_name, bookmark_url)
         except ValueError as e:
             error_msg = str(e)
             current_app.logger.exception(f'Bad request: {error_msg},  project: {short_name}, bookmark_name:{bookmark_name}')
@@ -1225,7 +1247,7 @@ def taskbrowse_bookmarks(user_name, short_name):
     elif request.method == 'DELETE':
         bookmark_name = request.json.get('name', None)
         try:
-            res_bookmarks = _delete_bookmark(user_name, short_name, bookmark_name)
+            res_bookmarks = delete_bookmark(user_name, short_name, bookmark_name)
         except ValueError as e:
             error_msg = str(e)
             current_app.logger.exception(f'Bad request: {error_msg},  project: {short_name}, bookmark_name:{bookmark_name}')

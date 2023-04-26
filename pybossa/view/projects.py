@@ -1814,6 +1814,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                     regular_user=regular_user,
                     admin_subadmin_coowner=admin_subadmin_coowner)
 
+
         return handle_content_type(data)
 
     def get_users_fullname(page_tasks, get_users_func, result_field):
