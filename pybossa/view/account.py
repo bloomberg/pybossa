@@ -1176,8 +1176,8 @@ def _add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
     if old_bookmark is not None:
         created_date = old_bookmark['created']
     else:
-        created_date = make_timestamp()
-    updated_date = make_timestamp()
+        created_date = model.make_timestamp()
+    updated_date = model.make_timestamp()
     bookmark_data = {
         'url': bookmark_url,
         'created': created_date,
