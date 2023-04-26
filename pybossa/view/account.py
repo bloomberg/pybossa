@@ -58,6 +58,7 @@ from pybossa.jobs import send_mail, export_userdata, delete_account
 from pybossa.core import user_repo, ldap
 from pybossa.feed import get_update_feed
 from pybossa.messages import *
+from pybossa.model import make_timestamp
 
 from pybossa.forms.forms import UserPrefMetadataForm, RegisterFormWithUserPrefMetadata
 from pybossa.forms.account_view_forms import *
@@ -1153,11 +1154,6 @@ def add_metadata(name):
     cached_users.delete_user_pref_metadata(user)
     flash("Input saved successfully", "info")
     return redirect(url_for('account.profile', name=name))
-
-
-def make_timestamp():
-    now = datetime.now()
-    return now.isoformat()
 
 
 def _get_bookmarks(user_name, short_name):
