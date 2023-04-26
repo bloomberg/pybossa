@@ -10657,13 +10657,13 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
 
-        assert data['bookmark 1']['url'] == bookmark_1_data['url']
-        assert data['bookmark 1']['created'] == bookmark_1_data['created']
-        assert data['bookmark 1']['updated'] == bookmark_1_data['updated']
+        assert data[0]['url'] == bookmark_1_data['url']
+        assert data[0]['created'] == bookmark_1_data['created']
+        assert data[0]['updated'] == bookmark_1_data['updated']
 
-        assert data['bookmark 2']['url'] == bookmark_2_data['url']
-        assert data['bookmark 2']['created'] == bookmark_2_data['created']
-        assert data['bookmark 2']['updated'] == bookmark_2_data['updated']
+        assert data[1]['url'] == bookmark_2_data['url']
+        assert data[1]['created'] == bookmark_2_data['created']
+        assert data[1]['updated'] == bookmark_2_data['updated']
 
 
     @with_context
@@ -10679,7 +10679,7 @@ class TestWebUserMetadataUpdate(web.Helper):
 
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
-        assert str(data) == str({})
+        assert len(data) == 0
 
 
     @with_context
@@ -10698,7 +10698,7 @@ class TestWebUserMetadataUpdate(web.Helper):
 
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
-        assert str(data) == str({})
+        assert len(data) == 0
 
 
     @with_context
@@ -10720,37 +10720,37 @@ class TestWebUserMetadataUpdate(web.Helper):
         res = self.app.post(url, json={"name":name1, "url":url1})
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
-        assert data[name1]['url'] == url1
-        assert 'created' in data[name1]
-        assert 'updated' in data[name1]
+        assert data[0]['url'] == url1
+        assert 'created' in data[0]
+        assert 'updated' in data[0]
 
-        # test if new url is appended correctly
+        # test second insertion
         res = self.app.post(url, json={"name":name2, "url":url2})
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
-        assert data[name1]['url'] == url1
-        assert data[name2]['url'] == url2
+        assert data[0]['url'] == url1
+        assert data[1]['url'] == url2
 
         # test if data is saved in db
         res = self.app.get(url)
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
-        assert data[name1]['url'] == url1
-        assert data[name2]['url'] == url2
+        assert data[0]['url'] == url1
+        assert data[1]['url'] == url2
 
         # test adding bookmark for a different project
         new_url = f"/account/{user.name}/taskbrowse_bookmarks/project2"
         res = self.app.post(new_url, json={"name":name2, "url":url1})
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
-        assert data[name2]['url'] == url1
+        assert data[0]['url'] == url1
 
         # test new post does not affect old data
         res = self.app.get(url)
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
-        assert data[name1]['url'] == url1
-        assert data[name2]['url'] == url2
+        assert data[0]['url'] == url1
+        assert data[1]['url'] == url2
 
     @with_context
     def test_update_taskbrowse_bookmark(self):
@@ -10769,9 +10769,9 @@ class TestWebUserMetadataUpdate(web.Helper):
         res = self.app.post(url, json={"name":"bookmark 1", "url":"www.google.com"})
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
-        assert data["bookmark 1"]["updated"] != bookmark_1_data["updated"]
-        assert data["bookmark 1"]["created"] == bookmark_1_data["created"]
-        assert data["bookmark 1"]["url"] == "www.google.com"
+        assert data[0]["updated"] != bookmark_1_data["updated"]
+        assert data[0]["created"] == bookmark_1_data["created"]
+        assert data[0]["url"] == "www.google.com"
 
 
     @with_context
@@ -10815,10 +10815,11 @@ class TestWebUserMetadataUpdate(web.Helper):
         expected_res = {"bookmark 2" : "https://gigwork.net/project/testproject66/tasks/browse"}
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
+        print(data)
         assert len(data) == 1
-        assert data['bookmark 2']['url'] == bookmark_2_data['url']
-        assert data['bookmark 2']['created'] == bookmark_2_data['created']
-        assert data['bookmark 2']['updated'] == bookmark_2_data['updated']
+        assert data[0]['url'] == bookmark_2_data['url']
+        assert data[0]['created'] == bookmark_2_data['created']
+        assert data[0]['updated'] == bookmark_2_data['updated']
 
         # ensure deleting last bookmark does not result in error
         url = f"/account/{user.name}/taskbrowse_bookmarks/{target_project}"
