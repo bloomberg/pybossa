@@ -1212,7 +1212,8 @@ def _delete_bookmark(user_name, short_name, bookmark_name):
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
 
     if bookmark_name not in proj_bookmarks:
-        raise ValueError('Bookmark not found.')
+        print("b name:", bookmark_name, "short name:", short_name)
+        raise ValueError('Bookmark not found')
     del proj_bookmarks[bookmark_name]
     # if no bookmarks left for this project, delete the mapping entry
     if len(proj_bookmarks) == 0:
