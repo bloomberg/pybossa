@@ -879,7 +879,7 @@ def large_language_model(model_name):
     model_endpoint = endpoints.get(model_name.lower())
 
     if not model_endpoint:
-        return abort(403, f'Model with name {model_name} does not exist.')
+        return abort(400, f'{model_name} LLM is unsupported on this platform.')
 
     proxies = current_app.config.get('PROXIES')
     cert = current_app.config.get('CA_CERT', False)
@@ -899,7 +899,7 @@ def large_language_model(model_name):
         if isinstance(prompts, list):
             prompts = prompts[0]  # Batch request temporarily NOT supported
         if not isinstance(prompts, str):
-            return abort(400, f'prompts should be a string a list of strings')
+            return abort(400, f'prompts should be a string or a list of strings')
         data = {
             "instances": [
                 {
