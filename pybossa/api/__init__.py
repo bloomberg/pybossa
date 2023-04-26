@@ -847,3 +847,75 @@ def user_has_partial_answer(short_name=None):
     task_id_map = get_user_saved_partial_tasks(sentinel, project_id, current_user.id, task_repo)
     response = {"has_answer": bool(task_id_map)}
     return Response(json.dumps(response), status=200, mimetype="application/json")
+
+
+@jsonpify
+@csrf.exempt
+@blueprint.route('/llm', defaults={'model_name': None}, methods=['POST'])
+@blueprint.route('/llm/<model_name>', methods=['POST'])
+@ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+def large_language_model(model_name):
+    """Large language model endpoint
+    The JSON data in the POST request can be one of the following:
+    {
+        "instances": [
+            {
+                "context": "Identify the company name: Microsoft will release Windows 20 next year.",
+                "temperature": 1.0,
+                "seed": 12345,
+                "repetition_penalty": 1.05,
+                "num_beams": 1,
+            }
+        ]
+    }
+    or
+    {
+        "prompts": "Identify the company name: Microsoft will release Windows 20 next year."
+    }
+    """
+    if model_name is None:
+        model_name = 'flan-ul2'
+    endpoints = current_app.config.get('LLM_ENDPOINTS')
+    model_endpoint = endpoints.get(model_name.lower())
+
+    if not model_endpoint:
+        return abort(400, f'{model_name} LLM is unsupported on this platform.')
+
+    proxies = current_app.config.get('PROXIES')
+    cert = current_app.config.get('CA_CERT', False)
+
+    try:
+        data = request.get_json(force=True)
+    except:
+        return abort(400, "Invalid JSON data")
+
+    if "prompts" not in data and "instances" not in data:
+        return abort(400, "The JSON should have either 'prompts' or 'instances'")
+
+    if "prompts" in data:
+        prompts = data.get("prompts")
+        if not prompts:
+            return abort(400, 'prompts should not be empty')
+        if isinstance(prompts, list):
+            prompts = prompts[0]  # Batch request temporarily NOT supported
+        if not isinstance(prompts, str):
+            return abort(400, f'prompts should be a string or a list of strings')
+        data = {
+            "instances": [
+                {
+                    "context": prompts + ' ',
+                    "temperature": 1.0,
+                    "seed": 12345,
+                    "repetition_penalty": 1.05,
+                    "num_beams": 1,
+                }
+            ]
+        }
+    data = json.dumps(data)
+
+    r = requests.post(model_endpoint, data=data, proxies=proxies, verify=cert)
+    out = json.loads(r.text)
+    predictions = out["predictions"][0]["output"]
+    response = {"Model: ": model_name, "predictions: ": predictions}
+
+    return Response(json.dumps(response), status=r.status_code, mimetype="application/json")
