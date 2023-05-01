@@ -30,7 +30,7 @@ requirements = [
     "factory-boy==3.2.0",
     "Faker==8.14.0",
     "feedparser==6.0.8",
-    "Flask==2.0.1",
+    "Flask==2.3.2",
     "Flask-Assets==2.0",
     "Flask-Babel==2.0.0",
     "Flask-Cors==3.0.10",
