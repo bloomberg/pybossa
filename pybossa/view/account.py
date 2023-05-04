@@ -28,7 +28,6 @@ This module exports the following endpoints:
 """
 import json
 
-from enum import Enum
 from itsdangerous import BadData
 from markdown import markdown
 
@@ -1158,15 +1157,10 @@ def add_metadata(name):
 
 
 def bookmarks_dict_to_array(bookmarks_dict, order_by, desc):
-    order_by = "name" if order_by is None else order_by
-    desc = False if desc is None else desc
+    order_by =  order_by or "name"
+    desc = desc or False
 
-    bookmarks_array = []
-    for name, meta in bookmarks_dict.items():
-        b = {'name': name}
-        b.update(meta)
-        bookmarks_array.append(b)
-
+    bookmarks_array = [{'name': name, **meta} for name, meta in bookmarks_dict.items()]
     bookmarks_array.sort(key=lambda b: b[order_by], reverse=desc)
     return bookmarks_array
 
@@ -1178,14 +1172,16 @@ def get_bookmarks(user_name, short_name, order_by, desc):
 
 
 def add_bookmark(user_name, short_name, bookmark_name, bookmark_url, order_by, desc):
-    user = user_repo.get_by_name(name=user_name)
-    taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
-    proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
 
     if bookmark_name is None or len(bookmark_name) > MAX_BOOKMARK_NAME_LEN:
         raise ValueError(f'Bookmark name must be between 1-{MAX_BOOKMARK_NAME_LEN} characters.')
     if bookmark_url is None or len(bookmark_url) > MAX_BOOKMARK_URL_LEN:
         raise ValueError('Bookmark URL must be between 1-100 characters.')
+    bookmark_name = str(bookmark_name)
+
+    user = user_repo.get_by_name(name=user_name)
+    taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
+    proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
 
     old_bookmark = proj_bookmarks.get(bookmark_name, None)
     if old_bookmark is not None:
@@ -1208,6 +1204,8 @@ def add_bookmark(user_name, short_name, bookmark_name, bookmark_url, order_by, d
 
 
 def delete_bookmark(user_name, short_name, bookmark_name, order_by, desc):
+    bookmark_name = str(bookmark_name)
+
     user = user_repo.get_by_name(name=user_name)
     taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
@@ -1235,8 +1233,8 @@ def taskbrowse_bookmarks(user_name, short_name):
         return abort(404)
 
     order_by  = request.args.get('order_by', None, type=str)
-    desc_str  = request.args.get('desc', None).lower()
-    desc = True if desc_str == 'true' else False if desc_str == 'false' else None
+    desc_str  = request.args.get('desc', None)
+    desc = {'true': True, 'false': False}.get(desc_str)
 
     # get bookmarks for project from cache
     if request.method == 'GET':
@@ -1244,7 +1242,7 @@ def taskbrowse_bookmarks(user_name, short_name):
 
     # add a bookmark
     elif request.method == 'POST':
-        bookmark_name = str(request.json.get('name', None))
+        bookmark_name = request.json.get('name', None)
         bookmark_url = request.json.get('url', None)
         try:
             res_bookmarks = add_bookmark(user_name, short_name, bookmark_name, bookmark_url, order_by, desc)
@@ -1255,7 +1253,7 @@ def taskbrowse_bookmarks(user_name, short_name):
 
     # delete a bookmark
     elif request.method == 'DELETE':
-        bookmark_name = str(request.json.get('name', None))
+        bookmark_name = request.json.get('name', None)
         try:
             res_bookmarks = delete_bookmark(user_name, short_name, bookmark_name, order_by, desc)
         except ValueError as e:
