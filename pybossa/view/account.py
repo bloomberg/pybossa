@@ -28,6 +28,7 @@ This module exports the following endpoints:
 """
 import json
 
+from enum import Enum
 from itsdangerous import BadData
 from markdown import markdown
 
@@ -1156,22 +1157,27 @@ def add_metadata(name):
     return redirect(url_for('account.profile', name=name))
 
 
-def bookmarks_dict_to_array(bookmarks_dict):
+def bookmarks_dict_to_array(bookmarks_dict, order_by, desc):
+    order_by = "name" if order_by is None else order_by
+    desc = False if desc is None else desc
+
     bookmarks_array = []
     for name, meta in bookmarks_dict.items():
         b = {'name': name}
         b.update(meta)
         bookmarks_array.append(b)
+
+    bookmarks_array.sort(key=lambda b: b[order_by], reverse=desc)
     return bookmarks_array
 
 
-def get_bookmarks(user_name, short_name):
+def get_bookmarks(user_name, short_name, order_by, desc):
     taskbrowse_bookmarks = cached_users.get_taskbrowse_bookmarks(user_name)
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
-    return bookmarks_dict_to_array(proj_bookmarks)
+    return bookmarks_dict_to_array(proj_bookmarks, order_by, desc)
 
 
-def add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
+def add_bookmark(user_name, short_name, bookmark_name, bookmark_url, order_by, desc):
     user = user_repo.get_by_name(name=user_name)
     taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
@@ -1198,10 +1204,10 @@ def add_bookmark(user_name, short_name, bookmark_name, bookmark_url):
 
     user_repo.update(user)
     cached_users.delete_taskbrowse_bookmarks(user)
-    return bookmarks_dict_to_array(proj_bookmarks)
+    return bookmarks_dict_to_array(proj_bookmarks, order_by, desc)
 
 
-def delete_bookmark(user_name, short_name, bookmark_name):
+def delete_bookmark(user_name, short_name, bookmark_name, order_by, desc):
     user = user_repo.get_by_name(name=user_name)
     taskbrowse_bookmarks = user.info.get('taskbrowse_bookmarks', {})
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
@@ -1218,7 +1224,7 @@ def delete_bookmark(user_name, short_name, bookmark_name):
     user.info['taskbrowse_bookmarks'] = taskbrowse_bookmarks
     user_repo.update(user)
     cached_users.delete_taskbrowse_bookmarks(user)
-    return bookmarks_dict_to_array(proj_bookmarks)
+    return bookmarks_dict_to_array(proj_bookmarks, order_by, desc)
 
 
 @blueprint.route('/<user_name>/taskbrowse_bookmarks/<short_name>', methods=['GET', 'POST', 'DELETE'])
@@ -1228,16 +1234,20 @@ def taskbrowse_bookmarks(user_name, short_name):
     if current_user.name != user_name:
         return abort(404)
 
+    order_by  = request.args.get('order_by', None, type=str)
+    desc_str  = request.args.get('desc', None).lower()
+    desc = True if desc_str == 'true' else False if desc_str == 'false' else None
+
     # get bookmarks for project from cache
     if request.method == 'GET':
-        res_bookmarks = get_bookmarks(user_name, short_name)
+        res_bookmarks = get_bookmarks(user_name, short_name, order_by, desc)
 
     # add a bookmark
     elif request.method == 'POST':
-        bookmark_name = request.json.get('name', None)
+        bookmark_name = str(request.json.get('name', None))
         bookmark_url = request.json.get('url', None)
         try:
-            res_bookmarks = add_bookmark(user_name, short_name, bookmark_name, bookmark_url)
+            res_bookmarks = add_bookmark(user_name, short_name, bookmark_name, bookmark_url, order_by, desc)
         except ValueError as e:
             error_msg = str(e)
             current_app.logger.exception(f'Bad request: {error_msg},  project: {short_name}, bookmark_name:{bookmark_name}')
@@ -1245,9 +1255,9 @@ def taskbrowse_bookmarks(user_name, short_name):
 
     # delete a bookmark
     elif request.method == 'DELETE':
-        bookmark_name = request.json.get('name', None)
+        bookmark_name = str(request.json.get('name', None))
         try:
-            res_bookmarks = delete_bookmark(user_name, short_name, bookmark_name)
+            res_bookmarks = delete_bookmark(user_name, short_name, bookmark_name, order_by, desc)
         except ValueError as e:
             error_msg = str(e)
             current_app.logger.exception(f'Bad request: {error_msg},  project: {short_name}, bookmark_name:{bookmark_name}')
