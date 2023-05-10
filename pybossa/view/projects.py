@@ -49,6 +49,7 @@ from pybossa.model.auditlog import Auditlog
 from pybossa.model.project_stats import ProjectStats
 from pybossa.model.webhook import Webhook
 from pybossa.model.blogpost import Blogpost
+from pybossa.view.account import get_bookmarks
 from pybossa.util import (Pagination, admin_required, get_user_id_or_ip, rank,
                           handle_content_type, redirect_content_type,
                           get_avatar_url, admin_or_subadmin_required,
@@ -1781,6 +1782,8 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             # Populate list of user names for "Completed By" column.
             get_users_fullname(page_tasks, lambda task: get_users_completed(task), 'completed_users')
 
+        taskbrowse_bookmarks = get_bookmarks(current_user.name, short_name, None, None)
+
         valid_user_preferences = app_settings.upref_mdata.get_valid_user_preferences() \
             if app_settings.upref_mdata else {}
         language_options = valid_user_preferences.get('languages')
@@ -1812,7 +1815,8 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                     can_know_task_is_gold=can_know_task_is_gold,
                     allow_taskrun_edit=allow_taskrun_edit,
                     regular_user=regular_user,
-                    admin_subadmin_coowner=admin_subadmin_coowner)
+                    admin_subadmin_coowner=admin_subadmin_coowner,
+                    taskbrowse_bookmarks=taskbrowse_bookmarks)
 
 
         return handle_content_type(data)
