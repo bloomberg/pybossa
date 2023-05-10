@@ -161,7 +161,7 @@ class TestCoowners(web.Helper):
 
         # coowner can browse tasks in a draft project
         res = self.app.get('/project/sampleapp/tasks/browse')
-        assert 'Browse tasks' in str(res.data), res.data
+        assert 'Browse Tasks' in str(res.data), res.data
         # coowner can modify task presenter
         res = self.app.get('/project/sampleapp/tasks/taskpresentereditor')
         assert 'Task Presenter Editor' in str(res.data), res.data
