@@ -130,7 +130,7 @@ requirements = [
     "readability-lxml==0.8.1",
     "redis==3.5.3",
     "rednose==1.3.0",
-    "requests==2.26.0",
+    "requests==2.31.0",
     "requests-kerberos==0.12.0",
     "requests-oauthlib==1.1.0",
     "rfc3986==1.5.0",
