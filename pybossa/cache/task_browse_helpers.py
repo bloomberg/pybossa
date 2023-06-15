@@ -352,7 +352,8 @@ def validate_user_preferences(user_pref):
 
     # Support old spelling of Türkiye
     if valid_locations:
-        valid_locations.append('Turkey')
+        valid_locations.append(['Turkey', 'Turkiye'])
+        valid_locations.extend()
 
     lang = user_pref.get('languages')
     loc = user_pref.get('locations')
