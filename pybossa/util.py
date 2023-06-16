@@ -1016,8 +1016,9 @@ def get_user_pref_db_clause(user_pref, user_email=None):
 
     _valid = ((k, v) for k, v in user_pref.items() if isinstance(v, list))
     turkey_spellings = {'Turkey', 'Türkiye', 'Turkiye'}
-    if any(turkey_spelling in user_pref[location_key] for turkey_spelling in turkey_spellings):
-        user_pref[location_key] = list(set(user_pref[location_key]).union(turkey_spellings))
+    if location_key in user_pref and \
+       any(turkey_spelling in user_pref[location_key] for turkey_spelling in turkey_spellings):
+            user_pref[location_key] = list(set(user_pref[location_key]).union(turkey_spellings))
 
     user_prefs = [{k: [item]} for k, pref_list in _valid
                   for item in pref_list]
