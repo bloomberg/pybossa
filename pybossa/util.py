@@ -1010,12 +1010,18 @@ def get_user_pref_db_clause(user_pref, user_email=None):
     # expand user preferences as per sql format for jsonb datatype
     # single user preference with multiple value or
     # multiple user preferences with single/multiple values
-    _valid = ((k, v) for k, v in user_pref.items() if isinstance(v, list))
-    user_prefs = [{k: [item]} for k, pref_list in _valid
-                  for item in pref_list]
     assign_key = 'assign_user'
     location_key = 'locations'
     language_key = 'languages'
+
+    _valid = ((k, v) for k, v in user_pref.items() if isinstance(v, list))
+    turkey_spellings = {'Turkey', 'Türkiye', 'Turkiye'}
+    if location_key in user_pref and \
+       any(turkey_spelling in user_pref[location_key] for turkey_spelling in turkey_spellings):
+            user_pref[location_key] = list(set(user_pref[location_key]).union(turkey_spellings))
+
+    user_prefs = [{k: [item]} for k, pref_list in _valid
+                  for item in pref_list]
 
     if not user_prefs:
         user_pref_sql = '''(task.user_pref IS NULL OR task.user_pref = \'{}\' )'''
@@ -1024,8 +1030,9 @@ def get_user_pref_db_clause(user_pref, user_email=None):
                     AND task.user_pref->\'{}\' IS NOT NULL AND task.user_pref @> :assign_user)
                     '''.format(location_key, language_key, assign_key)
     else:
-        sql = ('task.user_pref @> \'{}\''.format(json.dumps(up).lower())
+        sql = ('task.user_pref @> \'{}\''.format(json.dumps(up, ensure_ascii=False).lower())
                    for up in user_prefs)
+
         user_pref_sql = '''( (task.user_pref-> \'{}\' IS NULL AND task.user_pref-> \'{}\' IS NULL) OR ({}) )'''.format(location_key, language_key, ' OR '.join(sql))
         if user_email:
             email_sql = ''' AND (task.user_pref->\'{}\' IS NULL OR task.user_pref @> :assign_user)
