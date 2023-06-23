@@ -18,6 +18,16 @@ from pybossa.util import get_avatar_url
 
 app = create_app(run_as_server=False)
 
+def create_su():
+    '''Create the first super user'''
+    with app.app_context():
+        from pybossa.core import user_repo
+        from pybossa.model.user import User
+        if not user_repo.get_all():
+            user = User(email_addr='user@user.com', name='user', fullname='user', admin=True)
+            user.set_password('test')
+            user_repo.save(user)
+
 def setup_alembic_config():
     alembic_cfg = Config("alembic.ini")
     command.stamp(alembic_cfg, "head")
