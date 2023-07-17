@@ -31,7 +31,8 @@ allowed_mime_types = ['application/pdf',
                       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                       'audio/mpeg',
                       'audio/wav',
-                      'application/json']
+                      'application/json',
+                      'application/csv']
 
 
 DEFAULT_CONN = 'S3_DEFAULT'
