@@ -10,7 +10,7 @@ requirements = [
     "boto==2.49.0",
     "cachelib==0.3.0",
     "cachetools==4.2.2",
-    "certifi==2021.5.30",
+    "certifi==2023.7.22",
     "cffi==1.14.6",
     "chardet==4.0.0",
     "charset-normalizer==2.0.6",
