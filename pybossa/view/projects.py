@@ -96,7 +96,7 @@ from pybossa.util import crossdomain
 from pybossa.error import ErrorStatus
 from pybossa.redis_lock import get_locked_tasks_project
 from pybossa.sched import (Schedulers, select_task_for_gold_mode, lock_task_for_user, fetch_lock_for_user,
-    get_task_id_and_duration_for_project_user)
+    get_task_id_and_duration_for_project_user, sched_variants)
 from pybossa.syncer import NotEnabled, SyncUnauthorized
 from pybossa.syncer.project_syncer import ProjectSyncer
 from pybossa.exporter.csv_reports_export import ProjectReportCsvExporter
@@ -949,12 +949,17 @@ def update(short_name):
                     prodsubprods=prodsubprods)
     return handle_content_type(response)
 
-
 @blueprint.route('/<short_name>/')
 @login_required
 def details(short_name):
 
     project, owner, ps = project_by_shortname(short_name)
+
+    # all projects require password check
+    redirect_to_password = _check_if_redirect_to_password(project)
+    if redirect_to_password:
+        return redirect_to_password
+
     num_available_tasks = n_available_tasks(project.id)
     num_completed_tasks_by_user = n_completed_tasks_by_user(project.id, current_user.id)
     oldest_task = oldest_available_task(project.id, current_user.id)
@@ -965,11 +970,19 @@ def details(short_name):
     num_gold_tasks = n_gold_tasks(project.id)
     num_locked_tasks = len({task["task_id"] for task in get_locked_tasks(project)})
     num_priority_one_tasks = n_priority_x_tasks(project.id)
+    n_tasks = ps.n_tasks - num_gold_tasks
+    notifications = {}
 
-    # all projects require password check
-    redirect_to_password = _check_if_redirect_to_password(project)
-    if redirect_to_password:
-        return redirect_to_password
+    if n_tasks and ps.overall_progress < 100 and num_available_tasks_for_user == 0:
+        task_scheduler_id = project.info.get('sched')
+        task_scheduler = dict(sched_variants()).get(task_scheduler_id)
+        if task_scheduler_id in [Schedulers.task_queue, Schedulers.user_pref] and task_scheduler:
+            notifications['project_incomplete_info'] = {
+                'user_preferences': {
+                    'task_scheduler': task_scheduler,
+                    'account_profile_link': url_for('account.profile', name=current_user.name)
+                }
+            }
 
     ensure_authorized_to('read', project)
     template = '/projects/project.html'
@@ -983,7 +996,7 @@ def details(short_name):
     template_args = {"project": project_sanitized,
                      "title": title,
                      "owner":  owner_sanitized,
-                     "n_tasks": ps.n_tasks - num_gold_tasks,
+                     "n_tasks": n_tasks,
                      "n_task_runs": ps.n_task_runs,
                      "overall_progress": ps.overall_progress,
                      "last_activity": ps.last_activity,
@@ -1005,6 +1018,8 @@ def details(short_name):
         template_args['ckan_name'] = current_app.config.get('CKAN_NAME')
         template_args['ckan_url'] = current_app.config.get('CKAN_URL')
         template_args['ckan_pkg_name'] = short_name
+    if notifications:
+        template_args['notifications'] = notifications
     response = dict(template=template, **template_args)
 
     return handle_content_type(response)
