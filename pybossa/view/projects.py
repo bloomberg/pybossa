@@ -1018,7 +1018,7 @@ def details(short_name):
         template_args['ckan_name'] = current_app.config.get('CKAN_NAME')
         template_args['ckan_url'] = current_app.config.get('CKAN_URL')
         template_args['ckan_pkg_name'] = short_name
-    if len(notifications):
+    if notifications:
         template_args['notifications'] = notifications
     response = dict(template=template, **template_args)
 
