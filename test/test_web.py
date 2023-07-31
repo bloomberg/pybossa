@@ -1972,17 +1972,22 @@ class TestWeb(web.Helper):
 
         res = self.app_get_json(url)
         data = json.loads(res.data)
+        # Default task scheduler: verify notification message does not display.
         assert 'notifications' not in data.keys(), list(data.keys())
 
         project.info['sched'] = Schedulers.task_queue
         res = self.app_get_json(url)
         data = json.loads(res.data)
+        # Task Queue scheduler: verify notification message displays.
         assert 'notifications' in data.keys(), list(data.keys())
 
         project.info['sched'] = Schedulers.user_pref
         res = self.app_get_json(url)
         data = json.loads(res.data)
+        # User Preferences task scheduler: verify notification message displays.
         assert 'notifications' in data.keys(), list(data.keys())
+
+        # Verify notification payload keys.
         notifications = data['notifications']
         assert 'project_incomplete_info' in notifications.keys(), list(notifications.keys())
         project_incomplete_info = notifications['project_incomplete_info']
