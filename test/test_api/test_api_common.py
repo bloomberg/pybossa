@@ -20,6 +20,7 @@ import datetime
 from test import db, with_context
 from test.test_api import TestAPI
 from pybossa.core import project_repo
+from pybossa.messages import *
 
 from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory
 
@@ -475,3 +476,16 @@ class TestApiCommon(TestAPI):
             assert "Statistics" in res.data.decode()
             assert 'id="percent-completed"' in res.data.decode()
             assert "<div>100%</div>" in res.data.decode()
+
+    @with_context
+    def test_request_with_invalid_filter_query(self):
+        """Test API response status code upon invalid request with filter query"""
+
+        user = UserFactory.create()
+        # owners_ids is missing curly braces
+        bad_url_query = '/api/project?owners_ids=9999&api_key=' + user.api_key
+        res = self.app_get_json(bad_url_query)
+        data = json.loads(res.data)
+        assert data.get('status') == FAILED
+        assert data.get('status_code') == 415
+        assert data.get('exception_msg') == 'Your request was invalid. Please check your arguments.'

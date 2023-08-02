@@ -27,6 +27,7 @@ This package adds GET, POST, PUT and DELETE errors for the API:
 import json
 from flask import Response
 from flask import current_app, request
+from flask_babel import gettext
 
 
 class ErrorStatus(object):
@@ -69,6 +70,9 @@ class ErrorStatus(object):
                              'Conflict'):
             if message is None:
                 message = e.description
+        elif exception_cls in ('DataError'):
+            if message is None:
+                message = gettext('Your request was invalid. Please check your arguments.')
         else:
             if message is None:
                 message = str(e)
