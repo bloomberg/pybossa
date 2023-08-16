@@ -40,12 +40,13 @@ import pybossa.app_settings as app_settings
 import json
 from pybossa.wizard import Wizard
 
+from flask_openapi3 import OpenAPI
 
 def create_app(run_as_server=True):
     """Create web app."""
 
     setup_logging(run_as_server)
-    app = Flask(__name__.split('.')[0])
+    app = OpenAPI(__name__.split('.')[0])
     configure_app(app)
     global talisman
     talisman = Talisman(app, content_security_policy={

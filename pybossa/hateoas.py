@@ -30,6 +30,7 @@ class Hateoas(object):
     def create_link(self, item_id, title, rel='self'):
         """Create hateoas link."""
         # title = item.__class__.__name__.lower()
+        print("create_link args: ", item_id, title, rel)
         method = ".api_%s" % title
         href = url_for(method, oid=item_id, _external=True)
         return self.link(rel, title, href)
@@ -38,6 +39,7 @@ class Hateoas(object):
         """Create Hateoas links."""
         cls = item.__class__.__name__.lower()
         links = []
+        print("CLS IS ", cls)
         if cls == 'result':
             link = self. create_link(item.id, title='result')
             if item.project_id is not None:

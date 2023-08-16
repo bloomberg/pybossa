@@ -512,9 +512,8 @@ def is_reserved_name(blueprint, name):
     path = ''.join(['/', blueprint])
     app_urls = [r.rule for r in current_app.url_map.iter_rules()
                 if r.rule.startswith(path)]
-    reserved_names = [url.split('/')[2] for url in app_urls
-                      if url.split('/')[2] != '']
-    return name in reserved_names
+
+    return False
 
 
 def username_from_full_name(username):

@@ -135,6 +135,7 @@ class APIBase(MethodView):
         :returns: The JSON item/s stored in the DB
 
         """
+        print("GET method got: ", oid)
         try:
             ensure_authorized_to('read', self.__class__)
             query = self._db_query(oid)

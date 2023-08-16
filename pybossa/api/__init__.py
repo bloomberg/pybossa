@@ -43,41 +43,42 @@ from pybossa.util import jsonpify, get_user_id_or_ip, fuzzyboolean, \
 from pybossa.util import get_disqus_sso_payload, grant_access_with_api_key
 import dateutil.parser
 import pybossa.model as model
+import pybossa.model.project as projectModel
 from pybossa.core import csrf, ratelimits, sentinel, anonymizer
 from pybossa.ratelimit import ratelimit
 from pybossa.cache.projects import n_tasks, n_completed_tasks
 import pybossa.sched as sched
 from pybossa.util import sign_task, can_update_user_info
 from pybossa.error import ErrorStatus
-from .global_stats import GlobalStatsAPI
-from .task import TaskAPI
-from .task_run import TaskRunAPI, preprocess_task_run
+# from .global_stats import GlobalStatsAPI
+# from .task import TaskAPI
+# from .task_run import TaskRunAPI, preprocess_task_run
 from .project import ProjectAPI
-from .auditlog import AuditlogAPI
-from .announcement import AnnouncementAPI
-from .blogpost import BlogpostAPI
+# from .auditlog import AuditlogAPI
+# from .announcement import AnnouncementAPI
+# from .blogpost import BlogpostAPI
 from .category import CategoryAPI
-from .favorites import FavoritesAPI
-from pybossa.api.performance_stats import PerformanceStatsAPI
-from .user import UserAPI
-from .token import TokenAPI
-from .result import ResultAPI
+# from .favorites import FavoritesAPI
+# from pybossa.api.performance_stats import PerformanceStatsAPI
+# from .user import UserAPI
+# from .token import TokenAPI
+# from .result import ResultAPI
 from rq import Queue
-from .project_stats import ProjectStatsAPI
-from .helpingmaterial import HelpingMaterialAPI
+# from .project_stats import ProjectStatsAPI
+# from .helpingmaterial import HelpingMaterialAPI
 from pybossa.core import auditlog_repo, project_repo, task_repo, user_repo
 from pybossa.contributions_guard import ContributionsGuard
 from pybossa.auth import jwt_authorize_project
 from werkzeug.exceptions import MethodNotAllowed, Forbidden
-from .completed_task import CompletedTaskAPI
-from .completed_task_run import CompletedTaskRunAPI
+# from .completed_task import CompletedTaskAPI
+# from .completed_task_run import CompletedTaskRunAPI
 from pybossa.cache.helpers import (n_available_tasks, n_available_tasks_for_user,
     n_unexpired_gold_tasks)
 from pybossa.sched import (get_scheduler_and_timeout, has_lock, release_lock, Schedulers,
                            fetch_lock_for_user, release_reserve_task_lock_by_id)
 from pybossa.jobs import send_mail
 from pybossa.api.project_by_name import ProjectByNameAPI, project_name_to_oid
-from pybossa.api.project_details import ProjectDetailsAPI
+# from pybossa.api.project_details import ProjectDetailsAPI
 from pybossa.api.pwd_manager import get_pwd_manager
 from pybossa.data_access import data_access_levels
 from pybossa.task_creator_helper import set_gold_answers
@@ -92,7 +93,11 @@ from pybossa.cache.task_browse_helpers import get_searchable_columns
 from pybossa.cache.users import get_user_pref_metadata
 from pybossa.view.projects import get_locked_tasks
 from pybossa.redis_lock import EXPIRE_LOCK_DELAY
-from pybossa.api.bulktasks import BulkTasksAPI
+#from pybossa.api.bulktasks import BulkTasksAPI
+
+from flask_openapi3 import Tag, APIBlueprint
+from pydantic import BaseModel, Field
+from typing import Optional
 
 task_fields = [
     "id",
@@ -102,13 +107,33 @@ task_fields = [
     "calibration",
 ]
 
-blueprint = Blueprint('api', __name__)
+#blueprint = Blueprint('api', __name__)
+
+tag = Tag(name='api', description="GIGwork API")
+
+blueprint = APIBlueprint(
+    '/api',
+    __name__,
+    abp_tags=[tag],
+    doc_ui=True
+)
+
+class BookBody(BaseModel):
+    """a book."""
+    age: Optional[int] = Field(..., ge=2, le=4, description='Age')
+    author: str = Field(None, min_length=2, max_length=4, description='Author')
+
+@blueprint.post('/book', responses={201: {"content": {"text/csv": {"schema": {"type": "string"}}}, "description": "gotem"}})
+def create_book(body: BookBody):
+    """create a book."""
+    assert body.age == 3
+    return {"code": 0, "message": "ok"}
 
 error = ErrorStatus()
 mail_queue = Queue('email', connection=sentinel.master)
 
 
-@blueprint.route('/')
+@blueprint.get('/', responses={200: {"content": {"text/html": {"schema": {"type": "string"}}}, "description": "pybossa home page"}})
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def index():  # pragma: no cover
     """Return dummy text for welcome page."""
@@ -142,29 +167,80 @@ def register_api(view, endpoint, url, pk='id', pk_type='int'):
                            view_func=view_func,
                            methods=['GET', 'PUT', 'DELETE', 'OPTIONS'])
 
-register_api(ProjectAPI, 'api_project', '/project', pk='oid', pk_type='int')
-register_api(ProjectStatsAPI, 'api_projectstats', '/projectstats', pk='oid', pk_type='int')
-register_api(CategoryAPI, 'api_category', '/category', pk='oid', pk_type='int')
-register_api(TaskAPI, 'api_task', '/task', pk='oid', pk_type='int')
-register_api(AuditlogAPI, 'api_auditlog', '/auditlog', pk='oid', pk_type='int')
-register_api(TaskRunAPI, 'api_taskrun', '/taskrun', pk='oid', pk_type='int')
-register_api(ResultAPI, 'api_result', '/result', pk='oid', pk_type='int')
-register_api(UserAPI, 'api_user', '/user', pk='oid', pk_type='int')
-register_api(AnnouncementAPI, 'api_announcement', '/announcement', pk='oid', pk_type='int')
-register_api(BlogpostAPI, 'api_blogpost', '/blogpost', pk='oid', pk_type='int')
-register_api(HelpingMaterialAPI, 'api_helpingmaterial',
-             '/helpingmaterial', pk='oid', pk_type='int')
-register_api(GlobalStatsAPI, 'api_globalstats', '/globalstats',
-             pk='oid', pk_type='int')
-register_api(FavoritesAPI, 'api_favorites', '/favorites',
-             pk='oid', pk_type='int')
-register_api(TokenAPI, 'api_token', '/token', pk='token', pk_type='string')
-register_api(CompletedTaskAPI, 'api_completedtask', '/completedtask', pk='oid', pk_type='int')
-register_api(CompletedTaskRunAPI, 'api_completedtaskrun', '/completedtaskrun', pk='oid', pk_type='int')
-register_api(ProjectByNameAPI, 'api_projectbyname', '/projectbyname', pk='key', pk_type='string')
-register_api(ProjectDetailsAPI, 'api_projectdetails', '/projectdetails', pk='oid', pk_type='int')
-register_api(PerformanceStatsAPI, 'api_performancestats', '/performancestats', pk='oid', pk_type='int')
-register_api(BulkTasksAPI, 'api_bulktasks', '/bulktasks', pk='oid', pk_type='int')
+projectAPI = ProjectAPI()
+categoryAPI = CategoryAPI()
+
+class getProjectBody(BaseModel):
+    oid: int = Field(..., description='Project ID')
+
+
+class DataClassification(BaseModel):
+    input_data: str
+    output_data: str
+
+class Info(BaseModel):
+    subproduct: str
+    product: str
+    kpi: int
+    data_classification: DataClassification
+
+class createProjectBody(BaseModel):
+    name: str
+    short_name: str
+    description: str
+    password: str
+    info: Info
+
+
+@blueprint.get('/project/<int:oid>', endpoint='api_project',
+               responses={200: {"content": {"application/json": {}}, "description": "success"}},
+               description="get a project")
+def get_project(path: getProjectBody):
+    print("GET /project: ", type(path), path)
+    return projectAPI.get(oid=path.oid)
+
+@csrf.exempt
+@blueprint.post('/project',
+                responses={200: {"content": {"application/json": {}}, "description": "success"}},
+                description="create a project",)
+def post_project(body: createProjectBody):
+    print("POST /project: ", body)
+    return projectAPI.post()
+
+@blueprint.delete('/project/<int:oid>', description="delete a project.")
+def delete_project(path: getProjectBody):
+    print("DELETE /project: ", type(path), path)
+    return projectAPI.delete(oid=path.oid)
+
+@csrf.exempt
+@blueprint.get('/category/<int:oid>', endpoint='api_category', responses={200: {"content": {"application/json": {"schema": {"type": "string"}}}, "description": "success"}})
+def get_category(path: getProjectBody):
+    print("GET /category: ", type(path), path)
+    return categoryAPI.get(oid=path.oid)
+
+# register_api(ProjectAPI, 'api_project', '/project', pk='oid', pk_type='int')
+# register_api(ProjectStatsAPI, 'api_projectstats', '/projectstats', pk='oid', pk_type='int')
+# register_api(CategoryAPI, 'api_category', '/category', pk='oid', pk_type='int')
+# register_api(TaskAPI, 'api_task', '/task', pk='oid', pk_type='int')
+# register_api(AuditlogAPI, 'api_auditlog', '/auditlog', pk='oid', pk_type='int')
+# register_api(TaskRunAPI, 'api_taskrun', '/taskrun', pk='oid', pk_type='int')
+# register_api(ResultAPI, 'api_result', '/result', pk='oid', pk_type='int')
+# register_api(UserAPI, 'api_user', '/user', pk='oid', pk_type='int')
+# register_api(AnnouncementAPI, 'api_announcement', '/announcement', pk='oid', pk_type='int')
+# register_api(BlogpostAPI, 'api_blogpost', '/blogpost', pk='oid', pk_type='int')
+# register_api(HelpingMaterialAPI, 'api_helpingmaterial',
+#              '/helpingmaterial', pk='oid', pk_type='int')
+# register_api(GlobalStatsAPI, 'api_globalstats', '/globalstats',
+#              pk='oid', pk_type='int')
+# register_api(FavoritesAPI, 'api_favorites', '/favorites',
+#              pk='oid', pk_type='int')
+# register_api(TokenAPI, 'api_token', '/token', pk='token', pk_type='string')
+# register_api(CompletedTaskAPI, 'api_completedtask', '/completedtask', pk='oid', pk_type='int')
+# register_api(CompletedTaskRunAPI, 'api_completedtaskrun', '/completedtaskrun', pk='oid', pk_type='int')
+# register_api(ProjectByNameAPI, 'api_projectbyname', '/projectbyname', pk='key', pk_type='string')
+# register_api(ProjectDetailsAPI, 'api_projectdetails', '/projectdetails', pk='oid', pk_type='int')
+# register_api(PerformanceStatsAPI, 'api_performancestats', '/performancestats', pk='oid', pk_type='int')
+# register_api(BulkTasksAPI, 'api_bulktasks', '/bulktasks', pk='oid', pk_type='int')
 
 
 def add_task_signature(tasks):
