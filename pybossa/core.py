@@ -39,13 +39,14 @@ from pybossa.messages import *
 import pybossa.app_settings as app_settings
 import json
 from pybossa.wizard import Wizard
-
+from flasgger import Swagger
 
 def create_app(run_as_server=True):
     """Create web app."""
 
     setup_logging(run_as_server)
     app = Flask(__name__.split('.')[0])
+    swagger = Swagger(app)
     configure_app(app)
     global talisman
     talisman = Talisman(app, content_security_policy={

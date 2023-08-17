@@ -177,7 +177,30 @@ def add_task_signature(tasks):
 @blueprint.route('/project/<project_id>/newtask/<int:task_id>')
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def new_task(project_id, task_id=None):
-    """Return a new task for a project."""
+    """Return a new task for a project.
+    ---
+    parameters:
+      - name: project_id
+        schema:
+            type: integer
+        in: path
+        required: true
+
+      - name: task_id
+        in: path
+        schema:
+            type: integer
+        required: false
+    definitions:
+      Res:
+        type: object
+
+    responses:
+      200:
+        description: Successfully got task
+        schema:
+          $ref: '#/definitions/Res'
+    """
     # Check the value of saved_task_position from Redis:
     saved_task_position = None
     if not current_user.is_anonymous:
