@@ -399,3 +399,20 @@ class ProjectRepository(Repository):
             'kpi', 'product', 'subproduct', 'input_data_classification', 'output_data_classification',
             'data_access']]
         return data
+
+    def get_gold_annotations(self, project_id):
+        sql = text(
+                    '''
+                        SELECT
+                        task.id AS task_id, task.gold_answers,
+                        result.info AS consensus_annotations 
+                        FROM task INNER JOIN result  
+                        ON task.id = result.task_id
+                        WHERE task.project_id=:project_id
+                        AND task.calibration=1 
+                        AND result.last_version=True 
+                        ORDER BY task_id;
+                    '''
+                    )
+        rows = self.db.session.execute(sql, dict(project_id=project_id)).fetchall()
+        return [dict(row) for row in rows]
