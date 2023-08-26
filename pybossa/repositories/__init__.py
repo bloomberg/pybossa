@@ -60,13 +60,17 @@ class Repository(object):
                                      **kwargs):
         clauses = [_entity_descriptor(model, key) == value
                        for key, value in kwargs.items()
-                       if (key != 'info' and key != 'fav_user_ids'
+                       if (key != 'custom_query_filters' and key != 'info' and key != 'fav_user_ids'
                             and key != 'created' and key != 'project_id'
                             and key != 'created_from' and key != 'created_to')]
+
         queries = []
         headlines = []
         order_by_ranks = []
         or_clauses = []
+
+        if 'custom_query_filters' in kwargs.keys():
+            clauses = clauses + kwargs.get('custom_query_filters')
 
         if 'info' in kwargs.keys():
             queries, headlines, order_by_ranks = self.handle_info_json(model, kwargs['info'],
@@ -232,6 +236,7 @@ class Repository(object):
             filters.pop('finish_time', None)
         to_finish_time = filters.pop('to_finish_time', None)
         query = self.create_context(filters, fulltextsearch, model)
+
         if hasattr(model, 'finish_time'):
             if from_finish_time:
                 if not to_finish_time:

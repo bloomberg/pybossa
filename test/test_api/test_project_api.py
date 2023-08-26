@@ -285,6 +285,104 @@ class TestProjectAPI(TestAPI):
         for d in data:
             d['owner_id'] == user.id, d
 
+    @with_context
+    def test_project_query_for_coowner(self):
+        """ Test API project query for coowner."""
+        owner1 = UserFactory.create()
+        project1 = ProjectFactory.create(owner=owner1)
+        owner2 = UserFactory.create()
+        project2 = ProjectFactory.create(owner=owner2)
+
+        # 1. owner1 is owner of their project
+        res1 = self.app.get('/api/project?api_key=' + owner1.api_key)
+        data1 = json.loads(res1.data)
+        assert len(data1) == 1, len(data1)
+        result1 = data1[0]
+        assert result1['id'] == project1.id, result1
+        assert result1['owner_id'] == owner1.id, result1
+
+        # 2. owner1 is also co-owner of their own project
+        res2 = self.app.get(f'/api/project?coowner_id={owner1.id}&api_key={owner1.api_key}')
+        data2 = json.loads(res2.data)
+        assert len(data2) == 1, len(data2)
+        result2 = data2[0]
+        assert result2['id'] == project1.id, result2
+        assert owner1.id in result2['owners_ids'], result2
+
+        # 3. owner1 does not share any projects with owner2
+        res3 = self.app.get(f'/api/project?coowner_id={owner2.id}&api_key={owner1.api_key}')
+        data3 = json.loads(res3.data)
+        assert len(data3) == 0, len(data3)
+
+        # create coowner1
+        coowner1 = UserFactory.create()
+
+        # 4. coowner1 is owner of 0 projects
+        res4 = self.app.get(f'/api/project?api_key={coowner1.api_key}')
+        data4 = json.loads(res4.data)
+        assert len(data4) == 0, len(data4)
+
+        # 5. coowner1 is co-owner of 0 projects
+        res5 = self.app.get(f'/api/project?coowner_id={coowner1.id}&api_key={coowner1.api_key}')
+        data5 = json.loads(res5.data)
+        assert len(data5) == 0, len(data5)
+
+        # 6. coowner1 cannot view projects shared with owner1
+        res6 = self.app.get(f'/api/project?coowner_id={owner1.id}&api_key={coowner1.api_key}')
+        data6 = json.loads(res6.data)
+        assert len(data6) == 0, len(data6)
+
+        # add coowner1 to project1
+        project1.owners_ids.append(coowner1.id)
+
+        # 6. coowner1 is still not owner of any projects
+        res6 = self.app.get(f'/api/project?api_key={coowner1.api_key}')
+        data6 = json.loads(res6.data)
+        assert len(data6) == 0, len(data6)
+
+        # 7. coowner1 is now co-owner of project1 (queried using coowner1's api key)
+        res7 = self.app.get(f'/api/project?coowner_id={coowner1.id}&api_key={coowner1.api_key}')
+        data7 = json.loads(res7.data)
+        assert len(data7) == 1, len(data7)
+        result7 = data7[0]
+        assert result7['id'] == project1.id, result7
+        assert coowner1.id in result7['owners_ids'], result7
+
+        # 8. coowner1 can view projects shared with owner1
+        res8 = self.app.get(f'/api/project?coowner_id={owner1.id}&api_key={coowner1.api_key}')
+        data8 = json.loads(res8.data)
+        assert len(data8) == 1, len(data8)
+        result8 = data8[0]
+        assert result8['id'] == project1.id, result8
+        assert owner1.id in result8['owners_ids'], result8
+
+        # 9. coowner1 is now co-owner of project1 (queried using owner1's api key)
+        res9 = self.app.get(f'/api/project?coowner_id={coowner1.id}&api_key={owner1.api_key}')
+        data9 = json.loads(res9.data)
+        assert len(data9) == 1, len(data9)
+        result9 = data9[0]
+        assert result9['id'] == project1.id, result9
+        assert coowner1.id in result9['owners_ids'], result9
+
+        # 10. coowner1 is now co-owner of project1, but owner2 cannot see this because they are not a co-owner
+        res10 = self.app.get(f'/api/project?coowner_id={coowner1.id}&api_key={owner2.api_key}')
+        data10 = json.loads(res10.data)
+        assert len(data10) == 0, len(data10)
+
+        # 11. coowner1 does not share any projects with owner2
+        res11 = self.app.get(f'/api/project?coowner_id={owner2.id}&api_key={coowner1.api_key}')
+        data11 = json.loads(res11.data)
+        assert len(data11) == 0, len(data11)
+
+    @with_context
+    def test_project_query_for_coowner_using_invalid_id(self):
+        """ Test API project query for coowner using invalid id"""
+        user = UserFactory.create()
+        invalid_id = "abc123"
+
+        res = self.app.get(f'/api/project?coowner_id={invalid_id}&api_key={user.api_key}')
+        data = json.loads(res.data)
+        assert data["exception_msg"] == "Please enter a valid id.", data
 
     @with_context
     def test_query_project(self):
