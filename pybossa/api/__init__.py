@@ -919,3 +919,21 @@ def large_language_model(model_name):
     response = {"Model: ": model_name, "predictions: ": predictions}
 
     return Response(json.dumps(response), status=r.status_code, mimetype="application/json")
+
+
+@jsonpify
+@blueprint.route('/project/<project_id>/gold_annotations')
+@ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+def get_gold_annotations(project_id):
+    """Obtain all gold tasks under a given project along with consensus built on their annotations
+    """
+
+    if not current_user.is_authenticated:
+        return abort(401)
+
+    project = project_repo.get(project_id)
+    if not current_user.admin and not (current_user.subadmin and current_user.id in project.owners_ids):
+        return abort(403)
+
+    tasks = project_repo.get_gold_annotations(project_id)
+    return Response(json.dumps(tasks), status=200, mimetype="application/json")

@@ -10079,6 +10079,49 @@ class TestWeb(web.Helper):
         assert "class=\" sort-asc sortable\" data-sort=\"completed_by\"" not in str(res.data), "Unexpected sorted column (sort-asc) indicator on Completed By."
         assert "class=\" sort-asc sortable\" data-sort=\"priority\"" not in str(res.data), "Missing sorted column indicator (sort-asc) on Priority."
 
+    @with_context
+    def test_gold_annotations_anonymous_access_fails(self):
+        """Test gold_annotations without login"""
+        res = self.app_get_json("/api/project/test_proj/gold_annotations")
+        data = json.loads(res.data)
+        assert data.get('status_code') == 401, data
+
+    @with_context
+    def test_gold_annotations_regular_admin_subadmin_users(self):
+        """Test gold_annotations returns valid response based on user types"""
+        admin = UserFactory.create()
+        self.signin_user(admin)
+        project = ProjectFactory.create(owner=admin)
+
+        regular_user = UserFactory.create(id=999, subadmin=False, admin=False, name="reguser")
+        regular_user.set_password('1234')
+        user_repo.save(regular_user)
+
+        project.owners_ids.append(regular_user.id)
+        project_repo.save(project)
+
+        subadmin_user = UserFactory.create(id=1999, subadmin=True, admin=False, name="subuser")
+        subadmin_user.set_password('1234')
+        user_repo.save(subadmin_user)
+
+        # regular user forbidden
+        self.signin(email=regular_user.email_addr, password='1234')
+        res = self.app_get_json(f"/api/project/{project.id}/gold_annotations")
+        data = json.loads(res.data)
+        assert data.get('status_code') == 403, data
+
+        # subadmin user forbidden as user is not project coowner
+        self.signin(email=subadmin_user.email_addr, password='1234')
+        res = self.app_get_json(f"/api/project/{project.id}/gold_annotations")
+        data = json.loads(res.data)
+        assert data.get('status_code') == 403, data
+
+        project.owners_ids.append(subadmin_user.id)
+        project_repo.save(project)
+        res = self.app_get_json(f"/api/project/{project.id}/gold_annotations")
+        assert res.status_code == 200, data
+
+
 class TestWebUserMetadataUpdate(web.Helper):
 
     original = {
