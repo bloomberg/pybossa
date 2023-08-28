@@ -263,7 +263,7 @@ class APIBase(MethodView):
                 if self.__class__ == Task and k == 'external_uid':
                     pass
                 else:
-                    getattr(self.__class__, k)
+                    self._has_filterable_attribute(k)
                 filters[k] = request.args[k]
 
         repo = repo_info['repo']
@@ -513,6 +513,11 @@ class APIBase(MethodView):
         specific filtering criteria.
         """
         return query
+
+    def _has_filterable_attribute(self, attribute):
+        """Method to be overridden by inheriting classes that want
+        to have custom filterable attributes"""
+        getattr(self.__class__, attribute)
 
     def _validate_instance(self, instance):
         """Method to be overriden in inheriting classes which may need to

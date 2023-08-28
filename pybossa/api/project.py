@@ -25,6 +25,7 @@ This package adds GET, POST, PUT and DELETE methods for:
 import copy
 from werkzeug.exceptions import BadRequest, Forbidden, Unauthorized
 from flask import current_app, request
+from flask_babel import gettext
 from flask_login import current_user
 from .api_base import APIBase
 from pybossa.model.project import Project
@@ -33,6 +34,7 @@ from pybossa.util import is_reserved_name, description_from_long_description
 from pybossa.core import auditlog_repo, result_repo, http_signer
 from pybossa.auditlogger import AuditLogger
 from pybossa.data_access import ensure_user_assignment_to_project, set_default_amp_store
+from sqlalchemy.orm.base import _entity_descriptor
 
 auditlogger = AuditLogger(auditlog_repo, caller='api')
 
@@ -50,6 +52,30 @@ class ProjectAPI(APIBase):
     reserved_keys = set(['id', 'created', 'updated', 'completed', 'contacted', 'secret_key'])
     private_keys = set(['secret_key'])
     restricted_keys = set()
+
+    def _has_filterable_attribute(self, attribute):
+        if attribute not in ["coowner_id"]:
+            getattr(self.__class__, attribute)
+
+    def _custom_filter(self, query):
+        if "coowner_id" in query:
+            try:
+                coowner_id = int(query.pop("coowner_id"))
+            except ValueError:
+                raise ValueError(gettext("Please enter a valid id."))
+
+            query.pop("owner_id", None)
+
+            if current_user.id == coowner_id:
+                query['custom_query_filters'] = [
+                    _entity_descriptor(Project, "owners_ids").any(coowner_id),
+                ]
+            else:
+                query['custom_query_filters'] = [
+                    _entity_descriptor(Project, "owners_ids").any(current_user.id),
+                    _entity_descriptor(Project, "owners_ids").any(coowner_id),
+                ]
+        return query
 
     def _preprocess_request(self, request):
         # Limit maximum post data size.
