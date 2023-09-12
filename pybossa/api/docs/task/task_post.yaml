@@ -1,9 +1,12 @@
-Create task via POST with json data payload
+Create task with json data payload
 ---
+tags:
+  - name: task
 parameters:
   - name: task
     required: true
     description: the task to create
+    in: body
     schema:
       type: object
       required:

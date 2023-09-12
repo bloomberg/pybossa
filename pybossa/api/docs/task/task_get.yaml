@@ -1,5 +1,7 @@
 Get task information by task id
 ---
+tags:
+  - name: task
 definitions:
   Task:
     type: object

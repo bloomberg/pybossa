@@ -1,0 +1,36 @@
+Update a project by project id
+---
+tags:
+  - name: project
+parameters:
+  - name: oid
+    in: path
+    type: number
+    required: true
+    description: the project id
+  - name: project_info
+    in: body
+    type: ojbect
+    properties:
+      name:
+        type: string
+      short_name:
+        type: string
+      description:
+        type: string
+      long_description:
+        type: string
+      published:
+        type: boolean
+      task_presenter:
+        type: string
+    required: true
+    description: the new project info
+
+responses:
+  200:
+    description: new project info
+    schema:
+      $ref: '#definitions/Project'
+
+

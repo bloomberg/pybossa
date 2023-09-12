@@ -126,6 +126,7 @@ class APIBase(MethodView):
     @jsonpify
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
     @swag_from('docs/task/task_get.yaml', endpoint='api.api_task_oid')
+    @swag_from('docs/project/project_get.yaml', endpoint='api.api_project_oid')
     def get(self, oid):
         """Get an object.
 
@@ -317,6 +318,7 @@ class APIBase(MethodView):
     @jsonpify
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
     @swag_from('docs/task/task_post.yaml', endpoint='api.api_task')
+    @swag_from('docs/project/project_post.yaml', endpoint='api.api_project')
     def post(self):
         """Post an item to the DB with the request.data JSON object.
 
@@ -387,6 +389,7 @@ class APIBase(MethodView):
     @jsonpify
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
     @swag_from('docs/task/task_delete.yaml', endpoint='api.api_task_oid')
+    @swag_from('docs/project/project_delete.yaml', endpoint='api.api_project_oid')
     def delete(self, oid):
         """Delete a single item from the DB.
 
@@ -425,6 +428,7 @@ class APIBase(MethodView):
 
     @jsonpify
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+    @swag_from('docs/project/project_put.yaml', endpoint='api.api_project_oid')
     def put(self, oid):
         """Update a single item in the DB.
 

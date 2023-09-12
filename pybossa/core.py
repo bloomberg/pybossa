@@ -47,6 +47,9 @@ def create_app(run_as_server=True):
 
     setup_logging(run_as_server)
     app = Flask(__name__.split('.')[0])
+    app.config['SWAGGER'] = {
+        'title': 'GIGwork API',
+    }
     swag  = Swagger(app)
     configure_app(app)
     global talisman

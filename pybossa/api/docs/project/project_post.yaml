@@ -1,0 +1,108 @@
+Create project with json data payload
+---
+tags:
+  - name: project
+parameters:
+  - name: project
+    required: true
+    description: the project to create
+    in: body
+    schema:
+      type: object
+      required:
+      - project_id
+        info
+      properties:
+            type: object
+      properties:
+        name:
+          type: string
+        short_name:
+          type: string
+        description:
+          type: string
+        password:
+          type: string
+        info:
+          type: object
+          properties:
+            subproduct:
+              type: string
+            product:
+              type: string
+            kpi:
+              type: integer
+            data_classification:
+              type: object
+              properties:
+                input_data:
+                  type: string
+                output_data:
+                  type: string
+responses:
+  200:
+    description: created project info
+    schema:
+      $ref: '#definitions/Project'
+    examples:
+      {
+        "id": 13,
+        "created": "2023-06-14T19:54:34.839245",
+        "updated": "2023-09-12T16:33:28.384714",
+        "name": "user pref test 2",
+        "short_name": "userpreftest2",
+        "description": "user pref test",
+        "long_description": "user pref test",
+        "webhook": null,
+        "allow_anonymous_contributors": true,
+        "published": true,
+        "hidden": false,
+        "featured": false,
+        "secret_key": "c57cca94-29d7-471c-8eee-4bcbbc7a9cb5",
+        "zip_download": true,
+        "contacted": false,
+        "owner_id": 1,
+        "category_id": 1,
+        "info": {
+        "kpi": 3,
+        "sync": {
+        "enabled": false
+        },
+        "sched": "user_pref_scheduler",
+        "product": "Companies",
+        "timeout": 3600,
+        "subproduct": "Entity Management",
+        "data_access": [
+        "L4"
+        ],
+        "passwd_hash": "pbkdf2:sha256:260000$6TmmSmlNFEjKRZrT$85ea2bb992c8baf68933616c4de78d021d45f817acf92dae899e74c852006a9d",
+        "reserve_tasks": {
+        "category": []
+        },
+        "task_presenter": "<div id=\"task-app\"><\\div>",
+        "task_guidelines": "<p>do the task.</p>",
+        "tasklist_columns": [],
+        "default_n_answers": 1,
+        "progress_reminder": {
+        "sent": false,
+        "webhook": null,
+        "target_remaining": null
+        },
+        "allow_taskrun_edit": false,
+        "data_classification": {
+        "input_data": "L4 - Public Third-Party Data",
+        "output_data": "L4 - Public Third-Party Data"
+        },
+        "sched_rand_within_priority": false,
+        "sched_gold_task_probability": 0.1,
+        "allow_anonymous_contributors": false
+        },
+        "email_notif": false,
+        "owners_ids": [
+        1
+        ],
+        "links": [
+        "<link rel='category' title='category' href='http://localhost:5000/api/category?oid=1'/>"
+        ],
+        "link": "<link rel='self' title='project' href='http://localhost:5000/api/project?oid=13'/>"
+      }

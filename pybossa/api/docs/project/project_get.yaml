@@ -1,0 +1,131 @@
+Get project information by project id
+---
+tags:
+  - name: project
+definitions:
+  Project:
+    type: object
+    properties:
+      id:
+        type: integer
+      created:
+        type: string
+      updated:
+        type: string
+      name:
+        type: string
+      short_name:
+        type: string
+      description:
+        type: string
+      long_description:
+        type: string
+      webhook:
+        type: null
+      allow_anonymous_contributors:
+        type: boolean
+      published:
+        type: boolean
+      hidden:
+        type: boolean
+      featured:
+        type: boolean
+      secret_key:
+        type: string
+      zip_download:
+        type: boolean
+      contacted:
+        type: boolean
+      owner_id:
+        type: integer
+      category_id:
+        type: integer
+      info:
+        type: object
+        properties:
+          kpi:
+            type: integer
+          sync:
+            type: object
+            properties:
+              enabled:
+                type: boolean
+          sched:
+            type: string
+          product:
+            type: string
+          timeout:
+            type: integer
+          subproduct:
+            type: string
+          data_access:
+            type: array
+            items:
+              type: string
+          passwd_hash:
+            type: string
+          reserve_tasks:
+            type: object
+            properties:
+              category:
+                type: array
+                items:
+                  type: string
+          task_presenter:
+            type: string
+          task_guidelines:
+            type: string
+          tasklist_columns:
+            type: array
+            items:
+              type: string
+          default_n_answers:
+            type: integer
+          progress_reminder:
+            type: object
+            properties:
+              sent:
+                type: boolean
+              webhook:
+                type: null
+              target_remaining:
+                type: null
+          allow_taskrun_edit:
+            type: boolean
+          data_classification:
+            type: object
+            properties:
+              input_data:
+                type: string
+              output_data:
+                type: string
+          sched_rand_within_priority:
+            type: boolean
+          sched_gold_task_probability:
+            type: number
+          allow_anonymous_contributors:
+            type: boolean
+      email_notif:
+        type: boolean
+      owners_ids:
+        type: array
+        items:
+          type: integer
+      links:
+        type: array
+        items:
+          type: string
+      link:
+        type: string
+parameters:
+  - name: oid
+    in: path
+    type: number
+    required: true
+    description: the project id
+responses:
+  200:
+    description: project info
+    schema:
+      $ref: '#definitions/Project'
+
