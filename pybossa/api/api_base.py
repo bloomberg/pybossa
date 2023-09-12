@@ -30,6 +30,7 @@ import json
 from flask import request, abort, Response, current_app
 from flask_login import current_user
 from flask.views import MethodView
+from flasgger import swag_from
 from werkzeug.exceptions import NotFound, Unauthorized, Forbidden, BadRequest
 from werkzeug.exceptions import MethodNotAllowed
 from pybossa.util import jsonpify, fuzzyboolean, get_avatar_url
@@ -124,6 +125,7 @@ class APIBase(MethodView):
 
     @jsonpify
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+    @swag_from('docs/task/task_get.yaml', endpoint='api.api_task_oid')
     def get(self, oid):
         """Get an object.
 
@@ -314,6 +316,7 @@ class APIBase(MethodView):
 
     @jsonpify
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+    @swag_from('docs/task/task_post.yaml', endpoint='api.api_task')
     def post(self):
         """Post an item to the DB with the request.data JSON object.
 
@@ -383,6 +386,7 @@ class APIBase(MethodView):
 
     @jsonpify
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+    @swag_from('docs/task/task_delete.yaml', endpoint='api.api_task_oid')
     def delete(self, oid):
         """Delete a single item from the DB.
 

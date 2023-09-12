@@ -1,0 +1,41 @@
+Delete a task
+---
+parameters:
+  - name: oid
+    in: path
+    type: number
+    required: true
+    description: the task id
+responses:
+  200:
+    description: deleted task info
+    schema:
+      $ref: '#definitions/Task'
+    examples:
+      {
+        "info": {
+          "company": "Bloomberg",
+          "task": "2",
+          "set_id": "2"
+        },
+        "fav_user_ids": null,
+        "user_pref": {
+        },
+        "n_answers": 1,
+        "quorum": 0,
+        "links": [
+          "<link rel='parent' title='project' href='https://qa.gigwork.net/api/project/2454'/>"
+        ],
+        "calibration": 0,
+        "expiration": null,
+        "created": "2021-04-30T21:56:30.632483",
+        "worker_filter": null,
+        "state": "completed",
+        "gold_answers": null,
+        "link": "<link rel='self' title='task' href='https://qa.gigwork.net/api/task/7225337'/>",
+        "exported": true,
+        "project_id": 2454,
+        "worker_pref": null,
+        "id": 7225337,
+        "priority_0": 0.99
+      }

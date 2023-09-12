@@ -132,15 +132,18 @@ def register_api(view, endpoint, url, pk='id', pk_type='int'):
     view_func = view.as_view(endpoint)
     csrf.exempt(view_func)
     blueprint.add_url_rule(url,
+                           endpoint=endpoint,
                            view_func=view_func,
                            defaults={pk: None},
                            methods=['GET', 'OPTIONS'])
     blueprint.add_url_rule(url,
+                           endpoint=endpoint,
                            view_func=view_func,
                            methods=['POST', 'OPTIONS'])
     blueprint.add_url_rule('%s/<%s:%s>' % (url, pk_type, pk),
-                           view_func=view_func,
-                           methods=['GET', 'PUT', 'DELETE', 'OPTIONS'])
+                            endpoint=endpoint + '_' + pk,
+                            view_func=view_func,
+                            methods=['GET', 'PUT', 'DELETE', 'OPTIONS'])
 
 register_api(ProjectAPI, 'api_project', '/project', pk='oid', pk_type='int')
 register_api(ProjectStatsAPI, 'api_projectstats', '/projectstats', pk='oid', pk_type='int')
