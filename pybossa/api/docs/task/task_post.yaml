@@ -1,0 +1,85 @@
+Create task with json data payload
+---
+tags:
+  - name: task
+parameters:
+  - name: task
+    required: true
+    description: the task to create
+    in: body
+    schema:
+      type: object
+      required:
+      - project_id
+        info
+      properties:
+        project_id:
+          type: integer
+        info:
+          type: object
+          additionalProperties:
+            type: string
+        user_pref:
+          type: object
+          additionalProperties:
+            type: string
+        fav_user_ids:
+          type: array
+          items:
+            type: integer
+        n_answers:
+          type: integer
+        gold_answers:
+          type: object
+          additionalProperties:
+            type: string
+        worker_filter:
+          type: object
+          additionalProperties:
+            type: string
+        worker_pref:
+          type: object
+          additionalProperties:
+            type: string
+        expiration:
+          type: string
+    examples:
+      project_id: 1185
+      info:
+        col_1: traditional chinese task
+      user_pref:
+        languages:
+        - traditional chinese
+responses:
+  200:
+    description: created task info
+    schema:
+      $ref: '#definitions/Task'
+    examples:
+      {
+        "info": {
+          "company": "Bloomberg",
+          "task": "2",
+          "set_id": "2"
+        },
+        "fav_user_ids": null,
+        "user_pref": {
+        },
+        "n_answers": 1,
+        "quorum": 0,
+        "links": [
+          "<link rel='parent' title='project' href='https://qa.gigwork.net/api/project/2454'/>"
+        ],
+        "calibration": 0,
+        "expiration": null,
+        "created": "2021-04-30T21:56:30.632483",
+        "worker_filter": null,
+        "state": "completed",
+        "gold_answers": null,
+        "link": "<link rel='self' title='task' href='https://qa.gigwork.net/api/task/7225337'/>",
+        "exported": true,
+        "project_id": 2454,
+        "worker_pref": null,
+        "id": 7225337,
+        "priority_0": 0.99
+      }

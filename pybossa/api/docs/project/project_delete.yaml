@@ -1,0 +1,16 @@
+Delete a project by project id
+---
+tags:
+  - name: project
+parameters:
+  - name: oid
+    in: path
+    type: number
+    required: true
+    description: the project id
+responses:
+  204:
+    description: successfully deleted project
+
+
+

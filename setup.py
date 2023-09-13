@@ -47,6 +47,7 @@ requirements = [
     "Flask-SQLAlchemy==2.5.1",
     "flask-talisman==0.8.1",
     "Flask-WTF==0.15.1",
+    "flasgger==0.9.7.1",
     "flatten-json==0.1.13",
     "frozendict==2.0.6",
     "google-api-core==2.0.1",

@@ -1,0 +1,14 @@
+Delete a task
+---
+tags:
+  - name: task
+parameters:
+  - name: oid
+    in: path
+    type: number
+    required: true
+    description: the task id
+responses:
+  204:
+    description: successfully deleted task
+

@@ -1,0 +1,89 @@
+Get task information by task id
+---
+tags:
+  - name: task
+definitions:
+  Task:
+    type: object
+    properties:
+      info:
+        type: object
+        additionalProperties:
+          type: string
+      fav_user_ids:
+        type: number
+      user_pref:
+        type: object
+        additionalProperties:
+          type: string
+      n_answers:
+        type: integer
+      quorum:
+        type: integer
+      links:
+        type: array
+        items:
+          type: string
+      calibration:
+        type: integer
+      expiration:
+        type: number
+      created:
+        type: string
+      worker_filter:
+        type: string
+      state:
+        type: string
+      gold_answers:
+        type: string
+      link:
+        type: string
+      exported:
+        type: boolean
+      project_id:
+        type: integer
+      worker_pref:
+        type: number
+      id:
+        type: integer
+      priority_0:
+        type: number
+parameters:
+  - name: oid
+    in: path
+    type: number
+    required: true
+    description: the task id
+responses:
+  200:
+    description: Task info
+    schema:
+      $ref: '#definitions/Task'
+    examples:
+      {
+        "info": {
+          "company": "Bloomberg",
+          "task": "2",
+          "set_id": "2"
+        },
+        "fav_user_ids": null,
+        "user_pref": {
+        },
+        "n_answers": 1,
+        "quorum": 0,
+        "links": [
+          "<link rel='parent' title='project' href='https://qa.gigwork.net/api/project/2454'/>"
+        ],
+        "calibration": 0,
+        "expiration": null,
+        "created": "2021-04-30T21:56:30.632483",
+        "worker_filter": null,
+        "state": "completed",
+        "gold_answers": null,
+        "link": "<link rel='self' title='task' href='https://qa.gigwork.net/api/task/7225337'/>",
+        "exported": true,
+        "project_id": 2454,
+        "worker_pref": null,
+        "id": 7225337,
+        "priority_0": 0.99
+      }

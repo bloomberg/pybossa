@@ -27,6 +27,7 @@ from flask_assets import Bundle
 from flask_json_multidict import get_json_multidict
 from flask_talisman import Talisman
 from flask_wtf.csrf import CSRFError
+from flasgger import Swagger
 from pybossa import default_settings
 from pybossa.extensions import *
 from pybossa.ratelimit import get_view_rate_limit
@@ -46,6 +47,10 @@ def create_app(run_as_server=True):
 
     setup_logging(run_as_server)
     app = Flask(__name__.split('.')[0])
+    app.config['SWAGGER'] = {
+        'title': 'GIGwork API',
+    }
+    swag  = Swagger(app)
     configure_app(app)
     global talisman
     talisman = Talisman(app, content_security_policy={
@@ -95,6 +100,7 @@ def create_app(run_as_server=True):
     anonymizer.init_app(app)
     setup_task_presenter_editor(app)
     setup_schedulers(app)
+
     return app
 
 # construct rq_dashboard config
