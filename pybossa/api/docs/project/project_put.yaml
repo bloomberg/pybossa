@@ -10,7 +10,7 @@ parameters:
     description: the project id
   - name: project_info
     in: body
-    type: ojbect
+    type: object
     properties:
       name:
         type: string
