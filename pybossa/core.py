@@ -47,10 +47,6 @@ def create_app(run_as_server=True):
 
     setup_logging(run_as_server)
     app = Flask(__name__.split('.')[0])
-    app.config['SWAGGER'] = {
-        'title': 'GIGwork API',
-    }
-    swag  = Swagger(app)
     configure_app(app)
     global talisman
     talisman = Talisman(app, content_security_policy={
@@ -100,7 +96,7 @@ def create_app(run_as_server=True):
     anonymizer.init_app(app)
     setup_task_presenter_editor(app)
     setup_schedulers(app)
-
+    Swagger(app, template=app.config.get('SWAGGER_TEMPLATE'))
     return app
 
 # construct rq_dashboard config
