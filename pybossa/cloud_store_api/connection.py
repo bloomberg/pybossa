@@ -13,6 +13,9 @@ from boto.s3.bucket import Bucket
 from boto.s3.connection import S3Connection, OrdinaryCallingFormat
 from boto.provider import Provider
 import jwt
+from boto3.session import Session
+from botocore.client import Config
+from pybossa.cloud_store_api.base_conn import BaseConnection
 
 
 def create_connection(**kwargs):
@@ -70,6 +73,28 @@ class CustomConnection(S3Connection):
     def get_path(self, path='/', *args, **kwargs):
         ret = super(CustomConnection, self).get_path(path, *args, **kwargs)
         return self.host_suffix + ret
+
+
+class CustomConnectionV2(BaseConnection):
+    def __init__(
+        self,
+        aws_access_key_id,
+        aws_secret_access_key,
+        endpoint,
+        **kwargs,
+    ):
+
+        self.client = Session().client(
+            service_name="s3",
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            use_ssl=True,
+            verify=True,
+            endpoint_url=endpoint,
+            # config=Config(
+            #     proxies={"https": proxy_url, "http": proxy_url},
+            # ),
+        )
 
 
 class CustomBucket(Bucket):
