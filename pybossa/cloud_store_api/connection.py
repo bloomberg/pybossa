@@ -3,6 +3,7 @@ import ssl
 import sys
 import time
 
+from flask import current_app
 from boto.auth_handler import AuthHandler
 import boto.auth
 
@@ -15,9 +16,13 @@ import jwt
 
 
 def create_connection(**kwargs):
+
+    current_app.logger.info(f"create_connection kwargs: %s", str(kwargs))
     if 'object_service' in kwargs:
+        current_app.logger.info("Calling ProxiedConnection")
         conn = ProxiedConnection(**kwargs)
     else:
+        current_app.logger.info("Calling CustomConnection")
         conn = CustomConnection(**kwargs)
     return conn
 
@@ -111,6 +116,7 @@ class ProxiedConnection(CustomConnection):
         headers = headers or {}
         headers['jwt'] = self.create_jwt(method, self.host, bucket, key)
         headers['x-objectservice-id'] = self.provider.object_service.upper()
+        current_app.logger.info("Calling ProxiedConnection.make_request. headers %s", str(headers))
         return super(ProxiedConnection, self).make_request(method, bucket, key,
             headers, data, query_args, sender, override_num_retries,
             retry_handler)
@@ -118,6 +124,7 @@ class ProxiedConnection(CustomConnection):
     def create_jwt(self, method, host, bucket, key):
         now = int(time.time())
         path = self.get_path(self.calling_format.build_path_base(bucket, key))
+        current_app.logger.info("create_jwt called. method %s, host %s, bucket %s, key %s", method, host, str(bucket), str(key), str(path))
         payload = {
             'iat': now,
             'nbf': now,

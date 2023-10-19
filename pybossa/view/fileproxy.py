@@ -34,6 +34,7 @@ from pybossa.encryption import AESWithGCM
 from pybossa.pybhdfs.client import HDFSKerberos
 from pybossa.sched import has_lock
 from pybossa.cloud_store_api.s3 import get_content_and_key_from_s3
+# from pybossa.task_creator_helper import s3_conn_type
 
 blueprint = Blueprint('fileproxy', __name__)
 
@@ -82,8 +83,8 @@ def check_allowed(user_id, task_id, project, is_valid_url):
 
     raise Forbidden('FORBIDDEN')
 
-
 def read_encrypted_file(project_id, bucket, key_name, signature):
+# def read_encrypted_file(store, project_id, bucket, key_name, signature):
     if not signature:
         current_app.logger.exception('Project id {} no signature {}'.format(project_id, key_name))
         raise Forbidden('No signature')
@@ -102,6 +103,7 @@ def read_encrypted_file(project_id, bucket, key_name, signature):
 
     check_allowed(current_user.id, task_id, project, lambda v: v == request.path)
 
+    # conn_name = "S3_TASK_REQUEST" if store == s3_conn_type() else "S3_TASK_REQUEST_V2"
     ## download file
     if bucket != current_app.config.get('S3_REQUEST_BUCKET'):
         secret = get_encryption_key(project)
@@ -111,6 +113,7 @@ def read_encrypted_file(project_id, bucket, key_name, signature):
     try:
         decrypted, key = get_content_and_key_from_s3(
             bucket, key_name, 'S3_TASK_REQUEST', decrypt=secret, secret=secret)
+            # store, bucket, key_name, conn_name, decrypt=secret, secret=secret)
     except S3ResponseError as e:
         current_app.logger.exception('Project id {} get task file {} {}'.format(project_id, key_name, e))
         if e.error_code == 'NoSuchKey':
@@ -145,6 +148,7 @@ def encrypted_file(store, bucket, project_id, path):
     key_name = '/{}/{}'.format(project_id, path)
     signature = request.args.get('task-signature')
     current_app.logger.info('Project id {} decrypt file. {}'.format(project_id, path))
+    current_app.logger.info("store %s, bucket %s, project_id %s, path %s", store, bucket, str(project_id), path)
     return read_encrypted_file(project_id, bucket, key_name, signature)
 
 
