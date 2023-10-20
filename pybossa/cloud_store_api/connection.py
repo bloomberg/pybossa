@@ -13,14 +13,34 @@ from boto.s3.bucket import Bucket
 from boto.s3.connection import S3Connection, OrdinaryCallingFormat
 from boto.provider import Provider
 import jwt
+from werkzeug.exceptions import BadRequest
 from boto3.session import Session
 from botocore.client import Config
 from pybossa.cloud_store_api.base_conn import BaseConnection
 
 
+def check_store(store):
+    if not store:
+        return
+
+    store_type = current_app.config.get("S3_CONN_TYPE")
+    store_type_v2 = current_app.config.get("S3_CONN_TYPE_V2")
+    if store not in [store_type, store_type_v2]:
+        raise BadRequest(f"Unsupported store type {store}")
+
 def create_connection(**kwargs):
 
     current_app.logger.info(f"create_connection kwargs: %s", str(kwargs))
+
+    store = kwargs.pop("store", None)
+    check_store(store)
+    store_type_v2 = current_app.config.get("S3_CONN_TYPE_V2")
+    if store and store == store_type_v2:
+        return CustomConnectionV2(
+            kwargs.get("aws_access_key_id"),
+            kwargs.get("aws_secret_access_key"),
+            kwargs.get("endpoint"),
+        )
     if 'object_service' in kwargs:
         current_app.logger.info("Calling ProxiedConnection")
         conn = ProxiedConnection(**kwargs)

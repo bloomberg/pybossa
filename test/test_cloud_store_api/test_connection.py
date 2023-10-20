@@ -22,7 +22,9 @@ from test import Test, with_context
 from pybossa.cloud_store_api.connection import create_connection, CustomAuthHandler, CustomProvider
 from nose.tools import assert_raises
 from boto.auth_handler import NotReadyToAuthenticate
-
+from unittest.mock import patch
+from nose.tools import assert_raises
+from werkzeug.exceptions import BadRequest
 
 class TestS3Connection(Test):
 
@@ -124,3 +126,41 @@ class TestS3Connection(Test):
         bucket = conn.get_bucket('test_bucket', validate=False)
         key = bucket.get_key('test_key', validate=False)
         assert key.generate_url(0).split('?')[0] == 'https://s3.test.com:443/test/test_bucket/test_key'
+
+
+class TestCustomConnectionV2(Test):
+
+    default_config = {
+        "S3_CONN_TYPE": "storev1",
+        "S3_CONN_TYPE_V2": "storev2"
+        }
+    access_key, secret_key = "test-access-key", "test-secret-key"
+
+    @with_context
+    @patch("pybossa.cloud_store_api.connection.Session")
+    def test_boto3_session_called(self, mock_boto3_session):
+        with patch.dict(self.flask_app.config, self.default_config):
+            conn = create_connection(aws_access_key_id=self.access_key,
+                                     aws_secret_access_key=self.secret_key,
+                                     endpoint="s3.store.com",
+                                     store="storev2")
+            assert mock_boto3_session.called
+
+    @with_context
+    def test_boto3_session_not_called(self):
+        with assert_raises(BadRequest):
+            create_connection(aws_access_key_id=self.access_key,
+                                    aws_secret_access_key=self.secret_key,
+                                    endpoint="s3.store.com",
+                                    store="storev2")
+
+    @with_context
+    @patch("pybossa.cloud_store_api.connection.CustomConnection")
+    @patch("pybossa.cloud_store_api.connection.Session")
+    def test_custom_conn_called(self, mock_boto3_session, mock_conn):
+        with patch.dict(self.flask_app.config, self.default_config):
+            conn = create_connection(aws_access_key_id=self.access_key,
+                                     aws_secret_access_key=self.secret_key,
+                                     store="storev1")
+            assert mock_conn.called
+            assert mock_boto3_session.called is False
