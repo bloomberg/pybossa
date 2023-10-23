@@ -29,8 +29,13 @@ def check_store(store):
         raise BadRequest(f"Unsupported store type {store}")
 
 def create_connection(**kwargs):
-
-    current_app.logger.info(f"create_connection kwargs: %s", str(kwargs))
+    if kwargs.get("aws_secret_access_key") in kwargs:
+        masked_kwargs = {k:v for k, v in kwargs.items()}
+        secret = kwargs["aws_secret_access_key"]
+        masked_kwargs["aws_secret_access_key"] = f"{secret[:3]}{'x'*(len(secret)-6)}{secret[-3:]}"
+        current_app.logger.info(f"create_connection kwargs: %s", str(masked_kwargs))
+    else:
+        current_app.logger.info(f"create_connection kwargs: %s", str(kwargs))
 
     store = kwargs.pop("store", None)
     check_store(store)
@@ -40,6 +45,7 @@ def create_connection(**kwargs):
             kwargs.get("aws_access_key_id"),
             kwargs.get("aws_secret_access_key"),
             kwargs.get("endpoint"),
+            kwargs.get("cert", False)
         )
     if 'object_service' in kwargs:
         current_app.logger.info("Calling ProxiedConnection")
@@ -101,15 +107,14 @@ class CustomConnectionV2(BaseConnection):
         aws_access_key_id,
         aws_secret_access_key,
         endpoint,
-        **kwargs,
+        ca_cert,
     ):
-
         self.client = Session().client(
             service_name="s3",
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
             use_ssl=True,
-            verify=True,
+            verify=ca_cert,
             endpoint_url=endpoint,
             # config=Config(
             #     proxies={"https": proxy_url, "http": proxy_url},

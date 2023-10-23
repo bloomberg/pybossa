@@ -109,6 +109,28 @@ class BaseConnection(ABC):
                 )
             raise
 
+    def set_contents_from_file(self, source_file, bucket, path, **kwargs):
+        try:
+            headers = kwargs.get("ExtraArgs", {}).get("headers", {})
+            content_type = headers.get("Content-Type")
+            extra_args = {"ContentType": content_type} if content_type else {}
+            self.client.upload_fileobj(
+                source_file, bucket, path, ExtraArgs=extra_args
+            )
+        except ClientError as e:
+            if "Error" in e.response:
+                err_resp = e.response["Error"]
+                http_status = e.response.get("ResponseMetadata", {}).get(
+                    "HTTPStatusCode"
+                )
+                logger.warning(
+                    "%s: %s, key %s. http status %d",
+                    self.__class__.__name__,
+                    str(e),
+                    err_resp.get("Key", path),
+                    http_status,
+                )
+            raise
     def delete_key(self, bucket, path, **kwargs):
         try:
             self.client.delete_object(
@@ -190,7 +212,7 @@ class BaseClientBucketAdapter:
 
     def delete_key(self, key_name, **kwargs):
         kwargs["VersionId"] = kwargs.pop("version_id", None)
-        self.connection.delete_key(bucket=self.name, path=key_name, **kwargs)
+        self.connection.delete_key(bucket=self.name, path=key_name)
 
     def new_key(self, key_name, *args, **kwargs):  # pylint: disable=W0613
         self.connection.new_key(bucket=self.name, path=key_name, **kwargs)
@@ -227,6 +249,11 @@ class BaseClientKeyAdapter:
     def set_contents_from_string(self, content, **kwargs):
         self.base_client.set_contents(
             bucket=self.bucket, path=self.name, content=content, **kwargs
+        )
+
+    def set_contents_from_file(self, source_file, **kwargs):
+        return self.base_client.set_contents_from_file(
+            source_file, bucket=self.bucket, path=self.name, ExtraArgs=kwargs
         )
 
     def get_object_head(self):

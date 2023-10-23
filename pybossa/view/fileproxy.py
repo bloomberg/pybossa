@@ -34,7 +34,7 @@ from pybossa.encryption import AESWithGCM
 from pybossa.pybhdfs.client import HDFSKerberos
 from pybossa.sched import has_lock
 from pybossa.cloud_store_api.s3 import get_content_and_key_from_s3
-# from pybossa.task_creator_helper import s3_conn_type
+
 
 blueprint = Blueprint('fileproxy', __name__)
 
@@ -83,8 +83,7 @@ def check_allowed(user_id, task_id, project, is_valid_url):
 
     raise Forbidden('FORBIDDEN')
 
-def read_encrypted_file(project_id, bucket, key_name, signature):
-# def read_encrypted_file(store, project_id, bucket, key_name, signature):
+def read_encrypted_file(store, project_id, bucket, key_name, signature):
     if not signature:
         current_app.logger.exception('Project id {} no signature {}'.format(project_id, key_name))
         raise Forbidden('No signature')
@@ -103,16 +102,16 @@ def read_encrypted_file(project_id, bucket, key_name, signature):
 
     check_allowed(current_user.id, task_id, project, lambda v: v == request.path)
 
-    # conn_name = "S3_TASK_REQUEST" if store == s3_conn_type() else "S3_TASK_REQUEST_V2"
+    conn_name = "S3_TASK_REQUEST_V2" if store == current_app.config.get("S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
     ## download file
-    if bucket != current_app.config.get('S3_REQUEST_BUCKET'):
+    if bucket not in [current_app.config.get("S3_REQUEST_BUCKET"), current_app.config.get("S3_REQUEST_BUCKET_V2")]:
         secret = get_encryption_key(project)
     else:
         secret = current_app.config.get('FILE_ENCRYPTION_KEY')
 
     try:
         decrypted, key = get_content_and_key_from_s3(
-            bucket, key_name, 'S3_TASK_REQUEST', decrypt=secret, secret=secret)
+            bucket, key_name, conn_name, decrypt=secret, secret=secret)
             # store, bucket, key_name, conn_name, decrypt=secret, secret=secret)
     except S3ResponseError as e:
         current_app.logger.exception('Project id {} get task file {} {}'.format(project_id, key_name, e))
@@ -122,9 +121,9 @@ def read_encrypted_file(project_id, bucket, key_name, signature):
             raise InternalServerError('An Error Occurred')
 
     response = Response(decrypted, content_type=key.content_type)
-    if key.content_encoding:
+    if hasattr(key, "content_encoding") and key.content_encoding:
         response.headers.add('Content-Encoding', key.content_encoding)
-    if key.content_disposition:
+    if hasattr(key, "content_disposition") and key.content_disposition:
         response.headers.add('Content-Disposition', key.content_disposition)
     return response
 
@@ -137,7 +136,7 @@ def encrypted_workflow_file(store, bucket, workflow_uid, project_id, path):
     key_name = '/workflow_request/{}/{}/{}'.format(workflow_uid, project_id, path)
     signature = request.args.get('task-signature')
     current_app.logger.info('Project id {} decrypt workflow file. {}'.format(project_id, path))
-    return read_encrypted_file(project_id, bucket, key_name, signature)
+    return read_encrypted_file(store, project_id, bucket, key_name, signature)
 
 
 @blueprint.route('/encrypted/<string:store>/<string:bucket>/<int:project_id>/<path:path>')
@@ -149,7 +148,7 @@ def encrypted_file(store, bucket, project_id, path):
     signature = request.args.get('task-signature')
     current_app.logger.info('Project id {} decrypt file. {}'.format(project_id, path))
     current_app.logger.info("store %s, bucket %s, project_id %s, path %s", store, bucket, str(project_id), path)
-    return read_encrypted_file(project_id, bucket, key_name, signature)
+    return read_encrypted_file(store, project_id, bucket, key_name, signature)
 
 
 def get_path(dict_, path):
