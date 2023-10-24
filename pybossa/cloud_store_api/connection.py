@@ -29,7 +29,7 @@ def check_store(store):
         raise BadRequest(f"Unsupported store type {store}")
 
 def create_connection(**kwargs):
-    if kwargs.get("aws_secret_access_key") in kwargs:
+    if kwargs.get("aws_secret_access_key"):
         masked_kwargs = {k:v for k, v in kwargs.items()}
         secret = kwargs["aws_secret_access_key"]
         masked_kwargs["aws_secret_access_key"] = f"{secret[:3]}{'x'*(len(secret)-6)}{secret[-3:]}"
