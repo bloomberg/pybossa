@@ -41,11 +41,13 @@ def create_connection(**kwargs):
     check_store(store)
     store_type_v2 = current_app.config.get("S3_CONN_TYPE_V2")
     if store and store == store_type_v2:
+        current_app.logger.info("Calling CustomConnectionV2")
         return CustomConnectionV2(
-            kwargs.get("aws_access_key_id"),
-            kwargs.get("aws_secret_access_key"),
-            kwargs.get("endpoint"),
-            kwargs.get("cert", False)
+            aws_access_key_id=kwargs.get("aws_access_key_id"),
+            aws_secret_access_key=kwargs.get("aws_secret_access_key"),
+            endpoint=kwargs.get("endpoint"),
+            cert=kwargs.get("cert", False),
+            proxy_url=kwargs.get("proxy_url")
         )
     if 'object_service' in kwargs:
         current_app.logger.info("Calling ProxiedConnection")
@@ -107,18 +109,19 @@ class CustomConnectionV2(BaseConnection):
         aws_access_key_id,
         aws_secret_access_key,
         endpoint,
-        ca_cert,
+        cert,
+        proxy_url
     ):
         self.client = Session().client(
             service_name="s3",
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
             use_ssl=True,
-            verify=ca_cert,
+            verify=cert,
             endpoint_url=endpoint,
-            # config=Config(
-            #     proxies={"https": proxy_url, "http": proxy_url},
-            # ),
+            config=Config(
+                proxies={"https": proxy_url, "http": proxy_url},
+            ),
         )
 
 
@@ -174,7 +177,7 @@ class ProxiedConnection(CustomConnection):
     def create_jwt(self, method, host, bucket, key):
         now = int(time.time())
         path = self.get_path(self.calling_format.build_path_base(bucket, key))
-        current_app.logger.info("create_jwt called. method %s, host %s, bucket %s, key %s", method, host, str(bucket), str(key), str(path))
+        current_app.logger.info("create_jwt called. method %s, host %s, bucket %s, key %s, path %s", method, host, str(bucket), str(key), str(path))
         payload = {
             'iat': now,
             'nbf': now,
