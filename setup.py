@@ -8,6 +8,7 @@ requirements = [
     "beautifulsoup4==4.10.0",
     "blinker==1.4",
     "boto==2.49.0",
+    "boto3==1.28.62",
     "cachelib==0.3.0",
     "cachetools==4.2.2",
     "certifi==2021.5.30",

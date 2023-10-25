@@ -5,6 +5,7 @@
 *.db
 settings_local.py
 settings_test.py
+ca-bundle.crt
 pybossa/settings_upref_mdata.py
 *env/
 doc/_build

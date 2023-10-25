@@ -34,11 +34,11 @@ def encrypted():
 
 
 def bucket_name():
-    return current_app.config.get("S3_REQUEST_BUCKET")
+    return current_app.config.get("S3_REQUEST_BUCKET_V2") or current_app.config.get("S3_REQUEST_BUCKET")
 
 
 def s3_conn_type():
-    return current_app.config.get('S3_CONN_TYPE')
+    return current_app.config.get('S3_CONN_TYPE_V2') or current_app.config.get('S3_CONN_TYPE')
 
 
 def get_task_expiration(expiration, create_time):
@@ -79,8 +79,9 @@ def upload_files_priv(task, project_id, data, file_name):
     task_hash = hashlib.md5(str(task).encode()).hexdigest()
 
     path = "{}/{}".format(project_id, task_hash)
+    store = s3_conn_type()
     values = dict(
-        store=s3_conn_type(),
+        store=store,
         bucket=bucket,
         project_id=project_id,
         path='{}/{}'.format(task_hash, file_name)
@@ -92,7 +93,7 @@ def upload_files_priv(task, project_id, data, file_name):
         upload_path=path,
         file_name=file_name,
         encryption=True,
-        conn_name='S3_TASK_REQUEST'
+        conn_name= "S3_TASK_REQUEST_V2" if store == current_app.config.get("S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
     )
     return {'externalUrl': file_url, 'internalUrl': internal_url}
 
