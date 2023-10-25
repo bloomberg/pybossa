@@ -17,6 +17,7 @@ from werkzeug.exceptions import BadRequest
 from boto3.session import Session
 from botocore.client import Config
 from pybossa.cloud_store_api.base_conn import BaseConnection
+from os import environ
 
 
 def check_store(store):
@@ -29,6 +30,15 @@ def check_store(store):
         raise BadRequest(f"Unsupported store type {store}")
 
 def create_connection(**kwargs):
+    # TODO: remove later
+    v2_access = environ.get("AWS_V2_ACCESS_KEY_ID")
+    v2_secret = environ.get("AWS_V2_SECRET_ACCESS_KEY")
+    if v2_access and v2_secret:
+        masked_v2_secret = f"{v2_secret[:3]}{'x'*(len(v2_secret)-6)}{v2_secret[-3:]}"
+        current_app.logger.info("v2_access %s, v2_secret %s", v2_access, masked_v2_secret)
+    else:
+        current_app.logger.info("v2_access, v2_secret not found")
+
     if kwargs.get("aws_secret_access_key"):
         masked_kwargs = {k:v for k, v in kwargs.items()}
         secret = kwargs["aws_secret_access_key"]
