@@ -866,8 +866,7 @@ def large_language_model(model_name):
                 "context": "Identify the company name: Microsoft will release Windows 20 next year.",
                 "temperature": 1.0,
                 "seed": 12345,
-                "repetition_penalty": 1.05,
-                "num_beams": 1,
+                "repetition_penalty": 1.05
             }
         ]
     }
@@ -909,8 +908,7 @@ def large_language_model(model_name):
                     "context": prompts + ' ',
                     "temperature": 1.0,
                     "seed": 12345,
-                    "repetition_penalty": 1.05,
-                    "num_beams": 1,
+                    "repetition_penalty": 1.05
                 }
             ]
         }

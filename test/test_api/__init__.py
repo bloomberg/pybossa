@@ -109,7 +109,6 @@ class TestLargeLanguageModel(unittest.TestCase):
                     "temperature": 1.0,
                     "seed": 12345,
                     "repetition_penalty": 1.05,
-                    "num_beams": 1,
                 }
             ]
         }):
@@ -151,7 +150,6 @@ class TestLargeLanguageModel(unittest.TestCase):
                     "temperature": 1.0,
                     "seed": 12345,
                     "repetition_penalty": 1.05,
-                    "num_beams": 1,
                 }
             ]
         }):
