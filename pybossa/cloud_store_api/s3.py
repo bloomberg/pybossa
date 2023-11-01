@@ -226,7 +226,7 @@ def upload_json_data(json_data, upload_path, file_name, encryption,
     conn_name, upload_root_dir=None, bucket=None):
     content = json.dumps(json_data, ensure_ascii=False)
     if not bucket:
-        bucket = app.config.get("S3_BUCKET")
+        bucket = app.config.get("S3_BUCKET_V2") if app.config.get("S3_CONN_TYPE_V2") else app.config.get("S3_BUCKET")
 
     return s3_upload_from_string(bucket, content, file_name,
         directory=upload_path, conn_name=conn_name,

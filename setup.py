@@ -9,6 +9,7 @@ requirements = [
     "blinker==1.4",
     "boto==2.49.0",
     "boto3==1.28.62",
+    "botocore==1.31.62",
     "cachelib==0.3.0",
     "cachetools==4.2.2",
     "certifi==2021.5.30",

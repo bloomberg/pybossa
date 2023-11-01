@@ -68,6 +68,7 @@ class TaskRunAPI(APIBase):
     def _preprocess_post_data(self, data):
         with_encryption = app.config.get('ENABLE_ENCRYPTION')
         upload_root_dir = app.config.get('S3_UPLOAD_DIRECTORY')
+        conn_name = "S3_TASKRUN_V2" if app.config.get("S3_CONN_TYPE_V2") else "S3_TASKRUN"
         if current_user.is_anonymous:
             raise Forbidden('')
         task_id = data['task_id']
@@ -84,7 +85,7 @@ class TaskRunAPI(APIBase):
             data['info'] = {}
             pyb_answer_url = upload_json_data(json_data=info, upload_path=path,
                 file_name='pyb_answer.json', encryption=with_encryption,
-                conn_name='S3_TASKRUN', upload_root_dir=upload_root_dir
+                conn_name=conn_name, upload_root_dir=upload_root_dir
             )
             if pyb_answer_url:
                 data['info']['pyb_answer_url'] = pyb_answer_url
@@ -208,10 +209,12 @@ def _upload_files_from_json(task_run_info, upload_path, with_encryption):
             upload_root_dir = app.config.get('S3_UPLOAD_DIRECTORY')
             if filename is None or content is None:
                 continue
-            out_url = s3_upload_from_string(app.config.get("S3_BUCKET"),
+            bucket = app.config.get("S3_BUCKET_V2") if app.config.get("S3_CONN_TYPE_V2") else app.config.get("S3_BUCKET")
+            conn_name = "S3_TASKRUN_V2" if app.config.get("S3_CONN_TYPE_V2") else "S3_TASKRUN"
+            out_url = s3_upload_from_string(bucket,
                                             content,
                                             filename,
-                                            directory=upload_path, conn_name='S3_TASKRUN',
+                                            directory=upload_path, conn_name=conn_name,
                                             with_encryption=with_encryption,
                                             upload_root_dir=upload_root_dir)
             task_run_info[key] = out_url
@@ -222,9 +225,11 @@ def _upload_files_from_request(task_run_info, files, upload_path, with_encryptio
         if not key.endswith('__upload_url'):
             raise BadRequest("File upload field should end in __upload_url")
         file_obj = request.files[key]
-        s3_url = s3_upload_file_storage(app.config.get("S3_BUCKET"),
+        bucket = app.config.get("S3_BUCKET_V2") if app.config.get("S3_CONN_TYPE_V2") else app.config.get("S3_BUCKET")
+        conn_name = "S3_TASKRUN_V2" if app.config.get("S3_CONN_TYPE_V2") else "S3_TASKRUN"
+        s3_url = s3_upload_file_storage(bucket,
                                         file_obj,
-                                        directory=upload_path, conn_name='S3_TASKRUN',
+                                        directory=upload_path, conn_name=conn_name,
                                         with_encryption=with_encryption)
         task_run_info[key] = s3_url
 
