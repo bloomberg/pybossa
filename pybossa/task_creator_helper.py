@@ -87,13 +87,14 @@ def upload_files_priv(task, project_id, data, file_name):
         path='{}/{}'.format(task_hash, file_name)
     )
     file_url = url_for('fileproxy.encrypted_file', **values)
+    conn_name = "S3_TASK_REQUEST_V2" if store == current_app.config.get("S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
     internal_url = upload_json_data(
         bucket=bucket,
         json_data=data,
         upload_path=path,
         file_name=file_name,
         encryption=True,
-        conn_name= "S3_TASK_REQUEST_V2" if store == current_app.config.get("S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
+        conn_name=conn_name
     )
     return {'externalUrl': file_url, 'internalUrl': internal_url}
 
