@@ -117,4 +117,4 @@ The GNU Affero General Public License is a free, copyleft license for
 software and other kinds of works, specifically designed to ensure
 cooperation with the community in the case of network server software.
 
-Documentation and media is under a Creative Commons Attribution License version 3.
+Documentation and media is under a Creative Commons Attribution License version 3
