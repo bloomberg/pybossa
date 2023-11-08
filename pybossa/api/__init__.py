@@ -883,7 +883,6 @@ def large_language_model(model_name):
     if not model_endpoint:
         return abort(400, f'{model_name} LLM is unsupported on this platform.')
 
-    proxies = current_app.config.get('PROXIES')
     cert = current_app.config.get('CA_CERT', False)
 
     try:
@@ -914,7 +913,7 @@ def large_language_model(model_name):
         }
     data = json.dumps(data)
 
-    r = requests.post(model_endpoint, data=data, proxies=proxies, verify=cert)
+    r = requests.post(model_endpoint, data=data, verify=cert)
     out = json.loads(r.text)
     predictions = out["predictions"][0]["output"]
     response = {"Model: ": model_name, "predictions: ": predictions}
