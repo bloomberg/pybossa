@@ -182,7 +182,7 @@ class TestProjectSyncer(Test):
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
         user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer.syncer = user
-        
+
         target = create_target()
         project = ProjectFactory.create()
         # no sync info by default
@@ -203,7 +203,7 @@ class TestProjectSyncer(Test):
         project_syncer = ProjectSyncer(self.target_url, self.target_key)
         user = UserFactory.create(admin=True, email_addr='user@test.com')
         project_syncer.syncer = user
-        
+
         project = ProjectFactory.create()
         project.info['data_classification'] = dict(input_data="L2 - propriertary valid", output_data="L2 - propriertary valid")
         project_repo.save(project)
@@ -241,7 +241,26 @@ class TestProjectSyncer(Test):
         assert res.status_code == 200, 'build_payload output should result in valid api query'
         assert res.json["info"]["sync"] == payload["info"]["sync"]
 
+    @with_context
+    @patch('pybossa.syncer.category_syncer.CategorySyncer.get_target', return_value={'id': 1})
+    def test_sync_create_new_without_project_users(self, mock_cat):
+        project_syncer = ProjectSyncer(self.target_url, self.target_key)
+        user = UserFactory.create(admin=True, email_addr='user@test.com')
+        project_syncer.syncer = user
+        project = ProjectFactory.create()
+        project.info['data_classification'] = dict(input_data="L3 - community", output_data="L3 - community")
+        project_user = UserFactory.create(id=123, info=dict(data_access=["L3"]))
+        project.set_project_users([project_user.id])
+        project_repo.save(project)
 
+        assert project.get_project_users()[0] == 123, 'original project should have project_users'
+
+        payload = project_syncer._build_payload(project)
+        headers = [('Authorization', user.api_key)]
+        res = self.app.put("/api/project/{}".format(project.id), headers=headers, data=json.dumps(payload))
+
+        assert res.status_code == 200, 'build_payload output should result in valid api query'
+        assert not res.json["info"].get('project_users'), 'new project should not have project_users'
 
     @with_context
     @patch('pybossa.syncer.project_syncer.ProjectSyncer.get_target')
