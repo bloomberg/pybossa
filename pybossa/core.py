@@ -96,7 +96,7 @@ def create_app(run_as_server=True):
     anonymizer.init_app(app)
     setup_task_presenter_editor(app)
     setup_schedulers(app)
-    Swagger(app, template=app.config.get('SWAGGER_TEMPLATE'))
+    setup_swagger(app)
     return app
 
 # construct rq_dashboard config
@@ -1011,3 +1011,12 @@ def setup_http_signer(app):
     from pybossa.http_signer import HttpSigner
     secret = app.config.get('SIGNATURE_SECRET')
     http_signer = HttpSigner(secret, 'X-Pybossa-Signature')
+
+
+def setup_swagger(app):
+    script_path = 'pybossa/themes/default/templates/flasgger_custom_head.html'
+    with open(script_path, 'r') as file:
+        html_as_string = file.read()
+        app.config.get('SWAGGER_TEMPLATE')['head_text'] = html_as_string
+    Swagger.DEFAULT_CONFIG.update(app.config.get('SWAGGER_TEMPLATE'))
+    Swagger(app, template=app.config.get('SWAGGER_TEMPLATE'))
