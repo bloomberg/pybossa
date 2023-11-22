@@ -18,13 +18,13 @@
 import json
 import unittest
 from datetime import datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, mock_open
 
 from dateutil.parser import parse
 from werkzeug.http import parse_cookie
 
 from pybossa.api import large_language_model
-from pybossa.core import create_app
+from pybossa.core import create_app, setup_swagger
 from test import Test
 
 
@@ -174,3 +174,33 @@ class TestLargeLanguageModel(unittest.TestCase):
             response = large_language_model('flan-ul2')
             self.assertEqual(response.status_code, 400)
             self.assertIn('prompts should be a string', response.json.get('exception_msg'))
+
+class TestSwagger(Test):
+
+    @patch('builtins.open', side_effect=FileNotFoundError)
+    @patch('pybossa.core.Swagger')
+    def test_setup_swagger_file_not_found(self, mock_swagger, mock_open):
+        mock_logger = unittest.mock.Mock()
+        mock_app = unittest.mock.Mock()
+        mock_app.logger = mock_logger
+
+        setup_swagger(mock_app)
+
+        mock_logger.warning.assert_called_once_with("WARNING: Swagger custom header file not found.")
+        mock_swagger.assert_called()  # Ensure Swagger is still instantiated when file not found
+
+    @patch('builtins.open', new_callable=mock_open, read_data="mocked_html_content")
+    @patch('pybossa.core.Swagger')  # Replace 'your_module' with the actual module name where Swagger is imported
+    def test_setup_swagger_file_found(self, mock_swagger, mock_open):
+        # Mock the logger and app
+        mock_logger = unittest.mock.Mock()
+        mock_app = unittest.mock.Mock()
+        mock_app.logger = mock_logger
+        mock_app.config.get.return_value = {}
+
+        # Call the function
+        setup_swagger(mock_app)
+
+        # Assertions
+        mock_logger.warning.assert_not_called()  # Ensure no warning is logged when file is found
+        mock_swagger.assert_called_once_with(mock_app, template={'head_text': 'mocked_html_content'})
