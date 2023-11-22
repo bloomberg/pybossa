@@ -114,6 +114,9 @@ def get_gold_answers(task):
     # from the url.
 
     parts = url.split('/')
+    store = parts[3] if len(parts) > 3 and parts[1] == "fileproxy" and parts[2] == "encrypted" else None
+    conn_name = "S3_TASK_REQUEST_V2" if store == current_app.config.get("S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
     key_name = '/{}/{}/{}'.format(*parts[-3:])
-    decrypted = get_content_from_s3(s3_bucket=parts[-4], path=key_name, conn_name='S3_TASK_REQUEST', decrypt=True)
+    current_app.logger.info("gold_answers url %s, store %s, conn_name %s, key %s", url, store, conn_name, key_name)
+    decrypted = get_content_from_s3(s3_bucket=parts[-4], path=key_name, conn_name=conn_name, decrypt=True)
     return json.loads(decrypted)
