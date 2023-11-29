@@ -39,7 +39,7 @@ requirements = [
     "Flask-DebugToolbar==0.11.0",
     "Flask-HTTPAuth==4.4.0",
     "flask-json-multidict==1.0.0",
-    "Flask-Login==0.5.0",
+    "Flask-Login==0.7.0",
     "Flask-Mail==0.9.1",
     "Flask-Misaka==1.0.0",
     "Flask-OAuthlib==0.9.6",
