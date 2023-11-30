@@ -1014,12 +1014,11 @@ def setup_http_signer(app):
 
 
 def setup_swagger(app):
-    script_path = 'pybossa/themes/default/templates/flasgger_custom_head.html'
     try:
-        with open(script_path, 'r') as file:
+        with open(app.config.get('SWAGGER_HEADER_PATH'), 'r') as file:
             html_as_string = file.read()
             app.config.get('SWAGGER_TEMPLATE')['head_text'] = html_as_string
-    except FileNotFoundError:
+    except (FileNotFoundError, TypeError):
         msg = "WARNING: Swagger custom header file not found."
         app.logger.warning(msg)
     Swagger.DEFAULT_CONFIG.update(app.config.get('SWAGGER_TEMPLATE'))
