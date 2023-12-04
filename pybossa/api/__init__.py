@@ -93,7 +93,7 @@ from pybossa.cache.users import get_user_pref_metadata
 from pybossa.view.projects import get_locked_tasks
 from pybossa.redis_lock import EXPIRE_LOCK_DELAY
 from pybossa.api.bulktasks import BulkTasksAPI
-
+from bloomberg.mlp.auth_client import AuthClient
 task_fields = [
     "id",
     "state",
@@ -913,13 +913,21 @@ def large_language_model(model_name):
             ]
         }
     data = json.dumps(data)
-
-    r = requests.post(model_endpoint, data=data, proxies=proxies, verify=cert)
-    out = json.loads(r.text)
-    predictions = out["predictions"][0]["output"]
-    response = {"Model: ": model_name, "predictions: ": predictions}
-
-    return Response(json.dumps(response), status=r.status_code, mimetype="application/json")
+    auth_client = AuthClient("username", "password")
+    try:
+        token = auth_client.get_token()
+        r = requests.post(model_endpoint,
+                      data=data,
+                      verify=cert,
+                      headers={"Authorization": f"Bearer {token}"}
+        )
+        out = json.loads(r.text)
+        predictions = out["predictions"][0]["output"]
+        response = {"Model: ": model_name, "predictions: ": predictions}
+        return Response(json.dumps(response), status=r.status_code, mimetype="application/json")
+    except Exception as e:
+        current_app.logger.error(f"Failed to fetch LLM data: {e}")
+        abort(500)
 
 
 @jsonpify

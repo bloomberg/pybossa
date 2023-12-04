@@ -4,6 +4,7 @@ requirements = [
     "alembic==1.7.3",
     "arrow==1.1.1",
     "asn1crypto==1.4.0",
+    "bloomberg.mlp.auth_client",
     "Babel==2.9.1",
     "beautifulsoup4==4.10.0",
     "blinker==1.4",
