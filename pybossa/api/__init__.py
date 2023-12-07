@@ -912,11 +912,14 @@ def large_language_model(model_name):
                 }
             ]
         }
-    data = json.dumps(data)
 
-    r = requests.post(model_endpoint, data=data, proxies=proxies, verify=cert)
+    body = {
+        "inference_endpoint": model_endpoint,
+        "payload": data,
+    }
+    r = requests.post(url=current_app.config.get('INFERENCE_ENDPOINT'), json=body, proxies=proxies)
     out = json.loads(r.text)
-    predictions = out["predictions"][0]["output"]
+    predictions = out["inference_response"]["predictions"][0]["output"]
     response = {"Model: ": model_name, "predictions: ": predictions}
 
     return Response(json.dumps(response), status=r.status_code, mimetype="application/json")
