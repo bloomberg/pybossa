@@ -884,7 +884,6 @@ def large_language_model(model_name):
         return abort(400, f'{model_name} LLM is unsupported on this platform.')
 
     proxies = current_app.config.get('LLM_PROXIES')
-    cert = current_app.config.get('CA_CERT', False)
 
     try:
         data = request.get_json(force=True)
