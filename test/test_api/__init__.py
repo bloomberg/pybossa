@@ -124,6 +124,25 @@ class TestLargeLanguageModel(unittest.TestCase):
             self.assertIn('predictions: ', response.json)
 
     @patch('requests.post')
+    def test_valid_request_no_model_name(self, mock_post):
+        response_data = {
+            "inference_response": {
+                "predictions": [{
+                    "output": "Microsoft"
+                }]
+            }
+        }
+        mock_post.return_value = MagicMock(status_code=200,
+                                           text=json.dumps(response_data))
+        with self.app.test_request_context('/', json={
+            "prompts": ["Identify the company name: Microsoft will release Windows 20 next year.", "test"]
+        }):
+            response = large_language_model(None)
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('Model: ', response.json)
+            self.assertIn('predictions: ', response.json)
+
+    @patch('requests.post')
     def test_invalid_model_name(self, mock_post):
         mock_post.return_value = MagicMock(status_code=403, text='{"error": "Model not found"}')
         with self.app.test_request_context('/', json={
