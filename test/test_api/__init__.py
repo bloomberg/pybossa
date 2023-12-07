@@ -63,9 +63,11 @@ class TestLargeLanguageModel(unittest.TestCase):
     @patch('requests.post')
     def test_valid_request(self, mock_post):
         response_data = {
-            "predictions": [{
-                "output": "Microsoft"
-            }]
+            "inference_response": {
+                "predictions": [{
+                    "output": "Microsoft"
+                }]
+            }
         }
         mock_post.return_value = MagicMock(status_code=200, text=json.dumps(response_data))
         with self.app.test_request_context('/', json={
@@ -79,9 +81,11 @@ class TestLargeLanguageModel(unittest.TestCase):
     @patch('requests.post')
     def test_valid_request_with_list_of_prompts(self, mock_post):
         response_data = {
-            "predictions": [{
-                "output": "Microsoft"
-            }]
+            "inference_response": {
+                "predictions": [{
+                    "output": "Microsoft"
+                }]
+            }
         }
         mock_post.return_value = MagicMock(status_code=200,
                                            text=json.dumps(response_data))
@@ -96,9 +100,11 @@ class TestLargeLanguageModel(unittest.TestCase):
     @patch('requests.post')
     def test_valid_request_with_instances_key_in_json(self, mock_post):
         response_data = {
-            "predictions": [{
-                "output": "Microsoft"
-            }]
+            "inference_response": {
+                "predictions": [{
+                    "output": "Microsoft"
+                }]
+            }
         }
         mock_post.return_value = MagicMock(status_code=200,
                                            text=json.dumps(response_data))
