@@ -116,7 +116,7 @@ requirements = [
     "pykerberos==1.2.1",
     "PyLD==1.0.4",  # "PyLD==2.0.3", 1.0.4 version resolves pyld.jsonld.JsonLdError
     "pyldap==3.0.0.post1",
-    "pyOpenSSL==21.0.0",
+    "pyOpenSSL==22.1.0",
     "pyparsing==2.4.7",
     "python-dateutil==2.8.2",
     "python-editor==1.0.4",
