@@ -25,7 +25,6 @@ This package adds GET, POST, PUT and DELETE methods for:
     * task_runs,
     * users,
     * global_stats,
-
 """
 
 from functools import partial
