@@ -419,7 +419,8 @@ def reserve_task_sql_filters(project_id, reserve_task_keys, exclude):
         filter_list = []
         for i in range(0, len(category_fv), 2):
             key, value = category_fv[i], category_fv[i + 1]
-            filter_list.append("task.info->>'{}' = '{}'".format(key, value))
+            escaped_value = value.replace("'", "\'")
+            filter_list.append("task.info->>'{}' = '{}'".format(key, escaped_value))
         filter_dict[category] = "({})".format(" AND ".join(filter_list))
 
     if filter_dict:
