@@ -82,7 +82,7 @@ class TestReserveTaskCategory(sched.Helper):
         # task category key exists, returns sql filter and its associated category_keys
         project_id, exclude = "202", False
         task_info = dict(name1="john's value", name2="john's baker's value")
-        expected_sql_filter = " AND ((task.info->>'name1' = 'john\'s value' AND task.info->>'name2' = 'john\'s baker\'s value')) "
+        expected_sql_filter = " AND ((task.info->>'name1' = 'john''s value' AND task.info->>'name2' = 'john''s baker''s value')) "
         reserve_task_keys = ["reserve_task:project:{}:category:name1:john's value:name2:john's baker's value:user:1008:task:454".format(project_id)]
         filters, category_keys = reserve_task_sql_filters(project_id, reserve_task_keys, exclude)
         assert filters == expected_sql_filter and \
