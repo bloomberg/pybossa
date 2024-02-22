@@ -1015,15 +1015,15 @@ def setup_http_signer(app):
 
 def setup_swagger(app):
     swagger_path = app.config.get('SWAGGER_HEADER_PATH')
-    if not swagger_path:
+    if swagger_path is None:
         return
 
     try:
         with open(swagger_path, 'r') as file:
             html_as_string = file.read()
             app.config.get('SWAGGER_TEMPLATE')['head_text'] = html_as_string
-    except (FileNotFoundError, TypeError) as ex:
-        msg = f"WARNING: Swagger custom header file not found. {ex}"
+    except (FileNotFoundError, TypeError):
+        msg = "WARNING: Swagger custom header file not found."
         app.logger.warning(msg)
     Swagger.DEFAULT_CONFIG.update(app.config.get('SWAGGER_TEMPLATE'))
     Swagger(app, template=app.config.get('SWAGGER_TEMPLATE'))

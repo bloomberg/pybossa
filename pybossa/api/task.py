@@ -86,6 +86,10 @@ class TaskAPI(APIBase):
     def _preprocess_post_data(self, data):
         project_id = data["project_id"]
         info = data["info"]
+        if isinstance(info, dict):
+            hdfs_task = any([val.startswith("/fileproxy/hdfs/") for val in info.values() if isinstance(val, str)])
+            if hdfs_task:
+                raise BadRequest("Invalid task payload. HDFS is not supported")
         duplicate = task_repo.find_duplicate(project_id=project_id, info=info)
         if duplicate:
             message = {
