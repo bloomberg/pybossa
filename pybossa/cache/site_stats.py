@@ -427,7 +427,10 @@ def n_projects_using_component(days='all', component=None):
     """
     component = '%' + component + '%'
     sql = '''
-            SELECT count(project.id) AS n_projects
+            SELECT
+                count(project.id) AS n_projects,
+                string_agg(project.id::text, ', ') AS project_ids,
+                string_agg(project.short_name, ', ') AS project_names
             FROM project
             LEFT JOIN "user" ON project.owner_id = "user".id
             WHERE project.info->>'task_presenter' like :component
@@ -437,7 +440,8 @@ def n_projects_using_component(days='all', component=None):
             AND to_timestamp(project.updated, 'YYYY-MM-DD"T"HH24:MI:SS.US') > current_timestamp - interval ':days days'
         '''
     data = {'days' : days, 'component' : component}
-    return session.execute(text(sql), data).scalar()
+
+    return session.execute(text(sql), data).fetchall()
 
 
 def management_dashboard_stats_cached():
