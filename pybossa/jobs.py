@@ -1367,9 +1367,6 @@ def load_usage_dashboard_data(days):
     for func, title in timed_stats_funcs:
         stats[title] = [(func(days), None, None)]
 
-    #from pybossa.cache import delete_memoized
-    #delete_memoized(site_stats.n_projects_using_component)
-
     # component usage
     for name, tag in current_app.config.get("USAGE_DASHBOARD_COMPONENTS", {}).items():
         stats[name] = site_stats.n_projects_using_component(days=days, component=tag)
