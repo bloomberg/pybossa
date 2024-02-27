@@ -434,7 +434,8 @@ def n_projects_using_component(days='all', component=None):
                 string_agg("user".id::text, ', ') AS owner_ids,
                 string_agg("user".name::text, ', ') AS owner_names,
                 string_agg("user".email_addr::text, ', ') AS owner_emails
-            FROM project, "user"
+            FROM project
+            LEFT JOIN "user" ON project.owner_id = "user".id
             WHERE project.info->>'task_presenter' like :component
         '''
     if days != 'all':
@@ -442,7 +443,7 @@ def n_projects_using_component(days='all', component=None):
             AND to_timestamp(project.updated, 'YYYY-MM-DD"T"HH24:MI:SS.US') > current_timestamp - interval ':days days'
         '''
     sql += '''
-            GROUP BY "user".id, "user".name, "user".email_addr
+            GROUP BY "user".id
         '''
     data = {'days' : days, 'component' : component}
 
