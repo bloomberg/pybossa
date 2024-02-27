@@ -434,8 +434,7 @@ def n_projects_using_component(days='all', component=None):
                 string_agg("user".id::text, ', ') AS owner_ids,
                 string_agg("user".name::text, ', ') AS owner_names,
                 string_agg("user".email_addr::text, ', ') AS owner_emails
-            FROM project
-            LEFT JOIN "user" ON project.owner_id = "user".id
+            FROM project, "user"
             WHERE project.info->>'task_presenter' like :component
         '''
     if days != 'all':
