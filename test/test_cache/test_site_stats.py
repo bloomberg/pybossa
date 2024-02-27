@@ -569,7 +569,7 @@ class TestSiteStatsCache(Test):
         ProjectFactory.create(created=date_12_mo, updated=date_12_mo, info=project_info)
 
         res = stats.n_projects_using_component(days=183, component='text-tagging')
-        assert res == 1, "Expected 1 project in last 6 months using text-tagging"
+        assert len(res) == 1, "Expected 1 project in last 6 months using text-tagging"
 
         res = stats.n_projects_using_component(days='all', component='text-tagging')
-        assert res == 2, "Expected 2 projects in all time using text-tagging"
+        assert len(res) == 2, "Expected 2 projects in all time using text-tagging"

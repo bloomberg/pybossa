@@ -1365,7 +1365,7 @@ def load_usage_dashboard_data(days):
     # total tasks, taskruns, projects over a specified amount of time.
     stats = OrderedDict()
     for func, title in timed_stats_funcs:
-        stats[title] = func(days)
+        stats[title] = [(func(days), None, None)]
 
     # component usage
     for name, tag in current_app.config.get("USAGE_DASHBOARD_COMPONENTS", {}).items():
