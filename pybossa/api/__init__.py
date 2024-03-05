@@ -715,6 +715,36 @@ def get_service_request(task_id, service_name, major_version, minor_version):
         .format(task_id, task_locked_by_user, current_user.id, payload))
     return abort(403)
 
+@jsonpify
+@login_required
+@csrf.exempt
+@blueprint.route('/task/<task_id>/services_v2/<service_name>/<major_version>/<minor_version>', methods=['POST'])
+@ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+def get_service_request_v2(task_id, service_name, major_version, minor_version):
+    """Proxy service call"""
+    proxy_service_config = current_app.config.get('PROXY_SERVICE_CONFIG_2', None)
+    task = task_repo.get_task(task_id)
+    project = project_repo.get(task.project_id)
+
+    if not (task and proxy_service_config and service_name and major_version and minor_version):
+        return abort(400)
+
+    timeout = project.info.get('timeout', ContributionsGuard.STAMP_TTL)
+    task_locked_by_user = has_lock(task.id, current_user.id, timeout)
+    payload = request.json if isinstance(request.json, dict) else None
+
+    if payload and task_locked_by_user:
+        service = _get_valid_service(task_id, service_name, payload, proxy_service_config)
+        if isinstance(service, dict):
+            url = '{}/{}/{}/{}'.format(proxy_service_config['uri'], service_name, major_version, minor_version)
+            headers = service.get('headers')
+            ret = requests.post(url, headers=headers, json=payload['data'])
+            return Response(ret.content, 200, mimetype="application/json")
+
+    current_app.logger.info(
+        'Task id {} with lock-status {} by user {} with this payload {} failed.'
+        .format(task_id, task_locked_by_user, current_user.id, payload))
+    return abort(403)
 
 def _get_valid_service(task_id, service_name, payload, proxy_service_config):
     service_data = payload.get('data', None)
