@@ -1237,3 +1237,30 @@ class TestTaskAPI(TestAPI):
 
         url = tasks.upload_gold_data(task, 1, {'ans1': 'test'})
         assert url == 'testURL', url
+
+
+    @with_context
+    def test_create_task_with_hdfs_payload(self):
+        [admin, subadminowner, subadmin, reguser] = UserFactory.create_batch(4)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+        make_subadmin(subadmin)
+
+        project = ProjectFactory.create(owner=subadminowner)
+        admin_headers = dict(Authorization=admin.api_key)
+        task_info = dict(field_1='one', field_2='/fileproxy/hdfs/my_hdfs_file.txt')
+
+        # POST fails with error 400
+        data = dict(project_id=project.id, info=task_info, n_answers=2)
+        res = self.app.post('/api/task', data=json.dumps(data), headers=admin_headers)
+        assert res.status_code == 400
+        response = json.loads(res.data)
+        assert response["exception_msg"] == "Invalid task payload. HDFS is not supported"
+
+        # POST successful with hdfs not present in task payload
+        task_info["field_2"] = "xyz"
+        data = dict(project_id=project.id, info=task_info, n_answers=2)
+        res = self.app.post('/api/task', data=json.dumps(data), headers=admin_headers)
+        task = json.loads(res.data)
+        assert res.status_code == 200
+        assert task["info"] == {"field_1": "one", "field_2": "xyz"}
