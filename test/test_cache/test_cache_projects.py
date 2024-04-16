@@ -29,7 +29,7 @@ from pybossa.cache.project_stats import update_stats
 from nose.tools import nottest, assert_raises
 from pybossa.cache.task_browse_helpers import get_task_filters, parse_tasks_browse_args
 import pybossa.cache.project_stats as stats
-
+from pybossa.redis_lock import get_locked_tasks_project
 
 class TestProjectsCache(Test):
 
@@ -1072,3 +1072,29 @@ class TestProjectsCache(Test):
         assert "assigned_users" in cached_tasks[0], "assigned_users column selected. assigned users should be part of task."
         assert "z@ijk.com" in cached_tasks[0]["assigned_users"], "user email to be present for user email not found in the system."
         assert cached_tasks[0]["assigned_users"] == "user_x at_abc, user_y at_def, z@ijk.com", "assigned users full names to be present in sorted order."
+
+
+    @with_context
+    @patch('pybossa.redis_lock.get_user_tasks_key')
+    @patch('pybossa.core.sentinel.master')
+    @patch('pybossa.redis_lock.LockManager')
+    @patch('pybossa.core.task_repo')
+    def test_deleted_locked_task(self, mock_task_repo, mock_lock_manager, mock_redis, mock_get_user_tasks_key):
+        """Test deleting a locked task should clear it from the cache."""
+        project_id = 1
+        user_id = '12'
+        task_id = '123'
+        user_tasks_key = '12_123'
+        mock_get_user_tasks_key.return_value = user_tasks_key
+        mock_redis.hgetall.return_value = {user_id: user_id}
+        mock_redis.mget.return_value = [None]
+        #mock_redis.mget.side_effect = lambda keys: ['1', None]
+        mock_lock_manager.return_value.get_locks.return_value = {task_id: task_id}
+        mock_task_repo.get_task.return_value = None # simulate deleted task
+
+        # Act
+        result = get_locked_tasks_project(project_id)
+
+        # Assert
+        assert result == [] # no tasks should be returned
+        mock_lock_manager.return_value.release_lock.assert_called_once_with(user_tasks_key, task_id)
