@@ -1088,7 +1088,6 @@ class TestProjectsCache(Test):
         mock_get_user_tasks_key.return_value = user_tasks_key
         mock_redis.hgetall.return_value = {user_id: user_id}
         mock_redis.mget.return_value = [None]
-        #mock_redis.mget.side_effect = lambda keys: ['1', None]
         mock_lock_manager.return_value.get_locks.return_value = {task_id: task_id}
         mock_task_repo.get_task.return_value = None # simulate deleted task
 
