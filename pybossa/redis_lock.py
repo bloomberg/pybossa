@@ -111,6 +111,8 @@ def get_locked_tasks_project(project_id):
                     task_project_id = task.project_id
                 else:
                     # Locked task has been deleted.
+                    task_users_key = get_task_users_key(task_id)
+                    lock_manager.release_lock(task_users_key, user_id)
                     lock_manager.release_lock(user_tasks_key, task_id)
             # Match the requested project id.
             elif int(task_project_id) == project_id:

@@ -20,7 +20,7 @@ from test import Test, with_context, with_request_context
 from pybossa.cache import projects as cached_projects
 from test.factories import UserFactory, ProjectFactory, TaskFactory, \
     TaskRunFactory, AnonymousTaskRunFactory, UserFactory
-from unittest.mock import patch
+from unittest.mock import patch, call
 import datetime
 import json
 from pybossa.core import result_repo, task_repo
@@ -1075,25 +1075,31 @@ class TestProjectsCache(Test):
 
 
     @with_context
+    @patch('pybossa.redis_lock.get_task_users_key')
     @patch('pybossa.redis_lock.get_user_tasks_key')
     @patch('pybossa.core.sentinel.master')
     @patch('pybossa.redis_lock.LockManager')
     @patch('pybossa.core.task_repo')
-    def test_deleted_locked_task(self, mock_task_repo, mock_lock_manager, mock_redis, mock_get_user_tasks_key):
+    def test_deleted_locked_task(self, mock_task_repo, mock_lock_manager, mock_redis, mock_get_user_tasks_key, mock_get_task_users_key):
         """Test deleting a locked task should clear it from the cache."""
         project_id = 1
         user_id = '12'
         task_id = '123'
         user_tasks_key = '12_123'
+        task_users_key = '123_12'
         mock_get_user_tasks_key.return_value = user_tasks_key
+        mock_get_task_users_key.return_value = task_users_key
         mock_redis.hgetall.return_value = {user_id: user_id}
-        mock_redis.mget.return_value = [None]
         mock_lock_manager.return_value.get_locks.return_value = {task_id: task_id}
-        mock_task_repo.get_task.return_value = None # simulate deleted task
 
-        # Act
+        # Simulate deleted task.
+        mock_redis.mget.return_value = [None]
+        mock_task_repo.get_task.return_value = None
+
+        # Execute method.
         result = get_locked_tasks_project(project_id)
 
-        # Assert
-        assert result == [] # no tasks should be returned
-        mock_lock_manager.return_value.release_lock.assert_called_once_with(user_tasks_key, task_id)
+        # Verify no tasks are returned and cache clear has been called.
+        assert result == []
+        calls = [call(task_users_key, user_id), call(user_tasks_key, task_id)]
+        mock_lock_manager.return_value.release_lock.assert_has_calls(calls, any_order=True)
