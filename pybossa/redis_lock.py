@@ -115,7 +115,7 @@ def get_locked_tasks_project(project_id):
                     lock_manager.release_lock(task_users_key, user_id)
                     lock_manager.release_lock(user_tasks_key, task_id)
             # Match the requested project id.
-            elif int(task_project_id) == project_id:
+            if task_project_id and int(task_project_id) == project_id:
                 # Calculate seconds remaining.
                 seconds_remaining = LockManager.seconds_remaining(user_tasks[task_id])
                 if seconds_remaining > 0:
