@@ -370,8 +370,6 @@ def delete_taskbrowse_bookmarks(user):
 def get_user_preferences(user_id, map_to_country_codes=False):
     user = get_user_by_id(user_id)
     user_pref = user.user_pref or {} if user else {}
-    # map country to country code here
-    # TODO: map country code -> country if needed
     if map_to_country_codes and 'locations' in user_pref:
         new_locations_set = set()
         for location in user_pref['locations']:
