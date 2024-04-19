@@ -386,7 +386,6 @@ def get_user_preferences(user_id, map_to_country_codes=False):
                 current_app.logger.warning(f"Invalid country code '{location}' for user {user_id} in get_user_preferences")
 
         user_pref['locations'] = list(new_locations_set)
-    print("user_prefuser_prefuser_pref",user_pref)
     user_email = user.email_addr if user else None
     return get_user_pref_db_clause(user_pref, user_email)
 

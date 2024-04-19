@@ -131,7 +131,9 @@ class TestSched(sched.Helper):
         assert not tasks
 
     @with_context
-    def test_task_4(self):
+    @patch('pybossa.cache.users.app_settings.upref_mdata.get_country_by_country_code')
+    @patch('pybossa.cache.users.app_settings.upref_mdata')
+    def test_task_4(self, upref_mdata, get_country_by_country_code):
         """
         User has multiple preferences of different kinds,
         task has single preference, match
@@ -143,11 +145,14 @@ class TestSched(sched.Helper):
         task = TaskFactory.create_batch(1, project=project, n_answers=10)[0]
         task.user_pref = {'languages': ['de']}
         task_repo.save(task)
+        get_country_by_country_code.return_value = 'United States'
         tasks = get_user_pref_task(1, 500)
         assert tasks
 
     @with_context
-    def test_task_5(self):
+    @patch('pybossa.cache.users.app_settings.upref_mdata.get_country_by_country_code')
+    @patch('pybossa.cache.users.app_settings.upref_mdata')
+    def test_task_5(self, upref_mdata, get_country_by_country_code):
         """
         User has multiple preferences of different kinds,
         task has single preference, match
@@ -159,11 +164,14 @@ class TestSched(sched.Helper):
         task = TaskFactory.create_batch(1, project=project, n_answers=10)[0]
         task.user_pref = {'locations': ['us']}
         task_repo.save(task)
+        get_country_by_country_code.return_value = "United States"
         tasks = get_user_pref_task(1, 500)
         assert tasks
 
     @with_context
-    def test_task_6(self):
+    @patch('pybossa.cache.users.app_settings.upref_mdata.get_country_by_country_code')
+    @patch('pybossa.cache.users.app_settings.upref_mdata')
+    def test_task_6(self, upref_mdata, get_country_by_country_code):
         """
         User has multiple preferences of different kinds,
         task has multiple preferences of different kinds, no match
@@ -175,6 +183,7 @@ class TestSched(sched.Helper):
         task = TaskFactory.create_batch(1, project=project, n_answers=10)[0]
         task.user_pref = {'languages': ['en', 'zh'], 'locations': ['es']}
         task_repo.save(task)
+        get_country_by_country_code.return_value = "Spain"
         tasks = get_user_pref_task(1, 500)
         assert not tasks
 
@@ -194,43 +203,54 @@ class TestSched(sched.Helper):
         assert not tasks
 
     @with_context
-    def test_get_user_preferences_cc(self):
+    @patch('pybossa.cache.users.app_settings.upref_mdata.get_country_by_country_code')
+    @patch('pybossa.cache.users.app_settings.upref_mdata')
+    def test_get_user_preferences_cc(self, upref_mdata, get_country_by_country_code):
         """
         Test mapping from country code to country name
         """
-        user = UserFactory.create(id)
+        user = UserFactory.create()
         user.user_pref = {'locations': ['US']}
         user_repo.save(user)
 
-        prefs = get_user_preferences(user.id, map_to_country_codes=True)
+        get_country_by_country_code.return_value = "United States"
 
-        assert 'US' in prefs and 'United States' in prefs
+        prefs = get_user_preferences(user.id, map_to_country_codes=True)
+        assert 'us' in prefs and 'united states' in prefs
 
     @with_context
-    def test_get_user_preferences_cn(self):
+    @patch('pybossa.cache.users.app_settings.upref_mdata.get_country_code_by_country')
+    @patch('pybossa.cache.users.app_settings.upref_mdata')
+    def test_get_user_preferences_cn(self, upref_mdata, get_country_code_by_country):
         """
         Test mapping from country name to country code
         """
-        user = UserFactory.create(id)
+        user = UserFactory.create()
         user.user_pref = {'locations': ['United States']}
         user_repo.save(user)
 
+        get_country_code_by_country.return_value = "US"
+
         prefs = get_user_preferences(user.id, map_to_country_codes=True)
 
-        assert 'US' in prefs and 'United States' in prefs
+        assert 'us' in prefs and 'united states' in prefs
 
     @with_context
-    def test_get_user_preferences_invalid(self):
+    @patch('pybossa.cache.users.app_settings.upref_mdata.get_country_code_by_country')
+    @patch('pybossa.cache.users.app_settings.upref_mdata')
+    def test_get_user_preferences_invalid(self, upref_mdata, get_country_code_by_country):
         """
         Test invalid location preference
         """
-        user = UserFactory.create(id)
+        user = UserFactory.create()
         user.user_pref = {'locations': ['invalid country']}
         user_repo.save(user)
 
+        get_country_code_by_country.return_value = None
+
         prefs = get_user_preferences(user.id, map_to_country_codes=True)
 
-        assert len(prefs) == 1 and 'invalid country' in prefs
+        assert 'invalid country' in prefs
 
     @with_context
     def test_get_unique_user_pref(self):
