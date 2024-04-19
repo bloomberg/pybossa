@@ -33,7 +33,7 @@ import json
 from pybossa.util import get_user_pref_db_clause, get_user_filter_db_clause
 from pybossa.data_access import data_access_levels
 from pybossa.util import get_taskrun_date_range_sql_clause_params
-
+from flask import current_app
 
 session = db.slave_session
 
@@ -382,6 +382,8 @@ def get_user_preferences(user_id, map_to_country_codes=False):
                 mapped_loc = app_settings.upref_mdata.get_country_code_by_country(location)
             if mapped_loc is not None:
                 new_locations_set.add(mapped_loc)
+            else:
+                current_app.logger.warning(f"Invalid country code '{location}' for user {user_id} in get_user_preferences")
 
         user_pref['locations'] = list(new_locations_set)
     print("user_prefuser_prefuser_pref",user_pref)

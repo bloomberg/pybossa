@@ -24,6 +24,7 @@ from pybossa.jobs import send_email_notifications
 from test.factories import TaskFactory, ProjectFactory, UserFactory, TaskRunFactory
 from pybossa.sched import get_user_pref_task, Schedulers
 from pybossa.cache.helpers import n_available_tasks_for_user
+from pybossa.cache.users import get_user_preferences
 import datetime
 from test.helper.gig_helper import make_admin, make_subadmin
 import json
@@ -191,6 +192,45 @@ class TestSched(sched.Helper):
         task_repo.save(task)
         tasks = get_user_pref_task(1, 500)
         assert not tasks
+
+    @with_context
+    def test_get_user_preferences_cc(self):
+        """
+        Test mapping from country code to country name
+        """
+        user = UserFactory.create(id)
+        user.user_pref = {'locations': ['US']}
+        user_repo.save(user)
+
+        prefs = get_user_preferences(user.id, map_to_country_codes=True)
+
+        assert 'US' in prefs and 'United States' in prefs
+
+    @with_context
+    def test_get_user_preferences_cn(self):
+        """
+        Test mapping from country name to country code
+        """
+        user = UserFactory.create(id)
+        user.user_pref = {'locations': ['United States']}
+        user_repo.save(user)
+
+        prefs = get_user_preferences(user.id, map_to_country_codes=True)
+
+        assert 'US' in prefs and 'United States' in prefs
+
+    @with_context
+    def test_get_user_preferences_invalid(self):
+        """
+        Test invalid location preference
+        """
+        user = UserFactory.create(id)
+        user.user_pref = {'locations': ['invalid country']}
+        user_repo.save(user)
+
+        prefs = get_user_preferences(user.id, map_to_country_codes=True)
+
+        assert len(prefs) == 1 and 'invalid country' in prefs
 
     @with_context
     def test_get_unique_user_pref(self):
