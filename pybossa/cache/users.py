@@ -18,6 +18,7 @@
 """Cache module for users."""
 from sqlalchemy.sql import text
 from sqlalchemy.exc import ProgrammingError
+from pybossa import app_settings
 from pybossa.core import db, timeouts
 from pybossa.cache import cache, memoize, delete_memoized, FIVE_MINUTES, \
     ONE_DAY, ONE_WEEK, memoize_with_l2_cache
@@ -32,7 +33,7 @@ import json
 from pybossa.util import get_user_pref_db_clause, get_user_filter_db_clause
 from pybossa.data_access import data_access_levels
 from pybossa.util import get_taskrun_date_range_sql_clause_params
-
+from flask import current_app
 
 session = db.slave_session
 
@@ -366,9 +367,25 @@ def delete_taskbrowse_bookmarks(user):
     delete_memoized(get_user_by_id, user.id)
 
 
-def get_user_preferences(user_id):
+def get_user_preferences(user_id, map_to_country_codes=False):
     user = get_user_by_id(user_id)
     user_pref = user.user_pref or {} if user else {}
+    if map_to_country_codes and 'locations' in user_pref:
+        new_locations_set = set()
+        for location in user_pref['locations']:
+            new_locations_set.add(location)
+            # location is a country code, fetch country name
+            if len(location) == 2:
+                mapped_loc = app_settings.upref_mdata.get_country_by_country_code(location)
+            # location is a country name, fetch country code
+            else:
+                mapped_loc = app_settings.upref_mdata.get_country_code_by_country(location)
+            if mapped_loc is not None:
+                new_locations_set.add(mapped_loc)
+            else:
+                current_app.logger.warning(f"Invalid country code '{location}' for user {user_id} in get_user_preferences")
+
+        user_pref['locations'] = list(new_locations_set)
     user_email = user.email_addr if user else None
     return get_user_pref_db_clause(user_pref, user_email)
 

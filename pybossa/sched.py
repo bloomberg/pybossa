@@ -496,7 +496,7 @@ def locked_task_sql(project_id, user_id=None, limit=1, rand_within_priority=Fals
     '''
     filters = []
     if filter_user_prefs:
-        filters.append('AND ({}) AND ({})'.format(cached_users.get_user_preferences(user_id), cached_users.get_user_filters(user_id)))
+        filters.append('AND ({}) AND ({})'.format(cached_users.get_user_preferences(user_id, map_to_country_codes=True), cached_users.get_user_filters(user_id)))
     if task_type == 'gold':
         filters.append('AND task.calibration = 1')
     elif task_type == 'no_gold':
