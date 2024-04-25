@@ -331,7 +331,7 @@ def delete_user_summary(name):
     delete_memoized(get_user_summary, name)
 
 
-@memoize(timeout=timeouts.get('APP_TIMEOUT'))
+#@memoize(timeout=timeouts.get('APP_TIMEOUT'))
 def get_user_pref_metadata(name):
     sql = text("""
     SELECT info->'metadata', user_pref, info->'data_access' FROM "user" WHERE name=:name;
@@ -342,8 +342,22 @@ def get_user_pref_metadata(name):
     upref_mdata.update(row[1] or {})
     if data_access_levels:
         upref_mdata['data_access'] = row[2] or []
+
+    if 'locations' in upref_mdata:
+        _map_locations(upref_mdata)
     return upref_mdata
 
+def _map_locations(upref_mdata):
+    upref_mdata['country_codes'] = []
+    upref_mdata['country_names'] = []
+    for location in upref_mdata['locations']:
+        if len(location) == 2:
+            upref_mdata['country_codes'].append(location)
+        else:
+            upref_mdata['country_names'].append(location)
+    country_codes_set = set(upref_mdata['country_codes'])
+    country_names_set = set(upref_mdata['country_names'])
+    upref_mdata['locations'] = list(country_codes_set.union(country_names_set))
 
 def delete_user_pref_metadata(user):
     delete_memoized(get_user_pref_metadata, user.name)
@@ -370,6 +384,8 @@ def get_user_preferences(user_id):
     user = get_user_by_id(user_id)
     user_pref = user.user_pref or {} if user else {}
     user_email = user.email_addr if user else None
+    if 'locations' in user.user_pref:
+        _map_locations(user.user_pref)
     return get_user_pref_db_clause(user_pref, user_email)
 
 

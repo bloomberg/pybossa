@@ -607,7 +607,9 @@ def _show_public_profile(user, form, can_update):
                     form=form,
                     can_update=can_update,
                     private_instance=bool(data_access_levels),
-                    upref_mdata_enabled=bool(app_settings.upref_mdata))
+                    upref_mdata_enabled=bool(app_settings.upref_mdata),
+                    country_name_to_country_code=app_settings.upref_mdata.country_name_to_country_code,
+                    country_code_to_country_name=app_settings.upref_mdata.country_code_to_country_name)
 
     return handle_content_type(response)
 
@@ -631,7 +633,9 @@ def _show_own_profile(user, form, current_user, can_update):
                     form=form,
                     can_update=can_update,
                     private_instance=bool(data_access_levels),
-                    upref_mdata_enabled=bool(app_settings.upref_mdata))
+                    upref_mdata_enabled=bool(app_settings.upref_mdata),
+                    country_name_to_country_code=app_settings.upref_mdata.country_name_to_country_code,
+                    country_code_to_country_name=app_settings.upref_mdata.country_code_to_country_name)
 
     response = make_response(handle_content_type(response))
     response.headers['Cache-Control'] = 'no-store'
@@ -1144,7 +1148,9 @@ def add_metadata(name):
                                form=form,
                                input_form=True,
                                can_update=can_update,
-                               upref_mdata_enabled=bool(app_settings.upref_mdata))
+                               upref_mdata_enabled=bool(app_settings.upref_mdata),
+                               country_name_to_country_code=app_settings.upref_mdata.country_name_to_country_code(),
+                               country_code_to_country_name=app_settings.upref_mdata.country_code_to_country_name())
 
     user_pref, metadata = get_user_pref_and_metadata(name, form)
     user.info['metadata'] = metadata
@@ -1312,7 +1318,10 @@ def get_user_pref_and_metadata(user_name, form):
                         profile=form.profile.data)
         if form.languages.data:
             user_pref['languages'] = form.languages.data
-        if form.locations.data:
-            user_pref['locations'] = form.locations.data
+
+        if form.country_names.data and form.country_codes.data:
+            # combine the two arrays
+            user_pref['locations'] = [x for arr in (form.country_names.data, form.country_codes.data) if arr is not None for x in arr]
+
         return user_pref, metadata
 
