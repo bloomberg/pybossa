@@ -35,6 +35,8 @@ from functools import wraps
 from math import ceil
 from tempfile import NamedTemporaryFile
 
+from pybossa import app_settings
+
 import dateutil.parser
 import dateutil.tz
 import simplejson
@@ -1413,3 +1415,34 @@ def delete_redis_keys(sentinel, pattern):
     if not keys_to_delete:
         return False
     return bool(sentinel.master.delete(*keys_to_delete))
+
+
+def map_locations(locations):
+    country_codes_set = set()
+    country_names_set = set()
+    for location in locations:
+        if len(location) == 2:
+            country_codes_set.add(location)
+            mapped_cn = app_settings.upref_mdata.get_country_name_by_country_code(location)
+            if mapped_cn is not None:
+                country_names_set.add(mapped_cn)
+            else:
+                current_app.logger.warning(f"Invalid country code '{location}' in map_locations")
+        else:
+            country_names_set.add(location)
+            mapped_cc = app_settings.upref_mdata.get_country_code_by_country_name(location)
+            if mapped_cc is not None:
+                country_codes_set.add(mapped_cc)
+            else:
+                current_app.logger.warning(f"Invalid country name '{location}' in map_locations")
+
+    print({
+        'locations': list(country_codes_set.union(country_names_set)),
+        'country_codes': list(country_codes_set),
+        'country_names': list(country_names_set)
+    })
+    return {
+        'locations': list(country_codes_set.union(country_names_set)),
+        'country_codes': list(country_codes_set),
+        'country_names': list(country_names_set)
+    }

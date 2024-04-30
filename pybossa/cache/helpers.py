@@ -202,7 +202,7 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
                project_id=:project_id AND user_id=:user_id)
                ; '''
     else:
-        user_pref_list = cached_users.get_user_preferences(user_id, map_to_country_codes=True)
+        user_pref_list = cached_users.get_user_preferences(user_id)
         user_filter_list = cached_users.get_user_filters(user_id)
 
         timeout = project_info.get("timeout", TIMEOUT)

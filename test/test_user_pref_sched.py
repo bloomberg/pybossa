@@ -215,7 +215,7 @@ class TestSched(sched.Helper):
 
         get_country_by_country_code.return_value = "United States"
 
-        prefs = get_user_preferences(user.id, map_to_country_codes=True)
+        prefs = get_user_preferences(user.id)
         assert 'us' in prefs and 'united states' in prefs
 
     @with_context
@@ -231,7 +231,7 @@ class TestSched(sched.Helper):
 
         get_country_code_by_country.return_value = "US"
 
-        prefs = get_user_preferences(user.id, map_to_country_codes=True)
+        prefs = get_user_preferences(user.id)
 
         assert 'us' in prefs and 'united states' in prefs
 
@@ -248,7 +248,7 @@ class TestSched(sched.Helper):
 
         get_country_code_by_country.return_value = None
 
-        prefs = get_user_preferences(user.id, map_to_country_codes=True)
+        prefs = get_user_preferences(user.id)
 
         assert 'invalid country' in prefs
 

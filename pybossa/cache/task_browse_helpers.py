@@ -7,7 +7,7 @@ from werkzeug.exceptions import BadRequest
 from pybossa.cache import memoize, ONE_DAY
 from pybossa.core import db
 from pybossa.util import (convert_est_to_utc,
-    get_user_pref_db_clause, get_user_filter_db_clause)
+    get_user_pref_db_clause, get_user_filter_db_clause, map_locations)
 from flask import current_app
 import pybossa.app_settings as app_settings
 from functools import reduce
@@ -361,6 +361,8 @@ def validate_user_preferences(user_pref):
     if loc and valid_locations and not all(x in valid_locations for x in loc):
         raise ValueError('invalid locations user preference: {}'
                         .format(loc))
+
+    user_pref['locations'] = map_locations(loc)['locations']
 
 
 def _get_field_filters(filters):

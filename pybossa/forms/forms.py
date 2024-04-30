@@ -786,9 +786,9 @@ class UserPrefMetadataForm(Form):
     locations = Select2Field(
         lazy_gettext('Location(s)'), choices=[], default="")
     country_codes = Select2Field(
-        lazy_gettext('Country Code(s)'), choices=[], default="")
+        lazy_gettext('Location - Country Code(s)'), choices=[], default="")
     country_names = Select2Field(
-        lazy_gettext('Country Name(s)'), choices=[], default="")
+        lazy_gettext('Location - Country Name(s)'), choices=[], default="")
     work_hours_from = TimeField(
         lazy_gettext('Work Hours From'),
         [TimeFieldsValidator(["work_hours_to", "timezone"],
