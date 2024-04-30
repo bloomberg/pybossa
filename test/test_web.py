@@ -10199,7 +10199,9 @@ class TestWebUserMetadataUpdate(web.Helper):
         def double(x): return (x,x)
         get_upref_mdata_choices.return_value = dict(
             languages=list(map(double,["Afrikaans", "Albanian", "Welsh"])),
-            locations=list(map(double, ['Bonaire', 'Wallis and Futuna', 'Vanuatu'])),
+            locations=list(map(double, ['Bonaire', 'BQ', 'Wallis and Futuna', 'WF', 'Vanuatu', 'VU'])),
+            country_names=list(map(double, ['Bonaire', 'Wallis and Futuna', 'Vanuatu'])),
+            country_codes=list(map(double, ['BQ', 'WF', 'VU'])),
             timezones=[("AET", "Australia Eastern Time"), ("AGT", "Argentina Standard Time")],
             user_types=list(map(double, ["Researcher", "Analyst", "Curator"]))
         )
