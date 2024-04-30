@@ -1322,6 +1322,9 @@ def get_user_pref_and_metadata(user_name, form):
         if form.country_names.data and form.country_codes.data:
             # combine the two arrays
             user_pref['locations'] = [x for arr in (form.country_names.data, form.country_codes.data) if arr is not None for x in arr]
-
+        elif form.country_names.data:
+            user_pref['locations'] = form.country_names.data
+        elif form.country_codes.data:
+            user_pref['locations'] = form.country_codes.data
         return user_pref, metadata
 
