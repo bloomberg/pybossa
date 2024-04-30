@@ -1294,6 +1294,8 @@ def get_user_data_as_form(user):
     return {
         'languages': user_pref.get('languages'),
         'locations': user_pref.get('locations'),
+        'country_codes': user_pref.get('country_codes'),
+        'country_names': user_pref.get('country_names'),
         'user_type': metadata.get('user_type'),
         'work_hours_from': metadata.get('work_hours_from'),
         'work_hours_to': metadata.get('work_hours_to'),
@@ -1326,5 +1328,7 @@ def get_user_pref_and_metadata(user_name, form):
             user_pref['locations'] = form.country_names.data
         elif form.country_codes.data:
             user_pref['locations'] = form.country_codes.data
+        elif form.locations.data:
+            user_pref['locations'] = form.locations.data
         return user_pref, metadata
 

@@ -786,9 +786,9 @@ class UserPrefMetadataForm(Form):
     locations = Select2Field(
         lazy_gettext('Location(s)'), choices=[], default="")
     country_codes = Select2Field(
-        lazy_gettext('Location - Country Code(s)'), choices=[], default="")
+        lazy_gettext('Location - Country Code(s)'), validators=[], choices=[], default="")
     country_names = Select2Field(
-        lazy_gettext('Location - Country Name(s)'), choices=[], default="")
+        lazy_gettext('Location - Country Name(s)'), validators=[], choices=[], default="")
     work_hours_from = TimeField(
         lazy_gettext('Work Hours From'),
         [TimeFieldsValidator(["work_hours_to", "timezone"],
@@ -826,6 +826,7 @@ class UserPrefMetadataForm(Form):
     def set_upref_mdata_choices(self):
         upref_mdata_choices = app_settings.upref_mdata.get_upref_mdata_choices()
         self.languages.choices = upref_mdata_choices['languages']
+        self.locations.choices = upref_mdata_choices['locations']
         self.country_codes.choices = upref_mdata_choices['country_codes']
         self.country_names.choices = upref_mdata_choices['country_names']
         self.timezone.choices = upref_mdata_choices['timezones']

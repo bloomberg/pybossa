@@ -927,6 +927,11 @@ class TestWeb(web.Helper):
         if account validation is enabled"""
         from flask import current_app
         current_app.config['ACCOUNT_CONFIRMATION_DISABLED'] = False
+        from pybossa import app_settings
+        app_settings.upref_mdata = {
+            'country_name_to_country_code': {'United States': 'US'},
+            'country_code_to_country_name': {'US': 'United States'}
+        }
         self.register()
         self.signin()
         user = db.session.query(User).get(1)
@@ -966,6 +971,11 @@ class TestWeb(web.Helper):
         if account validation is enabled"""
         from flask import current_app
         current_app.config['ACCOUNT_CONFIRMATION_DISABLED'] = False
+        from pybossa import app_settings
+        app_settings.upref_mdata = {
+            'country_name_to_country_code': {'United States': 'US'},
+            'country_code_to_country_name': {'US': 'United States'}
+        }
         self.register()
         user = db.session.query(User).get(1)
         user.valid_email = False
@@ -9531,8 +9541,10 @@ class TestWeb(web.Helper):
         assert th_tag_4 == expected_columns[3], f"found column {th_tag_4}, expected column {expected_columns[3]} not present"
 
     @with_context
-    def test_projects_account(self):
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_name_by_country_code')
+    def test_projects_account(self, get_country_name_by_country_code):
         """Test projecs on profiles are good."""
+        get_country_name_by_country_code.return_value = ""
         owner, contributor = UserFactory.create_batch(2)
         info = dict(passwd_hash='foo', foo='bar', data_classification=dict(input_data="L4 - public", output_data="L4 - public"))
         project = ProjectFactory.create(owner=owner, info=info)
@@ -9569,19 +9581,22 @@ class TestWeb(web.Helper):
             assert key in tmp['info'].keys()
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_name_by_country_code')
     @patch('pybossa.view.account.mail_queue', autospec=True)
     @patch('pybossa.view.account.render_template')
     @patch('pybossa.view.account.signer')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_register_with_upref_mdata(self, upref_mdata, get_upref_mdata_choices, signer, render, queue):
+    def test_register_with_upref_mdata(self, upref_mdata, get_upref_mdata_choices, signer, render, queue, get_country_name_by_country_code):
         """Test WEB register user with user preferences set"""
         from flask import current_app
         get_upref_mdata_choices.return_value = dict(languages=[("en", "en"), ("sp", "sp")],
                                     locations=[("us", "us"), ("uk", "uk")],
+                                    country_codes=[("us", "us"), ("uk", "uk")],
+                                    country_names=[("us", "us"), ("uk", "uk")],
                                     timezones=[("", ""), ("ACT", "Australia Central Time")],
                                     user_types=[("Researcher", "Researcher"), ("Analyst", "Analyst")])
-
+        get_country_name_by_country_code.return_value = 'US'
         current_app.config['ACCOUNT_CONFIRMATION_DISABLED'] = True
         data = dict(fullname="AJD", name="ajd",
                     password="p4ssw0rd", confirm="p4ssw0rd",
@@ -9631,6 +9646,8 @@ class TestWeb(web.Helper):
         from flask import current_app
         get_valid_user_preferences.return_value = dict(languages=[("en", "en"), ("sp", "sp")],
                                     locations=[("us", "us"), ("uk", "uk")],
+                                    country_codes=[("us", "us"), ("uk", "uk")],
+                                    country_names=[("us", "us"), ("uk", "uk")],
                                     timezones=[("", ""), ("ACT", "Australia Central Time")],
                                     user_types=[("Researcher", "Researcher"), ("Analyst", "Analyst")])
 
@@ -10173,7 +10190,10 @@ class TestWebUserMetadataUpdate(web.Helper):
 
         enabled = set(self.update.keys()) - set(disabled)
 
+        print(sorted(updated), '\n\n', sorted(self.update))
+
         for k in enabled:
+            print('checking enabled field: ', updated[k],  self.update[k])
             assert updated[k] == self.update[k], 'Enabled field [{}] did not get updated.'.format(k)
         for k in disabled:
             original_value = self.original[k]
@@ -10212,11 +10232,13 @@ class TestWebUserMetadataUpdate(web.Helper):
             assert v != self.original[k], '[{}] is same in original and update'.format(k)
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_normal_user_cannot_update_own_user_type(self, upref_mdata, get_upref_mdata_choices):
+    def test_normal_user_cannot_update_own_user_type(self, upref_mdata, get_upref_mdata_choices, get_country_code_by_country_name):
         """Test normal user can update their own metadata except for user_type"""
         self.mock_upref_mdata_choices(get_upref_mdata_choices)
+        get_country_code_by_country_name.return_value = 'VU'
         # First user created is automatically admin, so get that out of the way.
         user_admin = UserFactory.create()
         user_normal = self.create_user()
@@ -10227,11 +10249,13 @@ class TestWebUserMetadataUpdate(web.Helper):
         self.assert_updates_applied_correctly(user_normal.id, disabled)
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_admin_user_can_update_own_metadata(self, upref_mdata, get_upref_mdata_choices):
+    def test_admin_user_can_update_own_metadata(self, upref_mdata, get_upref_mdata_choices, get_country_code_by_country_name):
         '''Test admin can update their own metadata'''
         self.mock_upref_mdata_choices(get_upref_mdata_choices)
+        get_country_code_by_country_name.return_value = 'VU'
         user_admin = self.create_user()
         assert user_admin.admin
         self.signin_user(user_admin)
@@ -10240,11 +10264,13 @@ class TestWebUserMetadataUpdate(web.Helper):
         self.assert_updates_applied_correctly(user_admin.id, disabled)
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_subadmin_user_can_update_own_metadata(self, upref_mdata, get_upref_mdata_choices):
+    def test_subadmin_user_can_update_own_metadata(self, upref_mdata, get_upref_mdata_choices, get_country_code_by_country_name):
         '''Test subadmin can update their own metadata'''
         self.mock_upref_mdata_choices(get_upref_mdata_choices)
+        get_country_code_by_country_name.return_value = 'VU'
         # First user created is automatically admin, so get that out of the way.
         user_admin = UserFactory.create()
         user_subadmin = self.create_user(subadmin=True)
@@ -10255,11 +10281,13 @@ class TestWebUserMetadataUpdate(web.Helper):
         self.assert_updates_applied_correctly(user_subadmin.id, disabled)
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_subadmin_user_can_update_normal_user_metadata(self, upref_mdata, get_upref_mdata_choices):
+    def test_subadmin_user_can_update_normal_user_metadata(self, upref_mdata, get_upref_mdata_choices, get_country_code_by_country_name):
         '''Test subadmin can update normal user metadata'''
         self.mock_upref_mdata_choices(get_upref_mdata_choices)
+        get_country_code_by_country_name.return_value = 'VU'
         # First user created is automatically admin, so get that out of the way.
         user_admin = UserFactory.create()
         user_subadmin = UserFactory.create(subadmin=True)

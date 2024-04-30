@@ -381,8 +381,8 @@ def get_user_preferences(user_id):
     user = get_user_by_id(user_id)
     user_pref = user.user_pref or {} if user else {}
     user_email = user.email_addr if user else None
-    if 'locations' in user.user_pref:
-        map_locations_upref_mdata(user.user_pref)
+    if 'locations' in user_pref:
+        map_locations_upref_mdata(user_pref)
     return get_user_pref_db_clause(user_pref, user_email)
 
 
