@@ -908,7 +908,10 @@ class TestProjectsCache(Test):
         assert_raises(ValueError, parse_tasks_browse_args, args)
 
     @with_context
-    def test_task_browse_user_pref_args_no_upref_mdata_config(self):
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata.get_country_code_by_country_name')
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata.get_valid_user_preferences')
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_task_browse_user_pref_args_no_upref_mdata_config(self, upref_mdata, get_valid_user_preferences, get_country_code_by_country_name):
         """Test task browse user preference without user_pref settings loaded under pybossa.core.upref_mdata_choices"""
         args = dict(
             task_id=12345, pcomplete_from=0,
@@ -934,17 +937,19 @@ class TestProjectsCache(Test):
             priority_from=0.0,
             priority_to=0.5, order_by_dict={},
             display_columns=['task_id', 'priority'], display_info_columns=['co_id'],
-            filter_by_upref={'languages': ['English'], 'locations': ['Fiji']},
+            filter_by_upref={'languages': ['English'], 'locations': ['FJ', 'Fiji']},
             in_progress='Yes')
 
-
+        get_valid_user_preferences.return_value = {}
+        get_country_code_by_country_name.return_value = 'FJ'
         pargs = parse_tasks_browse_args(args)
         assert pargs == valid_args, pargs
 
     @with_context
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata.get_country_name_by_country_code')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata.get_valid_user_preferences')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_task_browse_user_pref_args(self, upref_mdata, get_valid_user_preferences):
+    def test_task_browse_user_pref_args(self, upref_mdata, get_valid_user_preferences, get_country_name_by_country_code):
         """Test task browse user preference works with valid user_pref settings"""
         get_valid_user_preferences.return_value = dict(languages=["en", "sp"],
                                     locations=["us", "uk"])
@@ -971,7 +976,9 @@ class TestProjectsCache(Test):
             priority_from=0.0,
             priority_to=0.5, order_by_dict={},
             display_columns=['task_id', 'priority'], display_info_columns=['co_id'],
-            filter_by_upref={'languages': ['en'], 'locations': ['us']})
+            filter_by_upref={'languages': ['en'], 'locations': ['United States', 'us']})
+
+        get_country_name_by_country_code.return_value = "United States"
 
         pargs = parse_tasks_browse_args(args)
         assert pargs == valid_args, pargs

@@ -1436,11 +1436,6 @@ def map_locations(locations):
             else:
                 current_app.logger.warning(f"Invalid country name '{location}' in map_locations")
 
-    print({
-        'locations': list(country_codes_set.union(country_names_set)),
-        'country_codes': list(country_codes_set),
-        'country_names': list(country_names_set)
-    })
     return {
         'locations': list(country_codes_set.union(country_names_set)),
         'country_codes': list(country_codes_set),
