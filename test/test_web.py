@@ -9573,11 +9573,11 @@ class TestWeb(web.Helper):
         assert th_tag_4 == expected_columns[3], f"found column {th_tag_4}, expected column {expected_columns[3]} not present"
 
     @with_context
-    @patch('pybossa.forms.forms.app_settings.upref_mdata.get_upref_mdata_choices')
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_projects_account(self, upref_mdata, get_upref_mdata_choices):
+    def test_projects_account(self, upref_mdata):
         """Test projects on profiles are good."""
-        get_upref_mdata_choices.return_value = self.upref_mdata_choices
         owner, contributor = UserFactory.create_batch(2)
         info = dict(passwd_hash='foo', foo='bar', data_classification=dict(input_data="L4 - public", output_data="L4 - public"))
         project = ProjectFactory.create(owner=owner, info=info)
