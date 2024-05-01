@@ -36,6 +36,8 @@ def map_diag(l):
 choices = {
     'languages': map_diag(['lang_a', 'lang_b']),
     'locations': map_diag(['loc_a', 'loc_b']),
+    'country_codes': map_diag(['loc_a', 'loc_b']),
+    'country_names': map_diag(['loc_a', 'loc_b']),
     'timezones': map_diag(['', 'tz_a', 'tz_b']),
     'user_types': map_diag(['type_a', 'type_b'])
 }

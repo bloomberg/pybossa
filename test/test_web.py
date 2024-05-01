@@ -1690,7 +1690,10 @@ class TestWeb(web.Helper):
 
 
     @with_context
-    def test_05_update_user_profile(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_05_update_user_profile(self, upref_mdata):
         """Test WEB update user profile"""
 
         # Create an account and log in
