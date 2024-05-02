@@ -2,3 +2,4 @@
 omit = 
     /home/travis/virtualenv*
     */test/*
+    */templates/*
