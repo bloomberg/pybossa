@@ -1829,7 +1829,8 @@ class TestMapLocations(Test):
 
     @with_context
     @patch('pybossa.util.app_settings.upref_mdata.get_country_name_by_country_code')
-    def test_map_locations_maps_cc(self, get_country_name_by_country_code):
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_map_locations_maps_cc(self, upref_mdata, get_country_name_by_country_code):
 
         get_country_name_by_country_code.return_value = 'United States'
 
@@ -1841,7 +1842,8 @@ class TestMapLocations(Test):
 
     @with_context
     @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
-    def test_map_locations_maps_cn(self, get_country_code_by_country_name):
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_map_locations_maps_cn(self, upref_mdata, get_country_code_by_country_name):
 
         get_country_code_by_country_name.return_value = 'US'
 
@@ -1853,7 +1855,8 @@ class TestMapLocations(Test):
 
     @with_context
     @patch('pybossa.util.app_settings.upref_mdata.get_country_name_by_country_code')
-    def test_map_locations_invalid_cc(self, get_country_name_by_country_code):
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_map_locations_invalid_cc(self, upref_mdata, get_country_name_by_country_code):
 
         get_country_name_by_country_code.return_value = None
 
@@ -1865,7 +1868,8 @@ class TestMapLocations(Test):
 
     @with_context
     @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
-    def test_map_locations_invalid_cn(self, get_country_code_by_country_name):
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_map_locations_invalid_cn(self, upref_mdata, get_country_code_by_country_name):
 
         get_country_code_by_country_name.return_value = None
 
