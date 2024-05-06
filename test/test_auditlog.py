@@ -279,7 +279,10 @@ class TestAuditlogWEB(web.Helper):
             assert log.user_id == 1, log.user_id
 
     @with_context
-    def test_project_create(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_project_create(self, upref_mdata):
         self.register()
         self.signin()
         self.new_project()

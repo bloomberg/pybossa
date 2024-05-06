@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 from test.helper import web
 from test import with_context
 from test import db, Fixtures
@@ -141,7 +142,10 @@ class TestCoowners(web.Helper):
         assert "User is not a project owner" in str(res.data), res.data
 
     @with_context
-    def test_coowner_can(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_coowner_can(self, upref_mdata):
         """
         Coowner can access features
         """

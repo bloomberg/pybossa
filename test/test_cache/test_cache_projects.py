@@ -908,7 +908,10 @@ class TestProjectsCache(Test):
         assert_raises(ValueError, parse_tasks_browse_args, args)
 
     @with_context
-    def test_task_browse_user_pref_args_no_upref_mdata_config(self):
+    @patch('pybossa.cache.task_browse_helpers.map_locations')
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata.get_valid_user_preferences')
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_task_browse_user_pref_args_no_upref_mdata_config(self, upref_mdata, get_valid_user_preferences, map_locations):
         """Test task browse user preference without user_pref settings loaded under pybossa.core.upref_mdata_choices"""
         args = dict(
             task_id=12345, pcomplete_from=0,
@@ -937,14 +940,18 @@ class TestProjectsCache(Test):
             filter_by_upref={'languages': ['English'], 'locations': ['Fiji']},
             in_progress='Yes')
 
-
+        get_valid_user_preferences.return_value = {}
+        map_locations.return_value = {
+            'locations': ['Fiji']
+        }
         pargs = parse_tasks_browse_args(args)
         assert pargs == valid_args, pargs
 
     @with_context
+    @patch('pybossa.cache.task_browse_helpers.map_locations')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata.get_valid_user_preferences')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_task_browse_user_pref_args(self, upref_mdata, get_valid_user_preferences):
+    def test_task_browse_user_pref_args(self, upref_mdata, get_valid_user_preferences, map_locations):
         """Test task browse user preference works with valid user_pref settings"""
         get_valid_user_preferences.return_value = dict(languages=["en", "sp"],
                                     locations=["us", "uk"])
@@ -972,6 +979,10 @@ class TestProjectsCache(Test):
             priority_to=0.5, order_by_dict={},
             display_columns=['task_id', 'priority'], display_info_columns=['co_id'],
             filter_by_upref={'languages': ['en'], 'locations': ['us']})
+
+        map_locations.return_value = {
+            'locations': ['us']
+        }
 
         pargs = parse_tasks_browse_args(args)
         assert pargs == valid_args, pargs

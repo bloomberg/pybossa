@@ -80,6 +80,13 @@ class TestWeb(web.Helper):
         valid_user_access_levels=[("L1", "L1"), ("L2", "L2"),("L3", "L3"), ("L4", "L4")]
     )
 
+    upref_mdata_choices = dict(languages=[("en", "en"), ("sp", "sp")],
+                                    locations=[("us", "us"), ("uk", "uk")],
+                                    country_codes=[("us", "us"), ("uk", "uk")],
+                                    country_names=[("us", "us"), ("uk", "uk")],
+                                    timezones=[("", ""), ("ACT", "Australia Central Time")],
+                                    user_types=[("Researcher", "Researcher"), ("Analyst", "Analyst")])
+
     def clear_temp_container(self, user_id):
         """Helper function which deletes all files in temp folder of a given owner_id"""
         temp_folder = os.path.join('/tmp', 'user_%d' % user_id)
@@ -919,14 +926,19 @@ class TestWeb(web.Helper):
         assert res.status_code == 404, res.status_code
 
     @with_context
+    @patch('pybossa.forms.forms.app_settings.upref_mdata.get_upref_mdata_choices')
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
     @patch('pybossa.view.account.mail_queue', autospec=True)
     @patch('pybossa.view.account.render_template')
     @patch('pybossa.view.account.signer')
-    def test_validate_email(self, signer, render, queue):
+    def test_validate_email(self, signer, render, queue, upref_mdata, get_upref_mdata_choices):
         """Test WEB validate email sends the confirmation email
         if account validation is enabled"""
+
         from flask import current_app
         current_app.config['ACCOUNT_CONFIRMATION_DISABLED'] = False
+
+        get_upref_mdata_choices.return_value = self.upref_mdata_choices
         self.register()
         self.signin()
         user = db.session.query(User).get(1)
@@ -1375,7 +1387,10 @@ class TestWeb(web.Helper):
 
 
     @with_context
-    def test_04_signin_signout(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_04_signin_signout(self, upref_mdata):
         """Test WEB sign in and sign out works"""
         res = self.register()
         # Log out as the registration already logs in the user
@@ -1552,7 +1567,10 @@ class TestWeb(web.Helper):
 
 
     @with_context
-    def test_05_update_user_profile_json(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_05_update_user_profile_json(self, upref_mdata):
         """Test WEB update user profile JSON"""
 
         # Create an account and log in
@@ -1672,7 +1690,10 @@ class TestWeb(web.Helper):
 
 
     @with_context
-    def test_05_update_user_profile(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_05_update_user_profile(self, upref_mdata):
         """Test WEB update user profile"""
 
         # Create an account and log in
@@ -2754,7 +2775,10 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    def test_14_delete_application(self, mock):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_14_delete_application(self, upref_mdata, mock):
         """Test WEB delete project works"""
         self.register()
         self.signin()
@@ -2779,8 +2803,11 @@ class TestWeb(web.Helper):
         assert res.status_code == 403, res.status_code
 
     @with_context
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
     @patch('pybossa.repositories.project_repository.uploader')
-    def test_delete_project_deletes_task_zip_files_too(self, uploader):
+    def test_delete_project_deletes_task_zip_files_too(self, uploader, upref_mdata):
         """Test WEB delete project also deletes zip files for task and taskruns"""
         Fixtures.create()
         make_subadmin_by(email_addr='tester@tester.com')
@@ -3875,8 +3902,11 @@ class TestWeb(web.Helper):
             str(res.data), "Project ID should be shown to the owner"
 
     @with_context
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    def test_31_user_profile_progress(self, mock):
+    def test_31_user_profile_progress(self, upref_mdata, mock):
         """Test WEB user progress profile page works"""
         self.register()
         self.signin()
@@ -7285,7 +7315,10 @@ class TestWeb(web.Helper):
         assert uploader.delete_file.call_args_list == expected
 
     @with_context
-    def test_57_reset_api_key(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_57_reset_api_key(self, upref_mdata):
         """Test WEB reset api key works"""
         url = "/account/johndoe/update"
         # Anonymous user
@@ -7571,7 +7604,10 @@ class TestWeb(web.Helper):
         assert 'This feature requires being logged in' in str(res.data), err_msg
 
     @with_context
-    def test_70_public_user_profile(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_70_public_user_profile(self, upref_mdata):
         """Test WEB public user profile works"""
         Fixtures.create()
 
@@ -7594,7 +7630,10 @@ class TestWeb(web.Helper):
         assert res.status_code == 404, err_msg
 
     @with_context
-    def test_71_public_user_profile_json(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_71_public_user_profile_json(self, upref_mdata):
         """Test JSON WEB public user profile works"""
 
         res = self.app.get('/account/nonexistent/',
@@ -7629,7 +7668,10 @@ class TestWeb(web.Helper):
         assert res.status_code == 302, res.status_code
 
     @with_context
-    def test_72_profile_url_json_restrict(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_72_profile_url_json_restrict(self, upref_mdata):
         """Test JSON WEB public user profile restrict works"""
 
         user = UserFactory.create(restrict=True)
@@ -9531,8 +9573,11 @@ class TestWeb(web.Helper):
         assert th_tag_4 == expected_columns[3], f"found column {th_tag_4}, expected column {expected_columns[3]} not present"
 
     @with_context
-    def test_projects_account(self):
-        """Test projecs on profiles are good."""
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_projects_account(self, upref_mdata):
+        """Test projects on profiles are good."""
         owner, contributor = UserFactory.create_batch(2)
         info = dict(passwd_hash='foo', foo='bar', data_classification=dict(input_data="L4 - public", output_data="L4 - public"))
         project = ProjectFactory.create(owner=owner, info=info)
@@ -9569,19 +9614,22 @@ class TestWeb(web.Helper):
             assert key in tmp['info'].keys()
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_name_by_country_code')
     @patch('pybossa.view.account.mail_queue', autospec=True)
     @patch('pybossa.view.account.render_template')
     @patch('pybossa.view.account.signer')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_register_with_upref_mdata(self, upref_mdata, get_upref_mdata_choices, signer, render, queue):
+    def test_register_with_upref_mdata(self, upref_mdata, get_upref_mdata_choices, signer, render, queue, get_country_name_by_country_code):
         """Test WEB register user with user preferences set"""
         from flask import current_app
         get_upref_mdata_choices.return_value = dict(languages=[("en", "en"), ("sp", "sp")],
                                     locations=[("us", "us"), ("uk", "uk")],
+                                    country_codes=[("us", "us"), ("uk", "uk")],
+                                    country_names=[("us", "us"), ("uk", "uk")],
                                     timezones=[("", ""), ("ACT", "Australia Central Time")],
                                     user_types=[("Researcher", "Researcher"), ("Analyst", "Analyst")])
-
+        get_country_name_by_country_code.return_value = 'US'
         current_app.config['ACCOUNT_CONFIRMATION_DISABLED'] = True
         data = dict(fullname="AJD", name="ajd",
                     password="p4ssw0rd", confirm="p4ssw0rd",
@@ -9631,6 +9679,8 @@ class TestWeb(web.Helper):
         from flask import current_app
         get_valid_user_preferences.return_value = dict(languages=[("en", "en"), ("sp", "sp")],
                                     locations=[("us", "us"), ("uk", "uk")],
+                                    country_codes=[("us", "us"), ("uk", "uk")],
+                                    country_names=[("us", "us"), ("uk", "uk")],
                                     timezones=[("", ""), ("ACT", "Australia Central Time")],
                                     user_types=[("Researcher", "Researcher"), ("Analyst", "Analyst")])
 
@@ -10173,7 +10223,10 @@ class TestWebUserMetadataUpdate(web.Helper):
 
         enabled = set(self.update.keys()) - set(disabled)
 
+        print(sorted(updated), '\n\n', sorted(self.update))
+
         for k in enabled:
+            print('checking enabled field: ', updated[k],  self.update[k])
             assert updated[k] == self.update[k], 'Enabled field [{}] did not get updated.'.format(k)
         for k in disabled:
             original_value = self.original[k]
@@ -10199,7 +10252,9 @@ class TestWebUserMetadataUpdate(web.Helper):
         def double(x): return (x,x)
         get_upref_mdata_choices.return_value = dict(
             languages=list(map(double,["Afrikaans", "Albanian", "Welsh"])),
-            locations=list(map(double, ['Bonaire', 'Wallis and Futuna', 'Vanuatu'])),
+            locations=list(map(double, ['Bonaire', 'BQ', 'Wallis and Futuna', 'WF', 'Vanuatu', 'VU'])),
+            country_names=list(map(double, ['Bonaire', 'Wallis and Futuna', 'Vanuatu'])),
+            country_codes=list(map(double, ['BQ', 'WF', 'VU'])),
             timezones=[("AET", "Australia Eastern Time"), ("AGT", "Argentina Standard Time")],
             user_types=list(map(double, ["Researcher", "Analyst", "Curator"]))
         )
@@ -10210,11 +10265,13 @@ class TestWebUserMetadataUpdate(web.Helper):
             assert v != self.original[k], '[{}] is same in original and update'.format(k)
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_normal_user_cannot_update_own_user_type(self, upref_mdata, get_upref_mdata_choices):
+    def test_normal_user_cannot_update_own_user_type(self, upref_mdata, get_upref_mdata_choices, get_country_code_by_country_name):
         """Test normal user can update their own metadata except for user_type"""
         self.mock_upref_mdata_choices(get_upref_mdata_choices)
+        get_country_code_by_country_name.return_value = 'VU'
         # First user created is automatically admin, so get that out of the way.
         user_admin = UserFactory.create()
         user_normal = self.create_user()
@@ -10225,11 +10282,13 @@ class TestWebUserMetadataUpdate(web.Helper):
         self.assert_updates_applied_correctly(user_normal.id, disabled)
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_admin_user_can_update_own_metadata(self, upref_mdata, get_upref_mdata_choices):
+    def test_admin_user_can_update_own_metadata(self, upref_mdata, get_upref_mdata_choices, get_country_code_by_country_name):
         '''Test admin can update their own metadata'''
         self.mock_upref_mdata_choices(get_upref_mdata_choices)
+        get_country_code_by_country_name.return_value = 'VU'
         user_admin = self.create_user()
         assert user_admin.admin
         self.signin_user(user_admin)
@@ -10238,11 +10297,13 @@ class TestWebUserMetadataUpdate(web.Helper):
         self.assert_updates_applied_correctly(user_admin.id, disabled)
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_subadmin_user_can_update_own_metadata(self, upref_mdata, get_upref_mdata_choices):
+    def test_subadmin_user_can_update_own_metadata(self, upref_mdata, get_upref_mdata_choices, get_country_code_by_country_name):
         '''Test subadmin can update their own metadata'''
         self.mock_upref_mdata_choices(get_upref_mdata_choices)
+        get_country_code_by_country_name.return_value = 'VU'
         # First user created is automatically admin, so get that out of the way.
         user_admin = UserFactory.create()
         user_subadmin = self.create_user(subadmin=True)
@@ -10253,11 +10314,13 @@ class TestWebUserMetadataUpdate(web.Helper):
         self.assert_updates_applied_correctly(user_subadmin.id, disabled)
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_subadmin_user_can_update_normal_user_metadata(self, upref_mdata, get_upref_mdata_choices):
+    def test_subadmin_user_can_update_normal_user_metadata(self, upref_mdata, get_upref_mdata_choices, get_country_code_by_country_name):
         '''Test subadmin can update normal user metadata'''
         self.mock_upref_mdata_choices(get_upref_mdata_choices)
+        get_country_code_by_country_name.return_value = 'VU'
         # First user created is automatically admin, so get that out of the way.
         user_admin = UserFactory.create()
         user_subadmin = UserFactory.create(subadmin=True)
