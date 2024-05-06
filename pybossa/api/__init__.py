@@ -915,6 +915,7 @@ def large_language_model(model_name):
         "inference_endpoint": model_endpoint,
         "payload": data,
         "access_token": current_app.config.get('AUTOLAB_ACCESS_TOKEN'),
+        "user_uuid": current_user.id
     }
     r = requests.post(url=current_app.config.get('INFERENCE_ENDPOINT'), json=body, proxies=proxies)
     out = json.loads(r.text)

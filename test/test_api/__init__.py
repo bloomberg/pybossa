@@ -60,8 +60,10 @@ class TestLargeLanguageModel(unittest.TestCase):
         }
         self.client = self.app.test_client()
 
+    @patch('pybossa.api.current_user')
     @patch('requests.post')
-    def test_valid_request(self, mock_post):
+    def test_valid_request(self, mock_post, mock_current_user):
+        mock_current_user.id = 123
         response_data = {
             "inference_response": {
                 "predictions": [{
@@ -78,8 +80,10 @@ class TestLargeLanguageModel(unittest.TestCase):
             self.assertIn('Model: ', response.json)
             self.assertIn('predictions: ', response.json)
 
+    @patch('pybossa.api.current_user')
     @patch('requests.post')
-    def test_valid_request_with_list_of_prompts(self, mock_post):
+    def test_valid_request_with_list_of_prompts(self, mock_post, mock_current_user):
+        mock_current_user.id = 123
         response_data = {
             "inference_response": {
                 "predictions": [{
@@ -97,8 +101,10 @@ class TestLargeLanguageModel(unittest.TestCase):
             self.assertIn('Model: ', response.json)
             self.assertIn('predictions: ', response.json)
 
+    @patch('pybossa.api.current_user')
     @patch('requests.post')
-    def test_valid_request_with_instances_key_in_json(self, mock_post):
+    def test_valid_request_with_instances_key_in_json(self, mock_post, mock_current_user):
+        mock_current_user.id = 123
         response_data = {
             "inference_response": {
                 "predictions": [{
@@ -123,8 +129,10 @@ class TestLargeLanguageModel(unittest.TestCase):
             self.assertIn('Model: ', response.json)
             self.assertIn('predictions: ', response.json)
 
+    @patch('pybossa.api.current_user')
     @patch('requests.post')
-    def test_valid_request_no_model_name(self, mock_post):
+    def test_valid_request_no_model_name(self, mock_post, mock_current_user):
+        mock_current_user.id = 123
         response_data = {
             "inference_response": {
                 "predictions": [{
