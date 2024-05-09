@@ -21,7 +21,8 @@ class TestSummary(web.Helper):
         assert 'ownership-setting' in str(res.data), res.data
         assert 'task-setting' in str(res.data), res.data
         assert 'fields-config' in str(res.data), res.data
-        assert 'consensus-config' in str(res.data), res.data
+        assert 'redundancy-config' in str(res.data), res.data
+        assert 'consensus-setting' in str(res.data), res.data
         assert 'quiz-setting' in str(res.data), res.data
 
     @with_context
