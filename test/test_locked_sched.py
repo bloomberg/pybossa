@@ -297,7 +297,7 @@ class TestLockedSched(sched.Helper):
         assert task.id == task_id
 
     @with_context
-    @patch('pybossa.core.task_repo.get_task')
+    @patch('pybossa.sched.task_repo.get_task')
     def get_task_id_and_duration_for_project_user_invalid_task_id(self, get_task):
         user = UserFactory.create()
         project = ProjectFactory.create(owner=user, short_name='egil', name='egil',
