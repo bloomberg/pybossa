@@ -875,7 +875,7 @@ def large_language_model(model_name):
     }
     """
     if model_name is None:
-        model_name = 'flan-ul2'
+        model_name = 'mixtral-8x7b-instruct'
     endpoints = current_app.config.get('LLM_ENDPOINTS')
     model_endpoint = endpoints.get(model_name.lower())
 
