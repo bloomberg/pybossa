@@ -38,6 +38,15 @@ class TestS3Uploader(Test):
         }
     }
 
+    util_config = {
+        'BCOSV2_PROD_UTIL_URL': "https://s3.storage.env-util.com",
+        'S3_DEFAULT': {
+            'host': "s3.storage.env-util.com",
+            'port': 443,
+            'auth_headers': [('test', 'name')]
+        }
+    }
+
     def test_check_valid_type(self):
         with NamedTemporaryFile() as fp:
             fp.write(b'hello world')
@@ -59,6 +68,14 @@ class TestS3Uploader(Test):
         with patch.dict(self.flask_app.config, self.default_config):
             url = s3_upload_from_string('bucket', 'hello world', 'test.txt')
             assert url == 'https://s3.storage.com:443/bucket/test.txt', url
+
+    @with_context
+    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
+    def test_upload_from_string_util(self, set_contents):
+        with patch.dict(self.flask_app.config, self.util_config):
+            """Test -util keyword dropped from meta url returned from s3 upload."""
+            url = s3_upload_from_string('bucket', 'hello world', 'test.txt')
+            assert url == 'https://s3.storage.env.com:443/bucket/test.txt', url
 
     @with_context
     @patch('pybossa.cloud_store_api.s3.io.open')
