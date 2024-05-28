@@ -707,7 +707,11 @@ def get_service_request(task_id, service_name, major_version, minor_version):
         if isinstance(service, dict):
             url = '{}/{}/{}/{}'.format(proxy_service_config['uri'], service_name, major_version, minor_version)
             headers = service.get('headers')
-            ret = requests.post(url, headers=headers, json=payload['data'])
+            ssl_cert = os.environ.get('SSL_CERT_PATH')
+            if ssl_cert:
+                ret = requests.post(url, headers=headers, json=payload['data'], verify=ssl_cert)
+            else:
+                ret = requests.post(url, headers=headers, json=payload['data'])
             return Response(ret.content, 200, mimetype="application/json")
 
     current_app.logger.info(
