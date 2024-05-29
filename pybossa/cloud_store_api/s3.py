@@ -125,9 +125,19 @@ def s3_upload_tmp_file(s3_bucket, tmp_file, filename,
         fp = io.BytesIO(content)  # BytesIO accepts bytes string
         url = s3_upload_file(s3_bucket, fp, filename, headers, upload_root_dir,
                              directory, return_key_only, conn_name)
+        bcosv2_prod_util_url = app.config.get('BCOSV2_PROD_UTIL_URL')
+
+        # generate url path to be stored as metadata
+        # which can be different from actual uploaded url
+        # and is based upon the type of uploaded url path
+        meta_url = url
+        if bcosv2_prod_util_url and url.startswith(bcosv2_prod_util_url):
+            meta_url = url.replace("-util", "")
+            app.logger.info("bcosv2 url paths. uploaded path %s, metadata path %s", url, meta_url)
+
     finally:
         os.unlink(tmp_file.name)
-    return url
+    return meta_url
 
 
 def form_upload_directory(directory, filename, upload_root_dir):
