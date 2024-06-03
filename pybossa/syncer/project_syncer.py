@@ -32,10 +32,6 @@ from pybossa.cache import users as cached_users
 class ProjectSyncer(Syncer):
     """Syncs one project with another."""
 
-    def __init__(self, target_url, target_key, proxies=None):
-        self.proxies = proxies
-        super().__init__(target_url, target_key)
-
     _api_endpoint = 'project'
     reserved_keys = (
             'id', 'created', 'updated', 'completed', 'contacted',
