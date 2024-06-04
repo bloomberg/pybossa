@@ -76,10 +76,6 @@ class Syncer(object):
         }
 
         params['all'] = 1
-        print("##### REQEST #####")
-
-        print(headers)
-        print(self.proxies)
         res = requests.get(url, params=params, headers=headers, proxies=self.proxies)
 
         if res.ok:
@@ -127,9 +123,6 @@ class Syncer(object):
         url = '{}/api/{}'.format(
             self.target_url, self._api_endpoint)
         headers = {'Authorization': api_key}
-        print("##### REQEST #####")
-        print(payload)
-        print(headers)
         res = requests.post(
             url, json=payload, headers=headers, auth=http_signer, proxies=self.proxies)
         return res
