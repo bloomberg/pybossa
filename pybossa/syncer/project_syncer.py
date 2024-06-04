@@ -73,7 +73,7 @@ class ProjectSyncer(Syncer):
                 self.target_url, target_id)
         headers = {'Authorization': api_key}
         res = requests.put(
-            url, json=payload, headers=headers, auth=http_signer, proxies=self.proxies)
+            url, json=payload, headers=headers, auth=http_signer, proxies=self.proxies, verify=self.ssl_cert)
         return res
 
     def _build_payload(self, project, target=None):

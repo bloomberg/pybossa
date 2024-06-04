@@ -3571,7 +3571,9 @@ def sync_project(short_name):
         # Perform sync
         is_new_project = False
         project_syncer = ProjectSyncer(
-            default_sync_target, target_key, current_app.config.get('DEFAULT_SYNC_TARGET_PROXIES'))
+            default_sync_target, target_key,
+            current_app.config.get('DEFAULT_SYNC_TARGET_PROXIES'),
+            current_app.config.get('SSL_CERT_PATH', True))
         synced_url = '{}/project/{}'.format(
             project_syncer.target_url, project.short_name)
         if request.body.get('btn') == 'sync':

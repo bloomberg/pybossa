@@ -39,7 +39,7 @@ class Syncer(object):
     sync_key = 'pybossa::sync::{}::target_url:{}::short_name:{}'
     cache_timeout = ONE_WEEK
 
-    def __init__(self, target_url, target_key, proxy=None):
+    def __init__(self, target_url, target_key, proxy=None, ssl_cert=None):
         """Initialize a Syncer.
 
         :param target_url: The target URL to sync with
@@ -48,6 +48,7 @@ class Syncer(object):
         self.target_url = target_url
         self.target_key = target_key
         self.proxies = dict(http=proxy, https=proxy) if proxy else None
+        self.ssl_cert = ssl_cert
         self.syncer = current_user
 
     @staticmethod
@@ -76,8 +77,7 @@ class Syncer(object):
         }
 
         params['all'] = 1
-        res = requests.get(url, params=params, headers=headers, proxies=self.proxies)
-
+        res = requests.get(url, params=params, headers=headers, proxies=self.proxies, verify=self.ssl_cert)
         if res.ok:
             data = json.loads(res.content)
 
@@ -124,7 +124,7 @@ class Syncer(object):
             self.target_url, self._api_endpoint)
         headers = {'Authorization': api_key}
         res = requests.post(
-            url, json=payload, headers=headers, auth=http_signer, proxies=self.proxies)
+            url, json=payload, headers=headers, auth=http_signer, proxies=self.proxies, verify=self.ssl_cert)
         return res
 
     def get_target_user(self, user_id, api_key):
@@ -132,7 +132,7 @@ class Syncer(object):
             self.target_url, user_id)
         headers = {'Authorization': api_key}
         res = requests.get(
-            url, headers=headers, proxies=self.proxies)
+            url, headers=headers, proxies=self.proxies, verify=self.ssl_cert)
         return res
 
     def cache_target(self, target, target_id):
