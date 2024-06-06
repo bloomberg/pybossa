@@ -1418,8 +1418,16 @@ def delete_redis_keys(sentinel, pattern):
 
 
 def map_locations(locations):
+    if locations is None:
+        return {
+            'locations': None,
+            'country_codes': None,
+            'country_names': None
+        }
+
     country_codes_set = set()
     country_names_set = set()
+
     for location in locations:
         if len(location) == 2:
             country_codes_set.add(location)
