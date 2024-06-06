@@ -1886,4 +1886,4 @@ class TestMapLocations(Test):
         expected_locations = None
         mapped_locations = util.map_locations(input_locations)
 
-        assert sorted(mapped_locations['locations']) == expected_locations
+        assert mapped_locations['locations'] == expected_locations
