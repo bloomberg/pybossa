@@ -1878,3 +1878,12 @@ class TestMapLocations(Test):
         mapped_locations = util.map_locations(input_locations)
 
         assert sorted(mapped_locations['locations']) == expected_locations
+
+    @with_context
+    def test_map_locations_none(self):
+
+        input_locations = None
+        expected_locations = None
+        mapped_locations = util.map_locations(input_locations)
+
+        assert mapped_locations['locations'] == expected_locations
