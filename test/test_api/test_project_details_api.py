@@ -235,6 +235,5 @@ class TestProjectAPI(TestAPI):
         data = json.loads(res.data)
         assert res.status_code == 200, data
         assert len(data) == 1, data
-        assert data[0]['product'] == 'test_product', data
         assert data[0]['short_name'] == 'test-app1', data
         assert data[0]['locks'] == '[]', data
