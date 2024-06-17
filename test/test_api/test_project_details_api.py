@@ -224,3 +224,17 @@ class TestProjectAPI(TestAPI):
         assert data[0]['product'] == 'test_product', data
         assert data[0]['subproduct'] == 'test_subproduct1', data
 
+    @with_context
+    def test_project_locks_get_by_id(self):
+        """ Test get locks by project id when project id exists"""
+        admin = UserFactory.create(admin=True)
+        project1 = self.setupProjects()
+
+        # Test get by id
+        res = self.app.get('/api/locks?id=' + str(project1.id) + '&api_key=' + admin.api_key + '&all=1')
+        data = json.loads(res.data)
+        assert res.status_code == 200, data
+        assert len(data) == 1, data
+        assert data[0]['product'] == 'test_product', data
+        assert data[0]['short_name'] == 'test-app1', data
+        assert data[0]['locks'] == '[]', data

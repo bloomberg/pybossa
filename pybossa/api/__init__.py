@@ -77,6 +77,7 @@ from pybossa.sched import (get_scheduler_and_timeout, has_lock, release_lock, Sc
 from pybossa.jobs import send_mail
 from pybossa.api.project_by_name import ProjectByNameAPI, project_name_to_oid
 from pybossa.api.project_details import ProjectDetailsAPI
+from pybossa.api.project_locks import ProjectLocksAPI
 from pybossa.api.pwd_manager import get_pwd_manager
 from pybossa.data_access import data_access_levels
 from pybossa.task_creator_helper import set_gold_answers
@@ -165,6 +166,7 @@ register_api(CompletedTaskAPI, 'api_completedtask', '/completedtask', pk='oid', 
 register_api(CompletedTaskRunAPI, 'api_completedtaskrun', '/completedtaskrun', pk='oid', pk_type='int')
 register_api(ProjectByNameAPI, 'api_projectbyname', '/projectbyname', pk='key', pk_type='string')
 register_api(ProjectDetailsAPI, 'api_projectdetails', '/projectdetails', pk='oid', pk_type='int')
+register_api(ProjectLocksAPI, 'api_projectlocks', '/locks', pk='oid', pk_type='int')
 register_api(PerformanceStatsAPI, 'api_performancestats', '/performancestats', pk='oid', pk_type='int')
 register_api(BulkTasksAPI, 'api_bulktasks', '/bulktasks', pk='oid', pk_type='int')
 
