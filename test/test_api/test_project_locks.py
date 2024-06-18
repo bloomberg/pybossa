@@ -23,6 +23,7 @@ from nose.tools import assert_equal
 from unittest.mock import patch
 
 from pybossa.model.project import Project
+from pybossa.repositories import ProjectRepository
 from pybossa.api.project_locks import ProjectLocksAPI
 from test import db, with_context
 from test.factories import (ProjectFactory, UserFactory)
@@ -34,6 +35,7 @@ class TestProjectLocksAPI(TestAPI):
     def setUp(self):
         super(TestProjectLocksAPI, self).setUp()
         db.session.query(Project).delete()
+        self.project_repo = ProjectRepository(db)
 
     def setupProjects(self):
         project = ProjectFactory.create(
@@ -104,6 +106,7 @@ class TestProjectLocksAPI(TestAPI):
 
         # Assign subadmin as owner of this project.
         project.owners_ids.append(subadmin.id)
+        project_repo.save(project)
 
         project_id = str(project.id)
         res = self.app.get('/api/locks?id=' + project_id + '&api_key=' + subadmin.api_key + '&all=1')
