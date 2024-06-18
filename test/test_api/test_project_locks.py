@@ -112,6 +112,22 @@ class TestProjectLocksAPI(TestAPI):
         assert data[0]['short_name'] == 'test-app1', data
 
     @with_context
+    def test_project_locks_user_subadmin_not_owner(self):
+        """ Test API should not work if user is subadmin but no in project owners"""
+        subadmin = UserFactory.create(admin=False, subadmin=True)
+
+        project = self.setupProjects()
+        project_id = str(project.id)
+
+        res = self.app.get('/api/locks?id=' + project_id + '&api_key=' + subadmin.api_key + '&all=1')
+        err = json.loads(res.data)
+        assert res.status_code == 401, err
+        assert err['status'] == 'failed', err
+        assert err['target'] == 'project', err
+        assert err['exception_cls'] == 'Unauthorized', err
+        assert err['action'] == 'GET', err
+
+    @with_context
     def test_project_locks_user_admin(self):
         """ Test API should work if user is admin"""
         admin = UserFactory.create(admin=True)
