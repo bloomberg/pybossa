@@ -87,6 +87,10 @@ class TestProjectLocksAPI(TestAPI):
         """ Test API should return 401 if user is worker"""
         worker = UserFactory.create(admin=False, subadmin=False)
 
+        # Remove admin from worker.
+        worker.admin = False
+        self.user_repo.save(worker)
+
         project = self.setupProjects()
         project_id = str(project.id)
 
