@@ -20,11 +20,13 @@ from unittest.mock import patch, call
 
 from nose.tools import assert_equal
 
+from unittest.mock import patch
+
 from pybossa.model.project import Project
+from pybossa.api.project_locks import ProjectLocksAPI
 from test import db, with_context
 from test.factories import (ProjectFactory, UserFactory)
 from test.test_api import TestAPI
-
 
 
 class TestProjectAPI(TestAPI):
@@ -54,6 +56,14 @@ class TestProjectAPI(TestAPI):
                 'subproduct': 'test_subproduct2'
         })
         return project
+
+    def _create_dict_from_model(self, item):
+        # Dummy method for testing
+        return {}
+
+    def _sign_item(self, item):
+        # Dummy method for testing
+        pass
 
     @with_context
     def test_project_locks_user_not_logged_in(self):
@@ -151,7 +161,6 @@ class TestProjectAPI(TestAPI):
         assert res.status_code == 200, data
         assert len(data) == 0, data
 
-
     @with_context
     def test_project_locks_param_does_not_exist(self):
         """ Test API project query when search value does not match"""
@@ -167,3 +176,22 @@ class TestProjectAPI(TestAPI):
         assert err['exception_cls'] == 'AttributeError', err
         assert err['action'] == 'GET', err
 
+    @with_context
+    def test_project_locks_no_query_result(self):
+        """ Test API locks when len(query_result) == 1 and query_result[0] is None"""
+        query_result = [None]
+        try:
+            ProjectLocksAPI._create_json_response(self, query_result, None)
+        except Exception as ex:
+            assert '404' in str(ex), ex
+
+    @patch('json.dumps')
+    def test_project_locks_oid_not_none(self, mock_json_dumps):
+        """ Test API locks when oid is not None"""
+        query_result = ['item1', 'item2']
+        oid = '123'
+        expected_result = 'item1'
+        mock_json_dumps.return_value = expected_result
+
+        result = ProjectLocksAPI._create_json_response(self, query_result, oid)
+        assert result == 'item1', result
