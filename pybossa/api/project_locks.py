@@ -58,7 +58,7 @@ class ProjectLocksAPI(APIBase):
 
     def _select_attributes(self, data):
         # Get the project.
-        project = project_by_shortname(data.get('short_name'))
+        project, _, _ = project_by_shortname(data.get('short_name'))
         task_id = ''
 
         if not current_user.is_authenticated:
