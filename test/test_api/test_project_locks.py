@@ -29,10 +29,10 @@ from test.factories import (ProjectFactory, UserFactory)
 from test.test_api import TestAPI
 
 
-class TestProjectAPI(TestAPI):
+class TestProjectLocksAPI(TestAPI):
 
     def setUp(self):
-        super(TestProjectAPI, self).setUp()
+        super(TestProjectLocksAPI, self).setUp()
         db.session.query(Project).delete()
 
     def setupProjects(self):
@@ -82,7 +82,6 @@ class TestProjectAPI(TestAPI):
     @with_context
     def test_project_locks_user_worker(self):
         """ Test API should return 401 if user is worker"""
-        admin = UserFactory.create(admin=True)
         worker = UserFactory.create(admin=False, subadmin=False)
 
         project = self.setupProjects()
@@ -99,12 +98,14 @@ class TestProjectAPI(TestAPI):
     @with_context
     def test_project_locks_user_subadmin(self):
         """ Test API should work if user is subadmin"""
-        admin = UserFactory.create(admin=True)
         subadmin = UserFactory.create(admin=False, subadmin=True)
 
         project = self.setupProjects()
-        project_id = str(project.id)
 
+        # Assign subadmin as owner of this project.
+        project.owners_ids.append(subadmin.id)
+
+        project_id = str(project.id)
         res = self.app.get('/api/locks?id=' + project_id + '&api_key=' + subadmin.api_key + '&all=1')
         data = json.loads(res.data)
         assert res.status_code == 200, data
@@ -163,7 +164,7 @@ class TestProjectAPI(TestAPI):
 
     @with_context
     def test_project_locks_param_does_not_exist(self):
-        """ Test API project query when search value does not match"""
+        """ Test API project query when param does not exist"""
         admin = UserFactory.create(admin=True)
         project1 = self.setupProjects()
 

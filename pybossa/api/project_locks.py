@@ -36,9 +36,6 @@ class ProjectLocksAPI(APIBase):
         if (len(request.args.keys()) == 0 or
             (len(request.args.keys()) == 1 and "api_key" in request.args.keys())):
             return []
-        if (not current_user.is_authenticated or
-             (not current_user.admin and not current_user.subadmin)):
-            raise Unauthorized("User not authorized for request")
 
         return APIBase._filter_query(self, repo_info, limit, offset, orderby)
 
@@ -61,8 +58,14 @@ class ProjectLocksAPI(APIBase):
 
     def _select_attributes(self, data):
         # Get the project.
-        project, owner, ps = project_by_shortname(data.get('short_name'))
+        project = project_by_shortname(data.get('short_name'))
         task_id = ''
+
+        if not current_user.is_authenticated:
+            raise Unauthorized("User not authorized for request")
+
+        if not current_user.admin and not (current_user.subadmin and current_user.id in project.owners_ids):
+            raise Unauthorized("User not authorized for request")
 
         tmp = {}
         tmp['id'] = data.get('id')
