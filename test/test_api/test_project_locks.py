@@ -23,7 +23,7 @@ from nose.tools import assert_equal
 from unittest.mock import patch
 
 from pybossa.model.project import Project
-from pybossa.repositories import ProjectRepository
+from pybossa.repositories import ProjectRepository, UserRepository
 from pybossa.api.project_locks import ProjectLocksAPI
 from test import db, with_context
 from test.factories import (ProjectFactory, UserFactory)
@@ -36,6 +36,7 @@ class TestProjectLocksAPI(TestAPI):
         super(TestProjectLocksAPI, self).setUp()
         db.session.query(Project).delete()
         self.project_repo = ProjectRepository(db)
+        self.user_repo = UserRepository(db)
 
     def setupProjects(self):
         project = ProjectFactory.create(
@@ -101,12 +102,15 @@ class TestProjectLocksAPI(TestAPI):
     def test_project_locks_user_subadmin(self):
         """ Test API should work if user is subadmin"""
         subadmin = UserFactory.create(admin=False, subadmin=True)
-
         project = self.setupProjects()
+
+        # Remove admin from subadmin.
+        subadmin.admin = False
+        self.user_repo.save(subadmin)
 
         # Assign subadmin as owner of this project.
         project.owners_ids.append(subadmin.id)
-        project_repo.save(project)
+        self.project_repo.save(project)
 
         project_id = str(project.id)
         res = self.app.get('/api/locks?id=' + project_id + '&api_key=' + subadmin.api_key + '&all=1')
@@ -118,6 +122,10 @@ class TestProjectLocksAPI(TestAPI):
     def test_project_locks_user_subadmin_not_owner(self):
         """ Test API should not work if user is subadmin but no in project owners"""
         subadmin = UserFactory.create(admin=False, subadmin=True)
+
+        # Remove admin from subadmin.
+        subadmin.admin = False
+        self.user_repo.save(subadmin)
 
         project = self.setupProjects()
         project_id = str(project.id)
