@@ -56,12 +56,12 @@ class TestProjectAPI(TestAPI):
         return project
 
     @with_context
-    def test_project_details_user_not_logged_in(self):
+    def test_project_locks_user_not_logged_in(self):
         """ Test should return 401 if the user is not logged in"""
         project = self.setupProjects()
         project_id = str(project.id)
 
-        res = self.app.get('/api/projectdetails/' + project_id)
+        res = self.app.get('/api/locks/' + project_id)
         err = json.loads(res.data)
         assert res.status_code == 401, err
         assert err['status'] == 'failed', err
@@ -70,7 +70,7 @@ class TestProjectAPI(TestAPI):
         assert err['action'] == 'GET', err
 
     @with_context
-    def test_project_details_user_worker(self):
+    def test_project_locks_user_worker(self):
         """ Test API should return 401 if user is worker"""
         admin = UserFactory.create(admin=True)
         worker = UserFactory.create(admin=False, subadmin=False)
@@ -78,7 +78,7 @@ class TestProjectAPI(TestAPI):
         project = self.setupProjects()
         project_id = str(project.id)
 
-        res = self.app.get('/api/projectdetails?id=' + project_id + '&api_key=' + worker.api_key + '&all=1')
+        res = self.app.get('/api/locks?id=' + project_id + '&api_key=' + worker.api_key + '&all=1')
         err = json.loads(res.data)
         assert res.status_code == 401, err
         assert err['status'] == 'failed', err
@@ -87,7 +87,7 @@ class TestProjectAPI(TestAPI):
         assert err['action'] == 'GET', err
 
     @with_context
-    def test_project_details_user_subadmin(self):
+    def test_project_locks_user_subadmin(self):
         """ Test API should work if user is subadmin"""
         admin = UserFactory.create(admin=True)
         subadmin = UserFactory.create(admin=False, subadmin=True)
@@ -95,115 +95,73 @@ class TestProjectAPI(TestAPI):
         project = self.setupProjects()
         project_id = str(project.id)
 
-        res = self.app.get('/api/projectdetails?id=' + project_id + '&api_key=' + subadmin.api_key + '&all=1')
+        res = self.app.get('/api/locks?id=' + project_id + '&api_key=' + subadmin.api_key + '&all=1')
         data = json.loads(res.data)
         assert res.status_code == 200, data
         assert data[0]['product'] == 'test_product', data
         assert data[0]['short_name'] == 'test-app1', data
 
     @with_context
-    def test_project_details_user_admin(self):
+    def test_project_locks_user_admin(self):
         """ Test API should work if user is admin"""
         admin = UserFactory.create(admin=True)
 
         project = self.setupProjects()
         project_id = str(project.id)
 
-        res = self.app.get('/api/projectdetails?id=' + project_id + '&api_key=' + admin.api_key + '&all=1')
+        res = self.app.get('/api/locks?id=' + project_id + '&api_key=' + admin.api_key + '&all=1')
         data = json.loads(res.data)
         assert res.status_code == 200, data
         assert data[0]['product'] == 'test_product', data
         assert data[0]['short_name'] == 'test-app1', data
 
-
     @with_context
-    def test_project_details_get_by_id_1(self):
-        """ Test get by id when result exists"""
+    def test_project_locks_get_by_id(self):
+        """ Test get locks by project id when project id exists"""
         admin = UserFactory.create(admin=True)
         project1 = self.setupProjects()
 
         # Test get by id
-        res = self.app.get('/api/projectdetails?id=' + str(project1.id) + '&api_key=' + admin.api_key + '&all=1')
+        res = self.app.get('/api/locks?id=' + str(project1.id) + '&api_key=' + admin.api_key + '&all=1')
         data = json.loads(res.data)
         assert res.status_code == 200, data
         assert len(data) == 1, data
-        assert data[0]['product'] == 'test_product', data
         assert data[0]['short_name'] == 'test-app1', data
+        assert data[0]['locks'] == [], data
 
     @with_context
-    def test_project_details_get_by_id_2(self):
-        """ Test get by id when result exists"""
-        admin = UserFactory.create(admin=True)
-        project1 = self.setupProjects()
-
-        # Test get by id
-        res = self.app.get('/api/projectdetails/' + str(project1.id) + '?api_key=' + admin.api_key)
-        data = json.loads(res.data)
-        assert res.status_code == 200, data
-        assert data['product'] == 'test_product', data
-        assert data['short_name'] == 'test-app1', data
-
-    @with_context
-    def test_project_details_get_by_product(self):
-        """ Test search by product when result exists"""
-        admin = UserFactory.create(admin=True)
-        project1 = self.setupProjects()
-
-        # Test get by product
-        res = self.app.get('/api/projectdetails?info=product::' + project1.info['product'] + '&api_key=' + admin.api_key + '&all=1')
-        data = json.loads(res.data)
-        assert res.status_code == 200, data
-        assert len(data) == 6, data
-        assert data[0]['product'] == 'test_product', data
-        assert data[1]['product'] == 'test_product', data
-
-    @with_context
-    def test_project_details_get_by_subproduct(self):
-        """ Test search by subproduct when result exists"""
-        admin = UserFactory.create(admin=True)
-        project1 = self.setupProjects()
-
-        # Test get by subproduct
-        res = self.app.get('/api/projectdetails?info=subproduct::' + project1.info['subproduct'] + '&api_key=' + admin.api_key + '&all=1')
-        data = json.loads(res.data)
-        assert res.status_code == 200, data
-        assert len(data) == 1, data
-        assert data[0]['product'] == 'test_product', data
-        assert data[0]['short_name'] == 'test-app1', data
-
-    @with_context
-    def test_project_details_no_params(self):
+    def test_project_locks_no_params(self):
         """ Test API project query when no search params"""
         admin = UserFactory.create(admin=True)
         project1 = self.setupProjects()
 
         # Test no params
-        res = self.app.get('/api/projectdetails?api_key=' + admin.api_key)
+        res = self.app.get('/api/locks?api_key=' + admin.api_key)
         data = json.loads(res.data)
         assert res.status_code == 200, data
         assert len(data) == 0, data
 
     @with_context
-    def test_project_details_value_does_not_match(self):
+    def test_project_locks_value_does_not_match(self):
         """ Test API project query when search value does not match"""
         admin = UserFactory.create(admin=True)
         project1 = self.setupProjects()
 
         # Test value DNE
-        res = self.app.get('/api/projectdetails?id=' + '9999' + '&api_key=' + admin.api_key + '&all=1')
+        res = self.app.get('/api/locks?id=' + '9999' + '&api_key=' + admin.api_key + '&all=1')
         data = json.loads(res.data)
         assert res.status_code == 200, data
         assert len(data) == 0, data
 
 
     @with_context
-    def test_project_details_param_does_not_exist(self):
+    def test_project_locks_param_does_not_exist(self):
         """ Test API project query when search value does not match"""
         admin = UserFactory.create(admin=True)
         project1 = self.setupProjects()
 
         # Test bad param
-        res = self.app.get('/api/projectdetails?fakeparam=product::' + project1.info['product'] + '&api_key=' + admin.api_key + '&all=1')
+        res = self.app.get('/api/locks?fakeparam=product::' + project1.info['product'] + '&api_key=' + admin.api_key + '&all=1')
         err = json.loads(res.data)
         assert res.status_code == 415, data
         assert err['status'] == 'failed', err
@@ -211,15 +169,3 @@ class TestProjectAPI(TestAPI):
         assert err['exception_cls'] == 'AttributeError', err
         assert err['action'] == 'GET', err
 
-    @with_context
-    def test_project_details_multiple_params(self):
-        """ Test API project query when result exists"""
-        admin = UserFactory.create(admin=True)
-        project1 = self.setupProjects()
-
-        # Test get by product and subproduct
-        res = self.app.get('/api/projectdetails?info=product::' + project1.info['product']  + '&info=subproduct::' + project1.info['subproduct'] + '&api_key=' + admin.api_key + '&all=1')
-        data = json.loads(res.data)
-        assert res.status_code == 200, data
-        assert data[0]['product'] == 'test_product', data
-        assert data[0]['subproduct'] == 'test_subproduct1', data
