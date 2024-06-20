@@ -58,7 +58,7 @@ def upref_languages():
     return langs
 
 
-country_to_country_code = {
+country_name_to_country_code = {
     "Andorra": "AD",
     "United Arab Emirates": "AE",
     "Afghanistan": "AF",
@@ -313,24 +313,23 @@ country_to_country_code = {
     "Zimbabwe": "ZW",
 }
 
-
-country_code_to_country = dict((reversed(item) for item in country_to_country_code.items()))
-
-
-def get_country_code_by_country(country):
-    return country_to_country_code.get(country)
+country_code_to_country_name = dict((reversed(item) for item in country_name_to_country_code.items()))
 
 
-def get_country_by_country_code(country_code):
-    return country_code_to_country.get(country_code)
+def get_country_code_by_country_name(country):
+    return country_name_to_country_code.get(country)
 
+def get_country_name_by_country_code(country_code):
+    return country_code_to_country_name.get(country_code)
+
+def upref_country_names():
+    return [(cn, cn) for cn in  country_name_to_country_code.keys()]
+
+def upref_country_codes():
+    return [(cc, cc) for cc in  country_code_to_country_name.keys()]
 
 def upref_locations():
-    cts = []
-    for cc, cn in country_code_to_country.items():
-        cts.append((cc,cc))
-        cts.append((cn, cn))
-    return sorted(cts)
+    return sorted(upref_country_names() + upref_country_codes())
 
 
 def mdata_user_types():
@@ -381,9 +380,12 @@ def get_upref_mdata_choices():
     upref_mdata_choices = dict(
         languages=upref_languages(),
         locations=upref_locations(),
+        country_codes=upref_country_codes(),
+        country_names=upref_country_names(),
         timezones=mdata_timezones(),
         user_types=mdata_user_types())
     return upref_mdata_choices
+
 
 def get_valid_user_preferences():
     if not valid_user_preferences:

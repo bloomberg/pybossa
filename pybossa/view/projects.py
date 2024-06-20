@@ -4264,7 +4264,6 @@ def get_locked_tasks(project, task_id=None):
 @blueprint.route('/<short_name>/locks/', methods=['GET'], defaults={'task_id': ''})
 @blueprint.route('/<short_name>/locks/<int:task_id>/', methods=['GET'])
 @login_required
-@csrf.exempt
 @admin_or_subadmin_required
 def locks(short_name, task_id):
     """View locked task(s) for a project."""
