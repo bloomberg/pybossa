@@ -1149,8 +1149,8 @@ def add_metadata(name):
                                input_form=True,
                                can_update=can_update,
                                upref_mdata_enabled=bool(app_settings.upref_mdata),
-                               country_name_to_country_code=app_settings.upref_mdata.country_name_to_country_code(),
-                               country_code_to_country_name=app_settings.upref_mdata.country_code_to_country_name())
+                               country_name_to_country_code=app_settings.upref_mdata.country_name_to_country_code,
+                               country_code_to_country_name=app_settings.upref_mdata.country_code_to_country_name)
 
     user_pref, metadata = get_user_pref_and_metadata(name, form)
     user.info['metadata'] = metadata
