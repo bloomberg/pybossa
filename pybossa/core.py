@@ -994,7 +994,7 @@ def setup_profiler(app):
 
 
 def setup_task_presenter_editor(app):
-    if app.config.get('DISABLE_TASK_PRESENTER_EDITOR'):
+    if app.config.get('DISABLE_TASK_PRESENTER_EDITOR_PAYLOAD'):
         from pybossa.api.project import ProjectAPI
         ProjectAPI.restricted_keys.add('info::task_presenter')
 

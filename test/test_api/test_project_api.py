@@ -895,7 +895,7 @@ class TestProjectAPI(TestAPI):
         from flask import current_app
         from pybossa.core import setup_task_presenter_editor
 
-        current_app.config['DISABLE_TASK_PRESENTER_EDITOR'] = True
+        current_app.config['DISABLE_TASK_PRESENTER_EDITOR_PAYLOAD'] = True
         setup_task_presenter_editor(current_app)
 
         [admin, subadmin] = UserFactory.create_batch(2)
