@@ -622,6 +622,121 @@ def send_mail(message_dict, mail_all=False):
             mail.send(message)
 
 
+def count_rows_to_delete(project_id):
+    from sqlalchemy.sql import text
+    from pybossa.core import db
+
+    sql = text('''
+        SELECT COUNT(*) FROM task WHERE
+        project_id=:project_id;
+        ''')
+    params = dict(project_id=project_id)
+    total_tasks = db.session.execute(sql, params).scalar()
+
+    sql = text('''
+        SELECT COUNT(*) FROM task_run WHERE
+        project_id=:project_id;
+        ''')
+    params = dict(project_id=project_id)
+    total_taskrun = db.session.execute(sql, params).scalar()
+
+
+    sql = text('''
+        SELECT COUNT(*) FROM result WHERE
+        project_id=:project_id;
+        ''')
+    params = dict(project_id=project_id)
+    total_result = db.session.execute(sql, params).scalar()
+
+
+    sql = text('''
+        SELECT COUNT(*) FROM counter WHERE
+        project_id=:project_id;
+        ''')
+    params = dict(project_id=project_id)
+    total_counter = db.session.execute(sql, params).scalar()
+    return total_tasks, total_taskrun, total_result, total_counter
+
+
+def cleanup_task_records(project_id, limit):
+    """Cleanup records associated with task from all related tables."""
+
+    from sqlalchemy.sql import text
+    from pybossa.core import db
+
+    tables = ["counter", "result", "task_run", "task"]
+    task_ids = []
+    params = {"project_id": project_id, "limit": limit}
+    sql = text('''
+        SELECT id FROM task WHERE project_id=:project_id LIMIT %(limit)s;"
+        ''')
+    response = db.session.execute(sql, params).fetchall()
+    task_ids = [id[0] for id in response]
+    if not task_ids:
+        return
+
+    for table in tables:
+        sql = f"DELETE FROM {table} "
+        sql += "WHERE id IN %s;" if table == "task" else "WHERE task_id IN %s;"
+        db.session.execute(sql, (tuple(task_ids),))
+
+
+def delete_bulk_tasks_in_batches(data):
+    """Delete bulk tasks in batches from project."""
+
+    from sqlalchemy.sql import text
+    from pybossa.core import db
+    import pybossa.cache.projects as cached_projects
+    from pybossa.cache.task_browse_helpers import get_task_filters
+
+    project_id = data['project_id']
+    project_name = data['project_name']
+    curr_user = data['curr_user']
+    coowners = data['coowners']
+    current_user_fullname = data['current_user_fullname']
+    force_reset = data['force_reset']
+    url = data['url']
+    params = {}
+
+    batch_size = 100
+    total_task, total_taskrun, total_result, total_counter = count_rows_to_delete(project_id)
+    current_app.logger.info("total records to delete. task %d, task_run %d, result %d, counter %d", 
+                            total_task, total_taskrun, total_result, total_counter)
+
+    # count iterations required to delete records from all tables
+    counter_iterations = int(total_counter / batch_size) + (1 if total_counter % batch_size else 0)
+    result_iterations = int(total_result / batch_size) + (1 if total_result % batch_size else 0)
+    taskrun_iterations = int(total_taskrun / batch_size) + (1 if total_taskrun % batch_size else 0)
+    task_iterations = int(total_task / batch_size) + (1 if total_task % batch_size else 0)
+    current_app.logger.info("total iterations. task %d, task_run %d, result %d, counter %d", 
+                            task_iterations, taskrun_iterations, result_iterations, counter_iterations)
+
+    limit = batch_size
+    total_iterations = max(counter_iterations, result_iterations, taskrun_iterations, task_iterations)
+    for i in range(total_iterations):
+        count_deleted_records = i * batch_size
+        current_app.logger.info("Count of records deleted: %d", count_deleted_records)
+        cleanup_task_records(project_id=project_id, limit=limit)
+        time.sleep(2) # allow sql queries other than delete records to execute
+
+    cached_projects.clean_project(project_id)
+    # TODO: implement force_reset = False
+    msg = ("Tasks, taskruns and results associated have been "
+        "deleted from project {0} on {1} as requested by {2}"
+        .format(project_name, url, current_user_fullname))
+    subject = 'Tasks deletion from %s' % project_name
+    body = 'Hello,\n\n' + msg + '\n\nThe %s team.'\
+        % current_app.config.get('BRAND')
+
+    recipients = [curr_user]
+    for user in coowners:
+        recipients.append(user.email_addr)
+
+    mail_dict = dict(recipients=recipients, subject=subject, body=body)
+    send_mail(mail_dict)
+    check_and_send_task_notifications(project_id)
+
+
 def delete_bulk_tasks(data):
     """Delete tasks in bulk from project."""
     from sqlalchemy.sql import text
