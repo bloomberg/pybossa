@@ -668,17 +668,21 @@ def cleanup_task_records(project_id, limit):
     task_ids = []
     params = {"project_id": project_id, "limit": limit}
     sql = text('''
-        SELECT id FROM task WHERE project_id=:project_id LIMIT %(limit)s;"
+        SELECT id FROM task WHERE project_id=:project_id LIMIT :limit;
         ''')
     response = db.session.execute(sql, params).fetchall()
     task_ids = [id[0] for id in response]
     if not task_ids:
         return
 
+    current_app.logger.info("Task ids staged for deletion: %s", task_ids)
+    task_ids_tuple = tuple(task_ids)
     for table in tables:
         sql = f"DELETE FROM {table} "
-        sql += "WHERE id IN %s;" if table == "task" else "WHERE task_id IN %s;"
-        db.session.execute(sql, (tuple(task_ids),))
+        sql += "WHERE id IN :taskids;" if table == "task" else "WHERE task_id IN :taskids;"
+        db.session.execute(sql, {"taskids": task_ids_tuple})
+        db.session.commit()
+    current_app.logger.info("Task ids staged deleted from tables %s", tables)
 
 
 def delete_bulk_tasks_in_batches(data):
