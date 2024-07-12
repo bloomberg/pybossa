@@ -53,6 +53,10 @@ IMPORT_TASKS_TIMEOUT = (20 * MINUTE)
 TASK_DELETE_TIMEOUT = (60 * MINUTE)
 EXPORT_TASKS_TIMEOUT = (20 * MINUTE)
 MAX_RECIPIENTS = 50
+BATCH_DELETE_TASK_DELAY = 2 # seconds
+BATCH_SIZE_BULK_DELETE_TASKS = 100
+MAX_BULK_DELETE_TASK_ITERATIONS = 1000
+
 from pybossa.exporter.json_export import JsonExporter
 
 auditlogger = AuditLogger(auditlog_repo, caller='web')
@@ -621,41 +625,24 @@ def send_mail(message_dict, mail_all=False):
         if not spam:
             mail.send(message)
 
-
-def count_rows_to_delete(project_id):
+def count_records(table, project_id):
     from sqlalchemy.sql import text
     from pybossa.core import db
 
     sql = text('''
-        SELECT COUNT(*) FROM task WHERE
+        SELECT COUNT(*) FROM :table WHERE
         project_id=:project_id;
         ''')
-    params = dict(project_id=project_id)
-    total_tasks = db.session.execute(sql, params).scalar()
-
-    sql = text('''
-        SELECT COUNT(*) FROM task_run WHERE
-        project_id=:project_id;
-        ''')
-    params = dict(project_id=project_id)
-    total_taskrun = db.session.execute(sql, params).scalar()
+    params = dict(table=table, project_id=project_id)
+    return db.session.execute(sql, params).scalar()
 
 
-    sql = text('''
-        SELECT COUNT(*) FROM result WHERE
-        project_id=:project_id;
-        ''')
-    params = dict(project_id=project_id)
-    total_result = db.session.execute(sql, params).scalar()
-
-
-    sql = text('''
-        SELECT COUNT(*) FROM counter WHERE
-        project_id=:project_id;
-        ''')
-    params = dict(project_id=project_id)
-    total_counter = db.session.execute(sql, params).scalar()
-    return total_tasks, total_taskrun, total_result, total_counter
+def count_rows_to_delete(project_id):
+    total_task = count_records("task", project_id)
+    total_taskrun = count_records("task_run", project_id)
+    total_result = count_records("result", project_id)
+    total_counter = count_records("counter", project_id)
+    return total_task, total_taskrun, total_result, total_counter
 
 
 def cleanup_task_records(project_id, limit):
@@ -688,7 +675,7 @@ def cleanup_task_records(project_id, limit):
 def delete_bulk_tasks_in_batches(project_id, force_reset):
     """Delete bulk tasks in batches from project."""
 
-    batch_size = 100
+    batch_size = BATCH_SIZE_BULK_DELETE_TASKS
     total_task, total_taskrun, total_result, total_counter = count_rows_to_delete(project_id)
     current_app.logger.info("total records to delete. task %d, task_run %d, result %d, counter %d", 
                             total_task, total_taskrun, total_result, total_counter)
@@ -704,11 +691,12 @@ def delete_bulk_tasks_in_batches(project_id, force_reset):
     # TODO: implement force_reset = False
     limit = batch_size
     total_iterations = max(counter_iterations, result_iterations, taskrun_iterations, task_iterations)
+    total_iterations = min(total_iterations, MAX_BULK_DELETE_TASK_ITERATIONS)
     for i in range(total_iterations):
         count_deleted_records = i * batch_size
         current_app.logger.info("Count of records deleted: %d", count_deleted_records)
         cleanup_task_records(project_id=project_id, limit=limit)
-        time.sleep(2) # allow sql queries other than delete records to execute
+        time.sleep(BATCH_DELETE_TASK_DELAY) # allow sql queries other than delete records to execute
 
 
 def delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_args):

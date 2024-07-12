@@ -16,10 +16,24 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA. If not, see <http://www.gnu.org/licenses/>.
 from pybossa.core import create_app
+from pybossa.jobs import delete_bulk_tasks_in_batches
 
 if __name__ == "__main__":  # pragma: no cover
     app = create_app()
     # logging.basicConfig(level=logging.NOTSET)
+
+    data = dict(
+        project_id = 2,
+        project_name = "test bulk del",
+        curr_user = "usera",
+        coowners = [],
+        current_user_fullname = "usera",
+        force_reset = True,
+        url = "https://testbulkdel"
+    )
+    # with app.app_context():
+    #     delete_bulk_tasks_in_batches(data)
+
     app.run(host=app.config['HOST'], port=app.config['PORT'],
             debug=app.config.get('DEBUG', True))
 else:
