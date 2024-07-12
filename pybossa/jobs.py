@@ -645,18 +645,29 @@ def count_rows_to_delete(project_id):
     return total_task, total_taskrun, total_result, total_counter
 
 
-def cleanup_task_records(project_id, limit):
+def cleanup_task_records(project_id, limit, force_reset):
     """Cleanup records associated with task from all related tables."""
 
     from sqlalchemy.sql import text
     from pybossa.core import db
 
-    tables = ["counter", "result", "task_run", "task"]
     task_ids = []
     params = {"project_id": project_id, "limit": limit}
-    sql = text('''
-        SELECT id FROM task WHERE project_id=:project_id LIMIT :limit;
+
+    if force_reset:
+        sql = text('''
+            SELECT id FROM task WHERE project_id=:project_id LIMIT :limit;
+            ''')
+        tables = ["counter", "result", "task_run", "task"]
+    else:
+        sql = text('''
+            SELECT t.id FROM task t
+            LEFT JOIN task_run tr
+            ON t.id = tr.task_id
+            WHERE t.project_id=:project_id AND tr.task_id IS NULL
+            LIMIT :limit;
         ''')
+        tables = ["task"]
     response = db.session.execute(sql, params).fetchall()
     task_ids = [id[0] for id in response]
     if not task_ids:
@@ -688,14 +699,13 @@ def delete_bulk_tasks_in_batches(project_id, force_reset):
     current_app.logger.info("total iterations. task %d, task_run %d, result %d, counter %d", 
                             task_iterations, taskrun_iterations, result_iterations, counter_iterations)
 
-    # TODO: implement force_reset = False
     limit = batch_size
     total_iterations = max(counter_iterations, result_iterations, taskrun_iterations, task_iterations)
     total_iterations = min(total_iterations, MAX_BULK_DELETE_TASK_ITERATIONS)
     for i in range(total_iterations):
         count_deleted_records = i * batch_size
         current_app.logger.info("Count of records deleted: %d", count_deleted_records)
-        cleanup_task_records(project_id=project_id, limit=limit)
+        cleanup_task_records(project_id=project_id, limit=limit, force_reset=force_reset)
         time.sleep(BATCH_DELETE_TASK_DELAY) # allow sql queries other than delete records to execute
 
 

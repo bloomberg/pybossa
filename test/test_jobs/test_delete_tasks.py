@@ -75,7 +75,7 @@ class TestDeleteTasks(Test):
 
         mock_db.return_value.scalar.side_effect = [102, 3, 0, 105]
         data = {'project_id': 123, 'project_name': "xyz", 'curr_user': "user@a.com",
-            'force_reset': 'true', 'coowners': [], 'current_user_fullname': "usera", 'url': "https://a.com"
+            'force_reset': True, 'coowners': [], 'current_user_fullname': "usera", 'url': "https://a.com"
         }
 
         with patch.dict(self.flask_app.config, {"DELETE_BULK_TASKS_IN_BATCHES": True}):
@@ -99,5 +99,16 @@ class TestDeleteTasks(Test):
         project_id = 123
         limit = 100
         mock_db.return_value.fetchall.side_effect = [[(1,), (2,), (3,), (4,)]]
-        cleanup_task_records(project_id, limit)
+        cleanup_task_records(project_id, limit, force_reset=True)
         mock_db.call_count = 5
+
+
+    @with_context
+    @patch('pybossa.core.db.session.execute')
+    def test_cleanup_task_records_without_force_reset(self, mock_db):
+        """"Test cleanup task pick records to delete and perform cleanup from task table"""
+        project_id = 123
+        limit = 100
+        mock_db.return_value.fetchall.side_effect = [[(1,), (2,), (3,), (4,)]]
+        cleanup_task_records(project_id, limit, force_reset=False)
+        mock_db.call_count = 2
