@@ -77,7 +77,10 @@ class TestDeleteTasks(Test):
         data = {'project_id': 123, 'project_name': "xyz", 'curr_user': "user@a.com",
             'force_reset': 'true', 'coowners': [], 'current_user_fullname': "usera", 'url': "https://a.com"
         }
-        delete_bulk_tasks_in_batches(data)
+
+        with patch.dict(self.flask_app.config, {"DELETE_BULK_TASKS_IN_BATCHES": True}):
+            delete_bulk_tasks(data) #delete_bulk_tasks_in_batches(data)
+
         assert mock_cleanup_task_records.call_count == 2
         mock_sleep.assert_called_with(2)
 

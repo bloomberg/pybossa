@@ -685,22 +685,8 @@ def cleanup_task_records(project_id, limit):
     current_app.logger.info("Task ids staged deleted from tables %s", tables)
 
 
-def delete_bulk_tasks_in_batches(data):
+def delete_bulk_tasks_in_batches(project_id, force_reset):
     """Delete bulk tasks in batches from project."""
-
-    from sqlalchemy.sql import text
-    from pybossa.core import db
-    import pybossa.cache.projects as cached_projects
-    from pybossa.cache.task_browse_helpers import get_task_filters
-
-    project_id = data['project_id']
-    project_name = data['project_name']
-    curr_user = data['curr_user']
-    coowners = data['coowners']
-    current_user_fullname = data['current_user_fullname']
-    force_reset = data['force_reset']
-    url = data['url']
-    params = {}
 
     batch_size = 100
     total_task, total_taskrun, total_result, total_counter = count_rows_to_delete(project_id)
@@ -715,6 +701,7 @@ def delete_bulk_tasks_in_batches(data):
     current_app.logger.info("total iterations. task %d, task_run %d, result %d, counter %d", 
                             task_iterations, taskrun_iterations, result_iterations, counter_iterations)
 
+    # TODO: implement force_reset = False
     limit = batch_size
     total_iterations = max(counter_iterations, result_iterations, taskrun_iterations, task_iterations)
     for i in range(total_iterations):
@@ -723,39 +710,11 @@ def delete_bulk_tasks_in_batches(data):
         cleanup_task_records(project_id=project_id, limit=limit)
         time.sleep(2) # allow sql queries other than delete records to execute
 
-    cached_projects.clean_project(project_id)
-    # TODO: implement force_reset = False
-    msg = ("Tasks, taskruns and results associated have been "
-        "deleted from project {0} on {1} as requested by {2}"
-        .format(project_name, url, current_user_fullname))
-    subject = 'Tasks deletion from %s' % project_name
-    body = 'Hello,\n\n' + msg + '\n\nThe %s team.'\
-        % current_app.config.get('BRAND')
 
-    recipients = [curr_user]
-    for user in coowners:
-        recipients.append(user.email_addr)
-
-    mail_dict = dict(recipients=recipients, subject=subject, body=body)
-    send_mail(mail_dict)
-    check_and_send_task_notifications(project_id)
-
-
-def delete_bulk_tasks(data):
-    """Delete tasks in bulk from project."""
+def delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_args):
     from sqlalchemy.sql import text
     from pybossa.core import db
-    import pybossa.cache.projects as cached_projects
     from pybossa.cache.task_browse_helpers import get_task_filters
-
-    project_id = data['project_id']
-    project_name = data['project_name']
-    curr_user = data['curr_user']
-    coowners = data['coowners']
-    current_user_fullname = data['current_user_fullname']
-    force_reset = data['force_reset']
-    url = data['url']
-    params = {}
 
     # bulkdel db conn is with db user having session_replication_role
     # when bulkdel is not configured, make explict sql query to set
@@ -795,12 +754,8 @@ def delete_bulk_tasks(data):
 
                 COMMIT;
                 '''.format(sql_session_repl))
-        msg = ("Tasks and taskruns with no associated results have been "
-               "deleted from project {0} by {1}"
-               .format(project_name, current_user_fullname))
     else:
-        args = data.get('filters', {})
-        conditions, params = get_task_filters(args)
+        conditions, params = get_task_filters(task_filter_args)
         sql = text('''
                 BEGIN;
                 SELECT task_id FROM counter WHERE project_id=:project_id FOR UPDATE;
@@ -833,11 +788,38 @@ def delete_bulk_tasks(data):
 
                 COMMIT;
                 '''.format(sql_session_repl, conditions))
+    db.bulkdel_session.execute(sql, dict(project_id=project_id, **params))
+
+def delete_bulk_tasks(data):
+    """Delete tasks in bulk from project."""
+    import pybossa.cache.projects as cached_projects
+
+
+    project_id = data['project_id']
+    project_name = data['project_name']
+    curr_user = data['curr_user']
+    coowners = data['coowners']
+    current_user_fullname = data['current_user_fullname']
+    force_reset = data['force_reset']
+    url = data['url']
+    params = {}
+
+    task_filter_args = data.get('filters', {})
+    if (current_app.config.get("DELETE_BULK_TASKS_IN_BATCHES")):
+        delete_bulk_tasks_in_batches(project_id, force_reset)
+    else:
+        delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_args)
+
+    cached_projects.clean_project(project_id)
+    if not force_reset:
+        msg = ("Tasks and taskruns with no associated results have been "
+            "deleted from project {0} by {1}"
+            .format(project_name, current_user_fullname))
+    else:
         msg = ("Tasks, taskruns and results associated have been "
                "deleted from project {0} on {1} as requested by {2}"
                .format(project_name, url, current_user_fullname))
-    db.bulkdel_session.execute(sql, dict(project_id=project_id, **params))
-    cached_projects.clean_project(project_id)
+
     subject = 'Tasks deletion from %s' % project_name
     body = 'Hello,\n\n' + msg + '\n\nThe %s team.'\
         % current_app.config.get('BRAND')
