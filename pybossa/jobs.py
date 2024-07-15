@@ -626,14 +626,13 @@ def send_mail(message_dict, mail_all=False):
             mail.send(message)
 
 def count_records(table, project_id):
-    from sqlalchemy.sql import text
     from pybossa.core import db
 
     sql = text('''
-        SELECT COUNT(*) FROM :table WHERE
+        SELECT COUNT(*) FROM {} WHERE
         project_id=:project_id;
-        ''')
-    params = dict(table=table, project_id=project_id)
+        '''.format(table))
+    params = dict(project_id=project_id)
     return db.session.execute(sql, params).scalar()
 
 
@@ -645,28 +644,30 @@ def count_rows_to_delete(project_id):
     return total_task, total_taskrun, total_result, total_counter
 
 
-def cleanup_task_records(project_id, limit, force_reset):
+def cleanup_task_records(project_id, limit, force_reset, task_filter_args):
     """Cleanup records associated with task from all related tables."""
 
-    from sqlalchemy.sql import text
     from pybossa.core import db
+    from pybossa.cache.task_browse_helpers import get_task_filters
 
     task_ids = []
-    params = {"project_id": project_id, "limit": limit}
+    conditions, params = get_task_filters(task_filter_args)
+    params["project_id"] = project_id
+    params["limit"] = limit
 
     if force_reset:
         sql = text('''
-            SELECT id FROM task WHERE project_id=:project_id LIMIT :limit;
-            ''')
+            SELECT id FROM task WHERE project_id=:project_id {} LIMIT :limit;
+            '''.format(conditions))
         tables = ["counter", "result", "task_run", "task"]
     else:
         sql = text('''
             SELECT t.id FROM task t
             LEFT JOIN task_run tr
             ON t.id = tr.task_id
-            WHERE t.project_id=:project_id AND tr.task_id IS NULL
+            WHERE t.project_id=:project_id AND tr.task_id IS NULL {}
             LIMIT :limit;
-        ''')
+        '''.format(conditions))
         tables = ["task"]
     response = db.session.execute(sql, params).fetchall()
     task_ids = [id[0] for id in response]
@@ -683,7 +684,7 @@ def cleanup_task_records(project_id, limit, force_reset):
     current_app.logger.info("Task ids staged deleted from tables %s", tables)
 
 
-def delete_bulk_tasks_in_batches(project_id, force_reset):
+def delete_bulk_tasks_in_batches(project_id, force_reset, task_filter_args):
     """Delete bulk tasks in batches from project."""
 
     batch_size = BATCH_SIZE_BULK_DELETE_TASKS
@@ -705,12 +706,11 @@ def delete_bulk_tasks_in_batches(project_id, force_reset):
     for i in range(total_iterations):
         count_deleted_records = i * batch_size
         current_app.logger.info("Count of records deleted: %d", count_deleted_records)
-        cleanup_task_records(project_id=project_id, limit=limit, force_reset=force_reset)
+        cleanup_task_records(project_id, limit, force_reset, task_filter_args)
         time.sleep(BATCH_DELETE_TASK_DELAY) # allow sql queries other than delete records to execute
 
 
 def delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_args):
-    from sqlalchemy.sql import text
     from pybossa.core import db
     from pybossa.cache.task_browse_helpers import get_task_filters
 
@@ -800,11 +800,10 @@ def delete_bulk_tasks(data):
     current_user_fullname = data['current_user_fullname']
     force_reset = data['force_reset']
     url = data['url']
-    params = {}
 
     task_filter_args = data.get('filters', {})
     if (current_app.config.get("DELETE_BULK_TASKS_IN_BATCHES")):
-        delete_bulk_tasks_in_batches(project_id, force_reset)
+        delete_bulk_tasks_in_batches(project_id, force_reset, task_filter_args)
     else:
         delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_args)
 

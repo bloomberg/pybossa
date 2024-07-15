@@ -99,7 +99,7 @@ class TestDeleteTasks(Test):
         project_id = 123
         limit = 100
         mock_db.return_value.fetchall.side_effect = [[(1,), (2,), (3,), (4,)]]
-        cleanup_task_records(project_id, limit, force_reset=True)
+        cleanup_task_records(project_id, limit, force_reset=True, task_filter_args={})
         mock_db.call_count = 5
 
 
@@ -110,5 +110,5 @@ class TestDeleteTasks(Test):
         project_id = 123
         limit = 100
         mock_db.return_value.fetchall.side_effect = [[(1,), (2,), (3,), (4,)]]
-        cleanup_task_records(project_id, limit, force_reset=False)
+        cleanup_task_records(project_id, limit, force_reset=False, task_filter_args={})
         mock_db.call_count = 2
