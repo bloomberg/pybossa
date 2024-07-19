@@ -703,8 +703,10 @@ def get_service_request(task_id, service_name, major_version, minor_version):
     timeout = project.info.get('timeout', ContributionsGuard.STAMP_TTL)
     task_locked_by_user = has_lock(task.id, current_user.id, timeout)
     payload = request.json if isinstance(request.json, dict) else None
+    can_create_gold_tasks = (current_user.subadmin and current_user.id in project.owners_ids) or current_user.admin
+    mode = request.args.get('mode')
 
-    if payload and task_locked_by_user:
+    if payload and (task_locked_by_user or (mode == "gold" and can_create_gold_tasks)):
         service = _get_valid_service(task_id, service_name, payload, proxy_service_config)
         if isinstance(service, dict):
             url = '{}/{}/{}/{}'.format(proxy_service_config['uri'], service_name, major_version, minor_version)
