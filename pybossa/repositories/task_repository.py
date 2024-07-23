@@ -243,7 +243,8 @@ class TaskRepository(Repository):
             # when bulkdel is not configured, make explict sql query to set
             # session replication role to replica
             sql_session_repl = ''
-            if not 'bulkdel' in current_app.config.get('SQLALCHEMY_BINDS'):
+            if not ('bulkdel' in current_app.config.get('SQLALCHEMY_BINDS') or
+                     current_app.config.get("SESSION_REPLICATION_ROLE_DISABLED")):
                 sql_session_repl = 'SET session_replication_role TO replica;'
             sql = text('''
                 BEGIN;
