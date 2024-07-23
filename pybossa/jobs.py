@@ -802,7 +802,7 @@ def delete_bulk_tasks(data):
     url = data['url']
 
     task_filter_args = data.get('filters', {})
-    if (current_app.config.get("DELETE_BULK_TASKS_IN_BATCHES")):
+    if (current_app.config.get("SESSION_REPLICATION_ROLE_DISABLED")):
         delete_bulk_tasks_in_batches(project_id, force_reset, task_filter_args)
     else:
         delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_args)
