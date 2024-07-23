@@ -916,13 +916,16 @@ def large_language_model(model_name):
             ]
         }
 
+    headers = {
+        "llm-access-token": current_app.config.get('AUTOLAB_ACCESS_TOKEN'),
+    }
+
     body = {
         "inference_endpoint": model_endpoint,
         "payload": data,
-        "access_token": current_app.config.get('AUTOLAB_ACCESS_TOKEN'),
         "user_uuid": current_user.id
     }
-    r = requests.post(url=current_app.config.get('INFERENCE_ENDPOINT'), json=body, proxies=proxies)
+    r = requests.post(url=current_app.config.get('INFERENCE_ENDPOINT'), json=body, proxies=proxies, headers=headers)
     out = json.loads(r.text)
     predictions = out["inference_response"]["predictions"][0]["output"]
     response = {"Model: ": model_name, "predictions: ": predictions}
