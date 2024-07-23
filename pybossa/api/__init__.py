@@ -1007,7 +1007,6 @@ def large_language_model(model_name):
         "prompts": "Identify the company name: Microsoft will release Windows 20 next year."
     }
     """
-    breakpoint()
     if model_name is None:
         model_name = "mixtral-8x7b-instruct"
     endpoints = current_app.config.get("LLM_ENDPOINTS")
