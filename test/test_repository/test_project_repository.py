@@ -190,8 +190,6 @@ class TestProjectRepositoryForProjects(Test):
             project = ProjectFactory.build()
             assert self.project_repo.get(project.id) is None
 
-            self.project_repo.save(project)
-
             assert_raises(BadRequest, self.project_repo.save, project)
 
 
