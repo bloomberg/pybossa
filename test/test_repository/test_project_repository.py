@@ -183,12 +183,15 @@ class TestProjectRepositoryForProjects(Test):
 
     @with_context
     def test_save(self):
-        """Test save fails if the project has no password"""
+        """Test save does not fail if the project has no password"""
 
         project = ProjectFactory.build()
         assert self.project_repo.get(project.id) is None
 
-        assert_raises(BadRequest, self.project_repo.save, project)
+        self.project_repo.save(project)
+
+        assert self.project_repo.get(project.id) == project, "Project not saved"
+
 
 
     @with_context
