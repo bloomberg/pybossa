@@ -99,7 +99,7 @@ class ProjectCommonForm(Form):
 
     password = PasswordField(
                     lazy_gettext('Password'),
-                    [validators.Required(),
+                    [validators.Optional(),
                         pb_validator.CheckPasswordStrength(
                                         min_len=PROJECT_PWD_MIN_LEN,
                                         special=False)],

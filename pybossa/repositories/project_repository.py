@@ -159,7 +159,7 @@ class ProjectRepository(Repository):
             project.owners_ids.append(project.owner_id)
 
     def _verify_has_password(self, project):
-        if not project.info.get('passwd_hash'):
+        if current_app.config.get('PROJECT_PASSWORD_REQUIRED') and not project.info.get('passwd_hash'):
             raise BadRequest('Project must have a password')
 
     def _verify_data_classification(self, project):
@@ -405,12 +405,12 @@ class ProjectRepository(Repository):
                     '''
                         SELECT
                         task.id AS task_id, task.gold_answers,
-                        result.info AS consensus_annotations 
-                        FROM task INNER JOIN result  
+                        result.info AS consensus_annotations
+                        FROM task INNER JOIN result
                         ON task.id = result.task_id
                         WHERE task.project_id=:project_id
-                        AND task.calibration=1 
-                        AND result.last_version=True 
+                        AND task.calibration=1
+                        AND result.last_version=True
                         ORDER BY task_id;
                     '''
                     )
