@@ -878,15 +878,13 @@ def large_language_model(model_name):
         "prompts": "Identify the company name: Microsoft will release Windows 20 next year."
     }
     """
-    if model_name is None:
-        model_name = 'mixtral-8x7b-instruct'
-    endpoints = current_app.config.get('LLM_ENDPOINTS')
-    model_endpoint = endpoints.get(model_name.lower())
-
-    if not model_endpoint:
-        return abort(400, f'{model_name} LLM is unsupported on this platform.')
+    endpoint = current_app.config.get('INFERENCE_ENDPOINT')
+    url = f"{endpoint}/inference_proxy/llm"
 
     proxies = current_app.config.get('LLM_PROXIES')
+
+    if model_name is None:
+        model_name = 'mixtral-8x7b-instruct'
 
     try:
         data = request.get_json(force=True)
@@ -898,21 +896,27 @@ def large_language_model(model_name):
 
     if "prompts" in data:
         prompts = data.get("prompts")
-        if not prompts:
-            return abort(400, 'prompts should not be empty')
-        if isinstance(prompts, list):
-            prompts = prompts[0]  # Batch request temporarily NOT supported
-        if not isinstance(prompts, str):
-            return abort(400, f'prompts should be a string or a list of strings')
-        data = {
-            "instances": [
-                {
-                    "context": prompts + ' ',
-                    "temperature": 1.0,
-                    "seed": 12345,
-                    "repetition_penalty": 1.05
-                }
-            ]
+    elif "instances" in data:
+        prompts = data.get("instances")[0]
+    else:
+        prompts = None
+
+    if not prompts:
+        return abort(400, 'prompts should not be empty')
+    if isinstance(prompts, list):
+        prompts = prompts[0]  # Batch request temporarily NOT supported
+    if not isinstance(prompts, dict):
+        return abort(400, f'prompts should be a dict or list of dicts')
+
+    data = {
+        "prompts": [prompts.get("context", '')],
+        "params":
+            {
+                "max_tokens": prompts.get("max_new_tokens", 16),
+                "temperature": int(prompts.get("temperature", 0.9)),
+                "top_p": 0.9,
+                "seed": 12345
+            }
         }
 
     headers = {
@@ -920,13 +924,15 @@ def large_language_model(model_name):
     }
 
     body = {
-        "inference_endpoint": model_endpoint,
+        "model_name": model_name,
         "payload": data,
-        "user_uuid": current_user.id
+        "user_uuid": current_user.id,
+        "proxies": proxies
     }
-    r = requests.post(url=current_app.config.get('INFERENCE_ENDPOINT'), json=body, proxies=proxies, headers=headers)
+
+    r = requests.post(url=url, json=body, headers=headers)
     out = json.loads(r.text)
-    predictions = out["inference_response"]["predictions"][0]["output"]
+    predictions = out["inference_response"]["predictions"][0]["choices"][0]["text"]
     response = {"Model: ": model_name, "predictions: ": predictions}
 
     return Response(json.dumps(response), status=r.status_code, mimetype="application/json")
