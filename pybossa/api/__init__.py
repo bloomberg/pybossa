@@ -878,7 +878,8 @@ def large_language_model(model_name):
         "prompts": "Identify the company name: Microsoft will release Windows 20 next year."
     }
     """
-    endpoint = current_app.config.get('INFERENCE_ENDPOINT')
+    #endpoint = current_app.config.get('INFERENCE_ENDPOINT')
+    endpoint = 'https://dt-kola-analysis-engine-test.stacker.dev.bloomberg.com'
     url = f"{endpoint}/inference_proxy/llm"
 
     proxies = current_app.config.get('LLM_PROXIES')
@@ -913,8 +914,9 @@ def large_language_model(model_name):
         "params":
             {
                 "max_tokens": prompts.get("max_new_tokens", 16),
-                "temperature": int(prompts.get("temperature", 0.9)),
-                "top_p": 0.9,
+                "temperature": prompts.get("temperature", 1.0),
+                "top_p": prompts.get("top_p", 0.9),
+                "frequency_penalty": prompts.get("temperature", 1.0),
                 "seed": 12345
             }
         }
@@ -932,6 +934,7 @@ def large_language_model(model_name):
 
     r = requests.post(url=url, json=body, headers=headers)
     out = json.loads(r.text)
+    breakpoint()
     predictions = out["inference_response"]["predictions"][0]["choices"][0]["text"]
     response = {"Model: ": model_name, "predictions: ": predictions}
 
