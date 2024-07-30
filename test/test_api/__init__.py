@@ -155,7 +155,7 @@ class TestLargeLanguageModel(unittest.TestCase):
             "prompts": "Identify the company name: Microsoft will release Windows 20 next year."
         }):
             response = large_language_model('invalid-model')
-            self.assertEqual(response.status_code, 415)
+            self.assertEqual(response.status_code, 400)
             self.assertIn('LLM is unsupported', response.json.get('exception_msg'))
 
     @patch('requests.post')
