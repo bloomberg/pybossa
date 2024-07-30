@@ -99,8 +99,7 @@ class ProjectCommonForm(Form):
 
     password = PasswordField(
                     lazy_gettext('Password'),
-                    [validators.Optional(),
-                        pb_validator.CheckPasswordStrength(
+                    [pb_validator.CheckPasswordStrength(
                                         min_len=PROJECT_PWD_MIN_LEN,
                                         special=False)],
                     render_kw={'placeholder': 'Minimum length {} characters, 1 uppercase, 1 lowercase and 1 numeric.'.format(PROJECT_PWD_MIN_LEN)})
@@ -112,6 +111,13 @@ class ProjectCommonForm(Form):
         Form.__init__(self, *args, **kwargs)
 
 class ProjectForm(ProjectCommonForm):
+
+    def __init__(self, *args, **kwargs):
+        super(ProjectForm, self).__init__(*args, **kwargs)
+        if current_app.config.get('PROJECT_PASSWORD_REQUIRED'):
+            self.password.validators.append(validators.Required())
+        else:
+            self.password.validators.append(validators.Optional())
 
     long_description = TextAreaField(lazy_gettext('Long Description'),
                                      [validators.Required()])
