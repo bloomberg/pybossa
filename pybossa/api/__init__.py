@@ -869,7 +869,7 @@ def get_prompt_data():
     if "prompts" in data:
         prompts = data.get("prompts")
     elif "instances" in data:
-        prompts = data.get("instances")[0]
+        prompts = data.get("instances")
     else:
         prompts = None
 
@@ -878,7 +878,7 @@ def get_prompt_data():
     if isinstance(prompts, list):
         prompts = prompts[0]  # Batch request temporarily NOT supported
     if not (isinstance(prompts, str) or isinstance(prompts, dict)):
-        return abort(400, f'prompts should be a str or list of str')
+        return abort(400, f'prompts should be a string or list of strings')
 
     return prompts
 
@@ -898,7 +898,7 @@ def large_language_model(model_name):
             "prompts": [ "Identify the company name: Microsoft will release Windows 20 next year." ]
             "params":
                 {
-                    "context": ,
+                    "seed": 1234,
                     "temperature": 0.9,
                     "max_tokens": 128,
 
@@ -943,7 +943,6 @@ def large_language_model(model_name):
         "proxies": proxies,
         "user_uuid": current_user.id,
         "project_name": request.json.get('projectname', None)
-
     }
 
     r = requests.post(url=url, json=body, headers=headers)
