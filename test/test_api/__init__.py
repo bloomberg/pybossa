@@ -55,9 +55,6 @@ class TestAPI(Test):
 class TestLargeLanguageModel(unittest.TestCase):
     def setUp(self):
         self.app = create_app(run_as_server=False)
-        self.app.config['LLM_ENDPOINTS'] = {
-            'mixtral-8x7b-instruct': 'http://localhost:5000/llm'
-        }
         self.default_model_name = 'mixtral-8x7b-instruct'
         self.client = self.app.test_client()
 
@@ -158,7 +155,7 @@ class TestLargeLanguageModel(unittest.TestCase):
             "prompts": "Identify the company name: Microsoft will release Windows 20 next year."
         }):
             response = large_language_model('invalid-model')
-            self.assertEqual(response.status_code, 400)
+            self.assertEqual(response.status_code, 415)
             self.assertIn('LLM is unsupported', response.json.get('exception_msg'))
 
     @patch('requests.post')

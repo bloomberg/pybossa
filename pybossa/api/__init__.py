@@ -854,39 +854,10 @@ def user_has_partial_answer(short_name=None):
     response = {"has_answer": bool(task_id_map)}
     return Response(json.dumps(response), status=200, mimetype="application/json")
 
-
-@jsonpify
-@csrf.exempt
-@blueprint.route('/llm', defaults={'model_name': None}, methods=['POST'])
-@blueprint.route('/llm/<model_name>', methods=['POST'])
-@ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
-def large_language_model(model_name):
-    """Large language model endpoint
-    The JSON data in the POST request can be one of the following:
-    {
-        "instances": [
-            {
-                "context": "Identify the company name: Microsoft will release Windows 20 next year.",
-                "temperature": 1.0,
-                "seed": 12345,
-                "repetition_penalty": 1.05
-            }
-        ]
-    }
-    or
-    {
-        "prompts": "Identify the company name: Microsoft will release Windows 20 next year."
-    }
-    """
-    #endpoint = current_app.config.get('INFERENCE_ENDPOINT')
-    endpoint = 'https://dt-kola-analysis-engine-test.stacker.dev.bloomberg.com'
-    url = f"{endpoint}/inference_proxy/llm"
-
-    proxies = current_app.config.get('LLM_PROXIES')
-
-    if model_name is None:
-        model_name = 'mixtral-8x7b-instruct'
-
+def get_prompt_data():
+    '''
+    Get data from request and validate it.
+    '''
     try:
         data = request.get_json(force=True)
     except:
@@ -906,8 +877,51 @@ def large_language_model(model_name):
         return abort(400, 'prompts should not be empty')
     if isinstance(prompts, list):
         prompts = prompts[0]  # Batch request temporarily NOT supported
-    if not isinstance(prompts, dict):
-        return abort(400, f'prompts should be a dict or list of dicts')
+    if not (isinstance(prompts, str) or isinstance(prompts, dict)):
+        return abort(400, f'prompts should be a str or list of str')
+
+    return prompts
+
+
+@jsonpify
+@csrf.exempt
+@blueprint.route('/llm', defaults={'model_name': None}, methods=['POST'])
+@blueprint.route('/llm/<model_name>', methods=['POST'])
+@ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+def large_language_model(model_name):
+    """Large language model endpoint
+    The JSON data in the POST request can be one of the following:
+    {
+        "model_name": "mixtral-8x7b-instruct"
+        "payload":
+            {
+            "prompts": [ "Identify the company name: Microsoft will release Windows 20 next year." ]
+            "params":
+                {
+                    "context": ,
+                    "temperature": 0.9,
+                    "max_tokens": 128,
+
+                }
+            }
+        "proxies": proxies,
+        "user_uuid": 30812532,
+        "project_name": "Inference_Proxy_test",
+    }
+    """
+    available_models = current_app.config.get('LLM_MODEL_NAMES')
+    endpoint = current_app.config.get('INFERENCE_ENDPOINT')
+    url = f"{endpoint}/inference_proxy/llm"
+
+    proxies = current_app.config.get('LLM_PROXIES')
+
+    if model_name is None:
+        model_name = 'mixtral-8x7b-instruct'
+
+    if model_name not in available_models:
+        return abort(400, "LLM is unsupported")
+
+    prompts = get_prompt_data()
 
     data = {
         "prompts": [prompts.get("context", '')],
@@ -915,8 +929,6 @@ def large_language_model(model_name):
             {
                 "max_tokens": prompts.get("max_new_tokens", 16),
                 "temperature": prompts.get("temperature", 1.0),
-                "top_p": prompts.get("top_p", 0.9),
-                "frequency_penalty": prompts.get("temperature", 1.0),
                 "seed": 12345
             }
         }
@@ -928,13 +940,14 @@ def large_language_model(model_name):
     body = {
         "model_name": model_name,
         "payload": data,
+        "proxies": proxies,
         "user_uuid": current_user.id,
-        "proxies": proxies
+        "project_name": request.json.get('projectname', None)
+
     }
 
     r = requests.post(url=url, json=body, headers=headers)
     out = json.loads(r.text)
-    breakpoint()
     predictions = out["inference_response"]["predictions"][0]["choices"][0]["text"]
     response = {"Model: ": model_name, "predictions: ": predictions}
 
