@@ -949,6 +949,19 @@ def update(short_name):
                     prodsubprods=prodsubprods)
     return handle_content_type(response)
 
+
+@blueprint.route('/<short_name>/remove-password', methods=['POST'])
+@login_required
+def remove_password(short_name):
+    if current_app.config.get('PROJECT_PASSWORD_REQUIRED'):
+        flash(gettext('Project password required'), 'error')
+        return redirect_content_type(url_for('.update', short_name=short_name))
+    project, owner, ps = project_by_shortname(short_name)
+    project.set_password("")
+    flash(gettext('Project password has been removed!'), 'success')
+    return redirect_content_type(url_for('.update', short_name=short_name))
+
+
 @blueprint.route('/<short_name>/')
 @login_required
 def details(short_name):

@@ -115,8 +115,10 @@ class ProjectForm(ProjectCommonForm):
     def __init__(self, *args, **kwargs):
         super(ProjectForm, self).__init__(*args, **kwargs)
         if current_app.config.get('PROJECT_PASSWORD_REQUIRED'):
+            self.password_required = True
             self.password.validators.append(validators.Required())
         else:
+            self.password_required = False
             self.password.validators.append(validators.Optional())
 
     long_description = TextAreaField(lazy_gettext('Long Description'),
@@ -156,6 +158,7 @@ class ProjectUpdateForm(ProjectForm):
                                         min_len=PROJECT_PWD_MIN_LEN,
                                         special=False)],
                     render_kw={'placeholder': 'Minimum length {} characters, 1 uppercase, 1 lowercase and 1 numeric.'.format(PROJECT_PWD_MIN_LEN)})
+
     webhook = TextField(lazy_gettext('Webhook'),
                         [pb_validator.Webhook()])
     sync_enabled = BooleanField(lazy_gettext('Enable Project Syncing'))
