@@ -18,7 +18,7 @@
 import json
 from test import with_context
 from test.helper import web
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from test.factories import CategoryFactory
 from pybossa.messages import *
 from pybossa.core import project_repo
@@ -372,3 +372,42 @@ class TestJsonProject(web.Helper):
                 assert proj_repo.info['data_classification']['input_data'] == project['input_data_class'], 'input_data_class has not been set as expected'
                 assert proj_repo.info['data_classification']['output_data'] == project['output_data_class'], 'output_data_class has not been set as expected'
 
+
+    @with_context
+    def test_remove_password_password_optional(self):
+        """Test removing project password when password is optional."""
+        self.register()
+        self.signin()
+        configs = {
+            'WTF_CSRF_ENABLED': True,
+            'PROJECT_PASSWORD_REQUIRED': False
+        }
+        with patch.dict(self.flask_app.config, configs):
+
+            project_mock = MagicMock()
+            owner_mock = MagicMock()
+            ps_mock = MagicMock()
+
+            with patch('pybossa.view.projects.project_by_shortname', return_value=(project_mock, owner_mock, ps_mock)), \
+                patch('pybossa.view.projects.redirect_content_type', return_value='/project/update/testproject'):
+                short_name = 'testproject'
+                url = f'project/{short_name}/remove-password'
+                res = self.app.post(url)
+                assert res.status_code == 200, res.status_code
+                project_mock.set_password.assert_called_once_with("")
+
+    @with_context
+    def test_remove_password_password_required(self):
+        """Test removing project password when password is required."""
+        self.register()
+        self.signin()
+        configs = {
+            'WTF_CSRF_ENABLED': True,
+            'PROJECT_PASSWORD_REQUIRED': True
+        }
+        with patch.dict(self.flask_app.config, configs), \
+            patch('pybossa.view.projects.project_by_shortname') as project_by_shortname:
+            short_name = 'testproject'
+            url = f'project/{short_name}/remove-password'
+            res = self.app.post(url)
+            assert project_by_shortname.assert_not_called()

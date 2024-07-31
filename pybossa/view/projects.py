@@ -952,6 +952,7 @@ def update(short_name):
 
 @blueprint.route('/<short_name>/remove-password', methods=['POST'])
 @login_required
+@csrf.exempt
 def remove_password(short_name):
     if current_app.config.get('PROJECT_PASSWORD_REQUIRED'):
         flash(gettext('Project password required'), 'error')
