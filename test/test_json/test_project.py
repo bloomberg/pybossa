@@ -410,4 +410,4 @@ class TestJsonProject(web.Helper):
             short_name = 'testproject'
             url = f'project/{short_name}/remove-password'
             res = self.app.post(url)
-            assert project_by_shortname.assert_not_called()
+            assert project_by_shortname.call_args == None
