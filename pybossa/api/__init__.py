@@ -878,7 +878,7 @@ def get_prompt_data():
     if isinstance(prompts, list):
         prompts = prompts[0]  # Batch request temporarily NOT supported
     if not (isinstance(prompts, str) or isinstance(prompts, dict)):
-        return abort(400, f'prompts should be a string or list of strings')
+        return abort(400, f'prompts should be a string or a dict')
 
     return prompts
 
