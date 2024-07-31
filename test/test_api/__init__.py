@@ -240,7 +240,7 @@ class TestLargeLanguageModel(unittest.TestCase):
     @patch('requests.post')
     def test_invalid_prompts_type(self, mock_post):
         with self.app.test_request_context('/', json={
-            "prompts": 123
+            "prompts": 1234
         }):
             response = large_language_model(self.default_model_name)
             self.assertEqual(response.status_code, 400)
