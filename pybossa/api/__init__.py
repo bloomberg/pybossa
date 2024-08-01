@@ -863,15 +863,12 @@ def get_prompt_data():
     except:
         return abort(400, "Invalid JSON data")
 
-    if "prompts" not in data and "instances" not in data:
-        return abort(400, "The JSON should have either 'prompts' or 'instances'")
-
     if "prompts" in data:
         prompts = data.get("prompts")
     elif "instances" in data:
         prompts = data.get("instances")
     else:
-        prompts = None
+        return abort(400, "The JSON should have either 'prompts' or 'instances'")
 
     if not prompts:
         return abort(400, 'prompts should not be empty')
