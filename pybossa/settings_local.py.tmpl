@@ -543,3 +543,18 @@ SWAGGER_TEMPLATE = {
 
 # perform task deletes in batches in absence of session_replication_role on db
 SESSION_REPLICATION_ROLE_DISABLED = True
+
+# For private GIGWork
+LLM_MODEL_NAMES = {
+    'finlm',
+    'flan-ul2',
+    'mixtral-8x7b',
+    'mixtral-8x7b-instruct'
+}
+
+INFERENCE_ENDPOINT = 'http://analysis-engine.dev.bloomberg.com/inference/llm'
+
+LLM_PROXIES = {
+        "http": "http://bproxy.tdmz1.bloomberg.com:80",
+        "https": "http://bproxy.tdmz1.bloomberg.com:80",
+}
