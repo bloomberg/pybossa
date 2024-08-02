@@ -908,8 +908,6 @@ def large_language_model(model_name):
     """
     available_models = current_app.config.get('LLM_MODEL_NAMES')
     endpoint = current_app.config.get('INFERENCE_ENDPOINT')
-    url = f"{endpoint}/inference_proxy/llm"
-
     proxies = current_app.config.get('LLM_PROXIES')
 
     if model_name is None:
@@ -942,7 +940,7 @@ def large_language_model(model_name):
         "project_name": request.json.get('projectname', None)
     }
 
-    r = requests.post(url=url, json=body, headers=headers)
+    r = requests.post(url=endpoint, json=body, headers=headers)
     out = json.loads(r.text)
     predictions = out["inference_response"]["predictions"][0]["choices"][0]["text"]
     response = {"Model: ": model_name, "predictions: ": predictions}
