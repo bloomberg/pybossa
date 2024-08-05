@@ -959,6 +959,7 @@ def remove_password(short_name):
         return redirect_content_type(url_for('.update', short_name=short_name))
     project, owner, ps = project_by_shortname(short_name)
     project.set_password("")
+    project_repo.update(project)
     flash(gettext('Project password has been removed!'), 'success')
     return redirect_content_type(url_for('.update', short_name=short_name))
 
@@ -973,7 +974,6 @@ def details(short_name):
     redirect_to_password = _check_if_redirect_to_password(project)
     if redirect_to_password:
         return redirect_to_password
-
     num_available_tasks = n_available_tasks(project.id)
     num_completed_tasks_by_user = n_completed_tasks_by_user(project.id, current_user.id)
     oldest_task = oldest_available_task(project.id, current_user.id)
