@@ -389,7 +389,8 @@ class TestJsonProject(web.Helper):
             ps_mock = MagicMock()
 
             with patch('pybossa.view.projects.project_by_shortname', return_value=(project_mock, owner_mock, ps_mock)), \
-                patch('pybossa.view.projects.redirect_content_type', return_value='/project/update/testproject'):
+                patch('pybossa.view.projects.redirect_content_type', return_value='/project/update/testproject'), \
+                patch('pybossa.view.projects.project_repo.update', return_value=True):
                 short_name = 'testproject'
                 url = f'project/{short_name}/remove-password'
                 res = self.app.post(url)
