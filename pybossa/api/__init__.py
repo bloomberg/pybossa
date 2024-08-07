@@ -854,6 +854,31 @@ def user_has_partial_answer(short_name=None):
     response = {"has_answer": bool(task_id_map)}
     return Response(json.dumps(response), status=200, mimetype="application/json")
 
+def get_prompt_data():
+    '''
+    Get data from request and validate it.
+    '''
+    try:
+        data = request.get_json(force=True)
+    except:
+        return abort(400, "Invalid JSON data")
+
+    if "prompts" in data:
+        prompts = data.get("prompts")
+    elif "instances" in data:
+        prompts = data.get("instances")
+    else:
+        return abort(400, "The JSON should have either 'prompts' or 'instances'")
+
+    if not prompts:
+        return abort(400, 'prompts should not be empty')
+    if isinstance(prompts, list):
+        prompts = prompts[0]  # Batch request temporarily NOT supported
+    if not (isinstance(prompts, str) or isinstance(prompts, dict)):
+        return abort(400, f'prompts should be a string or a dict')
+
+    return prompts
+
 
 @jsonpify
 @csrf.exempt
@@ -864,55 +889,43 @@ def large_language_model(model_name):
     """Large language model endpoint
     The JSON data in the POST request can be one of the following:
     {
-        "instances": [
+        "model_name": "mixtral-8x7b-instruct"
+        "payload":
             {
-                "context": "Identify the company name: Microsoft will release Windows 20 next year.",
-                "temperature": 1.0,
-                "seed": 12345,
-                "repetition_penalty": 1.05
+            "prompts": [ "Identify the company name: Microsoft will release Windows 20 next year." ]
+            "params":
+                {
+                    "seed": 1234,
+                    "temperature": 0.9,
+                    "max_tokens": 128,
+
+                }
             }
-        ]
-    }
-    or
-    {
-        "prompts": "Identify the company name: Microsoft will release Windows 20 next year."
+        "proxies": proxies,
+        "user_uuid": 30812532,
+        "project_name": "Inference_Proxy_test",
     }
     """
-    if model_name is None:
-        model_name = 'mixtral-8x7b-instruct'
-    endpoints = current_app.config.get('LLM_ENDPOINTS')
-    model_endpoint = endpoints.get(model_name.lower())
-
-    if not model_endpoint:
-        return abort(400, f'{model_name} LLM is unsupported on this platform.')
-
+    available_models = current_app.config.get('LLM_MODEL_NAMES')
+    endpoint = current_app.config.get('INFERENCE_ENDPOINT')
     proxies = current_app.config.get('LLM_PROXIES')
 
-    try:
-        data = request.get_json(force=True)
-    except:
-        return abort(400, "Invalid JSON data")
+    if model_name is None:
+        model_name = 'mixtral-8x7b-instruct'
 
-    if "prompts" not in data and "instances" not in data:
-        return abort(400, "The JSON should have either 'prompts' or 'instances'")
+    if model_name not in available_models:
+        return abort(400, "LLM is unsupported")
 
-    if "prompts" in data:
-        prompts = data.get("prompts")
-        if not prompts:
-            return abort(400, 'prompts should not be empty')
-        if isinstance(prompts, list):
-            prompts = prompts[0]  # Batch request temporarily NOT supported
-        if not isinstance(prompts, str):
-            return abort(400, f'prompts should be a string or a list of strings')
-        data = {
-            "instances": [
-                {
-                    "context": prompts + ' ',
-                    "temperature": 1.0,
-                    "seed": 12345,
-                    "repetition_penalty": 1.05
-                }
-            ]
+    prompts = get_prompt_data()
+
+    data = {
+        "prompts": [prompts.get("context", '')],
+        "params":
+            {
+                "max_tokens": prompts.get("max_new_tokens", 16),
+                "temperature": prompts.get("temperature", 1.0),
+                "seed": 12345
+            }
         }
 
     headers = {
@@ -920,13 +933,16 @@ def large_language_model(model_name):
     }
 
     body = {
-        "inference_endpoint": model_endpoint,
+        "model_name": model_name,
         "payload": data,
-        "user_uuid": current_user.id
+        "proxies": proxies,
+        "user_uuid": current_user.id,
+        "project_name": request.json.get('projectname', None)
     }
-    r = requests.post(url=current_app.config.get('INFERENCE_ENDPOINT'), json=body, proxies=proxies, headers=headers)
+
+    r = requests.post(url=endpoint, json=body, headers=headers)
     out = json.loads(r.text)
-    predictions = out["inference_response"]["predictions"][0]["output"]
+    predictions = out["inference_response"]["predictions"][0]["choices"][0]["text"]
     response = {"Model: ": model_name, "predictions: ": predictions}
 
     return Response(json.dumps(response), status=r.status_code, mimetype="application/json")
