@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 # Cache global variables for timeouts
+from unittest.mock import patch
 from sqlalchemy.exc import IntegrityError
 
 from test import Test, db, with_context
@@ -182,13 +183,27 @@ class TestProjectRepositoryForProjects(Test):
 
 
     @with_context
-    def test_save(self):
-        """Test save fails if the project has no password"""
+    def test_save_project_password_required(self):
+        """Test save project without password fails when password required"""
+        with patch.dict(self.flask_app.config,
+                        {'PROJECT_PASSWORD_REQUIRED': True}):
+            project = ProjectFactory.build()
+            assert self.project_repo.get(project.id) is None
 
-        project = ProjectFactory.build()
-        assert self.project_repo.get(project.id) is None
+            assert_raises(BadRequest, self.project_repo.save, project)
 
-        assert_raises(BadRequest, self.project_repo.save, project)
+
+    @with_context
+    def test_save_project_password_not_required(self):
+        """Test save project without password success when password not required"""
+        with patch.dict(self.flask_app.config,
+                        {'PROJECT_PASSWORD_REQUIRED': False}):
+            project = ProjectFactory.build()
+            assert self.project_repo.get(project.id) is None
+
+            self.project_repo.save(project)
+
+            assert self.project_repo.get(project.id) == project, "Project not saved"
 
 
     @with_context
