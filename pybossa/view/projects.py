@@ -954,10 +954,17 @@ def update(short_name):
 @login_required
 @csrf.exempt
 def remove_password(short_name):
+    # password required
     if current_app.config.get('PROJECT_PASSWORD_REQUIRED'):
         flash(gettext('Project password required'), 'error')
         return redirect_content_type(url_for('.update', short_name=short_name))
     project, owner, ps = project_by_shortname(short_name)
+    access_levels = project.info.get('data_access', None)
+    # access levels not set
+    if not data_access_levels or not access_levels:
+        flash('Cannot remove password from a project without data access levels', 'warning')
+        return redirect_content_type(url_for('.update', short_name=short_name))
+    # remove password
     project.set_password("")
     project_repo.update(project)
     flash(gettext('Project password has been removed!'), 'success')
