@@ -64,7 +64,7 @@ def get_task_filters(args):
         params['created_to'] = datestring
         filters += " AND task.created <= :created_to"
     if args.get('assign_user'):
-        params['assign_user'] = args['assign_user']
+        params['assign_user'] = f"%{args['assign_user']}%"
         # url parameter must have %keyword% for partial match.
         filters += """
             AND EXISTS (
