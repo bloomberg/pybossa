@@ -63,6 +63,16 @@ def get_task_filters(args):
         datestring = convert_est_to_utc(args['created_to']).isoformat()
         params['created_to'] = datestring
         filters += " AND task.created <= :created_to"
+    if args.get('assign_user'):
+        params['assign_user'] = args['assign_user']
+        # url parameter must have %keyword% for partial match.
+        filters += """
+            AND EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements_text(task.user_pref -> 'assign_user') elem
+              WHERE elem ILIKE :assign_user
+            )
+        """
     if args.get('ftime_from'):
         datestring = convert_est_to_utc(args['ftime_from']).isoformat()
         params['ftime_from'] = datestring
@@ -207,7 +217,8 @@ allowed_fields = {
     'lock_status': 'lock_status',
     'completed_by': 'completed_by',
     'assigned_users': 'assigned_users',
-    'in_progress': 'in_progress'
+    'in_progress': 'in_progress',
+    'assign_user': 'assign_user'
 }
 
 
@@ -253,6 +264,8 @@ def parse_tasks_browse_args(args):
         else:
             raise ValueError('ftime_to date format error, value: %s'
                              .format(args['ftime_to']))
+    if args.get('assign_user') is not None:
+        parsed_args["assign_user"] = args['assign_user']
     if args.get('priority_from') is not None:
         parsed_args['priority_from'] = float(args['priority_from'])
     if args.get('priority_to') is not None:

@@ -62,7 +62,7 @@ class Repository(object):
                        for key, value in kwargs.items()
                        if (key != 'custom_query_filters' and key != 'info' and key != 'fav_user_ids'
                             and key != 'created' and key != 'project_id'
-                            and key != 'created_from' and key != 'created_to')]
+                            and key != 'created_from' and key != 'created_to' and key != 'assign_user')]
 
         queries = []
         headlines = []
@@ -86,6 +86,10 @@ class Repository(object):
 
         if 'created_to' in kwargs.keys():
             clauses.append(_entity_descriptor(model,'created') <= kwargs['created_to'])
+
+        if 'assign_user' in kwargs.keys():
+            like_query = kwargs['assign_user'] + '%'
+            clauses.append(_entity_descriptor(model,'assigned_user').like(like_query))
 
         if 'project_id' in kwargs.keys():
             tmp = "%s" % kwargs['project_id']
