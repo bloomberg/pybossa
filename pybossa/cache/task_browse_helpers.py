@@ -217,8 +217,7 @@ allowed_fields = {
     'lock_status': 'lock_status',
     'completed_by': 'completed_by',
     'assigned_users': 'assigned_users',
-    'in_progress': 'in_progress',
-    'assign_user': 'assign_user'
+    'in_progress': 'in_progress'
 }
 
 
