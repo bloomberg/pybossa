@@ -1086,6 +1086,146 @@ class TestProjectsCache(Test):
 
 
     @with_context
+    @patch('pybossa.cache.projects.get_user_saved_partial_tasks')
+    def test_browse_tasks_filter_by_assigned_user(self, task_id_map_mock):
+        """
+        Test CACHE PROJECTS browse_tasks returns tasks filtered by assigned user.
+        """
+
+        project = ProjectFactory.create()
+        user_pref = dict(assign_user=["y@def.com", "z@ijk.com", "x@abc.com"])
+        tasks = TaskFactory.create_batch(1, project=project, info={}, n_answers=2, user_pref=user_pref)
+        TaskRunFactory.create_batch(3, task=tasks[0])
+        user_x = UserFactory.create(email_addr="x@abc.com", fullname="user_x at_abc")
+        user_y = UserFactory.create(email_addr="y@def.com", fullname="user_y at_def")
+
+        count, cached_tasks = cached_projects.browse_tasks(project.id, {
+            "display_columns": ["assigned_users"],
+            "assign_user": "z@ijk.com"
+        })
+
+        assert count == 1
+        assert cached_tasks[0]["id"] == tasks[0].id
+        assert "assigned_users" in cached_tasks[0], "assigned_users column selected. assigned users should be part of task."
+        assert "z@ijk.com" in cached_tasks[0]["assigned_users"], "user email to be present for user email not found in the system."
+        assert cached_tasks[0]["assigned_users"] == "user_x at_abc, user_y at_def, z@ijk.com", "assigned users full names to be present in sorted order."
+
+
+    @with_context
+    @patch('pybossa.cache.projects.get_user_saved_partial_tasks')
+    def test_browse_tasks_filter_by_assigned_user_partial(self, task_id_map_mock):
+        """
+        Test CACHE PROJECTS browse_tasks returns tasks filtered by assigned user partial match.
+        """
+
+        project = ProjectFactory.create()
+        user_pref = dict(assign_user=["y@def.com", "z@ijk.com", "x@abc.com"])
+        tasks = TaskFactory.create_batch(1, project=project, info={}, n_answers=2, user_pref=user_pref)
+        TaskRunFactory.create_batch(3, task=tasks[0])
+        user_x = UserFactory.create(email_addr="x@abc.com", fullname="user_x at_abc")
+        user_y = UserFactory.create(email_addr="y@def.com", fullname="user_y at_def")
+
+        count, cached_tasks = cached_projects.browse_tasks(project.id, {
+            "display_columns": ["assigned_users"],
+            "assign_user": "ijk"
+        })
+
+        assert count == 1
+        assert cached_tasks[0]["id"] == tasks[0].id
+        assert "assigned_users" in cached_tasks[0], "assigned_users column selected. assigned users should be part of task."
+        assert "z@ijk.com" in cached_tasks[0]["assigned_users"], "user email to be present for user email not found in the system."
+        assert cached_tasks[0]["assigned_users"] == "user_x at_abc, user_y at_def, z@ijk.com", "assigned users full names to be present in sorted order."
+
+
+    @with_context
+    @patch('pybossa.cache.projects.get_user_saved_partial_tasks')
+    def test_browse_tasks_filter_by_assigned_user_no_match(self, task_id_map_mock):
+        """
+        Test CACHE PROJECTS browse_tasks returns no tasks filtered by assigned user no match.
+        """
+
+        project = ProjectFactory.create()
+        user_pref = dict(assign_user=["y@def.com", "z@ijk.com", "x@abc.com"])
+        tasks = TaskFactory.create_batch(1, project=project, info={}, n_answers=2, user_pref=user_pref)
+        TaskRunFactory.create_batch(3, task=tasks[0])
+        user_x = UserFactory.create(email_addr="x@abc.com", fullname="user_x at_abc")
+        user_y = UserFactory.create(email_addr="y@def.com", fullname="user_y at_def")
+
+        count, cached_tasks = cached_projects.browse_tasks(project.id, {
+            "display_columns": ["assigned_users"],
+            "assign_user": "no_match"
+        })
+
+        assert count == 0
+
+
+    @with_context
+    @patch('pybossa.cache.projects.get_user_saved_partial_tasks')
+    def test_browse_tasks_filter_by_assigned_user_multi_match_1(self, task_id_map_mock):
+        """
+        Test CACHE PROJECTS browse_tasks returns tasks filtered by assigned user multiple matches.
+        Same keyword match two users.
+        """
+
+        project = ProjectFactory.create()
+        user_pref = dict(assign_user=["y@one.abc" ])
+        tasks = TaskFactory.create_batch(3, project=project, info={}, n_answers=2, user_pref=user_pref)
+        TaskRunFactory.create_batch(3, task=tasks[0])
+
+
+        user_pref = dict(assign_user=["x@two.abc"])
+        tasks = TaskFactory.create_batch(3, project=project, info={}, n_answers=2, user_pref=user_pref)
+        TaskRunFactory.create_batch(3, task=tasks[0])
+
+        user_pref = dict(assign_user=["z@ijk.com"])
+        tasks = TaskFactory.create_batch(3, project=project, info={}, n_answers=2, user_pref=user_pref)
+        TaskRunFactory.create_batch(3, task=tasks[0])
+
+        user_x = UserFactory.create(email_addr="x@two.abc", fullname="user_x at_abc")
+        user_y = UserFactory.create(email_addr="y@one.abc", fullname="user_y at_def")
+
+        count, cached_tasks = cached_projects.browse_tasks(project.id, {
+            "display_columns": ["assigned_users"],
+            "assign_user": ".abc"
+        })
+
+        assert count == 6
+
+
+    @with_context
+    @patch('pybossa.cache.projects.get_user_saved_partial_tasks')
+    def test_browse_tasks_filter_by_assigned_user_multi_match_2(self, task_id_map_mock):
+        """
+        Test CACHE PROJECTS browse_tasks returns tasks filtered by assigned user multiple matches.
+        Same keyword match three users.
+        """
+
+        project = ProjectFactory.create()
+        user_pref = dict(assign_user=["y@one.abc" ])
+        tasks = TaskFactory.create_batch(3, project=project, info={}, n_answers=2, user_pref=user_pref)
+        TaskRunFactory.create_batch(3, task=tasks[0])
+
+
+        user_pref = dict(assign_user=["x@two.abc"])
+        tasks = TaskFactory.create_batch(3, project=project, info={}, n_answers=2, user_pref=user_pref)
+        TaskRunFactory.create_batch(3, task=tasks[0])
+
+        user_pref = dict(assign_user=["z@three.abcom"])
+        tasks = TaskFactory.create_batch(3, project=project, info={}, n_answers=2, user_pref=user_pref)
+        TaskRunFactory.create_batch(3, task=tasks[0])
+
+        user_x = UserFactory.create(email_addr="x@two.abc", fullname="user_x at_abc")
+        user_y = UserFactory.create(email_addr="y@one.abc", fullname="user_y at_def")
+
+        count, cached_tasks = cached_projects.browse_tasks(project.id, {
+            "display_columns": ["assigned_users"],
+            "assign_user": ".ab"
+        })
+
+        assert count == 9
+
+
+    @with_context
     @patch('pybossa.redis_lock.get_task_users_key')
     @patch('pybossa.redis_lock.get_user_tasks_key')
     @patch('pybossa.core.sentinel.master')
