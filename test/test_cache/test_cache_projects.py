@@ -907,6 +907,13 @@ class TestProjectsCache(Test):
         args = dict(in_progress='Bad')
         assert_raises(ValueError, parse_tasks_browse_args, args)
 
+    def test_parse_tasks_browse_args_assign_user(self):
+        """Test parse_tasks_browse_args for assign_user"""
+        args = dict(assign_user='worker')
+        result = parse_tasks_browse_args(args)
+
+        assert 'assign_user' in result
+
     @with_context
     @patch('pybossa.cache.task_browse_helpers.map_locations')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata.get_valid_user_preferences')
