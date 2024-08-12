@@ -34,7 +34,7 @@ if app_settings.config.get('ENABLE_ACCESS_CONTROL'):
         valid_access_levels_for_user_types = app_settings.config['VALID_ACCESS_LEVELS_FOR_USER_TYPES'],
         valid_user_access_levels=app_settings.config['VALID_USER_ACCESS_LEVELS']
     )
-
+default_user_access_levels = app_settings.config.get('DEFAULT_USER_ACCESS_LEVELS')
 
 def execute_if(this_is_true, otherwise_return=None):
     def decorator(otherwise_return=otherwise_return):
@@ -70,6 +70,10 @@ def valid_user_access_levels(levels):
 def can_assign_user(levels, user_levels):
     """check if user be assigned to a project based on
     whether user_levels matches project levels """
+
+    if len(user_levels) == 0 and app_settings.config.get('DEFAULT_USER_ACCESS_LEVELS'):
+        user_levels = default_user_access_levels
+
     if not (valid_user_access_levels(levels) and valid_user_access_levels(user_levels)):
         return False
 

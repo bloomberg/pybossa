@@ -19,6 +19,7 @@
 from sqlalchemy.sql import text
 from sqlalchemy.exc import ProgrammingError
 from pybossa.core import db, timeouts
+import pybossa.app_settings as app_settings
 from pybossa.cache import cache, memoize, delete_memoized, FIVE_MINUTES, \
     ONE_DAY, ONE_WEEK, memoize_with_l2_cache
 from pybossa.util import pretty_date, exists_materialized_view
@@ -518,12 +519,16 @@ def get_announcements_cached(user, announcement_levels):
 
 def get_users_for_data_access(data_access):
     from pybossa.data_access import get_user_data_access_db_clause
-
     clause = get_user_data_access_db_clause(data_access)
     if not clause:
         return None
 
-    sql = text('''select id::text, fullname from "user" where {}'''.format(clause))
+    default_user_access_levels = app_settings.config.get('DEFAULT_USER_ACCESS_LEVELS')
+    if default_user_access_levels and bool(set(data_access).intersection(set(default_user_access_levels))):
+        sql = text('''select id::text, fullname from "user"''')
+    else:
+        sql = text('''select id::text, fullname from "user" where {}'''.format(clause))
+
     results = session.execute(sql).fetchall()
     return [dict(row) for row in results]
 
