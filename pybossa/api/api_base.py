@@ -261,7 +261,7 @@ class APIBase(MethodView):
             if k not in ['limit', 'offset', 'api_key', 'last_id', 'all',
                          'fulltextsearch', 'desc', 'orderby', 'related',
                          'participated', 'full', 'stats',
-                         'from_finish_time', 'to_finish_time', 'created_from', 'created_to', 'assign_user']:
+                         'from_finish_time', 'to_finish_time', 'created_from', 'created_to']:
                 # Raise an error if the k arg is not a column
                 if self.__class__ == Task and k == 'external_uid':
                     pass
@@ -285,9 +285,6 @@ class APIBase(MethodView):
 
         if request.args.get('created_to'):
             filters['created_to'] = request.args.get('created_to')
-
-        if request.args.get('assign_user'):
-            filters['assign_user'] = request.args.get('assign_user')
 
         if last_id:
             results = getattr(repo, query_func)(limit=limit, last_id=last_id,
