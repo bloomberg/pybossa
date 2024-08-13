@@ -945,7 +945,7 @@ def update(short_name):
                     title=title,
                     pro_features=pro,
                     sync_enabled=sync_enabled,
-                    private_instance=bool(data_access_levels),
+                    private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')),
                     prodsubprods=prodsubprods)
     return handle_content_type(response)
 
@@ -1080,7 +1080,7 @@ def settings(short_name):
                     n_volunteers=ps.n_volunteers,
                     title=title,
                     pro_features=pro,
-                    private_instance=bool(data_access_levels))
+                    private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')))
     return handle_content_type(response)
 
 
@@ -2484,10 +2484,9 @@ def show_stats(short_name):
                                                                 owner,
                                                                 current_user,
                                                                 ps)
-
     if not ((ps.n_tasks > 0) and (ps.n_task_runs > 0)):
         project = add_custom_contrib_button_to(project, get_user_id_or_ip(),
-                                               ps=ps)
+                                           ps=ps)
         response = dict(template='/projects/non_stats.html',
                         title=title,
                         project=project_sanitized,
@@ -2496,7 +2495,8 @@ def show_stats(short_name):
                         overall_progress=ps.overall_progress,
                         n_volunteers=ps.n_volunteers,
                         n_completed_tasks=ps.n_completed_tasks,
-                        pro_features=pro)
+                        pro_features=pro,
+                        private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')))
         return handle_content_type(response)
 
     dates_stats = ps.info['dates_stats']
@@ -2558,7 +2558,8 @@ def show_stats(short_name):
                     n_volunteers=ps.n_volunteers,
                     n_completed_tasks=ps.n_completed_tasks,
                     avg_contrib_time=formatted_contrib_time,
-                    pro_features=pro)
+                    pro_features=pro,
+                    private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')))
 
     return handle_content_type(response)
 
