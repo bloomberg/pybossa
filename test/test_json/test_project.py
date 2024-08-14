@@ -400,8 +400,8 @@ class TestJsonProject(web.Helper):
                 project_mock.set_password.assert_called_once_with("")
 
     @with_context
-    def test_remove_password_password_required(self):
-        """Test removing project password when password is required."""
+    def test_remove_password_access_level_not_set(self):
+        """Test removing project password when access level is not set."""
         self.register()
         self.signin()
         configs = {
@@ -414,3 +414,29 @@ class TestJsonProject(web.Helper):
             url = f'project/{short_name}/remove-password'
             res = self.app.post(url)
             assert project_by_shortname.call_args == None
+
+    @with_context
+    def test_remove_password_password_required(self):
+        """Test removing project password when password is required."""
+        self.register()
+        self.signin()
+        configs = {
+            'WTF_CSRF_ENABLED': True,
+            'PROJECT_PASSWORD_REQUIRED': True
+        }
+        with patch.dict(self.flask_app.config, configs):
+
+            project_mock = MagicMock()
+            project_mock.info.get.return_value = ["L3", "L4"]
+            owner_mock = MagicMock()
+            ps_mock = MagicMock()
+
+            with patch('pybossa.view.projects.project_by_shortname', return_value=(project_mock, owner_mock, ps_mock)), \
+                patch('pybossa.view.projects.redirect_content_type', return_value='/project/update/testproject'), \
+                patch('pybossa.view.projects.project_repo.update', return_value=True), \
+                patch('pybossa.view.projects.data_access_levels', new=["L3", "L4"]):
+                short_name = 'testproject'
+                url = f'project/{short_name}/remove-password'
+                res = self.app.post(url)
+                project_mock.set_password.assert_not_called()
+                assert res.stats_code == 200

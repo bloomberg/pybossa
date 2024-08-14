@@ -145,8 +145,3 @@ class TestProjectClone(Helper):
                 assert new_project.info.get('ext_config', None) == None, new_project.info.get('ext_config', None)
                 assert new_project.owner_id == admin.id, new_project.owner_id
                 assert new_project.owners_ids == [admin.id], new_project.owners_ids
-
-
-
-
-
