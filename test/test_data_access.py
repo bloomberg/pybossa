@@ -69,7 +69,7 @@ class TestAccessLevels(Test):
 
     def test_can_assign_user_default_access_level(self):
         with patch.dict(data_access.data_access_levels, self.patched_levels()), \
-            patch('data_access.default_user_access_levels', new=["L3", "L4"]):
+            patch('pybossa.data_access.default_user_access_levels', new=["L3", "L4"]):
             proj_levels = ["L3", "L4"]
             user_levels = []
             assign_users = data_access.can_assign_user(proj_levels, user_levels)
