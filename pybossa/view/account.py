@@ -1182,7 +1182,7 @@ def add_bookmark(user_name, short_name, bookmark_name, bookmark_url, order_by, d
     if bookmark_name is None or len(bookmark_name) > MAX_BOOKMARK_NAME_LEN:
         raise ValueError(f'Bookmark name must be between 1-{MAX_BOOKMARK_NAME_LEN} characters.')
     if bookmark_url is None or len(bookmark_url) > MAX_BOOKMARK_URL_LEN:
-        raise ValueError('Bookmark URL must be between 1-100 characters.')
+        raise ValueError(f'Bookmark URL must be between 1-{MAX_BOOKMARK_URL_LEN} characters.')
     bookmark_name = str(bookmark_name)
 
     user = user_repo.get_by_name(name=user_name)
