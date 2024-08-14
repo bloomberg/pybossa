@@ -437,6 +437,6 @@ class TestJsonProject(web.Helper):
                 patch('pybossa.view.projects.data_access_levels', new=["L3", "L4"]):
                 short_name = 'testproject'
                 url = f'project/{short_name}/remove-password'
-                res = self.app.post(url)
+                res = self.app.post(url, follow_redirects=True)
+                assert res.status_code == 200, res.status_code
                 project_mock.set_password.assert_not_called()
-                assert res.stats_code == 200
