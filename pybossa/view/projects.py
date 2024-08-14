@@ -945,7 +945,7 @@ def update(short_name):
                     title=title,
                     pro_features=pro,
                     sync_enabled=sync_enabled,
-                    private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')),
+                    private_instance=bool(data_access_levels),
                     prodsubprods=prodsubprods)
     return handle_content_type(response)
 
@@ -1080,7 +1080,7 @@ def settings(short_name):
                     n_volunteers=ps.n_volunteers,
                     title=title,
                     pro_features=pro,
-                    private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')))
+                    private_instance=bool(data_access_levels))
     return handle_content_type(response)
 
 
