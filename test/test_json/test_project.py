@@ -385,12 +385,14 @@ class TestJsonProject(web.Helper):
         with patch.dict(self.flask_app.config, configs):
 
             project_mock = MagicMock()
+            project_mock.info.get.return_value = ["L3", "L4"]
             owner_mock = MagicMock()
             ps_mock = MagicMock()
 
             with patch('pybossa.view.projects.project_by_shortname', return_value=(project_mock, owner_mock, ps_mock)), \
                 patch('pybossa.view.projects.redirect_content_type', return_value='/project/update/testproject'), \
-                patch('pybossa.view.projects.project_repo.update', return_value=True):
+                patch('pybossa.view.projects.project_repo.update', return_value=True), \
+                patch('pybossa.view.projects.data_access_levels', new=["L3", "L4"]):
                 short_name = 'testproject'
                 url = f'project/{short_name}/remove-password'
                 res = self.app.post(url)

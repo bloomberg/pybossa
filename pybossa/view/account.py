@@ -606,7 +606,7 @@ def _show_public_profile(user, form, can_update):
                     percentage_tasks_completed=percentage_tasks_completed,
                     form=form,
                     can_update=can_update,
-                    private_instance=bool(data_access_levels),
+                    private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')),
                     upref_mdata_enabled=bool(app_settings.upref_mdata),
                     country_name_to_country_code=app_settings.upref_mdata.country_name_to_country_code,
                     country_code_to_country_name=app_settings.upref_mdata.country_code_to_country_name)
@@ -632,7 +632,7 @@ def _show_own_profile(user, form, current_user, can_update):
                     user=user_dict,
                     form=form,
                     can_update=can_update,
-                    private_instance=bool(data_access_levels),
+                    private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')),
                     upref_mdata_enabled=bool(app_settings.upref_mdata),
                     country_name_to_country_code=app_settings.upref_mdata.country_name_to_country_code,
                     country_code_to_country_name=app_settings.upref_mdata.country_code_to_country_name)
