@@ -454,7 +454,7 @@ def clone_project(project, form):
     proj_dict['info'].pop('data_classification', None)
     proj_dict['info'].pop('data_access', None)
 
-    if  bool(data_access_levels) and not form.get('copy_users', False):
+    if  bool(current_app.config.get('PRIVATE_INSTANCE')) and not form.get('copy_users', False):
         proj_dict['info'].pop('project_users', None)
 
     if current_user.id not in project.owners_ids:
@@ -945,7 +945,7 @@ def update(short_name):
                     title=title,
                     pro_features=pro,
                     sync_enabled=sync_enabled,
-                    private_instance=bool(data_access_levels),
+                    private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')),
                     prodsubprods=prodsubprods)
     return handle_content_type(response)
 
@@ -1087,7 +1087,7 @@ def settings(short_name):
                     n_volunteers=ps.n_volunteers,
                     title=title,
                     pro_features=pro,
-                    private_instance=bool(data_access_levels))
+                    private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')))
     return handle_content_type(response)
 
 
@@ -2020,7 +2020,7 @@ def bulk_update_assign_worker(short_name):
         response['assign_users'] = assign_users
 
         # get a list of all users can be assigned to task
-        if bool(data_access_levels):
+        if bool(current_app.config.get('PRIVATE_INSTANCE')):
             all_users = user_repo.get_users(project.get_project_users())
         else:
             all_users = user_repo.get_all()
@@ -3739,7 +3739,7 @@ def project_config(short_name):
         try:
             data = json.loads(request.data)
             project.info['ext_config'] = integrate_ext_config(data.get('config'))
-            if bool(data_access_levels):
+            if bool(current_app.config.get('PRIVATE_INSTANCE')):
                 # for private gigwork
                 project.info['data_access'] = data.get('data_access')
             project.info['completed_tasks_cleanup_days'] = data.get('completed_tasks_cleanup_days')

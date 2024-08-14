@@ -89,7 +89,7 @@ def handle_bloomberg_response():
             try:
                 firm_id_to_type = current_app.config.get('FIRM_TO_TYPE', "")
                 firm_id = int(attributes.get('firmId', [0])[0])
-                data_access = ["L2"] if bool(data_access_levels) else ["L4"]
+                data_access = ["L2"] if bool(current_app.config.get('PRIVATE_INSTANCE')) else ["L4"]
                 user_type = firm_id_to_type.get(firm_id, "")
                 user_data['fullname']    = attributes['firstName'][0] + " " + attributes['lastName'][0]
                 user_data['email_addr']  = attributes['emailAddress'][0]
