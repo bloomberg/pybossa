@@ -71,7 +71,7 @@ def can_assign_user(levels, user_levels):
     """check if user be assigned to a project based on
     whether user_levels matches project levels """
 
-    if len(user_levels) == 0 and app_settings.config.get('DEFAULT_USER_ACCESS_LEVELS'):
+    if len(user_levels) == 0 and default_user_access_levels:
         user_levels = default_user_access_levels
 
     if not (valid_user_access_levels(levels) and valid_user_access_levels(user_levels)):
