@@ -79,7 +79,7 @@ export_queue = Queue('high', connection=sentinel.master)
 super_queue = Queue('super', connection=sentinel.master)
 
 MAX_BOOKMARK_NAME_LEN = 100
-MAX_BOOKMARK_URL_LEN = 500
+MAX_BOOKMARK_URL_LEN = 2000
 
 @blueprint.route('/')
 @blueprint.route('/page/<int:page>')
