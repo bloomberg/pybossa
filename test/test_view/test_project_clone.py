@@ -109,38 +109,42 @@ class TestProjectClone(Helper):
     @with_context
     def test_clone_project_not_copy_assigned_users(self):
 
-        from pybossa.view.projects import data_access_levels
+        configs = {
+            'PRIVATE_INSTANCE': True
+        }
+        with patch.dict(self.flask_app.config, configs):
+            from pybossa.view.projects import data_access_levels
 
-        admin = UserFactory.create(admin=False, subadmin=True)
-        user2 = UserFactory.create()
-        assign_users = [user2.id]
-        task_presenter = 'test"; url="project/oldname/" pybossa.run("oldname"); test;'
-        project = ProjectFactory.create(id=40,
-                                        short_name='oldname',
-                                        info={'task_presenter': task_presenter,
-                                              'quiz': {'test': 123},
-                                              'enrichments': [{'test': 123}],
-                                              'project_users': assign_users,
-                                              'passwd_hash': 'testpass',
-                                              'ext_config': {'test': 123}},
-                                        owner=user2)
+            admin = UserFactory.create(admin=False, subadmin=True)
+            user2 = UserFactory.create()
+            assign_users = [user2.id]
+            task_presenter = 'test"; url="project/oldname/" pybossa.run("oldname"); test;'
+            project = ProjectFactory.create(id=40,
+                                            short_name='oldname',
+                                            info={'task_presenter': task_presenter,
+                                                'quiz': {'test': 123},
+                                                'enrichments': [{'test': 123}],
+                                                'project_users': assign_users,
+                                                'passwd_hash': 'testpass',
+                                                'ext_config': {'test': 123}},
+                                            owner=user2)
 
-        with patch.dict(data_access_levels, self.patch_data_access_levels):
-            data = {'short_name': 'newproj', 'name': 'newproj', 'password': 'Test123', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public'}
-            url = '/project/%s/clone?api_key=%s' % (project.short_name, admin.api_key)
-            res = self.app.post(url, data=data)
-            new_project = project_repo.get(1)
-            old_project = project_repo.get(40)
-            task_presenter_expected = 'test"; url="project/newproj/" pybossa.run("newproj"); test;'
-            assert old_project.owner_id == user2.id, old_project.owner_id
-            assert old_project.info['passwd_hash'] == 'testpass', old_project.info['passwd_hash']
-            assert new_project.info['task_presenter'] == task_presenter_expected, new_project.info['task_presenter']
-            assert new_project.get_project_users() == [], new_project.get_project_users()
-            assert new_project.info.get('enrichments') == None, new_project.info.get('enrichments')
-            assert new_project.info.get('quiz') == None, new_project.info.get('quiz')
-            assert new_project.info.get('ext_config', None) == None, new_project.info.get('ext_config', None)
-            assert new_project.owner_id == admin.id, new_project.owner_id
-            assert new_project.owners_ids == [admin.id], new_project.owners_ids
+            with patch.dict(data_access_levels, self.patch_data_access_levels):
+                data = {'short_name': 'newproj', 'name': 'newproj', 'password': 'Test123', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public'}
+                url = '/project/%s/clone?api_key=%s' % (project.short_name, admin.api_key)
+                res = self.app.post(url, data=data)
+                new_project = project_repo.get(1)
+                old_project = project_repo.get(40)
+                task_presenter_expected = 'test"; url="project/newproj/" pybossa.run("newproj"); test;'
+                assert old_project.owner_id == user2.id, old_project.owner_id
+                assert old_project.info['passwd_hash'] == 'testpass', old_project.info['passwd_hash']
+                assert new_project.info['task_presenter'] == task_presenter_expected, new_project.info['task_presenter']
+                assert new_project.get_project_users() == [], new_project.get_project_users()
+                assert new_project.info.get('enrichments') == None, new_project.info.get('enrichments')
+                assert new_project.info.get('quiz') == None, new_project.info.get('quiz')
+                assert new_project.info.get('ext_config', None) == None, new_project.info.get('ext_config', None)
+                assert new_project.owner_id == admin.id, new_project.owner_id
+                assert new_project.owners_ids == [admin.id], new_project.owners_ids
 
 
 
