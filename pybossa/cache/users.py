@@ -521,9 +521,9 @@ def get_users_for_data_access(data_access):
 
     clause = get_user_data_access_db_clause(data_access)
     if not clause:
-        return None
-
-    sql = text('''select id::text, fullname from "user" where {}'''.format(clause))
+        sql = text('''select id::text, fullname from "user"''')
+    else:
+        sql = text('''select id::text, fullname from "user" where {}'''.format(clause))
     results = session.execute(sql).fetchall()
     return [dict(row) for row in results]
 

@@ -3845,7 +3845,7 @@ def assign_users(short_name):
     ensure_authorized_to('read', project)
     ensure_authorized_to('update', project)
     access_levels = project.info.get('data_access', None)
-    if not data_access_levels or not access_levels:
+    if data_access_levels and not access_levels:
         flash('Cannot assign users to a project without data access levels', 'warning')
         return redirect_content_type(
             url_for('.settings', short_name=project.short_name))

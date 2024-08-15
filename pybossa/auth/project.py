@@ -53,7 +53,7 @@ class ProjectAuth(object):
     def _read(self, user, project=None):
         if project is not None and project.published is False:
             return self.only_admin_or_subadminowner(user, project)
-        if project is not None and data_access.data_access_levels:
+        if project is not None:
             return self.only_admin_or_subadminowner(user, project) or \
                 self.only_project_users(user, project)
         return user.is_authenticated
