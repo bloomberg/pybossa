@@ -41,6 +41,10 @@ class ProjectAuth(object):
         return user.is_authenticated and \
             user.id in project.info.get('project_users', [])
 
+    @staticmethod
+    def users_assigned_to_project(project):
+        return len(project.info.get('project_users', [])) > 0
+
     def can(self, user, action, project=None):
         action = ''.join(['_', action])
         return getattr(self, action)(user, project)
@@ -56,7 +60,7 @@ class ProjectAuth(object):
                 return self.only_admin_or_subadminowner(user, project)
             # private gigwork
             if data_access.data_access_levels or \
-                (not data_access.data_access_levels and not project.needs_password()): # public gigwork and no project password
+                (not data_access.data_access_levels and self.users_assigned_to_project(project)): # public gigwork and no users assigned to project
                 return self.only_admin_or_subadminowner(user, project) or \
                     self.only_project_users(user, project)
         return user.is_authenticated
