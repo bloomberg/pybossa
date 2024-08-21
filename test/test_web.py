@@ -9550,7 +9550,6 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.view.projects._check_if_redirect_to_password')
-    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     def test_tasks_browse_allow_taskrun_edit_works(self, check_password):
         """Test tasks browse with edit submission permitted works for regular user."""
         check_password.return_value = None
