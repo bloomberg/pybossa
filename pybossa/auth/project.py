@@ -51,14 +51,15 @@ class ProjectAuth(object):
         return self.only_admin_or_subadmin(user)
 
     def _read(self, user, project=None):
-        if project:
-            if project.published is False:
-                return self.only_admin_or_subadminowner(user, project)
-            # private gigwork
-            if data_access.data_access_levels or \
-                (not data_access.data_access_levels and len(project.get_project_users()) > 0): # public gigwork and no users assigned to project
-                return self.only_admin_or_subadminowner(user, project) or \
-                    self.only_project_users(user, project)
+        if not project:
+            return user.is_authenticated
+        if project.published is False:
+            return self.only_admin_or_subadminowner(user, project)
+        has_data_access = data_access.data_access_levels
+        has_project_users = len(project.get_project_users()) > 0
+        # private gigwork or public gigwork and no users assigned to project
+        if has_data_access or (not has_data_access and has_project_users):
+            return self.only_admin_or_subadminowner(user, project) or self.only_project_users(user, project)
         return user.is_authenticated
 
     def _update(self, user, project):
