@@ -438,12 +438,11 @@ def get_user_fullname_from_email(email_addr):
 
 
 def get_users_fullnames_from_emails(emails):
-    # given list of user emails as an input,
-    # obtain user full names, sort and return
-    # full names as comma separated string
-    users_fullnames = []
+    # Given list of user emails as an input,
+    # obtain user full names, sort and return.
+    users_info = {}
     for email_addr in emails:
         user_fullname = get_user_fullname_from_email(email_addr)
-        users_fullnames.append(user_fullname)
-    users_fullnames.sort()
-    return ", ".join(users_fullnames)
+        users_info[user_fullname] = email_addr
+    sorted_users_info = dict(sorted(users_info.items()))
+    return sorted_users_info

@@ -1089,7 +1089,10 @@ class TestProjectsCache(Test):
         assert cached_tasks[0]["id"] == tasks[0].id
         assert "assigned_users" in cached_tasks[0], "assigned_users column selected. assigned users should be part of task."
         assert "z@ijk.com" in cached_tasks[0]["assigned_users"], "user email to be present for user email not found in the system."
-        assert cached_tasks[0]["assigned_users"] == "user_x at_abc, user_y at_def, z@ijk.com", "assigned users full names to be present in sorted order."
+        assert len(cached_tasks[0]["assigned_users"]) == 3, "assigned_users count should be 3"
+        assert cached_tasks[0]["assigned_users"][0] == 'user_x at_abc', "assigned users full names to be present in sorted order."
+        assert cached_tasks[0]["assigned_users"][1] == 'user_y at_def', "assigned users full names to be present in sorted order."
+        assert cached_tasks[0]["assigned_users"][2] == 'z@ijk.com', "assigned users full names to be present in sorted order."
 
 
     @with_context
@@ -1115,7 +1118,11 @@ class TestProjectsCache(Test):
         assert cached_tasks[0]["id"] == tasks[0].id
         assert "assigned_users" in cached_tasks[0], "assigned_users column selected. assigned users should be part of task."
         assert "z@ijk.com" in cached_tasks[0]["assigned_users"], "user email to be present for user email not found in the system."
-        assert cached_tasks[0]["assigned_users"] == "user_x at_abc, user_y at_def, z@ijk.com", "assigned users full names to be present in sorted order."
+        assert len(cached_tasks[0]["assigned_users"]) == 3, "assigned_users count should be 3"
+        assert cached_tasks[0]["assigned_users"][0] == 'user_x at_abc', "assigned users full names to be present in sorted order."
+        assert cached_tasks[0]["assigned_users"][1] == 'user_y at_def', "assigned users full names to be present in sorted order."
+        assert cached_tasks[0]["assigned_users"][2] == 'z@ijk.com', "assigned users full names to be present in sorted order."
+
 
 
     @with_context
@@ -1141,7 +1148,10 @@ class TestProjectsCache(Test):
         assert cached_tasks[0]["id"] == tasks[0].id
         assert "assigned_users" in cached_tasks[0], "assigned_users column selected. assigned users should be part of task."
         assert "z@ijk.com" in cached_tasks[0]["assigned_users"], "user email to be present for user email not found in the system."
-        assert cached_tasks[0]["assigned_users"] == "user_x at_abc, user_y at_def, z@ijk.com", "assigned users full names to be present in sorted order."
+        assert len(cached_tasks[0]["assigned_users"]) == 3, "assigned_users count should be 3"
+        assert cached_tasks[0]["assigned_users"][0] == 'user_x at_abc', "assigned users full names to be present in sorted order."
+        assert cached_tasks[0]["assigned_users"][1] == 'user_y at_def', "assigned users full names to be present in sorted order."
+        assert cached_tasks[0]["assigned_users"][2] == 'z@ijk.com', "assigned users full names to be present in sorted order."
 
 
     @with_context

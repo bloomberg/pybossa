@@ -97,11 +97,13 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
 
     def format_current_page(task):
         # format current page. convert created and finish date utc to est.
-        # convert assign users from email address to full names.
+        # Set assign users full names and email addresses.
         task["created"] = format_date(task["created"])
         task["finish_time"] = format_date(task["finish_time"])
         if "assigned_users" in task:
-            task["assigned_users"] = get_users_fullnames_from_emails(task["assigned_users"])
+            users_info = get_users_fullnames_from_emails(task["assigned_users"])
+            task["assigned_users"] = list(users_info.keys())
+            task["assigned_users_emails"] = list(users_info.values())
 
     def search_lock_status_sorting_result():
         tasks = []
