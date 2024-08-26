@@ -94,7 +94,7 @@ def get_all_access_levels(levels, implicit_levels):
 
 def get_user_data_access_db_clause(access_levels):
 
-    if not valid_user_access_levels(access_levels):
+    if not data_access_levels or not valid_user_access_levels(access_levels):
         return
 
     valid_user_levels_for_project_level = data_access_levels['valid_user_levels_for_project_level']
