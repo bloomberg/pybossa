@@ -3223,6 +3223,7 @@ class TestWeb(web.Helper):
         assert res.status_code == 302
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     def test_23_get_specific_ongoing_task_user(self):
         """Test WEB get specific ongoing task_id for a project works as an user"""
         self.create()
@@ -3237,6 +3238,7 @@ class TestWeb(web.Helper):
         assert 'TaskPresenter' in str(res.data), res.data
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.fetch_lock_for_user')
     @patch('pybossa.view.projects.time')
     def test_23_get_specific_ongoing_task_user_json(self, mock_time, fetch_lock):
@@ -3286,6 +3288,7 @@ class TestWeb(web.Helper):
         assert fake_guard_instance.stamp.called
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects._get_locks', return_value={})
     def test_get_specific_task_no_lock_flash_message(self, _get_locks):
         self.create()
@@ -3305,6 +3308,7 @@ class TestWeb(web.Helper):
         assert msg in str(res.data), 'Flash message not found: "{}"'.format(msg)
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.fetch_lock_for_user')
     @patch('pybossa.view.projects.time')
     def test_get_specific_task_with_lock_seconds_remaining(self, mock_time, fetch_lock):
@@ -3330,6 +3334,7 @@ class TestWeb(web.Helper):
         assert '"timeout":10' in str(res.data), "Incorrect value for timeout"
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.get_task_id_and_duration_for_project_user')
     def test_get_next_task_with_lock_seconds_remaining(self, get_task_id_and_duration_for_project_user):
         self.create()
@@ -3365,6 +3370,7 @@ class TestWeb(web.Helper):
         assert 'setup_task_timeout_display(11, 3600)' in str(res.data), "Incorrect timeout value"
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.get_task_id_and_duration_for_project_user')
     def test_get_next_task_with_lock_seconds_remaining_less_10(self, get_task_id_and_duration_for_project_user):
         self.create()
@@ -3400,6 +3406,7 @@ class TestWeb(web.Helper):
         assert 'setup_task_timeout_display(3600, 3600)' in str(res.data), "Incorrect timeout value"
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.get_task_id_and_duration_for_project_user')
     def test_get_next_task_with_saved_task_position(self, get_task_id_and_duration_for_project_user):
         self.create()
@@ -3428,6 +3435,7 @@ class TestWeb(web.Helper):
         assert res.status_code == 200, res
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.has_no_presenter')
     @patch('pybossa.view.projects.fetch_lock_for_user')
     @patch('pybossa.view.projects.time')
@@ -3455,6 +3463,7 @@ class TestWeb(web.Helper):
         assert msg in str(res.data), 'Flash message not found: "{}"'.format(msg)
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.ContributionsGuard')
     def test_get_specific_ongoing_task_marks_task_as_requested_json(self, guard):
         fake_guard_instance = mock_contributions_guard()
@@ -3542,6 +3551,7 @@ class TestWeb(web.Helper):
 
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     def test_task_presenter_with_allow_taskrun_edit_works(self):
         """Test WEB with taskrun edit permitted, get expected task based on user access"""
         self.register()
@@ -3603,6 +3613,7 @@ class TestWeb(web.Helper):
         assert res.status_code == 403, res.status_code
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     def test_task_presenter_with_allow_taskrun_edit_allows_submission(self):
         """Test WEB with taskrun edit is permitted with task_submitter_id passed"""
         self.register()
@@ -3633,6 +3644,7 @@ class TestWeb(web.Helper):
         assert res.status_code == 200, res.status_code
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
     def test_25_get_wrong_task_app(self, mock):
         """Test WEB get wrong task.id for a project works"""
@@ -3658,6 +3670,7 @@ class TestWeb(web.Helper):
         assert msg in str(res.data), res.data
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
     def test_25_get_wrong_task_app_json(self, mock):
         """Test WEB get wrong task.id for a project works"""
@@ -3692,6 +3705,7 @@ class TestWeb(web.Helper):
         assert 'secret_key' not in data['project'], err_msg
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     def test_26_tutorial_signed_user(self):
         """Test WEB tutorials work as signed in user"""
         self.create()
@@ -3714,6 +3728,7 @@ class TestWeb(web.Helper):
         assert "some help" in str(res.data), err_msg
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     def test_26_tutorial_signed_user_json(self):
         """Test WEB tutorials work as signed in user"""
         self.create()
@@ -3791,6 +3806,7 @@ class TestWeb(web.Helper):
         assert 'My New Project' in data['title'], err_msg
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     def test_28_non_tutorial_signed_user(self):
         """Test WEB project without tutorial work as signed in user"""
         self.create()
@@ -7556,6 +7572,7 @@ class TestWeb(web.Helper):
         assert '<body' in data['content'], err_msg
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     def test_69_allow_anonymous_contributors(self):
         """Test WEB allow anonymous contributors works"""
         Fixtures.create()
