@@ -3224,7 +3224,7 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
-    def test_23_get_specific_ongoing_task_user(self):
+    def test_23_get_specific_ongoing_task_user(self, read_project):
         """Test WEB get specific ongoing task_id for a project works as an user"""
         self.create()
         self.delete_task_runs()
@@ -3241,7 +3241,7 @@ class TestWeb(web.Helper):
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.fetch_lock_for_user')
     @patch('pybossa.view.projects.time')
-    def test_23_get_specific_ongoing_task_user_json(self, mock_time, fetch_lock):
+    def test_23_get_specific_ongoing_task_user_json(self, mock_time, fetch_lock, read_project):
         """Test WEB get specific ongoing task_id for a project works as an user"""
         mock_now = 1652131709
         mock_time.time.return_value = mock_now
@@ -3290,7 +3290,7 @@ class TestWeb(web.Helper):
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects._get_locks', return_value={})
-    def test_get_specific_task_no_lock_flash_message(self, _get_locks):
+    def test_get_specific_task_no_lock_flash_message(self, _get_locks, read_project):
         self.create()
         self.delete_task_runs()
         self.register()
@@ -3311,7 +3311,7 @@ class TestWeb(web.Helper):
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.fetch_lock_for_user')
     @patch('pybossa.view.projects.time')
-    def test_get_specific_task_with_lock_seconds_remaining(self, mock_time, fetch_lock):
+    def test_get_specific_task_with_lock_seconds_remaining(self, mock_time, fetch_lock, read_project):
         mock_now = 1652131709
         mock_time.time.return_value = mock_now
 
@@ -3336,7 +3336,7 @@ class TestWeb(web.Helper):
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.get_task_id_and_duration_for_project_user')
-    def test_get_next_task_with_lock_seconds_remaining(self, get_task_id_and_duration_for_project_user):
+    def test_get_next_task_with_lock_seconds_remaining(self, get_task_id_and_duration_for_project_user, read_project):
         self.create()
         self.delete_task_runs()
         self.register()
@@ -3372,7 +3372,7 @@ class TestWeb(web.Helper):
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.get_task_id_and_duration_for_project_user')
-    def test_get_next_task_with_lock_seconds_remaining_less_10(self, get_task_id_and_duration_for_project_user):
+    def test_get_next_task_with_lock_seconds_remaining_less_10(self, get_task_id_and_duration_for_project_user, read_project):
         self.create()
         self.delete_task_runs()
         self.register()
@@ -3408,7 +3408,7 @@ class TestWeb(web.Helper):
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.get_task_id_and_duration_for_project_user')
-    def test_get_next_task_with_saved_task_position(self, get_task_id_and_duration_for_project_user):
+    def test_get_next_task_with_saved_task_position(self, get_task_id_and_duration_for_project_user, read_project):
         self.create()
         self.delete_task_runs()
         self.register()
@@ -3439,7 +3439,7 @@ class TestWeb(web.Helper):
     @patch('pybossa.view.projects.has_no_presenter')
     @patch('pybossa.view.projects.fetch_lock_for_user')
     @patch('pybossa.view.projects.time')
-    def test_get_specific_task_no_presenter_flash_message(self, mock_time, fetch_lock, has_no_presenter):
+    def test_get_specific_task_no_presenter_flash_message(self, mock_time, fetch_lock, has_no_presenter, read_project):
         mock_now = 1652131709
         mock_time.time.return_value = mock_now
 
@@ -3465,7 +3465,7 @@ class TestWeb(web.Helper):
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.ContributionsGuard')
-    def test_get_specific_ongoing_task_marks_task_as_requested_json(self, guard):
+    def test_get_specific_ongoing_task_marks_task_as_requested_json(self, guard, read_project):
         fake_guard_instance = mock_contributions_guard()
         guard.return_value = fake_guard_instance
         self.create()
@@ -3552,7 +3552,7 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
-    def test_task_presenter_with_allow_taskrun_edit_works(self):
+    def test_task_presenter_with_allow_taskrun_edit_works(self, read_project):
         """Test WEB with taskrun edit permitted, get expected task based on user access"""
         self.register()
         self.signin()
@@ -3614,7 +3614,7 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
-    def test_task_presenter_with_allow_taskrun_edit_allows_submission(self):
+    def test_task_presenter_with_allow_taskrun_edit_allows_submission(self, read_project):
         """Test WEB with taskrun edit is permitted with task_submitter_id passed"""
         self.register()
         self.signin()
@@ -3646,7 +3646,7 @@ class TestWeb(web.Helper):
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    def test_25_get_wrong_task_app(self, mock):
+    def test_25_get_wrong_task_app(self, mock, read_project):
         """Test WEB get wrong task.id for a project works"""
         self.register()
         self.signin()
@@ -3672,7 +3672,7 @@ class TestWeb(web.Helper):
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    def test_25_get_wrong_task_app_json(self, mock):
+    def test_25_get_wrong_task_app_json(self, mock, read_project):
         """Test WEB get wrong task.id for a project works"""
         self.create()
         project1 = db.session.query(Project).get(1)
@@ -3706,7 +3706,7 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
-    def test_26_tutorial_signed_user(self):
+    def test_26_tutorial_signed_user(self, read_project):
         """Test WEB tutorials work as signed in user"""
         self.create()
         project1 = db.session.query(Project).get(1)
@@ -3729,7 +3729,7 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
-    def test_26_tutorial_signed_user_json(self):
+    def test_26_tutorial_signed_user_json(self, read_project):
         """Test WEB tutorials work as signed in user"""
         self.create()
         project1 = db.session.query(Project).get(1)
@@ -3807,7 +3807,7 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
-    def test_28_non_tutorial_signed_user(self):
+    def test_28_non_tutorial_signed_user(self, read_project):
         """Test WEB project without tutorial work as signed in user"""
         self.create()
         project = db.session.query(Project).get(1)
@@ -7573,7 +7573,7 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
-    def test_69_allow_anonymous_contributors(self):
+    def test_69_allow_anonymous_contributors(self, read_project):
         """Test WEB allow anonymous contributors works"""
         Fixtures.create()
         project = db.session.query(Project).first()
