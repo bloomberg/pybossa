@@ -59,13 +59,11 @@ class ProjectAuth(object):
         has_project_users = len(project.get_project_users()) > 0
         if is_private_gigwork:
             return self.only_admin_or_subadminowner(user, project) or self.only_project_users(user, project)
-        else:
-            if has_project_users:
-                return self.only_admin_or_subadminowner(user, project) or self.only_project_users(user, project)
-            if project.needs_password():
-                return user.is_authenticated
-            else:
-                return self.only_admin_or_subadminowner(user, project)
+        if has_project_users:
+            return self.only_admin_or_subadminowner(user, project) or self.only_project_users(user, project)
+        if project.needs_password():
+            return user.is_authenticated
+        return self.only_admin_or_subadminowner(user, project)
 
     def _update(self, user, project):
         return self.only_admin_or_subadminowner(user, project)
