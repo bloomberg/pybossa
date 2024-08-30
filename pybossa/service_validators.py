@@ -1,7 +1,6 @@
 import re
 
-whitelist_regex = re.compile(r"[^a-zA-Z0-9\.\u00BC-\u00BE\u2150-\u215E\s]")
-
+allowlist_regex = re.compile(r"[^a-zA-Z0-9\.\u00BC-\u00BE\u2150-\u215E\s/]")
 
 class ServiceValidators(object):
     def __init__(self, service):
@@ -11,7 +10,7 @@ class ServiceValidators(object):
     def is_valid_query(self, service_request, payload):
         service_data = payload.get('data')
         query = service_data[service_request].get('query', None)
-        matches = whitelist_regex.search(query)
+        matches = allowlist_regex.search(query)
         if len(query) < 20 and not matches:
             return True
 
