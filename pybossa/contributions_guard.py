@@ -119,12 +119,6 @@ class ContributionsGuard(object):
         key = self._create_cancelled_time_key(task, user)
         self.conn.setex(key, self.STAMP_TTL, make_timestamp())
 
-    def check_task_cancelled_timestamp(self, task, user):
-        """Check if a task was cancelled by the user."""
-        key = self._create_cancelled_time_key(task, user)
-        task_cancelled = self.conn.get(key) is not None
-        return task_cancelled
-
     def remove_cancelled_timestamp(self, task, user):
         """Check if a task was cancelled by the user."""
         key = self._create_cancelled_time_key(task, user)
