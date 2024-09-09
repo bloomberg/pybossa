@@ -22,6 +22,7 @@ class ContributionsGuard(object):
 
     KEY_PREFIX = 'pybossa:task_requested:user:{0}:task:{1}'
     PRESENTED_KEY_PREFIX = 'pybossa:task_presented:user:{0}:task:{1}'
+    CANCEL_TASK_KEY_PREFIX = 'pybossa:task_cancelled:user:{0}:task:{1}'
     STAMP_TTL = 60 * 60
 
     def __init__(self, redis_conn, timeout=None):
@@ -98,3 +99,27 @@ class ContributionsGuard(object):
             return self.conn.expire(key, self.STAMP_TTL)
         else:
             return self.conn.setEx(key, self.STAMP_TTL, make_timestamp())
+
+    def _create_cancelled_time_key(self, task, user):
+        """Create a Redis key for the time when task is
+        cancelled by a user. user must have a user_id.
+        """
+        user_id = user['user_id'] or None
+        return self.CANCEL_TASK_KEY_PREFIX.format(user_id, task.id)
+
+    def retrieve_cancelled_timestamp(self, task, user):
+        """Get the cached timestamp for a task cancelled by the user."""
+        key = self._create_cancelled_time_key(task, user)
+        timestamp = self.conn.get(key)
+        # If timestamp is not None, convert it to unicode string
+        return timestamp and timestamp.decode()
+
+    def stamp_cancelled_time(self, task, user):
+        """Cache the time that a task was cancelled by the user."""
+        key = self._create_cancelled_time_key(task, user)
+        self.conn.setex(key, self.STAMP_TTL, make_timestamp())
+
+    def remove_cancelled_timestamp(self, task, user):
+        """Check if a task was cancelled by the user."""
+        key = self._create_cancelled_time_key(task, user)
+        return self.conn.delete(key)

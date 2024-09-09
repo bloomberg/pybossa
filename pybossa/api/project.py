@@ -140,8 +140,7 @@ class ProjectAPI(APIBase):
 
     def _update_attribute(self, new, old):
         for key, value in old.info.items():
-            if not new.info.get(key):
-                new.info[key] = value
+            new.info.setdefault(key, value)
 
     def _validate_instance(self, project):
         if project.short_name and is_reserved_name('project', project.short_name):

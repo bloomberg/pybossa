@@ -157,8 +157,30 @@ class TestContributionsGuard(object):
         assert self.guard.retrieve_presented_timestamp(self.task, self.anon_user) is None
 
     @patch('pybossa.contributions_guard.make_timestamp')
-    def test_retrieve_presented_timestamp_returs_the_timestamp_for_stamped_task(self, make_timestamp):
+    def test_retrieve_presented_timestamp_returns_the_timestamp_for_stamped_task(self, make_timestamp):
         make_timestamp.return_value = "now"
         self.guard.stamp_presented_time(self.task, self.auth_user)
 
         assert self.guard.retrieve_presented_timestamp(self.task, self.auth_user) == 'now'
+
+    def test_stamp_cancelled_time_registers_specific_user_id_and_task(self):
+        key = b'pybossa:task_cancelled:user:33:task:22'
+        self.guard.stamp_cancelled_time(self.task, self.auth_user)
+        assert key in self.connection.keys(), list(self.connection.keys())
+
+    @patch('pybossa.contributions_guard.make_timestamp')
+    def test_retrieve_cancelled_timestamp(self, make_timestamp):
+        key = b'pybossa:task_cancelled:user:33:task:22'
+        make_timestamp.return_value = "now"
+        self.guard.stamp_cancelled_time(self.task, self.auth_user)
+        assert key in self.connection.keys(), list(self.connection.keys())
+        cancelled_timestamp = self.guard.retrieve_cancelled_timestamp(self.task, self.auth_user)
+        assert cancelled_timestamp == "now"
+
+    def test_remove_cancelled_timestamp(self):
+        key = b'pybossa:task_cancelled:user:33:task:22'
+        self.guard.stamp_cancelled_time(self.task, self.auth_user)
+        assert key in self.connection.keys(), list(self.connection.keys())
+        self.guard.remove_cancelled_timestamp(self.task, self.auth_user)
+        cancelled_timestamp = self.guard.retrieve_cancelled_timestamp(self.task, self.auth_user)
+        assert not cancelled_timestamp

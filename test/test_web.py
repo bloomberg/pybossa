@@ -10454,6 +10454,64 @@ class TestWebUserMetadataUpdate(web.Helper):
         assert release_lock.call_count == 1, release_lock.call_count
 
     @with_context
+    @patch('pybossa.api.release_lock')
+    @patch('pybossa.api.has_lock')
+    @patch('pybossa.api.ContributionsGuard')
+    def test_cancel_task_reset_presented_time(self, guard, has_lock, release_lock):
+        """Test cancel task reset presented time"""
+
+        has_lock.return_value = True
+        url = "/api/task/1/canceltask"
+
+        admin = UserFactory.create()
+        self.signin_user(admin)
+        project = ProjectFactory.create(
+            info= {
+                "reset_presented_time": True
+            },
+            owner=admin
+        )
+        task = TaskFactory.create(project=project)
+        payload = {'projectname': project.short_name}
+        res = self.app_post_json(url,
+                            data=payload,
+                            follow_redirects=False,
+                            )
+        data = json.loads(res.data)
+        assert data.get('success') == True, data
+        assert release_lock.call_count == 1, release_lock.call_count
+        assert guard.return_value.stamp_cancelled_time.called
+
+    @with_context
+    @patch('pybossa.api.release_lock')
+    @patch('pybossa.api.has_lock')
+    @patch('pybossa.api.ContributionsGuard')
+    def test_cancel_task_not_reset_presented_time(self, guard, has_lock, release_lock):
+        """Test cancel task reset presented time"""
+
+        has_lock.return_value = True
+        url = "/api/task/1/canceltask"
+
+        admin = UserFactory.create()
+        self.signin_user(admin)
+        project = ProjectFactory.create(
+            info= {
+                "reset_presented_time": False
+            },
+            owner=admin
+        )
+        task = TaskFactory.create(project=project)
+        payload = {'projectname': project.short_name}
+        res = self.app_post_json(url,
+                            data=payload,
+                            follow_redirects=False,
+                            )
+        data = json.loads(res.data)
+        assert data.get('success') == True, data
+        assert release_lock.call_count == 1, release_lock.call_count
+        assert not guard.return_value.stamp_cancelled_time.called
+
+    @with_context
     def test_release_category_locks(self):
         """Test cancel task with wrong payload"""
 

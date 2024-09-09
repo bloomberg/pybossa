@@ -211,8 +211,21 @@ def new_task(project_id, task_id=None):
                 else:
                     # user returning back for the same task
                     # original presented time has not expired yet
-                    # to continue original presented time, extend expiry
-                    guard.extend_task_presented_timestamp_expiry(task, user_id_or_ip)
+                    # reset presented time for projects configured to reset it
+                    project = project_repo.get(project_id)
+                    if not project:
+                        return abort(400)
+                    reset_presented_time = project.info.get("reset_presented_time", False)
+                    if reset_presented_time:
+                        cancelled_task = guard.retrieve_cancelled_timestamp(task, user_id_or_ip)
+                        if cancelled_task:
+                            # user is returning to same task upon cancelling the task
+                            # reset presented time when configured under project settings
+                            guard.stamp_presented_time(task, user_id_or_ip)
+                            guard.remove_cancelled_timestamp(task, get_user_id_or_ip())
+                    else:
+                        # to continue original presented time, extend expiry
+                        guard.extend_task_presented_timestamp_expiry(task, user_id_or_ip)
 
             data = [TaskAuth.dictize_with_access_control(task) for task in tasks]
             add_task_signature(data)
@@ -579,6 +592,7 @@ def cancel_task(task_id=None):
 
     user_id = current_user.id
     scheduler, timeout = get_scheduler_and_timeout(project)
+    reset_presented_time = project.info.get("reset_presented_time", False)
     if scheduler in (Schedulers.locked, Schedulers.user_pref, Schedulers.task_queue):
         task_locked_by_user = has_lock(task_id, user_id, timeout)
         if task_locked_by_user:
@@ -587,6 +601,15 @@ def cancel_task(task_id=None):
                 'Project {} - user {} cancelled task {}'
                 .format(project.id, current_user.id, task_id))
             release_reserve_task_lock_by_id(project.id, task_id, current_user.id, timeout, expiry=EXPIRE_LOCK_DELAY, release_all_task=True)
+            # presented time would reset only upon cancel task when reset is
+            # configured under project settings. add an entry to the cache
+            # to make note that task has been cancelled. with this, obtaining
+            # the same task again would reset the presented time.
+            if reset_presented_time:
+                guard = ContributionsGuard(sentinel.master, timeout=timeout)
+                user_id_or_ip = get_user_id_or_ip()
+                task = task_repo.get_task(task_id)
+                guard.stamp_cancelled_time(task, user_id_or_ip)
 
     return Response(json.dumps({'success': True}), 200, mimetype="application/json")
 
