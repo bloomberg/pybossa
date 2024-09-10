@@ -41,7 +41,7 @@ DEFAULT_CONN = 'S3_DEFAULT'
 def check_type(filename):
     mime_type = magic.from_file(filename, mime=True)
     if mime_type not in allowed_mime_types:
-        raise BadRequest('File type not supported: {}'.format(mime_type))
+        raise BadRequest('File type not supported for {}: {}'.format(filename, mime_type))
 
 
 def validate_directory(directory_name):
@@ -238,6 +238,6 @@ def upload_json_data(json_data, upload_path, file_name, encryption,
     if not bucket:
         bucket = app.config.get("S3_BUCKET_V2") if app.config.get("S3_CONN_TYPE_V2") else app.config.get("S3_BUCKET")
 
-    return s3_upload_from_string(bucket, content, file_name,
+    return s3_upload_from_string(bucket, content, file_name, file_type_check=False,
         directory=upload_path, conn_name=conn_name,
         with_encryption=encryption, upload_root_dir=upload_root_dir)
