@@ -60,7 +60,7 @@ from bs4 import BeautifulSoup
 
 misaka = Misaka()
 TP_COMPONENT_TAGS = ["text-input", "dropdown-input", "radio-group-input",
-                     "checkbox-input", "multi-select-input", "input-text-area"]
+                     "checkbox-input", "multi-select-input", "input-text-area", "text-tagging"]
 
 PARTIAL_ANSWER_PREFIX = "partial_answer:project:{project_id}:user:{user_id}"
 PARTIAL_ANSWER_KEY = PARTIAL_ANSWER_PREFIX + ":task:{task_id}"
@@ -1239,7 +1239,6 @@ def process_tp_components(tp_code, user_response):
     from user_response(a dict). The response data is then used to set the
     :initial-value' """
     soup = BeautifulSoup(tp_code, 'html.parser')
-
     # Disable autosave so that response for different users will be different
     task_presenter_elements = soup.find_all("task-presenter")
     for task_presenter in task_presenter_elements:
