@@ -3738,6 +3738,7 @@ def project_config(short_name):
                 project.info['data_access'] = data.get('data_access')
             project.info['completed_tasks_cleanup_days'] = data.get('completed_tasks_cleanup_days')
             project.info["allow_taskrun_edit"] = data.get("allow_taskrun_edit")
+            project.info["reset_presented_time"] = data.get("reset_presented_time")
             project_repo.save(project)
             flash(gettext('Configuration updated successfully'), 'success')
         except Exception as e:
@@ -3751,6 +3752,7 @@ def project_config(short_name):
     data_access = project.info.get('data_access') or []
     completed_tasks_cleanup_days = project.info.get('completed_tasks_cleanup_days')
     allow_taskrun_edit = project.info.get("allow_taskrun_edit") or False
+    reset_presented_time = project.info.get("reset_presented_time") or False
     response = dict(template='/projects/summary.html',
                     external_config_dict=json.dumps(ext_config_dict),
                     forms=input_forms,
@@ -3758,7 +3760,8 @@ def project_config(short_name):
                     valid_access_levels=data_access_levels.get('valid_access_levels'),
                     csrf=generate_csrf(),
                     completed_tasks_cleanup_days=completed_tasks_cleanup_days,
-                    allow_taskrun_edit=allow_taskrun_edit
+                    allow_taskrun_edit=allow_taskrun_edit,
+                    reset_presented_time=reset_presented_time
                     )
 
     return handle_content_type(response)
