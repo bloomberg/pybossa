@@ -1737,6 +1737,10 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             args["regular_user"] = regular_user
             # default page size for worker view is 100
             per_page = records_per_page if records_per_page in allowed_records_per_page else task_list_default_records_per_page
+        elif view_type == 'tasklist' and n_available_tasks_for_user(project, current_user.id) == 0:
+            # When no tasks are available, redirect to browse all tasks view.
+            new_path = '/project/{}/tasks/browse'.format(project.short_name)
+            return redirect_content_type(new_path)
         else:
             abort(403)
     except (ValueError, TypeError) as err:
