@@ -3732,7 +3732,8 @@ def project_config(short_name):
     if request.method == 'POST':
         try:
             data = json.loads(request.data)
-            project.info['ext_config'] = integrate_ext_config(data.get('config'))
+            if (data.get('config')):
+                project.info['ext_config'] = integrate_ext_config(data.get('config'))
             if bool(data_access_levels):
                 # for private gigwork
                 project.info['data_access'] = data.get('data_access')
