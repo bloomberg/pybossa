@@ -519,11 +519,9 @@ def get_announcements_cached(user, announcement_levels):
 def get_users_for_data_access(data_access):
     from pybossa.data_access import get_user_data_access_db_clause
 
+    sql = '''select id::text, fullname, email_addr, enabled from "user"'''
     clause = get_user_data_access_db_clause(data_access)
-    if not clause:
-        sql = text('''select id::text, fullname from "user"''')
-    else:
-        sql = text('''select id::text, fullname from "user" where {}'''.format(clause))
+    sql = sql +  '''where {}'''.format(clause) if clause else sql
     results = session.execute(sql).fetchall()
     return [dict(row) for row in results]
 
