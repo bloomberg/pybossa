@@ -3732,14 +3732,27 @@ def project_config(short_name):
     if request.method == 'POST':
         try:
             data = json.loads(request.data)
+            current_app.logger.info("project-config. data %s, data type %s", request.data, type(data))
             project.info['ext_config'] = integrate_ext_config(data.get('config'))
+            current_app.logger.info('project-config. project.info["ext_config"] %s', str(project.info['ext_config']))
+            current_app.logger.info("project-config. data_access_levels %s", str(data_access_levels))
             if bool(data_access_levels):
                 # for private gigwork
                 project.info['data_access'] = data.get('data_access')
+                current_app.logger.info('project-config. project.info["data_access"] %s', str(project.info['data_access']))
+
             project.info['completed_tasks_cleanup_days'] = data.get('completed_tasks_cleanup_days')
+            current_app.logger.info('project-config. project.info["completed_tasks_cleanup_days"] %s', str(project.info['completed_tasks_cleanup_days']))
+
             project.info["allow_taskrun_edit"] = data.get("allow_taskrun_edit")
+            current_app.logger.info('project-config. project.info["allow_taskrun_edit"] %s', str(project.info["allow_taskrun_edit"]))
+
             project.info["reset_presented_time"] = data.get("reset_presented_time")
+            current_app.logger.info('project-config. project.info["reset_presented_time"] %s', str(project.info["reset_presented_time"]))
+
             project_repo.save(project)
+            current_app.logger.info("project-config configuration %s updated successfully", request.data)
+
             flash(gettext('Configuration updated successfully'), 'success')
         except Exception as e:
             current_app.logger.error('project-config post error. project id %d, data %s, error %s ',
