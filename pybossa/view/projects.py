@@ -3862,12 +3862,12 @@ def assign_users(short_name):
             'Project id {} no user matching data access level {} for this project.'.format(project.id, access_levels))
         flash('Cannot assign users. There is no user matching data access level for this project', 'warning')
         return redirect_content_type(url_for('.settings', short_name=project.short_name))
-    else:
-        # Update users with last_name for sorting.
-        users_with_name = []
-        for user in users:
-            full_name_parts = user.get('fullname').split(' ')
-            user['last_name'] = full_name_parts[-1] if len(full_name_parts) > 1 else user.get('fullname')
+
+    # Update users with last_name for sorting.
+    users_with_name = []
+    for user in users:
+        full_name_parts = user.get('fullname').split(' ')
+        user['last_name'] = full_name_parts[-1] if len(full_name_parts) > 1 else user.get('fullname')
 
     form = DataAccessForm(request.body)
     project_users = json.loads(request.data).get("select_users", []) if request.data else request.form.getlist('select_users')
