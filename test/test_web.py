@@ -9918,6 +9918,47 @@ class TestWeb(web.Helper):
             assert "Users unassigned or no user assigned to project" in data.get('flash'), data
 
     @with_context
+    def test_get_assign_users_to_project(self):
+        """Test GET assign users to project based on data access levels with successful load of users matching data access"""
+
+        from pybossa.view.projects import data_access_levels
+
+        user1 = UserFactory.create(id=999, subadmin=False, admin=True, name="adminuser")
+        user1.set_password('1234')
+        user1.info['data_access'] = ["L1", "L2", "L3", "L4"]
+        user_repo.save(user1)
+
+        user2 = UserFactory.create(id=998, subadmin=False, admin=False, name="workeruser1")
+        user2.set_password('1234')
+        user2.info['data_access'] = ["L1", "L2", "L3", "L4"]
+        user_repo.save(user2)
+
+        user3 = UserFactory.create(id=997, subadmin=False, admin=False, name="workeruser2", enabled=False)
+        user3.set_password('1234')
+        user3.info['data_access'] = ["L1", "L2", "L3", "L4"]
+        user_repo.save(user3)
+
+        project = ProjectFactory.create(info={
+            'sched': 'user_pref_scheduler',
+            'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
+            'data_access': ["L1", "L2", "L3", "L4"]
+        })
+        project_repo.save(project)
+
+        # Sign-in as an admin user.
+        csrf = self.get_csrf('/account/signin')
+        res = self.signin(email=user1.email_addr, password='1234', csrf=csrf)
+
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            # Fetch assign-users page with selection of users for project.
+            res = self.app.get('/project/{}/assign-users'.format(project.short_name))
+
+            # Confirm users exist in the page and disables users do not.
+            assert user1.fullname in str(res.data), 'User 1 not found on assign-users page.'
+            assert user2.fullname in str(res.data), 'User 2 not found on assign-users page.'
+            assert user3.fullname not in str(res.data), 'User 3 is disabled and should not be found on assign-users page.'
+
+    @with_context
     @patch('pybossa.view.account.send_mail', autospec=True)
     @patch('pybossa.view.account.mail_queue', autospec=True)
     @patch('pybossa.view.account.render_template')
