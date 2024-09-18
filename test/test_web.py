@@ -10181,6 +10181,51 @@ class TestWeb(web.Helper):
         assert "class=\" sort-asc sortable\" data-sort=\"completed_by\"" not in str(res.data), "Unexpected sorted column (sort-asc) indicator on Completed By."
         assert "class=\" sort-asc sortable\" data-sort=\"priority\"" not in str(res.data), "Missing sorted column indicator (sort-asc) on Priority."
 
+
+    @with_context
+    @patch('pybossa.view.projects.n_available_tasks_for_user')
+    def test_browse_task_view_tasklist_no_tasks_admin(self, n_available_tasks_for_user):
+        """Test browse task with view=tasklist and no available tasks redirects to tasks/browse."""
+        n_available_tasks_for_user.return_value = 0
+
+        # Initialize a project.
+        self.create()
+        self.delete_task_runs()
+
+        # Set the user password and admin.
+        user = db.session.query(User).get(2)
+        user.set_password('1234')
+        user.admin = True
+        user_repo.save(user)
+
+        # Create a project and task.
+        project = db.session.query(Project).first()
+        project.allow_anonymous_contributors = True
+        db.session.add(project)
+        db.session.commit()
+
+        # Retrieve the first task.
+        task = db.session.query(Task).filter(Project.id == project.id).first()
+
+        # Add task results.
+        for i in range(10):
+            task_run = TaskRun(project_id=project.id, task_id=task.id,
+                               user_id=user.id,
+                               info={'answer': i})
+            db.session.add(task_run)
+            db.session.commit()
+            res = self.app.get('api/project/%s/newtask' % project.id)
+
+        # Sign-in as an admin user.
+        csrf = self.get_csrf('/account/signin')
+        res = self.signin(email=user.email_addr, password='1234', csrf=csrf)
+
+        # Load the task browse page using the tasklist view.
+        res = self.app.get('project/%s/tasks/browse?view=tasklist' % (project.short_name), follow_redirects=True)
+        # Confirm a 200 response for /tasks/browse is returned.
+        assert res.status_code == 200
+
+
     @with_context
     def test_gold_annotations_anonymous_access_fails(self):
         """Test gold_annotations without login"""
