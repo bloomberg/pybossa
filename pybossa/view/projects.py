@@ -3864,7 +3864,6 @@ def assign_users(short_name):
         return redirect_content_type(url_for('.settings', short_name=project.short_name))
 
     # Update users with last_name for sorting.
-    users_with_name = []
     for user in users:
         full_name_parts = user.get('fullname').split(' ')
         user['last_name'] = full_name_parts[-1] if len(full_name_parts) > 1 else user.get('fullname')
