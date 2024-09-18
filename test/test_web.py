@@ -9928,10 +9928,15 @@ class TestWeb(web.Helper):
         user1.info['data_access'] = ["L1", "L2", "L3", "L4"]
         user_repo.save(user1)
 
-        user2 = UserFactory.create(id=998, subadmin=False, admin=False, name="workeruser")
+        user2 = UserFactory.create(id=998, subadmin=False, admin=False, name="workeruser1")
         user2.set_password('1234')
         user2.info['data_access'] = ["L1", "L2", "L3", "L4"]
         user_repo.save(user2)
+
+        user3 = UserFactory.create(id=997, subadmin=False, admin=False, name="workeruser2", enabled=False)
+        user3.set_password('1234')
+        user3.info['data_access'] = ["L1", "L2", "L3", "L4"]
+        user_repo.save(user3)
 
         project = ProjectFactory.create(info={
             'sched': 'user_pref_scheduler',
@@ -9948,9 +9953,10 @@ class TestWeb(web.Helper):
             # Fetch assign-users page with selection of users for project.
             res = self.app.get('/project/{}/assign-users'.format(project.short_name))
 
-            # Confirm users exist in the page.
+            # Confirm users exist in the page and disables users do not.
             assert user1.fullname in str(res.data), 'User 1 not found on assign-users page.'
             assert user2.fullname in str(res.data), 'User 2 not found on assign-users page.'
+            assert user3.fullname not in str(res.data), 'User 3 is disabled and should not be found on assign-users page.'
 
     @with_context
     @patch('pybossa.view.account.send_mail', autospec=True)
