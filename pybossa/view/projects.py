@@ -3846,6 +3846,22 @@ def notify_redundancy_updates(tasks_not_updated):
         mail_queue.enqueue(send_mail, email)
 
 
+def get_last_name(fullname):
+    last_name = ''
+
+    if fullname:
+        # Remove content within parentheses in name: Jane Doe (ai)
+        cleaned_name = re.sub(r'\s*\(.*?\)', '', fullname)
+        full_name_parts = cleaned_name.split(' ')
+
+        # Check if the last part is a number and use the second last if available.
+        if full_name_parts[-1].isdigit():
+            last_name = full_name_parts[-2] if len(full_name_parts) > 1 else fullname
+        else:
+            last_name = full_name_parts[-1]
+
+    return last_name
+
 @blueprint.route('/<short_name>/assign-users', methods=['GET', 'POST'])
 @login_required
 @admin_or_subadmin_required
@@ -3865,15 +3881,7 @@ def assign_users(short_name):
 
     # Update users with last_name for sorting.
     for user in users:
-        # Remove content within parentheses in name: Jane Doe (ai)
-        cleaned_name = re.sub(r'\s*\(.*?\)', '', user.get('fullname', ''))
-        full_name_parts = cleaned_name.split(' ')
-
-        # Check if the last part is a number and use the second last if available.
-        if full_name_parts[-1].isdigit():
-            user['last_name'] = full_name_parts[-2] if len(full_name_parts) > 1 else user.get('fullname')
-        else:
-            user['last_name'] = full_name_parts[-1]
+        user['last_name'] = get_last_name(user)
 
     form = DataAccessForm(request.body)
     project_users = json.loads(request.data).get("select_users", []) if request.data else request.form.getlist('select_users')
