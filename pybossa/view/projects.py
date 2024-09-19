@@ -3865,7 +3865,9 @@ def assign_users(short_name):
 
     # Update users with last_name for sorting.
     for user in users:
-        full_name_parts = user.get('fullname', '').split(' ')
+        # Remove content within parentheses and digits in name: Jane Doe (ai)
+        cleaned_name = re.sub(r'\s*\(.*?\)|\d+', '', user.get('fullname', ''))
+        full_name_parts = cleaned_name.split(' ')
         user['last_name'] = full_name_parts[-1] if len(full_name_parts) > 1 else user.get('fullname')
 
     form = DataAccessForm(request.body)
