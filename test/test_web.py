@@ -9940,6 +9940,12 @@ class TestWeb(web.Helper):
         user3.fullname = 'workeruser two'
         user_repo.save(user3)
 
+        user4 = UserFactory.create(id=996, subadmin=False, admin=False, name="workeruser 4", enabled=False)
+        user4.set_password('1234')
+        user4.info['data_access'] = ["L1", "L2", "L3", "L4"]
+        user4.fullname = 'workeruser 4'
+        user_repo.save(user4)
+
         project = ProjectFactory.create(info={
             'sched': 'user_pref_scheduler',
             'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),

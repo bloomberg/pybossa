@@ -3865,10 +3865,15 @@ def assign_users(short_name):
 
     # Update users with last_name for sorting.
     for user in users:
-        # Remove content within parentheses and digits in name: Jane Doe (ai)
-        cleaned_name = re.sub(r'\s*\(.*?\)|\d+', '', user.get('fullname', ''))
+        # Remove content within parentheses in name: Jane Doe (ai)
+        cleaned_name = re.sub(r'\s*\(.*?\)', '', user.get('fullname', ''))
         full_name_parts = cleaned_name.split(' ')
-        user['last_name'] = full_name_parts[-1] if len(full_name_parts) > 1 else user.get('fullname')
+
+        # Check if the last part is a number and use the second last if available.
+        if full_name_parts[-1].isdigit():
+            user['last_name'] = full_name_parts[-2] if len(full_name_parts) > 1 else user.get('fullname')
+        else:
+            user['last_name'] = full_name_parts[-1]
 
     form = DataAccessForm(request.body)
     project_users = json.loads(request.data).get("select_users", []) if request.data else request.form.getlist('select_users')
