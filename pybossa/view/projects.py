@@ -3881,7 +3881,7 @@ def assign_users(short_name):
 
     # Update users with last_name for sorting.
     for user in users:
-        user['last_name'] = get_last_name(user)
+        user['last_name'] = get_last_name(user.get('fullname', ''))
 
     form = DataAccessForm(request.body)
     project_users = json.loads(request.data).get("select_users", []) if request.data else request.form.getlist('select_users')
