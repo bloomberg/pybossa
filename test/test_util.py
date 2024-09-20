@@ -1370,6 +1370,17 @@ class TestPybossaUtil(Test):
         assert result == True
         assert len(list(test_sentinel.slave.keys(pattern))) == 0
 
+    def test_get_last_name(self):
+        assert util.get_last_name('Sara Smith') == 'Smith'
+        assert util.get_last_name('Sara Two Smith') == 'Smith'
+        assert util.get_last_name('Sara Smith 2') == 'Smith'
+        assert util.get_last_name('3 Sara Smith') == 'Smith'
+        assert util.get_last_name('Smith 1') == 'Smith'
+        assert util.get_last_name('Smith') == 'Smith'
+        assert util.get_last_name('Sara Smith ') == 'Smith'
+        assert util.get_last_name(' Sara Smith ') == 'Smith'
+        assert util.get_last_name('') == ''
+        assert util.get_last_name(None) == ''
 
 class TestIsReservedName(object):
     from test import flask_app as app
