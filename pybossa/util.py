@@ -1448,3 +1448,23 @@ def map_locations(locations):
         'country_codes': list(country_codes_set),
         'country_names': list(country_names_set)
     }
+
+
+def get_last_name(fullname):
+    """
+    Returns the last name from a fullname, ignoring parenthesis and digits. Used for sorting.
+    """
+    last_name = ''
+
+    if fullname:
+        # Remove content within parentheses in name: Jane Doe (ai)
+        cleaned_name = re.sub(r'\s*\(.*?\)', '', fullname)
+        full_name_parts = cleaned_name.strip().split(' ')
+
+        # Check if the last part is a number and use the second last if available.
+        if full_name_parts[-1].isdigit():
+            last_name = full_name_parts[-2] if len(full_name_parts) > 1 else fullname
+        else:
+            last_name = full_name_parts[-1]
+
+    return last_name

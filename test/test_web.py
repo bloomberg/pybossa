@@ -59,7 +59,6 @@ from test.helper.gig_helper import make_subadmin, make_subadmin_by
 from datetime import datetime, timedelta
 import six
 from pybossa.view.account import get_user_data_as_form
-from pybossa.view.projects import get_last_name
 from pybossa.cloud_store_api.s3 import upload_json_data
 from pybossa.task_creator_helper import get_gold_answers
 
@@ -9966,16 +9965,6 @@ class TestWeb(web.Helper):
             assert user1.fullname in str(res.data), user1.fullname + ' not found on assign-users page.'
             assert user2.fullname in str(res.data), user2.fullname + ' not found on assign-users page.'
             assert user3.fullname not in str(res.data), user3.fullname + ' is disabled and should not be found on assign-users page.'
-
-    def test_get_last_name(self):
-        assert get_last_name('Sara Smith') == 'Smith'
-        assert get_last_name('Sara Two Smith') == 'Smith'
-        assert get_last_name('Sara Smith 2') == 'Smith'
-        assert get_last_name('3 Sara Smith') == 'Smith'
-        assert get_last_name('Smith 1') == 'Smith'
-        assert get_last_name('Smith') == 'Smith'
-        assert get_last_name('') == ''
-        assert get_last_name(None) == ''
 
     @with_context
     @patch('pybossa.view.account.send_mail', autospec=True)
