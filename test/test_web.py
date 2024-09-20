@@ -33,7 +33,7 @@ from test.test_authorization import mock_current_user
 from unittest.mock import patch, Mock, call, MagicMock
 from flask import redirect
 from itsdangerous import BadSignature
-from pybossa.util import get_user_signup_method, unicode_csv_reader
+from pybossa.util import get_user_signup_method, unicode_csv_reader, get_last_name
 from bs4 import BeautifulSoup
 from requests.exceptions import ConnectionError
 from pybossa.model.project import Project
@@ -9974,6 +9974,8 @@ class TestWeb(web.Helper):
         assert get_last_name('3 Sara Smith') == 'Smith'
         assert get_last_name('Smith 1') == 'Smith'
         assert get_last_name('Smith') == 'Smith'
+        assert get_last_name('Sara Smith ') == 'Smith'
+        assert get_last_name(' Sara Smith ') == 'Smith'
         assert get_last_name('') == ''
         assert get_last_name(None) == ''
 
