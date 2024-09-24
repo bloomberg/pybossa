@@ -84,6 +84,19 @@ BooleanField.false_values = {False, 'false', '', 'off', 'n', 'no'}
 
 
 class ProjectCommonForm(Form):
+    def __init__(self, *args, **kwargs):
+        super(ProjectCommonForm, self).__init__(*args, **kwargs)
+        if current_app.config.get('PROJECT_PASSWORD_REQUIRED'):
+            self.password.validators = [pb_validator.CheckPasswordStrength(
+                                        min_len=PROJECT_PWD_MIN_LEN,
+                                        special=False,
+                                        password_required=True), validators.Required()]
+        else:
+            self.password.validators = [pb_validator.CheckPasswordStrength(
+                                        min_len=PROJECT_PWD_MIN_LEN,
+                                        special=False,
+                                        password_required=False), validators.Optional()]
+
     name = TextField(lazy_gettext('Name'),
                      [validators.Required(),
                       pb_validator.Unique(project_repo.get_by, 'name',
@@ -104,26 +117,11 @@ class ProjectCommonForm(Form):
                                             validators=[validators.Required()], choices=[], default='')
     output_data_class = SelectFieldWithProps(lazy_gettext('Output Data Classification'),
                                              validators=[validators.Required()], choices=[], default='')
-    def __init__(self, *args, **kwargs):
-        Form.__init__(self, *args, **kwargs)
+
 
 class ProjectForm(ProjectCommonForm):
-
     def __init__(self, *args, **kwargs):
         super(ProjectForm, self).__init__(*args, **kwargs)
-        if current_app.config.get('PROJECT_PASSWORD_REQUIRED'):
-            self.password_required = True
-            self.password.validators = [pb_validator.CheckPasswordStrength(
-                                        min_len=PROJECT_PWD_MIN_LEN,
-                                        special=False,
-                                        password_required=True), validators.Required()]
-        else:
-            self.password_required = False
-            self.password.validators = [pb_validator.CheckPasswordStrength(
-                                        min_len=PROJECT_PWD_MIN_LEN,
-                                        special=False,
-                                        password_required=False), validators.Optional()]
-
     long_description = TextAreaField(lazy_gettext('Long Description'),
                                      [validators.Required()])
     description = TextAreaField(lazy_gettext('Description'),
