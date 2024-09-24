@@ -145,13 +145,14 @@ class CheckPasswordStrength(object):
             self, message=None, min_len=8,
             max_len=None, uppercase=True,
             lowercase=True, numeric=True,
-            special=True):
+            special=True, password_required=True):
         self.min_len = min_len
         self.max_len = max_len
         self.uppercase = uppercase
         self.lowercase = lowercase
         self.numeric = numeric
         self.special = special
+        self.password_required = password_required
 
         if message:
             self.message = message
@@ -162,6 +163,8 @@ class CheckPasswordStrength(object):
 
     def __call__(self, form, field):
         pwd = field.data
+        if not self.password_required and len(pwd) == 0:
+            return
         valid, message = check_password_strength(
                             pwd, self.min_len, self.max_len,
                             self.uppercase, self.lowercase,
