@@ -575,8 +575,6 @@ def disable_users_job():
 
     # default user deactivation time
     user_interval = current_app.config.get('STALE_USERS_MONTHS') or 3
-    # if disabling extended users, time until this is done
-    ext_user_interval = current_app.config.get('EXTENDED_STALE_USERS_MONTHS') or 9
     # domains that are in extended users category
     ext_user_domains = current_app.config.get('EXTENDED_STALE_USERS_DOMAINS') or []
 
