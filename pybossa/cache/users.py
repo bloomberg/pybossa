@@ -109,10 +109,19 @@ def get_user_summary(name, current_user=None):
                (current_user.id == user['id'])):
                 return user
             else:
+                current_app.logger.info("""
+                    Method get_user_summary(): User restricted. Returning None as user is not current_user
+                    for user name %s, user id %s, user restrict %s, current user id %s, current user name %s,
+                    current user authenticated %s, is_current_user == user %s""",
+                    name, user.get('id'), user.get('restrict'), current_user.id if current_user else None,
+                    current_user.name if current_user else None, current_user.is_authenticated if current_user else False,
+                    current_user.id == user.get('id') if current_user else False)
                 return None
         else:
             return user
-    else:  # pragma: no cover
+    else:
+        current_app.logger.info("Method get_user_summary(): user is None for user name %s, current user id %s, current user name %s",
+            name, current_user.id if current_user else None, current_user.name if current_user else None)
         return None
 
 
@@ -124,6 +133,9 @@ def public_get_user_summary(name):
     if private_user is not None:
         u = User()
         public_user = u.to_public_json(data=private_user)
+    if not public_user:
+        current_app.logger.info("Method public_get_user_summary(): public_user is None for user name %s. private_user None = %s",
+            name, private_user == None)
     return public_user
 
 
