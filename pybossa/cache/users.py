@@ -119,7 +119,7 @@ def get_user_summary(name, current_user=None):
                 return None
         else:
             return user
-    else:  # pragma: no cover
+    else:
         current_app.logger.info("Method get_user_summary(): user is None for user name %s, current user id %s, current user name %s",
             name, current_user.id if current_user else None, current_user.name if current_user else None)
         return None
