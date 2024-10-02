@@ -146,7 +146,8 @@ def project_id_route_converter(projectid, path):
 
 def sanitize_project_owner(project, owner, current_user, ps=None):
     """Sanitize project and owner data."""
-    if current_user.is_authenticated and owner.id == current_user.id:
+    is_current_user_owner = current_user.is_authenticated and owner.id == current_user.id
+    if is_current_user_owner:
         if isinstance(project, Project):
             project_sanitized = project.dictize()   # Project object
         else:
@@ -166,6 +167,13 @@ def sanitize_project_owner(project, owner, current_user, ps=None):
                 project_sanitized = project             # dict object
         owner_sanitized = cached_users.public_get_user_summary(owner.name)
     project_sanitized = deepcopy(project_sanitized)
+
+    if not owner_sanitized:
+        current_app.logger.info("owner_sanitized is None. \
+                            project id %s, project name %s, owner id %s, owner name %s, current user id %s, \
+                            current user name %s, current user authenticated %s, is_current_user == owner %s",
+                            project.id, project.name, owner.id, owner.name, current_user.id, current_user.name,
+                            current_user.is_authenticated, is_current_user_owner)
 
     # remove project, owner creds so that they're unavailable under json response
     project_sanitized['info'].pop('passwd_hash', None)
