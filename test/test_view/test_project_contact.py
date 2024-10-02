@@ -183,7 +183,7 @@ class TestProjectContact(Helper):
     @with_request_context
     @patch('pybossa.cache.users.public_get_user_summary')
     def test_project_sanitize_project_no_owner_not_project_owner(self, public_get_user_summary):
-        """Test Project sanitize_project_owner when no onwer returned and current user not owner."""
+        """Test Project sanitize_project_owner when no owner returned and current user not owner."""
         admin, owner, user = UserFactory.create_batch(3)
         project = ProjectFactory.create(owner=owner, short_name='test-app', name='My New Project')
 
@@ -197,7 +197,7 @@ class TestProjectContact(Helper):
     @with_request_context
     @patch('pybossa.cache.users.get_user_summary')
     def test_project_sanitize_project_no_owner_is_project_owner(self, get_user_summary):
-        """Test Project sanitize_project_owner when no onwer returned and current user is owner."""
+        """Test Project sanitize_project_owner when no owner returned and current user is owner."""
         admin, owner, user = UserFactory.create_batch(3)
         project = ProjectFactory.create(owner=owner, short_name='test-app', name='My New Project')
 
