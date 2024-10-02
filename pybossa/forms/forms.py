@@ -242,7 +242,6 @@ class TaskDefaultRedundancyForm(Form):
                                         task_repo.MAX_REDUNDANCY
                                     )))])
 
-
 class TaskRedundancyForm(Form):
     n_answers = IntegerField(lazy_gettext('Redundancy'),
                              [validators.Required(),
@@ -255,7 +254,6 @@ class TaskRedundancyForm(Form):
                                           task_repo.MIN_REDUNDANCY,
                                           task_repo.MAX_REDUNDANCY
                                       )))])
-
 
 class TaskPriorityForm(Form):
     task_ids = TextField(lazy_gettext('Task IDs'),
@@ -289,6 +287,7 @@ class TaskTimeoutForm(Form):
 class TaskNotificationForm(Form):
     remaining = IntegerField(lazy_gettext('Notify when the number of remaining tasks is less than or equal to'))
     webhook = TextField(lazy_gettext('Webhook URL'))
+
 
 class TaskSchedulerForm(Form):
     _translate_names = lambda variant: (variant[0], lazy_gettext(variant[1]))

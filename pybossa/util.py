@@ -368,6 +368,11 @@ def datetime_filter(source, fmt):
     return source.strftime(fmt)
 
 
+def validate_ownership_id(ownership_id):
+    if ownership_id == None or len(ownership_id) == 0:
+        return True
+    return ownership_id.isnumeric() and len(ownership_id) <= 20
+
 class Pagination(object):
 
     """Class to paginate domain objects."""
