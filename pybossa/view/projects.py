@@ -169,9 +169,10 @@ def sanitize_project_owner(project, owner, current_user, ps=None):
     project_sanitized = deepcopy(project_sanitized)
 
     if not owner_sanitized:
-        current_app.logger.info("owner_sanitized is None. \
-                            project id %s, project name %s, owner id %s, owner name %s, current user id %s, \
-                            current user name %s, current user authenticated %s, is_current_user == owner %s",
+        current_app.logger.info("""owner_sanitized is None after %sget_user_summary().
+                            project id %s, project name %s, owner id %s, owner name %s, current user id %s,
+                            current user name %s, current user authenticated %s, is_current_user == owner %s""",
+                            "public_" if not is_current_user_owner else "",
                             project.id, project.name, owner.id, owner.name, current_user.id, current_user.name,
                             current_user.is_authenticated, is_current_user_owner)
 
