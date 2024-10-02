@@ -205,4 +205,4 @@ class TestProjectContact(Helper):
 
         # Verify error is raised from owner_sanitized.pop().
         with assert_raises(AttributeError) as ex:
-            sanitize_project_owner(project, owner, user)
+            sanitize_project_owner(project, owner, owner)
