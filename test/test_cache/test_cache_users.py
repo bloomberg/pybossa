@@ -55,6 +55,17 @@ class TestUsersCache(Test):
         assert zizou != None, zizou
 
     @with_context
+    def test_get_user_summary_user_exists_restrict(self):
+        """Test CACHE USERS get_user_summary returns a dict with the user data
+        if the user exists restricted"""
+        UserFactory.create(name='zidane', restrict=True)
+        UserFactory.create(name='figo')
+
+        zizou = cached_users.get_user_summary('zidane')
+
+        assert zizou is None, zizou
+
+    @with_context
     def test_public_get_user_summary_user_exists(self):
         """Test public CACHE USERS get_user_summary returns a dict with the user data
         if the user exists"""
