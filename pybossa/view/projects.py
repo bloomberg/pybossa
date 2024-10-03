@@ -3528,9 +3528,8 @@ def ownership_id(short_name):
                 old_ownership_id, new_ownership_id)
             project.info['ownership_id'] = new_ownership_id
             project_repo.save(project)
-            response['ownership_id'] = new_ownership_id
-
-            flash(gettext('Ownership ID updated successfully'), 'success')
+        response['ownership_id'] = new_ownership_id
+        flash(gettext('Ownership ID updated successfully'), 'success')
 
     return handle_content_type(response)
 
