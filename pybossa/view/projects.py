@@ -107,7 +107,7 @@ import pybossa.app_settings as app_settings
 from copy import deepcopy
 from pybossa.cache import delete_memoized
 from sqlalchemy.orm.attributes import flag_modified
-from pybossa.util import admin_or_project_owner
+from pybossa.util import admin_or_project_owner, validate_ownership_id
 
 cors_headers = ['Content-Type', 'Authorization']
 
@@ -3512,6 +3512,35 @@ def del_coowner(short_name, user_name=None):
         return redirect_content_type(url_for('.coowners', short_name=short_name))
     return abort(404)
 
+
+@blueprint.route('/<short_name>/ownership_id', methods=['GET', 'PUT'])
+@login_required
+def ownership_id(short_name):
+    """Manage project project ownership identifer."""
+    project, owner, ps = project_by_shortname(short_name)
+    response = {'title': current_app.config.get('OWNERSHIP_ID_TITLE', 'Ownership ID')}
+
+    if request.method == 'GET':
+        ensure_authorized_to('read', project)
+        response['ownership_id'] = project.info.get('ownership_id', None)
+
+    if request.method == 'PUT':
+        ensure_authorized_to('update', project)
+        data = request.get_json()
+        new_ownership_id = data.get("ownership_id")
+        if not validate_ownership_id(new_ownership_id):
+            flash(gettext('Ownership ID must be numeric and less than 20 characters!'), 'error')
+            handle_content_type(response)
+        old_ownership_id = project.info.get('ownership_id', None)
+        if new_ownership_id != old_ownership_id:
+            auditlogger.log_event(project, current_user, 'update', 'project.ownership_id',
+                old_ownership_id, new_ownership_id)
+            project.info['ownership_id'] = new_ownership_id
+            project_repo.save(project)
+        response['ownership_id'] = new_ownership_id
+        flash(gettext('Ownership ID updated successfully'), 'success')
+
+    return handle_content_type(response)
 
 @blueprint.route('/<short_name>/projectreport/export', methods=['GET', 'POST'])
 @login_required
