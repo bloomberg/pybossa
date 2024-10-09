@@ -35,6 +35,7 @@ from flask import current_app
 from sqlalchemy import or_
 from sqlalchemy.sql import case as sqlalchemy_case
 from pybossa.task_creator_helper import get_task_expiration
+import time
 
 
 class TaskRepository(Repository):
@@ -201,11 +202,31 @@ class TaskRepository(Repository):
             raise DBIntegrityError(e)
 
     def delete(self, element):
+        start_time = time.time()
+        tstart = time.time()
         self._delete(element)
+        tend = time.time()
+        current_app.logger.info("Delete task profiling. Time for self._delete %f seconds (task %d, project %d)", tend - tstart, element.id, element.project_id)
+
         project = element.project
+        tstart = time.time()
         self.db.session.commit()
+        tend = time.time()
+        current_app.logger.info("Delete task profiling. Time for self.db.session.commit %f seconds (task %d, project %d)", tend - tstart, element.id, element.project_id)
+
+        tstart = time.time()
         cached_projects.clean_project(element.project_id)
+        tend = time.time()
+        current_app.logger.info("Delete task profiling. Time for cached_projects.clean_project %f seconds (task %d, project %d)", tend - tstart, element.id, element.project_id)
+
+        tstart = time.time()
         self._delete_zip_files_from_store(project)
+        tend = time.time()
+        current_app.logger.info("Delete task profiling. Time for self._delete_zip_files_from_store %f seconds (task %d, project %d)", tend - tstart, element.id, element.project_id)
+
+        end_time = time.time()
+        time_diff = end_time - start_time
+        current_app.logger.info("Delete task profiling. Total deletion time for task %d, project %d was %f seconds", element.id, element.project_id, time_diff)
 
     def delete_task_by_id(self, project_id, task_id):
         from pybossa.jobs import check_and_send_task_notifications
