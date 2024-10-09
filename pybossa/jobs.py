@@ -719,13 +719,13 @@ def delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_arg
     if not 'bulkdel' in current_app.config.get('SQLALCHEMY_BINDS'):
         sql_session_repl = 'SET session_replication_role TO replica;'
 
-    conditions, params = get_task_filters(task_filter_args)
     # lock tasks for given project with SELECT FOR UPDATE
     # create temp table with all tasks to be deleted
     # during transaction, disable constraints check with session_replication_role
     # delete rows from child talbes first and then from parent
     if not force_reset:
         """Delete only tasks that have no results associated."""
+        params = {}
         sql = text('''
                 BEGIN;
                 SELECT task_id FROM counter WHERE project_id=:project_id FOR UPDATE;
@@ -752,6 +752,7 @@ def delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_arg
                 COMMIT;
                 '''.format(sql_session_repl))
     else:
+        conditions, params = get_task_filters(task_filter_args)
         sql = text('''
                 BEGIN;
                 SELECT task_id FROM counter WHERE project_id=:project_id FOR UPDATE;
