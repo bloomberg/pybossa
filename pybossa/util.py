@@ -368,10 +368,12 @@ def datetime_filter(source, fmt):
     return source.strftime(fmt)
 
 
-def validate_ownership_id(ownership_id):
-    if ownership_id == None or len(ownership_id) == 0:
-        return True
-    return ownership_id.isnumeric() and len(ownership_id) <= 20
+def validate_ownership_id(o_id):
+    ownership_id_title = current_app.config.get('OWNERSHIP_ID_TITLE', 'Ownership ID')
+    if o_id == None or len(o_id) == 0:
+        return
+    if not (o_id.isnumeric() and len(o_id) <= 20):
+        raise ValueError(f"{ownership_id_title} must be numeric and less than 20 characters. Got: {o_id}")
 
 class Pagination(object):
 

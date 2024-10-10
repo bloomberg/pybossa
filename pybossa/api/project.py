@@ -30,7 +30,7 @@ from flask_login import current_user
 from .api_base import APIBase
 from pybossa.model.project import Project
 from pybossa.cache.categories import get_all as get_categories
-from pybossa.util import is_reserved_name, description_from_long_description
+from pybossa.util import is_reserved_name, description_from_long_description, validate_ownership_id
 from pybossa.core import auditlog_repo, result_repo, http_signer
 from pybossa.auditlogger import AuditLogger
 from pybossa.data_access import ensure_user_assignment_to_project, set_default_amp_store
@@ -147,6 +147,7 @@ class ProjectAPI(APIBase):
             msg = "Project short_name is not valid, as it's used by the system."
             raise ValueError(msg)
         ensure_user_assignment_to_project(project)
+        validate_ownership_id(project.info.get('ownership_id'))
 
     def _log_changes(self, old_project, new_project):
         auditlogger.add_log_entry(old_project, new_project, current_user)
