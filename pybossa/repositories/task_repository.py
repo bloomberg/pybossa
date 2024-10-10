@@ -202,31 +202,32 @@ class TaskRepository(Repository):
             raise DBIntegrityError(e)
 
     def delete(self, element):
-        start_time = time.time()
+        total_time = 0
         tstart = time.time()
         self._delete(element)
         tend = time.time()
+        total_time += tend - tstart
         current_app.logger.info("Delete task profiling. Time for self._delete %f seconds (task %d, project %d)", tend - tstart, element.id, element.project_id)
 
         project = element.project
         tstart = time.time()
         self.db.session.commit()
         tend = time.time()
+        total_time += tend - tstart
         current_app.logger.info("Delete task profiling. Time for self.db.session.commit %f seconds (task %d, project %d)", tend - tstart, element.id, element.project_id)
 
         tstart = time.time()
         cached_projects.clean_project(element.project_id)
         tend = time.time()
+        total_time += tend - tstart
         current_app.logger.info("Delete task profiling. Time for cached_projects.clean_project %f seconds (task %d, project %d)", tend - tstart, element.id, element.project_id)
 
         tstart = time.time()
         self._delete_zip_files_from_store(project)
         tend = time.time()
+        total_time += tend - tstart
         current_app.logger.info("Delete task profiling. Time for self._delete_zip_files_from_store %f seconds (task %d, project %d)", tend - tstart, element.id, element.project_id)
-
-        end_time = time.time()
-        time_diff = end_time - start_time
-        current_app.logger.info("Delete task profiling. Total deletion time for task %d, project %d was %f seconds", element.id, element.project_id, time_diff)
+        current_app.logger.info("Delete task profiling. Total deletion time for task %d, project %d was %f seconds", element.id, element.project_id, total_time)
 
     def delete_task_by_id(self, project_id, task_id):
         from pybossa.jobs import check_and_send_task_notifications
