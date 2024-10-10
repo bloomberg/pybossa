@@ -1903,7 +1903,11 @@ class TestMapLocations(Test):
     def test_validate_ownership_id(self):
         # valid ownership_id
         ownership_id = "1111"
-        assert util.validate_ownership_id(ownership_id) == True
+        util.validate_ownership_id(ownership_id)
+
+        # empty ownership_id
+        ownership_id = ""
+        util.validate_ownership_id(ownership_id)
 
         # ownership_id too long
         ownership_id = "12341234123412341234"
