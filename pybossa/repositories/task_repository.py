@@ -202,31 +202,34 @@ class TaskRepository(Repository):
             raise DBIntegrityError(e)
 
     def delete(self, element):
-        start_time = time.time()
         tstart = time.time()
         self._delete(element)
         tend = time.time()
-        current_app.logger.info("Delete task profiling. Time for self._delete %f seconds (task %d, project %d)", tend - tstart, element.id, element.project_id)
+        time_delete = tend - tstart
 
+        tstart = time.time()
         project = element.project
+        tend = time.time()
+        time_project = tend - tstart
+
         tstart = time.time()
         self.db.session.commit()
         tend = time.time()
-        current_app.logger.info("Delete task profiling. Time for self.db.session.commit %f seconds (task %d, project %d)", tend - tstart, element.id, element.project_id)
+        time_commit = tend - tstart
 
         tstart = time.time()
         cached_projects.clean_project(element.project_id)
         tend = time.time()
-        current_app.logger.info("Delete task profiling. Time for cached_projects.clean_project %f seconds (task %d, project %d)", tend - tstart, element.id, element.project_id)
+        time_clean_project = tend - tstart
 
         tstart = time.time()
         self._delete_zip_files_from_store(project)
         tend = time.time()
-        current_app.logger.info("Delete task profiling. Time for self._delete_zip_files_from_store %f seconds (task %d, project %d)", tend - tstart, element.id, element.project_id)
+        time_delete_zip = tend - tstart
 
-        end_time = time.time()
-        time_diff = end_time - start_time
-        current_app.logger.info("Delete task profiling. Total deletion time for task %d, project %d was %f seconds", element.id, element.project_id, time_diff)
+        time_total = time_delete + time_project + time_commit + time_clean_project + time_delete_zip
+        current_app.logger.info("Delete task profiling task %d, project %d Total time %f seconds. self._delete %f seconds, element.project %f seconds, db.session.commit %f seconds, cached_projects.clean_project %f seconds, self._delete_zip_files_from_store %f seconds",
+                                element.id, element.project_id, time_total, time_delete, time_project, time_commit, time_clean_project, time_delete_zip)
 
     def delete_task_by_id(self, project_id, task_id):
         from pybossa.jobs import check_and_send_task_notifications
