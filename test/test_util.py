@@ -1898,3 +1898,17 @@ class TestMapLocations(Test):
         mapped_locations = util.map_locations(input_locations)
 
         assert mapped_locations['locations'] == expected_locations
+
+    @with_context
+    def test_validate_ownership_id(self):
+        # valid ownership_id
+        ownership_id = "1111"
+        assert util.validate_ownership_id(ownership_id) == True
+
+        # ownership_id too long
+        ownership_id = "12341234123412341234"
+        assert_raises(ValueError, util.validate_ownership_id, ownership_id)
+
+        # ownership_id not numeric
+        ownership_id = "1234abcd1234"
+        assert_raises(ValueError, util.validate_ownership_id, ownership_id)
