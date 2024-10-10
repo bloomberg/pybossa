@@ -1909,8 +1909,8 @@ class TestMapLocations(Test):
         ownership_id = ""
         util.validate_ownership_id(ownership_id)
 
-        # ownership_id too long
-        ownership_id = "12341234123412341234"
+        # ownership_id too long (> 20 chars)
+        ownership_id = "123412341234123412341234"
         assert_raises(ValueError, util.validate_ownership_id, ownership_id)
 
         # ownership_id not numeric
