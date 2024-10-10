@@ -725,6 +725,7 @@ def delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_arg
     # delete rows from child talbes first and then from parent
     if not force_reset:
         """Delete only tasks that have no results associated."""
+        params = {}
         sql = text('''
                 BEGIN;
                 SELECT task_id FROM counter WHERE project_id=:project_id FOR UPDATE;
