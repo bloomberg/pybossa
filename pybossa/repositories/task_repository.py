@@ -497,6 +497,8 @@ class TaskRepository(Repository):
         json_taskruns_filename = json_exporter.download_name(project, 'task_run')
         csv_taskruns_filename = csv_exporter.download_name(project, 'task_run')
         container = "user_%s" % project.owner_id
+
+        current_app.logger.info("delete_zip_files_from_store. project %d container %s. delete files %s, %s, %s, %s", project.id, container, json_tasks_filename, csv_tasks_filename, json_taskruns_filename, csv_taskruns_filename)
         uploader.delete_file(json_tasks_filename, container)
         uploader.delete_file(csv_tasks_filename, container)
         uploader.delete_file(json_taskruns_filename, container)
