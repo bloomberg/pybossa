@@ -19,7 +19,7 @@
 
 import os
 import tempfile
-from test import Test
+from test import Test, with_context
 from pybossa.uploader.local import LocalUploader
 from unittest.mock import patch
 from werkzeug.datastructures import FileStorage
@@ -130,6 +130,7 @@ class TestLocalUploader(Test):
         err_msg = "This local path should exist: %s" % path
         assert os.path.isdir(path) is True, err_msg
 
+    @with_context
     @patch('os.remove', return_value=None)
     def test_local_folder_delete(self, mock):
         """Test LOCAL UPLOADER delete works."""

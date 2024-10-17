@@ -69,7 +69,9 @@ class LocalUploader(Uploader):
     def delete_file(self, filename, container):
         """Delete file from filesystem."""
         try:
+            from flask import current_app
             path = self.get_file_path(container, filename)
+            current_app.logger.info("delete_file local delete. container %s, filename %s, path %s", container, filename, path)
             os.remove(path)
             return True
         except Exception:
