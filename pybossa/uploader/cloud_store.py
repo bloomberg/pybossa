@@ -55,9 +55,7 @@ class CloudStoreUploader(Uploader):
 
     def delete_file(self, name, container):  # pragma: no cover
         try:
-            from flask import current_app
             key = self.key_name(container, name)
-            current_app.logger.info("delete_file cloud_store delete. container %s, name %s, key %s", container, name, key)
             self.bucket.delete_key(key)
             return True
         except Exception:
