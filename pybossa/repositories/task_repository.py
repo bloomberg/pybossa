@@ -208,11 +208,6 @@ class TaskRepository(Repository):
         time_delete = tend - tstart
 
         tstart = time.time()
-        project = element.project
-        tend = time.time()
-        time_project = tend - tstart
-
-        tstart = time.time()
         self.db.session.commit()
         tend = time.time()
         time_commit = tend - tstart
@@ -222,14 +217,9 @@ class TaskRepository(Repository):
         tend = time.time()
         time_clean_project = tend - tstart
 
-        tstart = time.time()
-        self._delete_zip_files_from_store(project)
-        tend = time.time()
-        time_delete_zip = tend - tstart
-
-        time_total = time_delete + time_project + time_commit + time_clean_project + time_delete_zip
-        current_app.logger.info("Delete task profiling task %d, project %d Total time %f seconds. self._delete %f seconds, element.project %f seconds, db.session.commit %f seconds, cached_projects.clean_project %f seconds, self._delete_zip_files_from_store %f seconds",
-                                element.id, element.project_id, time_total, time_delete, time_project, time_commit, time_clean_project, time_delete_zip)
+        time_total = time_delete + time_commit + time_clean_project
+        current_app.logger.info("Delete task profiling task %d, project %d Total time %f seconds. self._delete %f seconds, db.session.commit %f seconds, cached_projects.clean_project %f seconds",
+                                element.id, element.project_id, time_total, time_delete, time_commit, time_clean_project)
 
     def delete_task_by_id(self, project_id, task_id):
         from pybossa.jobs import check_and_send_task_notifications
@@ -497,6 +487,7 @@ class TaskRepository(Repository):
         json_taskruns_filename = json_exporter.download_name(project, 'task_run')
         csv_taskruns_filename = csv_exporter.download_name(project, 'task_run')
         container = "user_%s" % project.owner_id
+        current_app.logger.info("delete_zip_files_from_store. project %d container %s. delete files %s, %s, %s, %s", project.id, container, json_tasks_filename, csv_tasks_filename, json_taskruns_filename, csv_taskruns_filename)
         uploader.delete_file(json_tasks_filename, container)
         uploader.delete_file(csv_tasks_filename, container)
         uploader.delete_file(json_taskruns_filename, container)
