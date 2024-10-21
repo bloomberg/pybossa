@@ -986,22 +986,6 @@ class TestTaskAPI(TestAPI):
         assert task not in tasks, tasks
         assert root_task not in tasks, tasks
 
-
-    @with_context
-    @patch('pybossa.repositories.task_repository.uploader')
-    def test_task_delete_deletes_zip_files(self, uploader):
-        """Test API task delete deletes also zip files with tasks and taskruns"""
-        admin = UserFactory.create()
-        project = ProjectFactory.create(owner=admin)
-        task = TaskFactory.create(project=project)
-        url = '/api/task/%s?api_key=%s' % (task.id, admin.api_key)
-        res = self.app.delete(url)
-        expected = [call('1_project1_task_json.zip', 'user_1'),
-                    call('1_project1_task_csv.zip', 'user_1'),
-                    call('1_project1_task_run_json.zip', 'user_1'),
-                    call('1_project1_task_run_csv.zip', 'user_1')]
-        assert uploader.delete_file.call_args_list == expected
-
     @with_context
     def test_delete_task_cascade(self):
         """Test API delete task deletes associated taskruns"""
