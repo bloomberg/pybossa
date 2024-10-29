@@ -213,3 +213,19 @@ def browse_tasks_export_count(obj, project_id, expanded, filters):
         return
     return session.execute(
             sql, dict(project_id=project_id, **filter_params)).scalar()
+
+
+def filter_table_headers(headers, accepted_fields):
+            new_headers = []
+            accepted_fields_set = set(accepted_fields)
+            for header in headers:
+                if header == 'task__info':
+                    pass
+                elif header.startswith('task__info__'):
+                    masked_header = header[12:  ]
+                    print("masked header: ", masked_header)
+                    if masked_header in accepted_fields_set:
+                        new_headers.append(header)
+                else:
+                    new_headers.append(header)
+            return new_headers
