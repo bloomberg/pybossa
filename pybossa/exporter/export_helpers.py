@@ -223,7 +223,6 @@ def filter_table_headers(headers, accepted_fields):
                     pass
                 elif header.startswith('task__info__'):
                     masked_header = header[12:  ]
-                    print("masked header: ", masked_header)
                     if masked_header in accepted_fields_set:
                         new_headers.append(header)
                 else:

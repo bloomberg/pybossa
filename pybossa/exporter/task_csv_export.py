@@ -141,7 +141,7 @@ class TaskCsvExporter(CsvExporter):
             for kk, vv, in iterator:
                 yield kk, vv
 
-    def _get_all_headers(self, objs, expanded, table=None, filters=None):
+    def _get_all_headers(self, objs, expanded, table=None):
         """Construct headers to **guarantee** that all headers
         for all tasks are included, regardless of whether
         or not all tasks were imported with the same headers.
@@ -167,7 +167,8 @@ class TaskCsvExporter(CsvExporter):
         objs = browse_tasks_export(ty, project_id, expanded, filters, disclose_gold)
         rows = [obj for obj in objs]
         headers = self._get_all_headers(objs=rows, expanded=expanded, table=ty)
-        if ('display_info_columns' in filters and len(filters['display_info_columns']) > 0):
+        if (filters and 'display_info_columns' in filters and \
+            len(filters['display_info_columns']) > 0):
             headers = filter_table_headers(headers, filters['display_info_columns'])
 
         formatted_rows = []
