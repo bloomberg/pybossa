@@ -224,14 +224,12 @@ def filter_task_info_headers(headers, accepted_task_info_fields=[]):
 
   for header in headers:
     # skip task__info_header
-    if header == task_info_header:
-      pass
-    # check task info headers for accepted fields
-    elif header.startswith(task_info_header):
-      masked_header = header[task_info_header_len:]
-      if masked_header in accepted_task_info_fields_set:
-        new_headers.append(header)
-    # add all headers unrelated to task info
-    else:
-        new_headers.append(header)
+    if header != task_info_header:
+      if header.startswith(task_info_header):
+        masked_header = header[task_info_header_len:]
+        if masked_header in accepted_task_info_fields_set:
+          new_headers.append(header)
+      # add all headers unrelated to task info
+      else:
+          new_headers.append(header)
   return new_headers
