@@ -18,6 +18,7 @@
 from test import Test, with_context, flask_app
 from test.factories import ProjectFactory, UserFactory, TaskFactory, TaskRunFactory
 from pybossa.jobs import get_export_task_jobs, project_export, export_tasks, export_all_users
+from pybossa.exporter.export_helpers import filter_table_headers
 from unittest.mock import patch
 from nose.tools import assert_raises
 
@@ -130,3 +131,18 @@ class TestExport(Test):
         """Test export_all_users exception handled."""
         with assert_raises(KeyError) as exec:
             export_all_users(None, 'test@test.com')
+
+    @with_context
+    def test_filter_table_headers(self):
+        """Test filter_table_headers filters task__info fields"""
+        input_headers = ['task__calibration', 'task__created', 'task__exported', 'task__id', 'task__info', 'task__info__batch_id', 'task__info__class', 'task__info__document_type', 'task__info__notes', 'task__n_answers', 'task__priority_0', 'task__project_id', 'task__quorum', 'task__state', 'task__user_pref']
+
+        # only task__info__batch_id and task__info__document_type should be present in output headers
+        accepted_task_info_fields = ['batch_id,', 'document_type']
+        output_headers = filter_table_headers(input_headers, accepted_task_info_fields)
+        assert len(output_headers) == 10
+
+        # no task info fields should be present in output headers
+        accepted_task_info_fields = []
+        output_headers = filter_table_headers(input_headers, accepted_task_info_fields)
+        assert len(output_headers) == 8
