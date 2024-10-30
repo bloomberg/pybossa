@@ -30,7 +30,7 @@ from werkzeug.utils import safe_join, secure_filename
 from pybossa.core import uploader
 from pybossa.exporter.csv_export import CsvExporter
 from pybossa.uploader import local
-from .export_helpers import browse_tasks_export, filter_table_headers
+from .export_helpers import browse_tasks_export, filter_task_info_headers
 
 
 class TaskCsvExporter(CsvExporter):
@@ -169,7 +169,7 @@ class TaskCsvExporter(CsvExporter):
         headers = self._get_all_headers(objs=rows, expanded=expanded, table=ty)
         if (filters and 'display_info_columns' in filters and \
             len(filters['display_info_columns']) > 0):
-            headers = filter_table_headers(headers, filters['display_info_columns'])
+            headers = filter_task_info_headers(headers, filters['display_info_columns'])
 
         formatted_rows = []
         for row in rows:
