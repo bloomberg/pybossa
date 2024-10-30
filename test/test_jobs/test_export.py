@@ -138,11 +138,11 @@ class TestExport(Test):
         input_headers = ['task__calibration', 'task__created', 'task__exported', 'task__id', 'task__info', 'task__info__batch_id', 'task__info__class', 'task__info__document_type', 'task__info__notes', 'task__n_answers', 'task__priority_0', 'task__project_id', 'task__quorum', 'task__state', 'task__user_pref']
 
         # only task__info__batch_id and task__info__document_type should be present in output headers
-        accepted_task_info_fields = ['batch_id,', 'document_type']
+        accepted_task_info_fields = ['batch_id', 'document_type']
         output_headers = filter_table_headers(input_headers, accepted_task_info_fields)
-        assert len(output_headers) == 10
+        assert len(output_headers) == 12
 
         # no task info fields should be present in output headers
         accepted_task_info_fields = []
         output_headers = filter_table_headers(input_headers, accepted_task_info_fields)
-        assert len(output_headers) == 8
+        assert len(output_headers) == 10
