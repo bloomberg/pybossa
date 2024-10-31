@@ -213,3 +213,23 @@ def browse_tasks_export_count(obj, project_id, expanded, filters):
         return
     return session.execute(
             sql, dict(project_id=project_id, **filter_params)).scalar()
+
+
+def filter_task_info_headers(headers, accepted_task_info_fields=[]):
+  new_headers = []
+  accepted_task_info_fields_set = set(accepted_task_info_fields)
+  task_info_header = "task__info"
+  # account for the double underscore after task__info in headers
+  task_info_header_len = len(task_info_header) + 2
+
+  for header in headers:
+    # skip task info_header
+    if header != task_info_header:
+      if header.startswith(task_info_header):
+        masked_header = header[task_info_header_len:]
+        if masked_header in accepted_task_info_fields_set:
+          new_headers.append(header)
+      # add all headers unrelated to task info
+      else:
+          new_headers.append(header)
+  return new_headers
