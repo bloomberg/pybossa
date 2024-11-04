@@ -101,9 +101,9 @@ class TaskAPI(APIBase):
 
         if 'n_answers' not in data:
             project = project_repo.get(project_id)
-            data['n_answers'] = project.get_default_n_answers()
             if not project:
                 raise NotFound(f'Non existing project id {project_id}')
+            data['n_answers'] = project.get_default_n_answers()
         user_pref = data.get('user_pref', {})
         if user_pref.get('languages'):
             user_pref['languages'] = [s.lower() for s in user_pref.get('languages', [])]
