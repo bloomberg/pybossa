@@ -950,20 +950,23 @@ class TestTaskAPI(TestAPI):
         root_task = TaskFactory.create(project=project)
 
         ## anonymous
-        res = self.app.delete('/api/task/%s' % task.id)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete('/api/task/%s' % task.id)
         error_msg = 'Anonymous should not be allowed to delete'
         print(res.status)
         assert_equal(res.status, '401 UNAUTHORIZED', error_msg)
 
         ### real user but not allowed as not owner!
         url = '/api/task/%s?api_key=%s' % (task.id, non_owner.api_key)
-        res = self.app.delete(url)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete(url)
         error_msg = 'Should not be able to update tasks of others'
         assert_equal(res.status, '403 FORBIDDEN', error_msg)
 
         #### real user
         # DELETE with not allowed args
-        res = self.app.delete(url + "&foo=bar")
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete(url + "&foo=bar")
         err = json.loads(res.data)
         assert res.status_code == 415, err
         assert err['status'] == 'failed', err
@@ -973,13 +976,15 @@ class TestTaskAPI(TestAPI):
 
         # DELETE returns 204
         url = '/api/task/%s?api_key=%s' % (task.id, user.api_key)
-        res = self.app.delete(url)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete(url)
         assert_equal(res.status, '204 NO CONTENT', res.data)
         assert res.data == b'', res.data  # res.data is bytes type
 
         #### root user
         url = '/api/task/%s?api_key=%s' % (root_task.id, admin.api_key)
-        res = self.app.delete(url)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete(url)
         assert_equal(res.status, '204 NO CONTENT', res.data)
 
         tasks = task_repo.filter_tasks_by(project_id=project.id)
@@ -992,10 +997,12 @@ class TestTaskAPI(TestAPI):
         task = TaskFactory.create()
         task_runs = TaskRunFactory.create_batch(3, task=task)
         url = '/api/task/%s?api_key=%s' % (task.id, task.project.owner.api_key)
-        res = self.app.delete(url)
+        task_id = task.id
+        with patch.dict(self.flask_app.config, {'SESSION_REPLICATION_ROLE_DISABLED': True}):
+            res = self.app.delete(url)
 
         assert_equal(res.status, '204 NO CONTENT', res.data)
-        task_runs = task_repo.filter_task_runs_by(task_id=task.id)
+        task_runs = task_repo.filter_task_runs_by(task_id=task_id)
         assert len(task_runs) == 0, "There should not be any task run for task"
 
     @with_context
@@ -1034,7 +1041,8 @@ class TestTaskAPI(TestAPI):
 
         url = '/api/task/%s?api_key=%s' % (result.task_id,
                                            admin.api_key)
-        res = self.app.delete(url)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete(url)
         assert_equal(res.status, '204 NO CONTENT', res.status)
 
     @with_context
@@ -1051,7 +1059,8 @@ class TestTaskAPI(TestAPI):
 
         url = '/api/task/%s?api_key=%s' % (result.task_id,
                                            admin.api_key)
-        res = self.app.delete(url)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete(url)
         assert_equal(res.status, '204 NO CONTENT', res.status)
 
     @with_context
@@ -1068,7 +1077,8 @@ class TestTaskAPI(TestAPI):
         assert len(items) == 10
 
         task_id = task.id
-        task_repo.delete(task)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            task_repo.delete(task)
         items = db.session.query(Counter).filter_by(project_id=project.id).all()
         assert len(items) == 9
         items = db.session.query(Counter).filter_by(task_id=task_id).all()
@@ -1103,7 +1113,8 @@ class TestTaskAPI(TestAPI):
         items = db.session.query(Counter).filter_by(project_id=project.id).all()
         assert len(items) == 10, len(items)
 
-        res = self.app.delete('/api/task/%s?api_key=%s' % (created_task['id'],
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete('/api/task/%s?api_key=%s' % (created_task['id'],
                                                            project.owner.api_key))
         items = db.session.query(Counter).filter_by(project_id=project.id).all()
         assert len(items) == 9

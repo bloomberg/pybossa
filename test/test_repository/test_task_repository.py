@@ -721,9 +721,11 @@ class TestTaskRepositorySaveDeleteUpdate(Test):
         """Test delete removes the Task instance"""
 
         task = TaskFactory.create()
+        task_id = task.id
 
-        self.task_repo.delete(task)
-        deleted = self.task_repo.get_task(task.id)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            self.task_repo.delete(task)
+        deleted = self.task_repo.get_task(task_id)
 
         assert deleted is None, deleted
 
@@ -734,9 +736,11 @@ class TestTaskRepositorySaveDeleteUpdate(Test):
 
         task = TaskFactory.create()
         taskrun = TaskRunFactory.create(task=task)
+        taskrun_id = taskrun.id
 
-        self.task_repo.delete(task)
-        deleted = self.task_repo.get_task_run(taskrun.id)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            self.task_repo.delete(task)
+        deleted = self.task_repo.get_task_run(taskrun_id)
 
         assert deleted is None, deleted
 

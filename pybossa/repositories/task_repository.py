@@ -201,7 +201,24 @@ class TaskRepository(Repository):
         except IntegrityError as e:
             raise DBIntegrityError(e)
 
+    def _delete(self, element):
+        table = element.__class__
+        inst = self.db.session.query(table).filter(table.id==element.id).first()
+        self.db.session.delete(inst)
+
+    def delete_taskrun(self, element):
+        self._delete(element)
+        self.db.session.commit()
+        cached_projects.clean_project(element.project_id)
+
     def delete(self, element):
+        # task repo is shared between task and taskun
+        # call taskrun specific delete for taskrun deletes
+        self._validate_can_be('deleted', element)
+        if element.__tablename__ == "task_run":
+            self.delete_taskrun(element)
+            return
+
         tstart = time.perf_counter()
         self._validate_can_be('deleted', element)
         tend = time.perf_counter()
