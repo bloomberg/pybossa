@@ -203,33 +203,58 @@ class TaskRepository(Repository):
 
     def delete(self, element):
         tstart = time.perf_counter()
-        self._delete(element)
+        self._validate_can_be('deleted', element)
         tend = time.perf_counter()
-        time_delete = tend - tstart
+        time_validate = tend - tstart
 
         tstart = time.perf_counter()
-        project = element.project
+        project_id, task_id = element.project_id, element.id
         tend = time.perf_counter()
-        time_project = tend - tstart
+        time_pid_tid = tend - tstart
+
+        if current_app.config.get("SESSION_REPLICATION_ROLE_DISABLED"):
+            # with session_replication_role disabled, follow regular path of data cleanup
+            # from child tables via ON CASCADE DELETE configured on task table
+            sql = text('''
+                DELETE FROM task WHERE project_id=:project_id AND id=:task_id;
+                ''')
+        else:
+            # expedite the deletion process that cleans up data from child tables
+            # using set session_replication_role within db transaction. 'bulkdel'
+            # when configured has session_replication_role set and its not required
+            # to set it explicitly within db transaction
+            sql_session_repl = ''
+            if not 'bulkdel' in current_app.config.get('SQLALCHEMY_BINDS'):
+                sql_session_repl = 'SET session_replication_role TO replica;'
+
+            sql = text('''
+                BEGIN;
+                {}
+                DELETE FROM counter WHERE project_id=:project_id AND task_id=:task_id;
+                DELETE FROM result WHERE project_id=:project_id AND task_id=:task_id;
+                DELETE FROM task_run WHERE project_id=:project_id AND task_id=:task_id;
+                DELETE FROM task WHERE project_id=:project_id AND id=:task_id;
+                COMMIT;
+                '''.format(sql_session_repl))
 
         tstart = time.perf_counter()
-        self.db.session.commit()
+        self.db.bulkdel_session.execute(sql, dict(project_id=project_id, task_id=task_id))
+        tend = time.perf_counter()
+        time_sql_exec = tend - tstart
+
+        tstart = time.perf_counter()
+        self.db.bulkdel_session.commit()
         tend = time.perf_counter()
         time_commit = tend - tstart
 
         tstart = time.perf_counter()
-        cached_projects.clean_project(element.project_id)
+        cached_projects.clean_project(project_id)
         tend = time.perf_counter()
         time_clean_project = tend - tstart
 
-        tstart = time.perf_counter()
-        self._delete_zip_files_from_store(project)
-        tend = time.perf_counter()
-        time_delete_zip = tend - tstart
-
-        time_total = time_delete + time_project + time_commit + time_clean_project + time_delete_zip
-        current_app.logger.info("Delete task profiling task %d, project %d Total time %f seconds. self._delete %f seconds, element.project %f seconds, db.session.commit %f seconds, cached_projects.clean_project %f seconds, self._delete_zip_files_from_store %f seconds",
-                                element.id, element.project_id, time_total, time_delete, time_project, time_commit, time_clean_project, time_delete_zip)
+        time_total = time_validate + time_pid_tid + time_sql_exec + time_commit + time_clean_project
+        current_app.logger.info("Delete task profiling task %d, project %d Total time %.10f seconds. self._validate_can_be %.10f seconds, element.project_id task_id %.10f seconds, db.session.execute %.10f seconds, db.session.commit %.10f seconds, cached_projects.clean_project %.10f seconds",
+                                task_id, project_id, time_total, time_validate, time_pid_tid, time_sql_exec, time_commit, time_clean_project)
 
     def delete_task_by_id(self, project_id, task_id):
         from pybossa.jobs import check_and_send_task_notifications
@@ -480,12 +505,6 @@ class TaskRepository(Repository):
             name = element.__class__.__name__
             msg = '%s cannot be %s by %s' % (name, action, self.__class__.__name__)
             raise WrongObjectError(msg)
-
-    def _delete(self, element):
-        self._validate_can_be('deleted', element)
-        table = element.__class__
-        inst = self.db.session.query(table).filter(table.id==element.id).first()
-        self.db.session.delete(inst)
 
     def _delete_zip_files_from_store(self, project):
         from pybossa.core import json_exporter, csv_exporter
