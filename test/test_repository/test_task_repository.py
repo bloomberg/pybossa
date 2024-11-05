@@ -18,7 +18,7 @@
 # Cache global variables for timeouts
 
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from nose.tools import assert_raises
 
@@ -729,6 +729,21 @@ class TestTaskRepositorySaveDeleteUpdate(Test):
 
         assert deleted is None, deleted
 
+    @with_context
+    def test_delete_task_with_session_repl_role(self):
+        """Test delete includes sessions_replication_role"""
+
+        task = TaskFactory.create()
+        task_id = task.id
+
+        self.task_repo.db = MagicMock()
+        self.task_repo.delete(task)
+        args = self.task_repo.db.bulkdel_session.execute.call_args
+        assert self.task_repo.db.bulkdel_session.execute.called
+
+        sql_param = args[0][0]
+        sql = str(sql_param.compile(compile_kwargs={"literal_binds": True}))
+        assert "SET session_replication_role TO replica" in sql
 
     @with_context
     def test_delete_task_deletes_dependent_taskruns(self):
