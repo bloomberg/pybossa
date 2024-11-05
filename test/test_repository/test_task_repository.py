@@ -18,7 +18,7 @@
 # Cache global variables for timeouts
 
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from nose.tools import assert_raises
 
@@ -721,12 +721,29 @@ class TestTaskRepositorySaveDeleteUpdate(Test):
         """Test delete removes the Task instance"""
 
         task = TaskFactory.create()
+        task_id = task.id
 
-        self.task_repo.delete(task)
-        deleted = self.task_repo.get_task(task.id)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            self.task_repo.delete(task)
+        deleted = self.task_repo.get_task(task_id)
 
         assert deleted is None, deleted
 
+    @with_context
+    def test_delete_task_with_session_repl_role(self):
+        """Test delete includes sessions_replication_role"""
+
+        task = TaskFactory.create()
+        task_id = task.id
+
+        self.task_repo.db = MagicMock()
+        self.task_repo.delete(task)
+        args = self.task_repo.db.bulkdel_session.execute.call_args
+        assert self.task_repo.db.bulkdel_session.execute.called
+
+        sql_param = args[0][0]
+        sql = str(sql_param.compile(compile_kwargs={"literal_binds": True}))
+        assert "SET session_replication_role TO replica" in sql
 
     @with_context
     def test_delete_task_deletes_dependent_taskruns(self):
@@ -734,9 +751,11 @@ class TestTaskRepositorySaveDeleteUpdate(Test):
 
         task = TaskFactory.create()
         taskrun = TaskRunFactory.create(task=task)
+        taskrun_id = taskrun.id
 
-        self.task_repo.delete(task)
-        deleted = self.task_repo.get_task_run(taskrun.id)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            self.task_repo.delete(task)
+        deleted = self.task_repo.get_task_run(taskrun_id)
 
         assert deleted is None, deleted
 
