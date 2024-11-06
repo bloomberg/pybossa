@@ -745,7 +745,7 @@ class TestTaskAPI(TestAPI):
 
         assert res.status_code == 404, res.status_code
         error = json.loads(res.data)
-        assert error['exception_msg'] == f"Non existing project id {project_id}", error
+        assert error['exception_msg'] == f"404 Not Found: Non existing project id {project_id}", error
 
     @with_context
     def test_task_post_with_reserved_fav_user_ids(self):
