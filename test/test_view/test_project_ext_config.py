@@ -10,6 +10,26 @@ user_repo = UserRepository(db)
 
 
 class TestProjectExtConfig(web.Helper):
+    external_config_patch = {
+        "EXTERNAL_CONFIGURATIONS": {
+            "authorized_services": {
+                "display": "Authorized Services",
+                "fields": {
+                    "service_key": [
+                        "SelectMultipleField",
+                        "Authorized Services",
+                        None,
+                        {
+                            "choices": [
+                                ("test-service-1", "test-service-1"),
+                                ("test-service-2", "test-service-2"),
+                            ],
+                        },
+                    ]
+                },
+            }
+        }
+    }
 
     @with_context
     def setUp(self):
@@ -27,6 +47,26 @@ class TestProjectExtConfig(web.Helper):
         res = self.app.get('/project/%s/ext-config' % project.short_name)
 
         assert 'No external services have been configured' in str(res.data)
+
+    @with_context
+    def test_form_display_authorized_services_admin(self):
+        with patch.dict(self.flask_app.config, self.external_config_patch):
+            project = project_repo.get(self.project_id)
+            res = self.app.get("/project/%s/ext-config" % project.short_name)
+            # Only admins can see 'Authorized Services' form
+            assert "Authorized Services" in str(res.data)
+
+    @with_context
+    def test_form_display_authorized_services_non_admin(self):
+        with patch.dict(self.flask_app.config, self.external_config_patch):
+            non_admin = UserFactory.create(email_addr="b@b.com", admin=False)
+            non_admin.set_password("1234")
+            user_repo.save(non_admin)
+            project = ProjectFactory.create(owner=non_admin)
+            self.signin(email="b@b.com", password="1234")
+            res = self.app.get("/project/%s/ext-config" % project.short_name)
+            # Non-admins cannot see 'Authorized Services' form
+            assert "Authorized Services" not in str(res.data)
 
     @with_context
     def test_form_display(self):
@@ -65,7 +105,7 @@ class TestProjectExtConfig(web.Helper):
 
         project = project_repo.get(self.project_id)
         assert project.info['ext_config']['ml_service']['model'] == 'random_forest'
-        
+
     @with_context
     def test_update_config(self):
         ext_config = {
@@ -77,7 +117,7 @@ class TestProjectExtConfig(web.Helper):
                 }
             }
 
-        with patch.dict(self.flask_app.config, 
+        with patch.dict(self.flask_app.config,
                         {'EXTERNAL_CONFIGURATIONS': ext_config}):
             project = project_repo.get(self.project_id)
             self.app.post('/project/%s/ext-config' % project.short_name)
