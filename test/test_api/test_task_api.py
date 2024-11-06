@@ -735,6 +735,19 @@ class TestTaskAPI(TestAPI):
         assert error['exception_msg'] == "Reserved keys in payload", error
 
     @with_context
+    def test_task_post_with_notfound_project_id(self):
+        user = UserFactory.create()
+        project_id = 99999
+        data = dict(project_id=project_id, info='my task data')
+
+        res = self.app.post('/api/task?api_key=' + user.api_key,
+                            data=json.dumps(data))
+
+        assert res.status_code == 404, res.status_code
+        error = json.loads(res.data)
+        assert error['exception_msg'] == f"Non existing project id {project_id}", error
+
+    @with_context
     def test_task_post_with_reserved_fav_user_ids(self):
         user = UserFactory.create()
         project = ProjectFactory.create(owner=user)
