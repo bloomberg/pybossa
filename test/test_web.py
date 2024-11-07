@@ -11385,6 +11385,7 @@ class TestServiceRequest(web.Helper):
 
         from flask import current_app, Response
         current_app.config['PROXY_SERVICE_CONFIG'] = None
+        current_app.config["AUTHORIZED_SERVICES_KEY"] = "service_key"
         has_lock.return_value = True
         url = "/api/task/1/services/test-service-name/1/31"
 
@@ -11442,6 +11443,7 @@ class TestServiceRequest(web.Helper):
                     }
                 }
         }
+        current_app.config["AUTHORIZED_SERVICES_KEY"] = "service_key"
         user = UserFactory.create()
         user.set_password('1234')
         user_repo.save(user)
@@ -11525,7 +11527,7 @@ class TestServiceRequest(web.Helper):
                     }
                 }
         }
-
+        current_app.config["AUTHORIZED_SERVICES_KEY"] = "service_key"
         valid_request = {
             'data': { 'queryTest':{
                 'context':"test_context",
@@ -11572,7 +11574,7 @@ class TestServiceRequest(web.Helper):
                 }
             },
         }
-
+        current_app.config["AUTHORIZED_SERVICES_KEY"] = "service_key"
         valid_request = {
             "data": {
                 "queryTest": {
