@@ -11538,6 +11538,7 @@ class TestServiceRequest(web.Helper):
         user = UserFactory.create()
         user.set_password('1234')
         user_repo.save(user)
+        self.signin(email=user.email_addr, password='1234')
         ext_config = {"authorized_services": {"service_key": ["test-service-name"]}}
         project = ProjectFactory.create(owner=user, info={"ext_config": ext_config})
         task = TaskFactory.create(project=project)
