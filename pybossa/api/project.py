@@ -51,7 +51,7 @@ class ProjectAPI(APIBase):
     __class__ = Project
     reserved_keys = set(['id', 'created', 'updated', 'completed', 'contacted', 'secret_key'])
     private_keys = set(['secret_key'])
-    restricted_keys = set()
+    restricted_keys = set(['info::ext_config::authorized_services'])
 
     def _has_filterable_attribute(self, attribute):
         if attribute not in ["coowner_id"]:

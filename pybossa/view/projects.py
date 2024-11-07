@@ -108,6 +108,7 @@ from copy import deepcopy
 from pybossa.cache import delete_memoized
 from sqlalchemy.orm.attributes import flag_modified
 from pybossa.util import admin_or_project_owner, validate_ownership_id
+from pybossa.api.project import ProjectAPI
 
 cors_headers = ['Content-Type', 'Authorization']
 
@@ -3687,6 +3688,12 @@ def sync_project(short_name):
     return redirect_content_type(
         url_for('.publish', short_name=short_name))
 
+def remove_restricted_keys(forms):
+    for restricted_key in list(ProjectAPI.restricted_keys):
+        restricted_key = restricted_key.split("::")[-1]
+        if not current_user.admin:
+            forms.pop(restricted_key, None)
+
 @blueprint.route('/<short_name>/project-config', methods=['GET', 'POST'])
 @login_required
 @admin_or_subadmin_required
@@ -3700,6 +3707,7 @@ def project_config(short_name):
                                                             current_user,
                                                             ps)
     forms = current_app.config.get('EXTERNAL_CONFIGURATIONS_VUE', {})
+    remove_restricted_keys(forms)
 
     def generate_input_forms_and_external_config_dict():
         '''
@@ -3796,6 +3804,7 @@ def ext_config(short_name):
     ensure_authorized_to('update', project)
 
     forms = current_app.config.get('EXTERNAL_CONFIGURATIONS', {})
+    remove_restricted_keys(forms)
 
     form_classes = []
     for form_name, form_config in forms.items():

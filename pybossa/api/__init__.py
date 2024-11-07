@@ -720,6 +720,15 @@ def get_service_request(task_id, service_name, major_version, minor_version):
     task = task_repo.get_task(task_id)
     project = project_repo.get(task.project_id)
 
+    authorized_services_key = current_app.config.get("AUTHORIZED_SERVICES_KEY", None)
+    authorized_services = (
+        project.info.get("ext_config", {})
+        .get("authorized_services", {})
+        .get(authorized_services_key, [])
+    )
+    if service_name not in authorized_services:
+        return abort(403, "The project is not authorized to access this service")
+
     if not (task and proxy_service_config and service_name and major_version and minor_version):
         return abort(400)
 

@@ -11385,12 +11385,14 @@ class TestServiceRequest(web.Helper):
 
         from flask import current_app, Response
         current_app.config['PROXY_SERVICE_CONFIG'] = None
+        current_app.config["AUTHORIZED_SERVICES_KEY"] = "service_key"
         has_lock.return_value = True
         url = "/api/task/1/services/test-service-name/1/31"
 
         admin = UserFactory.create()
         self.signin_user(admin)
-        project = ProjectFactory.create(owner=admin)
+        ext_config = {"authorized_services": {"service_key": ["test-service-name"]}}
+        project = ProjectFactory.create(owner=admin, info={"ext_config": ext_config})
         task = TaskFactory.create(project=project)
         payload = {'test': 'test'}
 
@@ -11441,11 +11443,14 @@ class TestServiceRequest(web.Helper):
                     }
                 }
         }
+        current_app.config["AUTHORIZED_SERVICES_KEY"] = "service_key"
         user = UserFactory.create()
         user.set_password('1234')
         user_repo.save(user)
         self.signin(email=user.email_addr, password='1234')
-        project = ProjectFactory.create(owner=user)
+
+        ext_config = {"authorized_services": {"service_key": ["test-service-name"]}}
+        project = ProjectFactory.create(owner=user, info={"ext_config": ext_config})
         task = TaskFactory.create(project=project)
 
         # invalid payload
@@ -11522,7 +11527,7 @@ class TestServiceRequest(web.Helper):
                     }
                 }
         }
-
+        current_app.config["AUTHORIZED_SERVICES_KEY"] = "service_key"
         valid_request = {
             'data': { 'queryTest':{
                 'context':"test_context",
@@ -11534,7 +11539,8 @@ class TestServiceRequest(web.Helper):
         user.set_password('1234')
         user_repo.save(user)
         self.signin(email=user.email_addr, password='1234')
-        project = ProjectFactory.create(owner=user)
+        ext_config = {"authorized_services": {"service_key": ["test-service-name"]}}
+        project = ProjectFactory.create(owner=user, info={"ext_config": ext_config})
         task = TaskFactory.create(project=project)
 
         res = self.app_post_json(url,
@@ -11542,3 +11548,57 @@ class TestServiceRequest(web.Helper):
                             follow_redirects=False,
                             )
         assert res.data.decode() == mock_response.content, res.data
+
+    @with_context
+    @patch("pybossa.api.requests.post")
+    @patch("pybossa.api.has_lock")
+    def test_service_request_with_unauthorized_service(self, has_lock, post):
+        """Test with valid payload but to an unauthorized service"""
+        from flask import current_app, Response
+
+        class MockResponse(object):
+            def __init__(self, content):
+                self.content = content
+
+        has_lock.return_value = True
+        mock_response = MockResponse('{"test": "test"}')
+        post.return_value = mock_response
+
+        current_app.config["PROXY_SERVICE_CONFIG"] = {
+            "uri": "http://test-service.com:8080",
+            "services": {
+                "test-service-name": {
+                    "headers": {"CCRT-test": "test"},
+                    "requests": ["queryTest"],
+                    "context": ["test_context"],
+                    "validators": ["is_valid_query", "is_valid_context"],
+                }
+            },
+        }
+        current_app.config["AUTHORIZED_SERVICES_KEY"] = "service_key"
+        valid_request = {
+            "data": {
+                "queryTest": {
+                    "context": "test_context",
+                    "query": "foo",
+                    "maxresults": 10,
+                }
+            }
+        }
+
+        url = "/api/task/1/services/test-service-name/1/37"
+        user = UserFactory.create()
+        user.set_password("1234")
+        user_repo.save(user)
+        self.signin(email=user.email_addr, password="1234")
+        ext_config = {"authorized_services": {"service_key": ["a-random-service"]}}
+        project = ProjectFactory.create(owner=user, info={"ext_config": ext_config})
+        task = TaskFactory.create(project=project)
+
+        res = self.app_post_json(
+            url,
+            data=valid_request,
+            follow_redirects=False,
+        )
+        data = json.loads(res.data)
+        assert data.get("status_code") == 403, data
