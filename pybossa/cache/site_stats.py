@@ -427,23 +427,29 @@ def n_projects_using_component(days='all', component=None):
     """
     component = '%' + component + '%'
     sql = '''
-            SELECT
-                count(project.id) AS n_projects,
-                string_agg(project.id::text, ', ') AS project_ids,
-                string_agg(project.short_name, ', ') AS project_names,
-                string_agg("user".id::text, ', ') AS owner_ids,
-                string_agg("user".name::text, ', ') AS owner_names,
-                string_agg("user".email_addr::text, ', ') AS owner_emails
-            FROM project
-            LEFT JOIN "user" ON project.owner_id = "user".id
-            WHERE project.info->>'task_presenter' like :component
+        SELECT
+            count(project.id) AS n_projects,
+            string_agg(project.id::text, ', ') AS project_ids,
+            string_agg(project.short_name, ', ') AS project_names,
+            string_agg("user".id::text, ', ') AS owner_ids,
+            string_agg("user".name::text, ', ') AS owner_names,
+            string_agg("user".email_addr::text, ', ') AS owner_emails,
+            string_agg(finish_time_agg.max_finish_time::text, ', ') AS finish_times
+        FROM project
+        LEFT JOIN "user" ON project.owner_id = "user".id
+        LEFT JOIN (
+            SELECT project_id, MAX(finish_time) AS max_finish_time
+            FROM task_run
+            GROUP BY project_id
+        ) AS finish_time_agg ON finish_time_agg.project_id = project.id
+        WHERE project.info->>'task_presenter' like :component
         '''
     if days != 'all':
         sql += '''
             AND to_timestamp(project.updated, 'YYYY-MM-DD"T"HH24:MI:SS.US') > current_timestamp - interval ':days days'
         '''
     sql += '''
-            GROUP BY "user".id
+            GROUP BY project.id, "user".id
         '''
     data = {'days' : days, 'component' : component}
 
