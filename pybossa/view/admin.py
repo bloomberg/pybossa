@@ -35,6 +35,8 @@ from rq import Queue
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import ProgrammingError
 from werkzeug.exceptions import HTTPException
+from datetime import datetime, MINYEAR
+from collections import OrderedDict
 
 import pybossa.app_settings as app_settings
 import pybossa.dashboard.data as dashb
@@ -580,6 +582,31 @@ def management_dashboard():
                            submission_chart=submission_chart)
 
 
+def sort_stats_by_last_submission(stats):
+    sorted_stats = OrderedDict()
+    for component, records in stats.items():
+        finish_times_index = 6
+
+        def sort_key(record):
+            # Ensure the record has enough elements resulting from the query.
+            if len(record) > finish_times_index:
+                finish_times_str = record[finish_times_index]
+                if finish_times_str:
+                    # Convert each finish time string to datetime, ignoring 'None' or empty dates.
+                    finish_times = [
+                        datetime.strptime(finish_time.strip(), "%Y-%m-%dT%H:%M:%S.%f")
+                        for finish_time in finish_times_str.split(',')
+                        if finish_time.strip() not in ('None', '')
+                    ]
+                    return max(finish_times, default=datetime(MINYEAR, 1, 1))
+            return datetime(MINYEAR, 1, 1)  # Default sort value for records without finish_times.
+
+        sorted_records = sorted(records, key=sort_key, reverse=True)
+        sorted_stats[component] = sorted_records
+
+    return sorted_stats
+
+
 @blueprint.route('/usage_dashboard/')
 @login_required
 @admin_required
@@ -593,8 +620,12 @@ def usage_dashboard():
         days = int(days)
 
     stats = load_usage_dashboard_data(days)
+
+    # Sort stats by last_submission date descending.
+    sorted_stats = sort_stats_by_last_submission(stats)
+
     return render_template('admin/usage_dashboard.html',
-                           stats=stats)
+                           stats=sorted_stats)
 
 
 @blueprint.route('/subadminusers', methods=['GET', 'POST'])

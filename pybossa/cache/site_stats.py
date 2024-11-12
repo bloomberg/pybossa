@@ -434,7 +434,8 @@ def n_projects_using_component(days='all', component=None):
             string_agg("user".id::text, ', ') AS owner_ids,
             string_agg("user".name::text, ', ') AS owner_names,
             string_agg("user".email_addr::text, ', ') AS owner_emails,
-            string_agg(finish_time_agg.max_finish_time::text, ', ') AS finish_times
+            string_agg(finish_time_agg.max_finish_time::text, ', ') AS finish_times,
+            string_agg(project.published::text, ', ') AS project_published
         FROM project
         LEFT JOIN "user" ON project.owner_id = "user".id
         LEFT JOIN (
