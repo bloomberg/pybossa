@@ -247,7 +247,6 @@ class TaskRepository(Repository):
             sql = text('''
                 BEGIN;
                 {}
-                DELETE FROM counter WHERE project_id=:project_id AND task_id=:task_id;
                 DELETE FROM result WHERE project_id=:project_id AND task_id=:task_id;
                 DELETE FROM task_run WHERE project_id=:project_id AND task_id=:task_id;
                 DELETE FROM task WHERE project_id=:project_id AND id=:task_id;
