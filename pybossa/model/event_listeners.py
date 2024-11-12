@@ -338,13 +338,6 @@ def create_zero_counter(mapper, conn, target):
     conn.execute(sql_query)
 
 
-@event.listens_for(Task, 'after_delete')
-def delete_task_counter(mapper, conn, target):
-    sql_query = ("delete from counter where project_id=%s and task_id=%s"
-                 % (target.project_id, target.id))
-    conn.execute(sql_query)
-
-
 @event.listens_for(TaskRun, 'after_insert')
 def increase_task_counter(mapper, conn, target):
     sql_query = ("insert into counter(created, project_id, task_id, n_task_runs) \
