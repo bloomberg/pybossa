@@ -1021,4 +1021,4 @@ def get_project_progress(project_id=None, short_name=None):
         response = project_repo.get_total_and_completed_task_count(project.id)
         return Response(json.dumps(response), status=200, mimetype="application/json")
     else:
-        return abort(404)
+        return abort(403)

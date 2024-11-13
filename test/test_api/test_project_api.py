@@ -2525,7 +2525,7 @@ class TestProjectAPI(TestAPI):
         make_subadmin(subadminowner)
         make_subadmin(subadmin)
 
-        project = ProjectFactory.create(owner=subadminowner)
+        project = ProjectFactory.create(owner=subadminowner, short_name="testproject")
         n_answers = 2
         tasks = TaskFactory.create_batch(3, project=project, n_answers=n_answers)
         headers = [('Authorization', subadminowner.api_key)]
@@ -2571,23 +2571,28 @@ class TestProjectAPI(TestAPI):
 
         # accessing api with subadmin user who's not owner fails
         headers = [('Authorization', subadmin.api_key)]
-        # query for the count of all tasks in the propject
         res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
-        assert res.status_code == 404
+        assert res.status_code == 403
 
         # accessing api with regular user fails
         headers = [('Authorization', reguser.api_key)]
         # query for the count of all tasks in the propject
         res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
-        assert res.status_code == 404
+        assert res.status_code == 403
+
+        # accessing api with anonymous user fails
+        res = self.app.get('/api/project/1/projectprogress')
+        data = json.loads(res.data)
+        assert data['status_code'] == 401, "anonymous user should not have acess to project api"
 
         # accessing api with admin user pass
         headers = [('Authorization', admin.api_key)]
-        # query for the count of all tasks in the propject
+        # query for the count of total tasks and completed tasks in the propject
         res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
         assert res.status_code == 200
         assert res.json == dict(n_completed_tasks=3, n_tasks=3)
 
-        res = self.app.get('/api/project/1/projectprogress')
-        data = json.loads(res.data)
-        assert data['status_code'] == 401, "anonymous user should not have acess to project api"
+        # accessing api using project short_name pass
+        res = self.app.get('/api/project/testproject/projectprogress', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+        assert res.json == dict(n_completed_tasks=3, n_tasks=3)
