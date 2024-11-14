@@ -416,3 +416,18 @@ class ProjectRepository(Repository):
                     )
         rows = self.db.session.execute(sql, dict(project_id=project_id)).fetchall()
         return [dict(row) for row in rows]
+
+    def get_total_and_completed_task_count(self, project_id):
+        sql = text(
+                    '''
+                        SELECT
+                            (SELECT COUNT(*) FROM task
+                            WHERE task.project_id=:project_id AND task.state='completed') as n_completed,
+                            (SELECT COUNT(task.id) AS n_tasks FROM task
+                            WHERE task.project_id=:project_id AND calibration != 1) as n_tasks;
+                    '''
+                    )
+        response = self.db.session.execute(sql, dict(project_id=project_id)).fetchall()
+        n_completed, n_tasks = response[0]
+        result = dict(n_completed_tasks=n_completed, n_tasks=n_tasks)
+        return result
