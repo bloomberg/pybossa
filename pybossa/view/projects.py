@@ -3778,6 +3778,8 @@ def project_config(short_name):
     reset_presented_time = project.info.get("reset_presented_time") or False
     response = dict(template='/projects/summary.html',
                     external_config_dict=json.dumps(ext_config_dict),
+                    authorized_services=ext_config.get('authorized_services', {}).get(current_app.config.get('AUTHORIZED_SERVICES_KEY', ''), []),
+                    is_admin=current_user.admin,
                     forms=input_forms,
                     data_access=json.dumps(data_access),
                     valid_access_levels=data_access_levels.get('valid_access_levels'),
@@ -3847,6 +3849,8 @@ def ext_config(short_name):
         project=sanitize_project,
         title=gettext("Configure external services"),
         forms=template_forms,
+        authorized_services=ext_conf.get('authorized_services', {}).get(current_app.config.get('AUTHORIZED_SERVICES_KEY', ''), []),
+        is_admin=current_user.admin,
         pro_features=pro_features()
     )
 
