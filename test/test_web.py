@@ -62,6 +62,8 @@ from pybossa.view.account import get_user_data_as_form
 from pybossa.cloud_store_api.s3 import upload_json_data
 from pybossa.task_creator_helper import get_gold_answers
 from pybossa.core import setup_error_handlers
+from pybossa.task_creator_helper import generate_checksum
+
 
 class TestWeb(web.Helper):
     pkg_json_not_found = {
@@ -10281,6 +10283,26 @@ class TestWeb(web.Helper):
         project_repo.save(project)
         res = self.app_get_json(f"/api/project/{project.id}/gold_annotations")
         assert res.status_code == 200, data
+
+    @with_context
+    def test_generate_checksum(self):
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": ["a", "c"]
+                }
+            })
+
+        task = TaskFactory.create(
+            project=project,
+            info={"a": 1, "b": 2, "c": 3}
+        )
+        checksum = generate_checksum(task)
+        assert checksum == "13fd196ff24b922abb00bee70dce704efb614c9995dda0ba0362f339633ccb6d"
 
 
 class TestWebUserMetadataUpdate(web.Helper):

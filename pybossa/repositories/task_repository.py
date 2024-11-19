@@ -35,6 +35,7 @@ from flask import current_app
 from sqlalchemy import or_
 from sqlalchemy.sql import case as sqlalchemy_case
 from pybossa.task_creator_helper import get_task_expiration
+from pybossa.task_creator_helper import generate_checksum
 import time
 
 
@@ -184,6 +185,9 @@ class TaskRepository(Repository):
             # set task default expiration
             if element.__class__.__name__ == "Task":
                 element.expiration = get_task_expiration(element.expiration, make_timestamp())
+                checksum = generate_checksum(element)
+                print(checksum)
+                # element.checksum = generate_checksum(element)   TODO: upon task table updated
             self.db.session.add(element)
             self.db.session.commit()
             if clean_project:

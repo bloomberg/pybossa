@@ -19,11 +19,17 @@
 from flask import current_app
 import hashlib
 import datetime
-from pybossa.cloud_store_api.s3 import upload_json_data, get_content_from_s3
-from pybossa.util import get_time_plus_delta_ts
 from flask import url_for
 import json
+import requests
 from six import string_types
+from boto.exception import S3ResponseError
+from werkzeug.exceptions import InternalServerError, NotFound
+from pybossa.util import get_time_plus_delta_ts
+from pybossa.cloud_store_api.s3 import upload_json_data, get_content_from_s3
+from pybossa.cloud_store_api.s3 import get_content_and_key_from_s3
+from pybossa.encryption import AESWithGCM
+
 
 TASK_PRIVATE_GOLD_ANSWER_FILE_NAME = 'task_private_gold_answer.json'
 TASK_GOLD_ANSWER_URL_KEY = 'gold_ans__upload_url'
@@ -120,3 +126,103 @@ def get_gold_answers(task):
     current_app.logger.info("gold_answers url %s, store %s, conn_name %s, key %s", url, store, conn_name, key_name)
     decrypted = get_content_from_s3(s3_bucket=parts[-4], path=key_name, conn_name=conn_name, decrypt=True)
     return json.loads(decrypted)
+
+
+def get_path(dict_, path):
+    if not path:
+        return dict_
+    return get_path(dict_[path[0]], path[1:])
+
+
+def get_secret_from_vault(project_encryption):
+    config = current_app.config['VAULT_CONFIG']
+    res = requests.get(config['url'].format(**project_encryption), **config['request'])
+    res.raise_for_status()
+    data = res.json()
+    try:
+        return get_path(data, config['response'])
+    except Exception:
+        raise RuntimeError(get_path(data, config['error']))
+
+
+def get_project_encryption(project):
+    encryption_jpath = current_app.config.get('ENCRYPTION_CONFIG_PATH')
+    if not encryption_jpath:
+        return None
+    data = project['info']
+    for segment in encryption_jpath:
+        data = data.get(segment, {})
+    return data
+
+
+def get_encryption_key(project):
+    project_encryption = get_project_encryption(project)
+    if project_encryption:
+        return get_secret_from_vault(project_encryption)
+
+
+def read_encrypted_file(store, project, bucket, key_name):
+    conn_name = "S3_TASK_REQUEST_V2" if store == current_app.config.get("S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
+    ## download file
+    if bucket not in [current_app.config.get("S3_REQUEST_BUCKET"), current_app.config.get("S3_REQUEST_BUCKET_V2")]:
+        secret = get_encryption_key(project)
+    else:
+        secret = current_app.config.get('FILE_ENCRYPTION_KEY')
+
+    try:
+        decrypted, key = get_content_and_key_from_s3(
+            bucket, key_name, conn_name, decrypt=secret, secret=secret)
+    except S3ResponseError as e:
+        current_app.logger.exception('Project id {} get task file {} {}'.format(project.id, key_name, e))
+        if e.error_code == 'NoSuchKey':
+            raise NotFound('File Does Not Exist')
+        else:
+            raise InternalServerError('An Error Occurred')
+    return decrypted, key
+
+
+def generate_checksum(task):
+    from pybossa.cache.projects import get_project_data
+
+    if not (task or task.id or isinstance(task.info, dict)):
+        return
+
+    project_id = task.id
+    project = get_project_data(project_id)
+
+    if not project:
+        return
+
+    dup_task_config = project.info.get("duplicate_task_check")
+    if not dup_task_config:
+        return
+
+    dup_fields_configured = dup_task_config.get("duplicate_fields", [])
+    if not len(dup_fields_configured):
+        # include all task.info fields
+        pass
+
+    task_info_fields = []
+    secret = get_encryption_key(project) if current_app.config.get("PRIVATE_INSTANCE") else None
+    cipher = AESWithGCM(secret) if secret else None
+    task_contents = {}
+    if current_app.config.get("PRIVATE_INSTANCE"):
+        for field, value in task.info.items():
+            if field.endswith("__upload_url"):
+                _, fileproxy, encrypted, store, bucket, project_id, hash_key, filename = value.split('/')
+                content, _ = read_encrypted_file(store, project, bucket, filename)
+                task_contents.append(content)
+            elif field == "private_json__encrypted_payload":
+                encrypted_content = task.info.get("private_json__encrypted_payload")
+                content = cipher.decrypt(encrypted_content) if cipher else encrypted_content
+                task_contents.append(content)
+            else:
+                task_contents[field] = value
+    else:
+        # public instance has all task fields under task.info
+        task_contents = task.info
+    checksum_fields = task_contents.keys() if not dup_fields_configured else dup_fields_configured
+    checksum_payload = {field:task.info[field] for field in checksum_fields}
+    checksum = hashlib.sha256()
+    checksum.update(json.dumps(checksum_payload, sort_keys=True).encode("utf-8"))
+    return checksum.hexdigest()
