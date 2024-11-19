@@ -3806,7 +3806,6 @@ def ext_config(short_name):
     ensure_authorized_to('update', project)
 
     forms = current_app.config.get('EXTERNAL_CONFIGURATIONS', {})
-    remove_restricted_keys(forms)
 
     form_classes = []
     for form_name, form_config in forms.items():
@@ -3850,7 +3849,6 @@ def ext_config(short_name):
         title=gettext("Configure external services"),
         forms=template_forms,
         authorized_services=ext_conf.get('authorized_services', {}).get(current_app.config.get('AUTHORIZED_SERVICES_KEY', ''), []),
-        is_admin=current_user.admin,
         pro_features=pro_features()
     )
 
