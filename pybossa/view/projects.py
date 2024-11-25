@@ -1007,8 +1007,7 @@ def details(short_name):
                     'account_profile_link': url_for('account.profile', name=current_user.name)
                 }
             }
-
-    ensure_authorized_to('read', project)
+    ensure_authorized_to('read', project, custom_error_code=423)
     template = '/projects/project.html'
     pro = pro_features()
 
