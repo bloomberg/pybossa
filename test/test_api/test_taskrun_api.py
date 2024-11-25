@@ -21,6 +21,8 @@ from unittest.mock import patch
 
 from nose.tools import assert_equal
 from nose.tools import nottest
+import time
+
 
 from pybossa.core import db
 from pybossa.model.task_run import TaskRun
@@ -748,6 +750,7 @@ class TestTaskrunAPI(TestAPI):
 
         # POST with fake data
         task_run['wrongfield'] = 13
+        self.app.get(f"/api/project/{project.id}/newtask?api_key={project.owner.api_key}", follow_redirects=True)
         res = self.app.post(url, data=json.dumps(task_run))
         err = json.loads(res.data)
         assert res.status_code == 415, err
@@ -960,14 +963,17 @@ class TestTaskrunAPI(TestAPI):
     @with_request_context
     @patch('pybossa.api.task_run.request')
     @patch('pybossa.api.task_run.ContributionsGuard')
+    # @patch('pybossa.api.pwd_manager.ProjectPasswdManager.password_needed')
+    # def test_taskrun_updates_task_state(self, proj_passwd, guard, mock_request):
     def test_taskrun_updates_task_state(self, guard, mock_request):
         """Test API TaskRun POST updates task state"""
         guard.return_value = mock_contributions_guard(True)
+        # proj_passwd.return_value = False
         project = ProjectFactory.create()
         task = TaskFactory.create(project=project, n_answers=2)
         url = '/api/taskrun?api_key=%s' % project.owner.api_key
 
-        # Post first taskrun
+        # first taskrun payload
         data = dict(
             project_id=task.project_id,
             task_id=task.id,
@@ -976,23 +982,36 @@ class TestTaskrunAPI(TestAPI):
         datajson = json.dumps(data)
         mock_request.data = datajson
 
+        # for locked scheduler, request task first
+        self.app.get(f"api/project/{project.id}/newtask?api_key={project.owner.api_key}")
+        # Post first taskrun
         tmp = self.app.post(url, data=datajson)
         r_taskrun = json.loads(tmp.data)
-
         assert tmp.status_code == 200, r_taskrun
-
         err_msg = "Task state should be different from completed"
         assert task.state == 'ongoing', err_msg
 
-        # Post second taskrun
-        mock_request.remote_addr = '127.0.0.0'
-        admin = UserFactory.create()
-        url = '/api/taskrun?api_key=%s' % admin.api_key
+        # mock_request.remote_addr = '127.0.0.0'
+        admin = UserFactory.create(admin=True)
+        # second taskrun payload
         data = dict(
             project_id=task.project_id,
             task_id=task.id,
-            info='my task result anon')
+            user_id=admin.id,
+            info='my task result adm')
         datajson = json.dumps(data)
+        for _ in range(10):
+            # for locked scheduler, request task first
+            resp = self.app.get(f"api/project/{project.id}/newtask?api_key={admin.api_key}")
+            task_data = json.loads(resp.data)
+            if not task_data:
+                time.sleep(2)
+            else:
+                print("newtask response", str(task_data))
+                break
+
+        # Post second taskrun
+        url = '/api/taskrun?api_key=%s' % admin.api_key
         tmp = self.app.post(url, data=datajson)
         r_taskrun = json.loads(tmp.data)
 
@@ -1036,7 +1055,8 @@ class TestTaskrunAPI(TestAPI):
             user_id=project.owner.id,
             info='my result')
         datajson = json.dumps(data)
-
+        # for locked scheduler, request task first
+        self.app.get(f"api/project/{project.id}/newtask?api_key={project.owner.api_key}")
         resp = self.app.post(url, data=datajson)
         task_runs = task_repo.filter_task_runs_by(project_id=data['project_id'])
 
@@ -1061,6 +1081,8 @@ class TestTaskrunAPI(TestAPI):
             info='my result')
         datajson = json.dumps(data)
 
+        # for locked scheduler, request task first
+        self.app.get(f"api/project/{project.id}/newtask?api_key={project.owner.api_key}")
         resp = self.app.post(url, data=datajson)
         taskrun = task_repo.filter_task_runs_by(task_id=data['task_id'])[0]
 
@@ -1166,10 +1188,13 @@ class TestTaskrunAPI(TestAPI):
             info='my task result')
         datajson = json.dumps(data)
 
+        # for locked scheduler, request task first
+        res = self.app.get(f"api/project/{project.id}/newtask?api_key={project.owner.api_key}")
+        data = json.loads(res.data)
+        assert data["id"] == task.id, data
+
         self.app.post(url, data=datajson)
-
         result = result_repo.get_by(project_id=project.id, task_id=task.id)
-
         assert result is not None, result
 
     @with_context
