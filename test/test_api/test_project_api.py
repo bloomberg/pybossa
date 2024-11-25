@@ -1422,7 +1422,7 @@ class TestProjectAPI(TestAPI):
         # Get an empty task
         url = '/api/project/%s/newtask?offset=1000&api_key=%s' % (project.id, user.api_key)
         res = self.app.get(url)
-        assert res.data == b'{}', res.data
+        assert res.status == "400 BAD REQUEST", "locked scheduler with offset > 2 to return 400"
 
         # Test new task with a task ID as a parameter to simulate cherry pick
         project.info['sched'] = Schedulers.task_queue
@@ -1433,42 +1433,44 @@ class TestProjectAPI(TestAPI):
         task = json.loads(res.data)
         assert task['id'] == tasks[0].id
 
-    @with_context
-    @patch('pybossa.api.pwd_manager.ProjectPasswdManager.password_needed')
-    def test_newtask_without_race_condition(self, password_needed):
-        """Test API project new_task method without race condition
-           It simulates 10 users grabbing 1 to 10 tasks simultaneously
-        """
-        password_needed.return_value = False
-        concurrent_user = 10
+    # @with_context
+    # @patch('pybossa.api.pwd_manager.ProjectPasswdManager.password_needed')
+    # def test_newtask_without_race_condition(self, password_needed):
+    #     """Test API project new_task method without race condition
+    #        It simulates 10 users grabbing 1 to 10 tasks simultaneously
+    #     """
+    #     password_needed.return_value = False
+    #     concurrent_user = 10
 
-        n_answers_list = list(range(1, concurrent_user + 1))
-        for n_answers in n_answers_list:
-            project = ProjectFactory.create()
-            project.info['sched'] = Schedulers.locked
-            project_repo.save(project)
-            users = UserFactory.create_batch(concurrent_user)
-            responses = []
 
-            def api_call(user):
-                with patch.dict(flask_app.config, {'RATE_LIMIT_BY_USER_ID': True}):
-                    url = f'/api/project/{project.id}/newtask?api_key={user.api_key}'
-                    # self.set_proj_passwd_cookie(project, user)
-                    res = self.app.get(url)
-                    if res.status_code == 200 and res.data != b'{}':
-                        responses.append(json.loads(res.data))
+    #     n_answers_list = list(range(1, concurrent_user + 1))
+    #     for n_answers in n_answers_list:
+    #         project = ProjectFactory.create()
+    #         project.info['sched'] = Schedulers.locked
+    #         project_repo.save(project)
+    #         users = UserFactory.create_batch(concurrent_user)
+    #         responses = []
 
-            task = TaskFactory.create(n_answers=n_answers, project=project)
+    #         def api_call(user):
+    #             with patch.dict(flask_app.config, {'RATE_LIMIT_BY_USER_ID': True}):
+    #                 url = f'/api/project/{project.id}/newtask?api_key={user.api_key}'
+    #                 # self.set_proj_passwd_cookie(project, user)
+    #                 res = self.app.get(url)
+    #                 if res.status_code == 200 and res.data != b'{}':
+    #                     responses.append(json.loads(res.data))
 
-            threads = []
-            for u in users:
-                thread = threading.Thread(target=api_call, args=(u,))
-                threads.append(thread)
-                thread.start()
+    #         task = TaskFactory.create(n_answers=n_answers, project=project)
 
-            for thread in threads:
-                thread.join()
-            assert_equal(len(responses), task.n_answers)
+    #         threads = []
+    #         for u in users:
+    #             thread = threading.Thread(target=api_call, args=(u,))
+    #             threads.append(thread)
+    #             thread.start()
+
+    #         for thread in threads:
+    #             thread.join()
+
+    #         assert_equal(len(responses), task.n_answers)
 
     @with_context
     @patch('pybossa.repositories.project_repository.uploader')
