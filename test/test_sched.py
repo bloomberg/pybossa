@@ -29,6 +29,8 @@ from test.factories import AnonymousTaskRunFactory
 from test.factories import TaskFactory, ProjectFactory, TaskRunFactory, \
     UserFactory
 from test.helper import sched
+import time
+from pybossa.sched import release_reserve_task_lock_by_id
 
 
 class TestSched(sched.Helper):
@@ -115,45 +117,6 @@ class TestSched(sched.Helper):
             while data.get('id') is not None:
                 # Check that we received a Task
                 assert data.get('id'), data
-
-    @with_context
-    def test_newtask_breadth_orderby(self):
-        """Test SCHED breadth first works with orderby."""
-        project = ProjectFactory.create(info=dict(sched="breadth_first"))
-        task1 = TaskFactory.create(project=project, fav_user_ids=None)
-        task2 = TaskFactory.create(project=project, fav_user_ids=[1,2,3])
-        api_key = project.owner.api_key
-
-        url = "/api/project/%s/newtask?orderby=%s&desc=%s&api_key=%s" % (project.id, 'id', False, api_key)
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        assert data['id'] == task1.id, data
-
-        url = "/api/project/%s/newtask?orderby=%s&desc=%s&api_key=%s" % (project.id, 'id', True, api_key)
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        assert data['id'] == task2.id, data
-
-        url = "/api/project/%s/newtask?orderby=%s&desc=%s&api_key=%s" % (project.id, 'created', False, api_key)
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        assert data['id'] == task1.id, data
-
-        url = "/api/project/%s/newtask?orderby=%s&desc=%s&api_key=%s" % (project.id, 'created', True, api_key)
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        assert data['id'] == task2.id, data
-
-        url = "/api/project/%s/newtask?orderby=%s&desc=%s&api_key=%s" % (project.id, 'fav_user_ids', False, api_key)
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        assert data['id'] == task1.id, data
-
-        url = "/api/project/%s/newtask?orderby=%s&desc=%s&api_key=%s" % (project.id, 'fav_user_ids', True, api_key)
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        assert data['id'] == task2.id, data
-        assert data['fav_user_ids'] == task2.fav_user_ids, data
 
 
     @with_context
@@ -246,7 +209,7 @@ class TestSched(sched.Helper):
 
     @with_context
     def test_user_01_newtask_limits(self):
-        """ Test SCHED newtask returns a Task for John Doe User with limits"""
+        """ Test locked scheduler newtask returns single Task for John Doe User ignoring limits"""
         self.register()
         self.signin()
         project = ProjectFactory.create(owner=UserFactory.create(id=500))
@@ -256,9 +219,8 @@ class TestSched(sched.Helper):
         url = 'api/project/%s/newtask?limit=2' % project.id
         res = self.app.get(url)
         data = json.loads(res.data)
-        assert len(data) == 2, data
-        for t in data:
-            assert t['info']['foo'] == 1, t
+        assert not isinstance(data, list), data
+        assert data['info']['foo'] == 1, data
         self.signout()
 
     @with_context
@@ -313,30 +275,33 @@ class TestSched(sched.Helper):
         self.register()
         self.signin()
 
+        total_tasks = 10
         project = ProjectFactory.create(owner=UserFactory.create(id=500))
-        TaskFactory.create_batch(10, project=project)
+        TaskFactory.create_batch(total_tasks, project=project)
 
         assigned_tasks = []
-        # Get Task until scheduler returns None
-        url = 'api/project/%s/newtask?limit=5' % project.id
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        while len(data) > 0:
-            # Check that we received a Task
-            for t in data:
-                assert t.get('id'), t
 
-                # Save the assigned task
-                assigned_tasks.append(t)
+        # with locked scheduler, only one task returned no matter what limit is passed
+        # hence call newtask until the total number of tasks
+        for i in range(total_tasks):
+            # Get Task until scheduler returns None
+            url = 'api/project/%s/newtask?limit=5' % project.id
+            res = self.app.get(url)
+            data = json.loads(res.data)
+            assert data.get('id'), data
 
-                # Submit an Answer for the assigned task
-                tr = dict(project_id=t['project_id'], task_id=t['id'],
-                          info={'answer': 'No'})
-                tr = json.dumps(tr)
+            # Save the assigned task
+            assigned_tasks.append(data)
 
-                self.app.post('/api/taskrun', data=tr)
-                res = self.app.get(url)
-                data = json.loads(res.data)
+            # Submit an Answer for the assigned task
+            tr = dict(project_id=data['project_id'], task_id=data['id'],
+                        info={'answer': 'No'})
+            tr = json.dumps(tr)
+
+            self.app.post('/api/taskrun', data=tr)
+            res = self.app.get(url)
+            data = json.loads(res.data)
+            self.redis_flushall()
 
         # Check if we received the same number of tasks that the available ones
         tasks = db.session.query(Task).filter_by(project_id=1).all()
@@ -384,9 +349,7 @@ class TestSched(sched.Helper):
                           info={'answer': 'No'})
                 tr = json.dumps(tr)
                 self.app.post('/api/taskrun', data=tr)
-                #self.redis_flushall()
-                #res = self.app.get(url)
-                #data = json.loads(res.data)
+                self.redis_flushall()
             self.signout()
 
         # Check if there are 30 TaskRuns per Task
@@ -406,37 +369,41 @@ class TestSched(sched.Helper):
     @with_context
     @patch('pybossa.api.pwd_manager.ProjectPasswdManager.password_needed')
     def test_user_03_respects_limit_tasks_limit(self, password_needed):
-        """ Test SCHED limit arg newtask respects the limit of 30 TaskRuns per list of Tasks"""
+        """ Test SCHED limit arg newtask respects the limit of 20 TaskRuns per list of Tasks"""
         # Del previous TaskRuns
         password_needed.return_value = False
         assigned_tasks = []
         project = ProjectFactory.create(owner=UserFactory.create(id=500))
         TaskFactory.create_batch(2, project=project, n_answers=10)
+
         # We need one extra loop to allow the scheduler to mark a task as completed
+        # 10 users accessing 2 tasks and submitting taskruns
         url = 'api/project/%s/newtask?limit=2' % project.id
-        for i in range(11):
+        for i in range(10):
             name = "johndoe" + str(i)
             password = "1234" + str(i)
             self.register(fullname="John Doe" + str(i),
                           name=name, password=password)
             self.signin(email=name + "@example.com",
                         password=password)
-            # Get Task until scheduler returns None
-            res = self.app.get(url)
-            data = json.loads(res.data)
 
-            # Check that we received a Task
-            for t in data:
-                assert t.get('id'),  data
+            for j in range(2):
+                # Get Task until scheduler returns None
+                res = self.app.get(url)
+                data = json.loads(res.data)
+
+                # Check that we received a Task
+                assert data.get('id'),  data
 
                 # Save the assigned task
-                assigned_tasks.append(t)
+                assigned_tasks.append(data)
 
                 # Submit an Answer for the assigned task
-                tr = dict(project_id=t['project_id'], task_id=t['id'],
-                          info={'answer': 'No'})
+                tr = dict(project_id=data['project_id'], task_id=data['id'],
+                            info={'answer': 'No'})
                 tr = json.dumps(tr)
                 self.app.post('/api/taskrun', data=tr).data
+                self.redis_flushall()
             self.signout()
 
         # Check if there are 30 TaskRuns per Task
@@ -455,7 +422,12 @@ class TestSched(sched.Helper):
 
     @with_context
     def test_task_preloading(self):
-        """Test TASK Pre-loading works"""
+        """Test TASK Pre-loading returns no task"""
+
+        # locked scheduler (default) retuns only one locked task
+        # passing offset to fetch task expected to return no task
+        # https://github.com/bloomberg/pybossa/blob/main/pybossa/sched.py#L277-L278
+
         # Del previous TaskRuns
         project = ProjectFactory.create(owner=UserFactory.create(id=500))
         TaskFactory.create_batch(10, project=project)
@@ -475,13 +447,10 @@ class TestSched(sched.Helper):
         # Pre-load the next task for the user
         res = self.app.get(url + '?offset=1')
         task2 = json.loads(res.data)
-        # Check that we received a Task
-        assert task2.get('id'),  task2
-        # Check that both tasks are different
-        assert task1.get('id') != task2.get('id'), "Tasks should be different"
+        # Check that Task received is None with offset
+        assert not task2,  task2
         ## Save the assigned task
         assigned_tasks.append(task1)
-        assigned_tasks.append(task2)
 
         # Submit an Answer for the assigned and pre-loaded task
         for t in assigned_tasks:
@@ -494,78 +463,6 @@ class TestSched(sched.Helper):
         task3 = json.loads(res.data)
         # Check that we received a Task
         assert task3.get('id'),  task1
-        # Pre-load the next task for the user
-        res = self.app.get(url + '?offset=1')
-        task4 = json.loads(res.data)
-        # Check that we received a Task
-        assert task4.get('id'),  task2
-        # Check that both tasks are different
-        assert task3.get('id') != task4.get('id'), "Tasks should be different"
-        assert task1.get('id') != task3.get('id'), "Tasks should be different"
-        assert task2.get('id') != task4.get('id'), "Tasks should be different"
-        # Check that a big offset returns None
-        res = self.app.get(url + '?offset=11')
-        assert json.loads(res.data) == {}, res.data
-
-    @with_context
-    def test_task_preloading_limit(self):
-        """Test TASK Pre-loading with limit works"""
-        # Register
-        project = ProjectFactory.create(owner=UserFactory.create(id=500))
-        TaskFactory.create_batch(10, project=project)
-        self.register()
-        self.signin()
-
-        assigned_tasks = []
-        url = 'api/project/%s/newtask?limit=2' % project.id
-        self.set_proj_passwd_cookie(project, username='johndoe')
-        res = self.app.get(url)
-        tasks1 = json.loads(res.data)
-        # Check that we received a Task
-        for t in tasks1:
-            assert t.get('id'),  t
-        # Pre-load the next tasks for the user
-        res = self.app.get(url + '&offset=2')
-        tasks2 = json.loads(res.data)
-        # Check that we received a Task
-        for t in tasks2:
-            assert t.get('id'),  t
-        # Check that both tasks are different
-        tasks1_ids = set([t['id'] for t in tasks1])
-        tasks2_ids = set([t['id'] for t in tasks2])
-        assert len(tasks1_ids.union(tasks2_ids)) == 4, "Tasks should be different"
-        ## Save the assigned task
-        for t in tasks1:
-            assigned_tasks.append(t)
-        for t in tasks2:
-            assigned_tasks.append(t)
-
-        # Submit an Answer for the assigned and pre-loaded task
-        for t in assigned_tasks:
-            tr = dict(project_id=t['project_id'], task_id=t['id'], info={'answer': 'No'})
-            tr = json.dumps(tr)
-
-            self.app.post('/api/taskrun', data=tr)
-        # Get two tasks again
-        res = self.app.get(url)
-        tasks3 = json.loads(res.data)
-        # Check that we received a Task
-        for t in tasks3:
-            assert t.get('id'),  t
-        # Pre-load the next task for the user
-        res = self.app.get(url + '&offset=2')
-        tasks4 = json.loads(res.data)
-        # Check that we received a Task
-        for t in tasks4:
-            assert t.get('id'),  t
-        # Check that both tasks are different
-        tasks3_ids = set([t['id'] for t in tasks3])
-        tasks4_ids = set([t['id'] for t in tasks4])
-        assert len(tasks3_ids.union(tasks4_ids)) == 4, "Tasks should be different"
-
-        # Check that a big offset returns None
-        res = self.app.get(url + '&offset=11')
-        assert json.loads(res.data) == {}, res.data
 
     @with_context
     def test_task_priority(self):
@@ -587,6 +484,15 @@ class TestSched(sched.Helper):
         err_msg = "Task.id should be the same"
         assert task1.get('id') == tasks[0].id, err_msg
 
+        url = f"/api/task/%s/canceltask" % task1["id"]
+        res = self.app_post_json(url,
+                            data={'projectname': project.short_name},
+                            follow_redirects=False,
+                            )
+        data = json.loads(res.data)
+        assert data.get('success') == True, data
+        time.sleep(1)
+
         # Now let's change the priority to a random task
         import random
         t = random.choice(tasks)
@@ -595,7 +501,8 @@ class TestSched(sched.Helper):
         db.session.add(t)
         db.session.commit()
         # Request again a new task
-        res = self.app.get(url + '?orderby=priority_0&desc=true')
+        url = 'api/project/%s/newtask?orderby=priority_0&desc=true' % project.id
+        res = self.app.get(url)
         task1 = json.loads(res.data)
         # Check that we received a Task
         err_msg = "Task.id should be the same"
@@ -618,10 +525,21 @@ class TestSched(sched.Helper):
         url = 'api/project/%s/newtask?limit=2' % project.id
         self.set_proj_passwd_cookie(project, username='johndoe')
         res = self.app.get(url)
-        tasks1 = json.loads(res.data)
+        task1 = json.loads(res.data)
         # Check that we received a Task
         err_msg = "Task.id should be the same"
-        assert tasks1[0].get('id') == tasks[0].id, err_msg
+        assert task1.get('id') == tasks[0].id, err_msg
+
+        # cancel the tasks and obtain task upon changing priority
+        url = f"/api/task/%s/canceltask" % task1["id"]
+        res = self.app_post_json(url,
+                            data={'projectname': project.short_name},
+                            follow_redirects=False,
+                            )
+        data = json.loads(res.data)
+        assert data.get('success') == True, data
+        time.sleep(1)
+
 
         # Now let's change the priority to a random task
         import random
@@ -631,13 +549,14 @@ class TestSched(sched.Helper):
         db.session.add(t)
         db.session.commit()
         # Request again a new task
+        url = 'api/project/%s/newtask?limit=2' % project.id
         res = self.app.get(url + '&orderby=priority_0&desc=true')
-        tasks1 = json.loads(res.data)
+        task1 = json.loads(res.data)
         # Check that we received a Task
         err_msg = "Task.id should be the same"
-        assert tasks1[0].get('id') == t.id, (err_msg, tasks1[0])
+        assert task1.get('id') == t.id, (err_msg, task1)
         err_msg = "Task.priority_0 should be the 1"
-        assert tasks1[0].get('priority_0') == 1, err_msg
+        assert task1.get('priority_0') == 1, err_msg
 
 
     @with_context
@@ -722,14 +641,10 @@ class TestSched(sched.Helper):
         res = self.app.get(url)
         data = json.loads(res.data)
 
-        err_msg = "User should get a task"
-        i = 0
-        for t in data:
-            print(t['id'])
-            assert 'project_id' in t.keys(), err_msg
-            assert t['project_id'] == project_id, err_msg
-            assert t['id'] == tasks[i].id, (err_msg, t, tasks[i].id)
-            i += 1
+        err_msg = "User should get a task"        
+        assert 'project_id' in data.keys(), err_msg
+        assert data['project_id'] == project_id, err_msg
+        assert data['id'] == tasks[0].id, (err_msg, t, tasks[0].id)
 
     @with_context
     @patch('pybossa.sched.get_user_saved_partial_tasks')
@@ -767,307 +682,3 @@ class TestSched(sched.Helper):
         assert res.status_code == 200, res.status_code
         assert res.json['id'] == task1.id
 
-class TestGetBreadthFirst(Test):
-
-    def del_task_runs(self, project_id=1):
-        """Deletes all TaskRuns for a given project_id"""
-        db.session.query(TaskRun).filter_by(project_id=1).delete()
-        db.session.commit()
-        db.session.remove()
-
-    def create_task_run(self, project, user):
-        if user:
-            url_newtask = 'api/project/%s/newtask?api_key=%s' % (project.id, user.api_key)
-            url_post = 'api/taskrun?api_key=%s' % (user.api_key)
-        else:
-            url_newtask = 'api/project/%s/newtask' % (project.id)
-            url_post = 'api/taskrun'
-
-        self.set_proj_passwd_cookie(project, user)
-        res = self.app.get(url_newtask)
-        task = json.loads(res.data)
-        taskrun = dict(project_id=project.id, task_id=task['id'], info=task['id'])
-        res = self.app.post(url_post, data=json.dumps(taskrun))
-        data = json.loads(res.data)
-        return data
-
-    @with_context
-    def test_get_default_task_anonymous(self):
-        self._test_get_breadth_first_task()
-
-    @with_context
-    def test_get_breadth_first_task_user(self):
-        user = self.create_users()[0]
-        self._test_get_breadth_first_task(user=user)
-
-    @with_context
-    def test_get_breadth_first_task_external_user(self):
-        self._test_get_breadth_first_task(external_uid='234')
-
-
-    @with_context
-    def test_get_default_task_anonymous_limit(self):
-        self._test_get_breadth_first_task_limit()
-
-    @with_context
-    def test_get_breadth_first_task_user_limit(self):
-        user = self.create_users()[0]
-        self._test_get_breadth_first_task_limit(user=user)
-
-    @with_context
-    def test_get_breadth_first_task_external_user_limit(self):
-        self._test_get_breadth_first_task_limit(external_uid='234')
-
-
-    def _test_get_breadth_first_task(self, user=None, external_uid=None):
-        admin, owner, user = UserFactory.create_batch(3)
-        project = ProjectFactory.create(owner=owner, info=dict(sched='breadth_first'))
-        tasks = TaskFactory.create_batch(3, project=project, n_answers=3)
-
-        # now check we get task without task runs as anonymous user
-        out = pybossa.sched.get_breadth_first_task(project.id)
-        assert len(out) == 1, out
-        out = out[0]
-        assert out.id == tasks[0].id, out
-
-        # now check we get task without task runs as a user
-        out = pybossa.sched.get_breadth_first_task(project.id, user.id)
-        assert len(out) == 1, out
-        out = out[0]
-        assert out.id == tasks[0].id, out
-
-        # now check we get task without task runs as a external uid
-        out = pybossa.sched.get_breadth_first_task(project.id,
-                                                   external_uid=external_uid)
-        assert len(out) == 1, out
-        out = out[0]
-        assert out.id == tasks[0].id, out
-
-        # now check that offset works
-        out1 = pybossa.sched.get_breadth_first_task(project.id)
-        out2 = pybossa.sched.get_breadth_first_task(project.id, offset=1)
-        assert len(out1) == 1, out1
-        assert len(out2) == 1, out2
-        assert out1[0].id != out2[0].id, (out1, out2)
-        assert out1[0].id == tasks[0].id, (tasks[0], out1)
-        assert out2[0].id == tasks[1].id, (tasks[1], out2)
-
-        # Now check that orderby works
-        out1 = pybossa.sched.get_breadth_first_task(project.id, orderby='created', desc=True)
-        assert out1[0].id == tasks[2].id, out1
-        out1 = pybossa.sched.get_breadth_first_task(project.id, orderby='created', desc=False)
-        assert out1[0].id == tasks[0].id, out1
-
-        # Now check that orderby works with fav_user_ids
-        t = task_repo.get_task(tasks[1].id)
-        t.fav_user_ids = [1, 2, 3, 4, 5]
-        task_repo.update(t)
-        t = task_repo.get_task(tasks[2].id)
-        t.fav_user_ids = [1, 2, 3]
-        task_repo.update(t)
-
-        out1 = pybossa.sched.get_breadth_first_task(project.id, orderby='fav_user_ids', desc=True)
-        assert out1[0].id == tasks[1].id, out1
-        assert out1[0].fav_user_ids == [1, 2, 3, 4, 5], out1[0].dictize()
-        out1 = pybossa.sched.get_breadth_first_task(project.id, orderby='fav_user_ids', desc=False, offset=1)
-        assert out1[0].id == tasks[2].id, out1[0].dictize()
-        assert out1[0].fav_user_ids == [1, 2, 3], out1
-
-        # asking for a bigger offset (max 10)
-        out2 = pybossa.sched.get_breadth_first_task(project.id, offset=11)
-        assert out2 == [], out2
-
-        # Create a taskrun, so the next task should be returned for anon and auth users
-        self.create_task_run(project, user)
-        out = pybossa.sched.get_breadth_first_task(project.id)
-        assert len(out) == 1, out
-        out = out[0]
-        assert out.id == tasks[1].id, out
-        out = pybossa.sched.get_breadth_first_task(project.id, user.id)
-        assert len(out) == 1, out
-        out = out[0]
-        assert out.id == tasks[1].id, out
-
-        # We create another taskrun and the last task should be returned
-        self.create_task_run(project, user)
-        out = pybossa.sched.get_breadth_first_task(project.id)
-        assert len(out) == 1, out
-        out = out[0]
-        assert out.id == tasks[2].id, out
-        out = pybossa.sched.get_breadth_first_task(project.id, owner.id)
-        assert len(out) == 1, out
-        out = out[0]
-        assert out.id == tasks[2].id, out
-
-        # Add another taskrun to first task, so we have 2, 1, 0 taskruns for each task
-        TaskRunFactory.create(task=tasks[0], project=project, id=15)
-        out = pybossa.sched.get_breadth_first_task(project.id, UserFactory.create().id)
-        assert len(out) == 1, out
-        out = out[0]
-        assert out.id == tasks[2].id, out
-
-        # Mark last task as completed, so the scheduler returns tasks[1]
-        task = task_repo.get_task(tasks[2].id)
-        task.state = 'completed'
-        task_repo.update(task)
-
-        out = pybossa.sched.get_breadth_first_task(project.id, UserFactory.create().id)
-        assert len(out) == 1, out
-        out = out[0]
-        assert out.id == tasks[1].id, out
-
-
-    @with_context
-    def _test_get_breadth_first_task_limit(self, user=None, external_uid=None):
-        admin, owner, user = UserFactory.create_batch(3)
-        project = ProjectFactory.create(owner=owner, info=dict(sched='breadth_first'))
-        tasks = TaskFactory.create_batch(3, project=project, n_answers=3)
-
-        # now check we get task without task runs as anonymous user
-        limit = 2
-        out = pybossa.sched.get_breadth_first_task(project.id, limit=limit)
-        assert len(out) == limit, out
-        assert out[0].id == tasks[0].id, out
-        assert out[1].id == tasks[1].id, out
-
-        # now check we get task without task runs as a user
-        out = pybossa.sched.get_breadth_first_task(project.id, user.id, limit=limit)
-        assert len(out) == limit, out
-        assert out[0].id == tasks[0].id, out
-        assert out[1].id == tasks[1].id, out
-
-        # now check we get task without task runs as a external uid
-        out = pybossa.sched.get_breadth_first_task(project.id,
-                                                   external_uid=external_uid,
-                                                   limit=limit)
-        assert len(out) == limit, out
-        assert out[0].id == tasks[0].id, out
-        assert out[1].id == tasks[1].id, out
-
-        # now check that offset works
-        out1 = pybossa.sched.get_breadth_first_task(project.id, limit=limit)
-        out2 = pybossa.sched.get_breadth_first_task(project.id, offset=1, limit=limit)
-        assert len(out1) == limit, out1
-        assert len(out2) == limit, out2
-        assert out1 != out2, (out1, out2)
-        assert out1[0].id == tasks[0].id, (tasks[0], out1)
-        assert out1[1].id == tasks[1].id, (tasks[1], out1)
-
-        assert out2[0].id == tasks[1].id, (tasks[1], out2[0])
-        assert out2[1].id == tasks[2].id, (tasks[2], out2)
-
-        # asking for a bigger offset (max 10)
-        out2 = pybossa.sched.get_breadth_first_task(project.id, offset=11, limit=2)
-        assert out2 == [], out2
-
-        # Create a taskrun by Anon, so the next task should be returned for anon and auth users
-        self.create_task_run(project, user)
-        out = pybossa.sched.get_breadth_first_task(project.id, limit=limit)
-        assert len(out) == limit, out
-        assert out[0].id == tasks[1].id, out
-        assert out[1].id == tasks[2].id, out
-        out = pybossa.sched.get_breadth_first_task(project.id, user.id, limit=limit)
-        assert len(out) == limit, out
-        assert out[0].id == tasks[1].id, out
-        assert out[1].id == tasks[2].id, out
-
-        # We create another taskrun and the last task should be returned first, as we
-        # are getting two tasks. It should always return first the tasks with less number
-        # of task runs
-        self.create_task_run(project, user)
-        out = pybossa.sched.get_breadth_first_task(project.id, limit=limit)
-        assert len(out) == limit, out
-        assert out[0].id == tasks[2].id, out
-        out = pybossa.sched.get_breadth_first_task(project.id, owner.id, limit=limit)
-        assert len(out) == limit, out
-        assert out[0].id == tasks[2].id, out
-
-        # Add another taskrun to first task, so we have 2, 1, 0 taskruns for each task
-        TaskRunFactory.create(task=tasks[0], project=project, id=15)
-        out = pybossa.sched.get_breadth_first_task(project.id, UserFactory.create().id, limit=limit)
-        assert len(out) == limit, out
-        out = out[0]
-        assert out.id == tasks[2].id, out
-
-        # Mark last task as completed, so the scheduler returns tasks[1]
-        task = task_repo.get_task(tasks[2].id)
-        task.state = 'completed'
-        task_repo.update(task)
-
-        out = pybossa.sched.get_breadth_first_task(project.id, UserFactory.create().id, limit=2)
-        assert len(out) == limit, out
-        out = out[0]
-        assert out.id == tasks[1].id, out
-
-    def _add_task_run(self, project, task, user=None):
-        tr = TaskRun(project=project, task=task, user=user)
-        db.session.add(tr)
-        db.session.commit()
-
-class TestBreadthFirst(sched.Helper):
-
-    def setUp(self):
-        super(TestBreadthFirst, self).setUp()
-        with self.flask_app.app_context():
-            db.create_all()
-
-    @with_context
-    def test_breadth_complete(self):
-        """Test breadth respects complete."""
-        db.session.rollback()
-        admin = UserFactory.create(id=500)
-        owner = UserFactory.create(id=501)
-        user = UserFactory.create(id=502)
-        project = ProjectFactory(owner=owner, info=dict(sched='depth_first'), category_id=1)
-        tasks = TaskFactory.create_batch(3, project=project, n_answers=1)
-        url = '/api/project/%s/newtask' % (project.id)
-        self.register()
-        self.signin()
-        self.set_proj_passwd_cookie(project, username='johndoe')
-        res = self.app.get(url)
-        task_one = json.loads(res.data)
-        taskrun = dict(project_id=project.id, task_id=task_one['id'], info=1)
-        res = self.app.post('api/taskrun', data=json.dumps(taskrun))
-        taskrun = json.loads(res.data)
-        assert res.status_code == 200, res.data
-        #TaskRunFactory.create(task_id=task_one['id'])
-
-        url = '/api/project/%s/newtask' % (project.id)
-        res = self.app.get(url)
-        task_two = json.loads(res.data)
-        taskrun = dict(project_id=project.id, task_id=task_two['id'], info=2)
-        res = self.app.post('api/taskrun', data=json.dumps(taskrun))
-        taskrun = json.loads(res.data)
-        assert res.status_code == 200, res.data
-        #TaskRunFactory.create(task_id=task_two['id'])
-
-        url = '/api/project/%s/newtask?api_key=%s' % (project.id, owner.api_key)
-        res = self.app.get(url)
-        task_three = json.loads(res.data)
-
-        assert task_one['id'] != task_three['id'], (task_one, task_two, task_three)
-        assert task_two['id'] != task_three['id'], (task_one, task_two, task_three)
-
-        taskrun = dict(project_id=project.id, task_id=task_three['id'], info=3)
-        res = self.app.post('api/taskrun?api_key=%s' % owner.api_key, data=json.dumps(taskrun))
-        taskrun = json.loads(res.data)
-        assert res.status_code == 200, res.data
-
-        tasks = task_repo.filter_tasks_by(project_id=project.id)
-        for t in tasks:
-            assert t.state == 'completed'
-
-        url = '/api/project/%s/newtask' % (project.id)
-        res = self.app.get(url)
-        task_four = json.loads(res.data)
-        assert task_four == {}, task_four
-
-        url = '/api/project/%s/newtask?api_key=%s' % (project.id, owner.api_key)
-        res = self.app.get(url)
-        task_four = json.loads(res.data)
-        assert task_four == {}, task_four
-
-        url = '/api/project/%s/newtask?api_key=%s' % (project.id, admin.api_key)
-        res = self.app.get(url)
-        task_four = json.loads(res.data)
-        assert task_four == {}, task_four

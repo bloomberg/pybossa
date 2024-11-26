@@ -963,12 +963,9 @@ class TestTaskrunAPI(TestAPI):
     @with_request_context
     @patch('pybossa.api.task_run.request')
     @patch('pybossa.api.task_run.ContributionsGuard')
-    # @patch('pybossa.api.pwd_manager.ProjectPasswdManager.password_needed')
-    # def test_taskrun_updates_task_state(self, proj_passwd, guard, mock_request):
     def test_taskrun_updates_task_state(self, guard, mock_request):
         """Test API TaskRun POST updates task state"""
         guard.return_value = mock_contributions_guard(True)
-        # proj_passwd.return_value = False
         project = ProjectFactory.create()
         task = TaskFactory.create(project=project, n_answers=2)
         url = '/api/taskrun?api_key=%s' % project.owner.api_key
