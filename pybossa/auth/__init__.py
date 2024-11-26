@@ -83,13 +83,13 @@ def is_authorized(user, action, resource, **kwargs):
     return auth.can(user, action, resource, **kwargs)
 
 
-def ensure_authorized_to(action, resource, custom_error_code=None, **kwargs):
+def ensure_authorized_to(action, resource, forbidden_code_override=None, **kwargs):
     authorized = is_authorized(current_user, action, resource, **kwargs)
     if authorized is False:
         if current_user.is_anonymous:
             raise abort(401)
         else:
-            raise abort(custom_error_code or 403)
+            raise abort(forbidden_code_override or 403)
     return authorized
 
 
