@@ -344,30 +344,6 @@ def create_results():
         db.session.commit()
         print("Project %s completed!" % project.short_name)
 
-def update_counters():
-    """Populates the counters table."""
-    from pybossa.core import db
-    from pybossa.core import project_repo
-    from pybossa.model.counter import Counter
-
-    projects = project_repo.get_all()
-
-    print(len(projects))
-
-    db.session.query(Counter).delete()
-    db.session.commit()
-
-
-    for project in projects:
-        print("Working on project: %s" % project.id)
-        sql = text('''select task.project_id as project_id, task.id as task_id, count(task_run.task_id) as n_task_runs from task left outer join task_run on (task_run.task_id=task.id) where task.project_id=:project_id group by task.project_id, task.id, task_run.task_id''')
-        results = db.engine.execute(sql, project_id=project.id)
-        for result in results:
-            db.session.add(Counter(project_id=result.project_id,
-                                   task_id=result.task_id,
-                                   n_task_runs=result.n_task_runs))
-        db.session.commit()
-
 def update_project_stats():
     """Update project stats for draft projects."""
     from pybossa.core import db
@@ -414,8 +390,6 @@ def clean_project(project_id, skip_tasks=False):
     db.engine.execute(sql)
     sql = 'delete from result where project_id=%s' % project_id
     db.engine.execute(sql)
-    sql = 'delete from counter where project_id=%s' % project_id
-    db.engine.execute(sql)
     sql = 'delete from project_stats where project_id=%s' % project_id
     db.engine.execute(sql)
     sql = """INSERT INTO project_stats
@@ -425,20 +399,6 @@ def clean_project(project_id, skip_tasks=False):
              VALUES (%s, %s, 0, 0, 0, 0, 0, 0, 0, 0, '{}');""" % (project_id,
                                                                   n_tasks)
     db.engine.execute(sql)
-    if skip_tasks:
-        tasks = task_repo.filter_tasks_by(project_id=project_id, limit=100)
-        last_id = tasks[len(tasks)-1].id
-        while(len(tasks) > 0):
-            for task in tasks:
-                sql= ("insert into counter(created, project_id, task_id, n_task_runs) \
-                       VALUES (TIMESTAMP '%s', %s, %s, 0)"
-                       % (make_timestamp(), project_id, task.id))
-                db.engine.execute(sql)
-            tasks = task_repo.filter_tasks_by(project_id=project_id,
-                                              limit=100,
-                                              last_id=last_id)
-            if (len(tasks) > 0):
-                last_id = tasks[len(tasks)-1].id
     print("Project has been cleaned")
 
 
