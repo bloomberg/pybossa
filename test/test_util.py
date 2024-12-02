@@ -1846,10 +1846,10 @@ class TestMapLocations(Test):
         get_country_name_by_country_code.return_value = 'United States'
 
         input_locations = ['US']
-        expected_locations = ['US', 'United States']
+        expected_locations = ['United States', 'US']
         mapped_locations = util.map_locations(input_locations)
 
-        assert sorted(mapped_locations['locations']) == expected_locations
+        assert mapped_locations['locations'] == expected_locations
 
     @with_context
     @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
@@ -1859,10 +1859,10 @@ class TestMapLocations(Test):
         get_country_code_by_country_name.return_value = 'US'
 
         input_locations = ['United States']
-        expected_locations = ['US', 'United States']
+        expected_locations = ['United States', 'US']
         mapped_locations = util.map_locations(input_locations)
 
-        assert sorted(mapped_locations['locations']) == expected_locations
+        assert mapped_locations['locations'] == expected_locations
 
     @with_context
     @patch('pybossa.util.app_settings.upref_mdata.get_country_name_by_country_code')
