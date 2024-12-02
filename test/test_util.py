@@ -1849,7 +1849,8 @@ class TestMapLocations(Test):
         expected_locations = ['United States', 'US']
         mapped_locations = util.map_locations(input_locations)
 
-        assert mapped_locations['locations'] == expected_locations
+        assert mapped_locations['locations'] == expected_locations, \
+        (mapped_locations['locations'], expected_locations)
 
     @with_context
     @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
@@ -1862,7 +1863,8 @@ class TestMapLocations(Test):
         expected_locations = ['United States', 'US']
         mapped_locations = util.map_locations(input_locations)
 
-        assert mapped_locations['locations'] == expected_locations
+        assert mapped_locations['locations'] == expected_locations, \
+        (mapped_locations['locations'], expected_locations)
 
     @with_context
     @patch('pybossa.util.app_settings.upref_mdata.get_country_name_by_country_code')
@@ -1875,7 +1877,7 @@ class TestMapLocations(Test):
         expected_locations = ['XX']
         mapped_locations = util.map_locations(input_locations)
 
-        assert sorted(mapped_locations['locations']) == expected_locations
+        assert mapped_locations['locations'] == expected_locations
 
     @with_context
     @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
@@ -1897,7 +1899,7 @@ class TestMapLocations(Test):
         expected_locations = None
         mapped_locations = util.map_locations(input_locations)
 
-        assert mapped_locations['locations'] == expected_locations
+        assert mapped_locations['locations'] == expected_locations, (mapped_locations['locations'], expected_locations)
 
     @with_context
     def test_validate_ownership_id(self):

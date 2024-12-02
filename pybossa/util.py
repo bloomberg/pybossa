@@ -1465,18 +1465,19 @@ def map_locations(locations):
 def group_and_sort_countries(input_list):
     country_names = set()
     for item in input_list:
-        if item in app_settings.upref_mdata.country_name_to_country_code:
-            country_names.add(item)
-        elif item in app_settings.upref_mdata.country_code_to_country_name:
+        if item in app_settings.upref_mdata.country_code_to_country_name:
             country_names.add(app_settings.upref_mdata.country_code_to_country_name[item])
         else:
-            current_app.logger.warning(f"'{item}' not found in country code mappings")
+            country_names.add(item)
     sorted_country_names = sorted(country_names)
 
     output_items = []
     for name in sorted_country_names:
         code = app_settings.upref_mdata.country_name_to_country_code[name]
-        output_items.extend([name, code])
+        if code:
+            output_items.extend([name, code])
+        else:
+            output_items.append(name)
     return output_items
 
 
