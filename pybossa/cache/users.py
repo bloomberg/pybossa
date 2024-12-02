@@ -29,10 +29,10 @@ from pybossa.model.project import Project
 from pybossa.leaderboard.data import get_leaderboard as gl
 from pybossa.leaderboard.jobs import leaderboard as lb
 import json
-from pybossa.util import get_user_pref_db_clause, get_user_filter_db_clause
+from pybossa.util import get_user_pref_db_clause, get_user_filter_db_clause, map_locations
 from pybossa.data_access import data_access_levels
 from pybossa.util import get_taskrun_date_range_sql_clause_params
-
+from flask import current_app
 
 session = db.slave_session
 
@@ -109,10 +109,19 @@ def get_user_summary(name, current_user=None):
                (current_user.id == user['id'])):
                 return user
             else:
+                current_app.logger.info("""
+                    Method get_user_summary(): User restricted. Returning None as user is not current_user
+                    for user name %s, user id %s, user restrict %s, current user id %s, current user name %s,
+                    current user authenticated %s, is_current_user == user %s""",
+                    name, user.get('id'), user.get('restrict'), current_user.id if current_user else None,
+                    current_user.name if current_user else None, current_user.is_authenticated if current_user else False,
+                    current_user.id == user.get('id') if current_user else False)
                 return None
         else:
             return user
-    else:  # pragma: no cover
+    else:
+        current_app.logger.info("Method get_user_summary(): user is None for user name %s, current user id %s, current user name %s",
+            name, current_user.id if current_user else None, current_user.name if current_user else None)
         return None
 
 
@@ -124,6 +133,9 @@ def public_get_user_summary(name):
     if private_user is not None:
         u = User()
         public_user = u.to_public_json(data=private_user)
+    if not public_user:
+        current_app.logger.info("Method public_get_user_summary(): public_user is None for user name %s. private_user None = %s",
+            name, private_user == None)
     return public_user
 
 
@@ -342,7 +354,18 @@ def get_user_pref_metadata(name):
     upref_mdata.update(row[1] or {})
     if data_access_levels:
         upref_mdata['data_access'] = row[2] or []
+
+    if 'locations' in upref_mdata:
+        map_locations_upref_mdata(upref_mdata)
     return upref_mdata
+
+
+def map_locations_upref_mdata(upref_mdata):
+    mapped = map_locations(upref_mdata['locations'])
+
+    upref_mdata['country_codes'] = mapped['country_codes']
+    upref_mdata['country_names'] = mapped['country_names']
+    upref_mdata['locations'] = mapped['locations']
 
 
 def delete_user_pref_metadata(user):
@@ -370,6 +393,8 @@ def get_user_preferences(user_id):
     user = get_user_by_id(user_id)
     user_pref = user.user_pref or {} if user else {}
     user_email = user.email_addr if user else None
+    if 'locations' in user_pref:
+        map_locations_upref_mdata(user_pref)
     return get_user_pref_db_clause(user_pref, user_email)
 
 
@@ -506,11 +531,9 @@ def get_announcements_cached(user, announcement_levels):
 def get_users_for_data_access(data_access):
     from pybossa.data_access import get_user_data_access_db_clause
 
+    sql = '''select id::text, fullname, email_addr, enabled from "user"'''
     clause = get_user_data_access_db_clause(data_access)
-    if not clause:
-        return None
-
-    sql = text('''select id::text, fullname from "user" where {}'''.format(clause))
+    sql = sql +  '''where {}'''.format(clause) if clause else sql
     results = session.execute(sql).fetchall()
     return [dict(row) for row in results]
 

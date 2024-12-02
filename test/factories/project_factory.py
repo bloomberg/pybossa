@@ -59,7 +59,7 @@ class ProjectFactory(BaseFactory):
             'thumbnail_url': 'http://cdn.com/container/img.png',
             'onesignal': {'data': 'private'},
             'onesignal_app_id': 1,
-            'sched': 'breadth_first',
+            'sched': 'locked_scheduler',
             'product': 'abc',
             'subproduct': 'def',
             'kpi': 0.5,

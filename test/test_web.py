@@ -80,6 +80,13 @@ class TestWeb(web.Helper):
         valid_user_access_levels=[("L1", "L1"), ("L2", "L2"),("L3", "L3"), ("L4", "L4")]
     )
 
+    upref_mdata_choices = dict(languages=[("en", "en"), ("sp", "sp")],
+                                    locations=[("us", "us"), ("uk", "uk")],
+                                    country_codes=[("us", "us"), ("uk", "uk")],
+                                    country_names=[("us", "us"), ("uk", "uk")],
+                                    timezones=[("", ""), ("ACT", "Australia Central Time")],
+                                    user_types=[("Researcher", "Researcher"), ("Analyst", "Analyst")])
+
     def clear_temp_container(self, user_id):
         """Helper function which deletes all files in temp folder of a given owner_id"""
         temp_folder = os.path.join('/tmp', 'user_%d' % user_id)
@@ -919,14 +926,19 @@ class TestWeb(web.Helper):
         assert res.status_code == 404, res.status_code
 
     @with_context
+    @patch('pybossa.forms.forms.app_settings.upref_mdata.get_upref_mdata_choices')
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
     @patch('pybossa.view.account.mail_queue', autospec=True)
     @patch('pybossa.view.account.render_template')
     @patch('pybossa.view.account.signer')
-    def test_validate_email(self, signer, render, queue):
+    def test_validate_email(self, signer, render, queue, upref_mdata, get_upref_mdata_choices):
         """Test WEB validate email sends the confirmation email
         if account validation is enabled"""
+
         from flask import current_app
         current_app.config['ACCOUNT_CONFIRMATION_DISABLED'] = False
+
+        get_upref_mdata_choices.return_value = self.upref_mdata_choices
         self.register()
         self.signin()
         user = db.session.query(User).get(1)
@@ -1375,7 +1387,10 @@ class TestWeb(web.Helper):
 
 
     @with_context
-    def test_04_signin_signout(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_04_signin_signout(self, upref_mdata):
         """Test WEB sign in and sign out works"""
         res = self.register()
         # Log out as the registration already logs in the user
@@ -1552,7 +1567,10 @@ class TestWeb(web.Helper):
 
 
     @with_context
-    def test_05_update_user_profile_json(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_05_update_user_profile_json(self, upref_mdata):
         """Test WEB update user profile JSON"""
 
         # Create an account and log in
@@ -1672,7 +1690,10 @@ class TestWeb(web.Helper):
 
 
     @with_context
-    def test_05_update_user_profile(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_05_update_user_profile(self, upref_mdata):
         """Test WEB update user profile"""
 
         # Create an account and log in
@@ -2754,7 +2775,10 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    def test_14_delete_application(self, mock):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_14_delete_application(self, upref_mdata, mock):
         """Test WEB delete project works"""
         self.register()
         self.signin()
@@ -2779,8 +2803,11 @@ class TestWeb(web.Helper):
         assert res.status_code == 403, res.status_code
 
     @with_context
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
     @patch('pybossa.repositories.project_repository.uploader')
-    def test_delete_project_deletes_task_zip_files_too(self, uploader):
+    def test_delete_project_deletes_task_zip_files_too(self, uploader, upref_mdata):
         """Test WEB delete project also deletes zip files for task and taskruns"""
         Fixtures.create()
         make_subadmin_by(email_addr='tester@tester.com')
@@ -3196,7 +3223,8 @@ class TestWeb(web.Helper):
         assert res.status_code == 302
 
     @with_context
-    def test_23_get_specific_ongoing_task_user(self):
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
+    def test_23_get_specific_ongoing_task_user(self, read_project):
         """Test WEB get specific ongoing task_id for a project works as an user"""
         self.create()
         self.delete_task_runs()
@@ -3210,9 +3238,10 @@ class TestWeb(web.Helper):
         assert 'TaskPresenter' in str(res.data), res.data
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.fetch_lock_for_user')
     @patch('pybossa.view.projects.time')
-    def test_23_get_specific_ongoing_task_user_json(self, mock_time, fetch_lock):
+    def test_23_get_specific_ongoing_task_user_json(self, mock_time, fetch_lock, read_project):
         """Test WEB get specific ongoing task_id for a project works as an user"""
         mock_now = 1652131709
         mock_time.time.return_value = mock_now
@@ -3259,8 +3288,9 @@ class TestWeb(web.Helper):
         assert fake_guard_instance.stamp.called
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects._get_locks', return_value={})
-    def test_get_specific_task_no_lock_flash_message(self, _get_locks):
+    def test_get_specific_task_no_lock_flash_message(self, _get_locks, read_project):
         self.create()
         self.delete_task_runs()
         self.register()
@@ -3278,9 +3308,10 @@ class TestWeb(web.Helper):
         assert msg in str(res.data), 'Flash message not found: "{}"'.format(msg)
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.fetch_lock_for_user')
     @patch('pybossa.view.projects.time')
-    def test_get_specific_task_with_lock_seconds_remaining(self, mock_time, fetch_lock):
+    def test_get_specific_task_with_lock_seconds_remaining(self, mock_time, fetch_lock, read_project):
         mock_now = 1652131709
         mock_time.time.return_value = mock_now
 
@@ -3303,8 +3334,9 @@ class TestWeb(web.Helper):
         assert '"timeout":10' in str(res.data), "Incorrect value for timeout"
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.get_task_id_and_duration_for_project_user')
-    def test_get_next_task_with_lock_seconds_remaining(self, get_task_id_and_duration_for_project_user):
+    def test_get_next_task_with_lock_seconds_remaining(self, get_task_id_and_duration_for_project_user, read_project):
         self.create()
         self.delete_task_runs()
         self.register()
@@ -3338,8 +3370,9 @@ class TestWeb(web.Helper):
         assert 'setup_task_timeout_display(11, 3600)' in str(res.data), "Incorrect timeout value"
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.get_task_id_and_duration_for_project_user')
-    def test_get_next_task_with_lock_seconds_remaining_less_10(self, get_task_id_and_duration_for_project_user):
+    def test_get_next_task_with_lock_seconds_remaining_less_10(self, get_task_id_and_duration_for_project_user, read_project):
         self.create()
         self.delete_task_runs()
         self.register()
@@ -3373,8 +3406,9 @@ class TestWeb(web.Helper):
         assert 'setup_task_timeout_display(3600, 3600)' in str(res.data), "Incorrect timeout value"
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.get_task_id_and_duration_for_project_user')
-    def test_get_next_task_with_saved_task_position(self, get_task_id_and_duration_for_project_user):
+    def test_get_next_task_with_saved_task_position(self, get_task_id_and_duration_for_project_user, read_project):
         self.create()
         self.delete_task_runs()
         self.register()
@@ -3401,10 +3435,11 @@ class TestWeb(web.Helper):
         assert res.status_code == 200, res
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.has_no_presenter')
     @patch('pybossa.view.projects.fetch_lock_for_user')
     @patch('pybossa.view.projects.time')
-    def test_get_specific_task_no_presenter_flash_message(self, mock_time, fetch_lock, has_no_presenter):
+    def test_get_specific_task_no_presenter_flash_message(self, mock_time, fetch_lock, has_no_presenter, read_project):
         mock_now = 1652131709
         mock_time.time.return_value = mock_now
 
@@ -3428,8 +3463,9 @@ class TestWeb(web.Helper):
         assert msg in str(res.data), 'Flash message not found: "{}"'.format(msg)
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.ContributionsGuard')
-    def test_get_specific_ongoing_task_marks_task_as_requested_json(self, guard):
+    def test_get_specific_ongoing_task_marks_task_as_requested_json(self, guard, read_project):
         fake_guard_instance = mock_contributions_guard()
         guard.return_value = fake_guard_instance
         self.create()
@@ -3515,7 +3551,8 @@ class TestWeb(web.Helper):
 
 
     @with_context
-    def test_task_presenter_with_allow_taskrun_edit_works(self):
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
+    def test_task_presenter_with_allow_taskrun_edit_works(self, read_project):
         """Test WEB with taskrun edit permitted, get expected task based on user access"""
         self.register()
         self.signin()
@@ -3576,7 +3613,8 @@ class TestWeb(web.Helper):
         assert res.status_code == 403, res.status_code
 
     @with_context
-    def test_task_presenter_with_allow_taskrun_edit_allows_submission(self):
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
+    def test_task_presenter_with_allow_taskrun_edit_allows_submission(self, read_project):
         """Test WEB with taskrun edit is permitted with task_submitter_id passed"""
         self.register()
         self.signin()
@@ -3606,8 +3644,9 @@ class TestWeb(web.Helper):
         assert res.status_code == 200, res.status_code
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    def test_25_get_wrong_task_app(self, mock):
+    def test_25_get_wrong_task_app(self, mock, read_project):
         """Test WEB get wrong task.id for a project works"""
         self.register()
         self.signin()
@@ -3631,8 +3670,9 @@ class TestWeb(web.Helper):
         assert msg in str(res.data), res.data
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    def test_25_get_wrong_task_app_json(self, mock):
+    def test_25_get_wrong_task_app_json(self, mock, read_project):
         """Test WEB get wrong task.id for a project works"""
         self.create()
         project1 = db.session.query(Project).get(1)
@@ -3665,7 +3705,8 @@ class TestWeb(web.Helper):
         assert 'secret_key' not in data['project'], err_msg
 
     @with_context
-    def test_26_tutorial_signed_user(self):
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
+    def test_26_tutorial_signed_user(self, read_project):
         """Test WEB tutorials work as signed in user"""
         self.create()
         project1 = db.session.query(Project).get(1)
@@ -3687,7 +3728,8 @@ class TestWeb(web.Helper):
         assert "some help" in str(res.data), err_msg
 
     @with_context
-    def test_26_tutorial_signed_user_json(self):
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
+    def test_26_tutorial_signed_user_json(self, read_project):
         """Test WEB tutorials work as signed in user"""
         self.create()
         project1 = db.session.query(Project).get(1)
@@ -3764,7 +3806,8 @@ class TestWeb(web.Helper):
         assert 'My New Project' in data['title'], err_msg
 
     @with_context
-    def test_28_non_tutorial_signed_user(self):
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
+    def test_28_non_tutorial_signed_user(self, read_project):
         """Test WEB project without tutorial work as signed in user"""
         self.create()
         project = db.session.query(Project).get(1)
@@ -3875,8 +3918,11 @@ class TestWeb(web.Helper):
             str(res.data), "Project ID should be shown to the owner"
 
     @with_context
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    def test_31_user_profile_progress(self, mock):
+    def test_31_user_profile_progress(self, upref_mdata, mock):
         """Test WEB user progress profile page works"""
         self.register()
         self.signin()
@@ -7285,7 +7331,10 @@ class TestWeb(web.Helper):
         assert uploader.delete_file.call_args_list == expected
 
     @with_context
-    def test_57_reset_api_key(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_57_reset_api_key(self, upref_mdata):
         """Test WEB reset api key works"""
         url = "/account/johndoe/update"
         # Anonymous user
@@ -7523,7 +7572,8 @@ class TestWeb(web.Helper):
         assert '<body' in data['content'], err_msg
 
     @with_context
-    def test_69_allow_anonymous_contributors(self):
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
+    def test_69_allow_anonymous_contributors(self, read_project):
         """Test WEB allow anonymous contributors works"""
         Fixtures.create()
         project = db.session.query(Project).first()
@@ -7571,7 +7621,10 @@ class TestWeb(web.Helper):
         assert 'This feature requires being logged in' in str(res.data), err_msg
 
     @with_context
-    def test_70_public_user_profile(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_70_public_user_profile(self, upref_mdata):
         """Test WEB public user profile works"""
         Fixtures.create()
 
@@ -7594,7 +7647,10 @@ class TestWeb(web.Helper):
         assert res.status_code == 404, err_msg
 
     @with_context
-    def test_71_public_user_profile_json(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_71_public_user_profile_json(self, upref_mdata):
         """Test JSON WEB public user profile works"""
 
         res = self.app.get('/account/nonexistent/',
@@ -7629,7 +7685,10 @@ class TestWeb(web.Helper):
         assert res.status_code == 302, res.status_code
 
     @with_context
-    def test_72_profile_url_json_restrict(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_72_profile_url_json_restrict(self, upref_mdata):
         """Test JSON WEB public user profile restrict works"""
 
         user = UserFactory.create(restrict=True)
@@ -9531,8 +9590,11 @@ class TestWeb(web.Helper):
         assert th_tag_4 == expected_columns[3], f"found column {th_tag_4}, expected column {expected_columns[3]} not present"
 
     @with_context
-    def test_projects_account(self):
-        """Test projecs on profiles are good."""
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_projects_account(self, upref_mdata):
+        """Test projects on profiles are good."""
         owner, contributor = UserFactory.create_batch(2)
         info = dict(passwd_hash='foo', foo='bar', data_classification=dict(input_data="L4 - public", output_data="L4 - public"))
         project = ProjectFactory.create(owner=owner, info=info)
@@ -9569,19 +9631,22 @@ class TestWeb(web.Helper):
             assert key in tmp['info'].keys()
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_name_by_country_code')
     @patch('pybossa.view.account.mail_queue', autospec=True)
     @patch('pybossa.view.account.render_template')
     @patch('pybossa.view.account.signer')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_register_with_upref_mdata(self, upref_mdata, get_upref_mdata_choices, signer, render, queue):
+    def test_register_with_upref_mdata(self, upref_mdata, get_upref_mdata_choices, signer, render, queue, get_country_name_by_country_code):
         """Test WEB register user with user preferences set"""
         from flask import current_app
         get_upref_mdata_choices.return_value = dict(languages=[("en", "en"), ("sp", "sp")],
                                     locations=[("us", "us"), ("uk", "uk")],
+                                    country_codes=[("us", "us"), ("uk", "uk")],
+                                    country_names=[("us", "us"), ("uk", "uk")],
                                     timezones=[("", ""), ("ACT", "Australia Central Time")],
                                     user_types=[("Researcher", "Researcher"), ("Analyst", "Analyst")])
-
+        get_country_name_by_country_code.return_value = 'US'
         current_app.config['ACCOUNT_CONFIRMATION_DISABLED'] = True
         data = dict(fullname="AJD", name="ajd",
                     password="p4ssw0rd", confirm="p4ssw0rd",
@@ -9631,6 +9696,8 @@ class TestWeb(web.Helper):
         from flask import current_app
         get_valid_user_preferences.return_value = dict(languages=[("en", "en"), ("sp", "sp")],
                                     locations=[("us", "us"), ("uk", "uk")],
+                                    country_codes=[("us", "us"), ("uk", "uk")],
+                                    country_names=[("us", "us"), ("uk", "uk")],
                                     timezones=[("", ""), ("ACT", "Australia Central Time")],
                                     user_types=[("Researcher", "Researcher"), ("Analyst", "Analyst")])
 
@@ -9849,6 +9916,55 @@ class TestWeb(web.Helper):
             data = json.loads(res.data)
             assert data.get('status') == 'success', data
             assert "Users unassigned or no user assigned to project" in data.get('flash'), data
+
+    @with_context
+    def test_get_assign_users_to_project(self):
+        """Test GET assign users to project based on data access levels with successful load of users matching data access"""
+
+        from pybossa.view.projects import data_access_levels
+
+        user1 = UserFactory.create(id=999, subadmin=False, admin=True, name="adminuser")
+        user1.set_password('1234')
+        user1.info['data_access'] = ["L1", "L2", "L3", "L4"]
+        user_repo.save(user1)
+
+        user2 = UserFactory.create(id=998, subadmin=False, admin=False, name="workeruser_one")
+        user2.set_password('1234')
+        user2.info['data_access'] = ["L1", "L2", "L3", "L4"]
+        user2.fullname = 'workeruser one'
+        user_repo.save(user2)
+
+        user3 = UserFactory.create(id=997, subadmin=False, admin=False, name="workeruser_two", enabled=False)
+        user3.set_password('1234')
+        user3.info['data_access'] = ["L1", "L2", "L3", "L4"]
+        user3.fullname = 'workeruser two'
+        user_repo.save(user3)
+
+        user4 = UserFactory.create(id=996, subadmin=False, admin=False, name="workeruser 4", enabled=False)
+        user4.set_password('1234')
+        user4.info['data_access'] = ["L1", "L2", "L3", "L4"]
+        user4.fullname = 'workeruser 4'
+        user_repo.save(user4)
+
+        project = ProjectFactory.create(info={
+            'sched': 'user_pref_scheduler',
+            'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
+            'data_access': ["L1", "L2", "L3", "L4"]
+        })
+        project_repo.save(project)
+
+        # Sign-in as an admin user.
+        csrf = self.get_csrf('/account/signin')
+        res = self.signin(email=user1.email_addr, password='1234', csrf=csrf)
+
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            # Fetch assign-users page with selection of users for project.
+            res = self.app.get('/project/{}/assign-users'.format(project.short_name))
+
+            # Confirm users exist in the page and disables users do not.
+            assert user1.fullname in str(res.data), user1.fullname + ' not found on assign-users page.'
+            assert user2.fullname in str(res.data), user2.fullname + ' not found on assign-users page.'
+            assert user3.fullname not in str(res.data), user3.fullname + ' is disabled and should not be found on assign-users page.'
 
     @with_context
     @patch('pybossa.view.account.send_mail', autospec=True)
@@ -10079,6 +10195,51 @@ class TestWeb(web.Helper):
         assert "class=\" sort-asc sortable\" data-sort=\"completed_by\"" not in str(res.data), "Unexpected sorted column (sort-asc) indicator on Completed By."
         assert "class=\" sort-asc sortable\" data-sort=\"priority\"" not in str(res.data), "Missing sorted column indicator (sort-asc) on Priority."
 
+
+    @with_context
+    @patch('pybossa.view.projects.n_available_tasks_for_user')
+    def test_browse_task_view_tasklist_no_tasks_admin(self, n_available_tasks_for_user):
+        """Test browse task with view=tasklist and no available tasks redirects to tasks/browse."""
+        n_available_tasks_for_user.return_value = 0
+
+        # Initialize a project.
+        self.create()
+        self.delete_task_runs()
+
+        # Set the user password and admin.
+        user = db.session.query(User).get(2)
+        user.set_password('1234')
+        user.admin = True
+        user_repo.save(user)
+
+        # Create a project and task.
+        project = db.session.query(Project).first()
+        project.allow_anonymous_contributors = True
+        db.session.add(project)
+        db.session.commit()
+
+        # Retrieve the first task.
+        task = db.session.query(Task).filter(Project.id == project.id).first()
+
+        # Add task results.
+        for i in range(10):
+            task_run = TaskRun(project_id=project.id, task_id=task.id,
+                               user_id=user.id,
+                               info={'answer': i})
+            db.session.add(task_run)
+            db.session.commit()
+            res = self.app.get('api/project/%s/newtask' % project.id)
+
+        # Sign-in as an admin user.
+        csrf = self.get_csrf('/account/signin')
+        res = self.signin(email=user.email_addr, password='1234', csrf=csrf)
+
+        # Load the task browse page using the tasklist view.
+        res = self.app.get('project/%s/tasks/browse?view=tasklist' % (project.short_name), follow_redirects=True)
+        # Confirm a 200 response for /tasks/browse is returned.
+        assert res.status_code == 200
+
+
     @with_context
     def test_gold_annotations_anonymous_access_fails(self):
         """Test gold_annotations without login"""
@@ -10173,7 +10334,10 @@ class TestWebUserMetadataUpdate(web.Helper):
 
         enabled = set(self.update.keys()) - set(disabled)
 
+        print(sorted(updated), '\n\n', sorted(self.update))
+
         for k in enabled:
+            print('checking enabled field: ', updated[k],  self.update[k])
             assert updated[k] == self.update[k], 'Enabled field [{}] did not get updated.'.format(k)
         for k in disabled:
             original_value = self.original[k]
@@ -10199,7 +10363,9 @@ class TestWebUserMetadataUpdate(web.Helper):
         def double(x): return (x,x)
         get_upref_mdata_choices.return_value = dict(
             languages=list(map(double,["Afrikaans", "Albanian", "Welsh"])),
-            locations=list(map(double, ['Bonaire', 'Wallis and Futuna', 'Vanuatu'])),
+            locations=list(map(double, ['Bonaire', 'BQ', 'Wallis and Futuna', 'WF', 'Vanuatu', 'VU'])),
+            country_names=list(map(double, ['Bonaire', 'Wallis and Futuna', 'Vanuatu'])),
+            country_codes=list(map(double, ['BQ', 'WF', 'VU'])),
             timezones=[("AET", "Australia Eastern Time"), ("AGT", "Argentina Standard Time")],
             user_types=list(map(double, ["Researcher", "Analyst", "Curator"]))
         )
@@ -10210,11 +10376,13 @@ class TestWebUserMetadataUpdate(web.Helper):
             assert v != self.original[k], '[{}] is same in original and update'.format(k)
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_normal_user_cannot_update_own_user_type(self, upref_mdata, get_upref_mdata_choices):
+    def test_normal_user_cannot_update_own_user_type(self, upref_mdata, get_upref_mdata_choices, get_country_code_by_country_name):
         """Test normal user can update their own metadata except for user_type"""
         self.mock_upref_mdata_choices(get_upref_mdata_choices)
+        get_country_code_by_country_name.return_value = 'VU'
         # First user created is automatically admin, so get that out of the way.
         user_admin = UserFactory.create()
         user_normal = self.create_user()
@@ -10225,11 +10393,13 @@ class TestWebUserMetadataUpdate(web.Helper):
         self.assert_updates_applied_correctly(user_normal.id, disabled)
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_admin_user_can_update_own_metadata(self, upref_mdata, get_upref_mdata_choices):
+    def test_admin_user_can_update_own_metadata(self, upref_mdata, get_upref_mdata_choices, get_country_code_by_country_name):
         '''Test admin can update their own metadata'''
         self.mock_upref_mdata_choices(get_upref_mdata_choices)
+        get_country_code_by_country_name.return_value = 'VU'
         user_admin = self.create_user()
         assert user_admin.admin
         self.signin_user(user_admin)
@@ -10238,11 +10408,13 @@ class TestWebUserMetadataUpdate(web.Helper):
         self.assert_updates_applied_correctly(user_admin.id, disabled)
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_subadmin_user_can_update_own_metadata(self, upref_mdata, get_upref_mdata_choices):
+    def test_subadmin_user_can_update_own_metadata(self, upref_mdata, get_upref_mdata_choices, get_country_code_by_country_name):
         '''Test subadmin can update their own metadata'''
         self.mock_upref_mdata_choices(get_upref_mdata_choices)
+        get_country_code_by_country_name.return_value = 'VU'
         # First user created is automatically admin, so get that out of the way.
         user_admin = UserFactory.create()
         user_subadmin = self.create_user(subadmin=True)
@@ -10253,11 +10425,13 @@ class TestWebUserMetadataUpdate(web.Helper):
         self.assert_updates_applied_correctly(user_subadmin.id, disabled)
 
     @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.view.account.app_settings.upref_mdata.get_upref_mdata_choices')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_subadmin_user_can_update_normal_user_metadata(self, upref_mdata, get_upref_mdata_choices):
+    def test_subadmin_user_can_update_normal_user_metadata(self, upref_mdata, get_upref_mdata_choices, get_country_code_by_country_name):
         '''Test subadmin can update normal user metadata'''
         self.mock_upref_mdata_choices(get_upref_mdata_choices)
+        get_country_code_by_country_name.return_value = 'VU'
         # First user created is automatically admin, so get that out of the way.
         user_admin = UserFactory.create()
         user_subadmin = UserFactory.create(subadmin=True)
@@ -10372,6 +10546,64 @@ class TestWebUserMetadataUpdate(web.Helper):
         data = json.loads(res.data)
         assert data.get('success') == True, data
         assert release_lock.call_count == 1, release_lock.call_count
+
+    @with_context
+    @patch('pybossa.api.release_lock')
+    @patch('pybossa.api.has_lock')
+    @patch('pybossa.api.ContributionsGuard')
+    def test_cancel_task_reset_presented_time(self, guard, has_lock, release_lock):
+        """Test cancel task reset presented time"""
+
+        has_lock.return_value = True
+        url = "/api/task/1/canceltask"
+
+        admin = UserFactory.create()
+        self.signin_user(admin)
+        project = ProjectFactory.create(
+            info= {
+                "reset_presented_time": True
+            },
+            owner=admin
+        )
+        task = TaskFactory.create(project=project)
+        payload = {'projectname': project.short_name}
+        res = self.app_post_json(url,
+                            data=payload,
+                            follow_redirects=False,
+                            )
+        data = json.loads(res.data)
+        assert data.get('success') == True, data
+        assert release_lock.call_count == 1, release_lock.call_count
+        assert guard.return_value.stamp_cancelled_time.called
+
+    @with_context
+    @patch('pybossa.api.release_lock')
+    @patch('pybossa.api.has_lock')
+    @patch('pybossa.api.ContributionsGuard')
+    def test_cancel_task_not_reset_presented_time(self, guard, has_lock, release_lock):
+        """Test cancel task reset presented time"""
+
+        has_lock.return_value = True
+        url = "/api/task/1/canceltask"
+
+        admin = UserFactory.create()
+        self.signin_user(admin)
+        project = ProjectFactory.create(
+            info= {
+                "reset_presented_time": False
+            },
+            owner=admin
+        )
+        task = TaskFactory.create(project=project)
+        payload = {'projectname': project.short_name}
+        res = self.app_post_json(url,
+                            data=payload,
+                            follow_redirects=False,
+                            )
+        data = json.loads(res.data)
+        assert data.get('success') == True, data
+        assert release_lock.call_count == 1, release_lock.call_count
+        assert not guard.return_value.stamp_cancelled_time.called
 
     @with_context
     def test_release_category_locks(self):
@@ -11153,12 +11385,14 @@ class TestServiceRequest(web.Helper):
 
         from flask import current_app, Response
         current_app.config['PROXY_SERVICE_CONFIG'] = None
+        current_app.config["AUTHORIZED_SERVICES_KEY"] = "service_key"
         has_lock.return_value = True
         url = "/api/task/1/services/test-service-name/1/31"
 
         admin = UserFactory.create()
         self.signin_user(admin)
-        project = ProjectFactory.create(owner=admin)
+        ext_config = {"authorized_services": {"service_key": ["test-service-name"]}}
+        project = ProjectFactory.create(owner=admin, info={"ext_config": ext_config})
         task = TaskFactory.create(project=project)
         payload = {'test': 'test'}
 
@@ -11209,11 +11443,14 @@ class TestServiceRequest(web.Helper):
                     }
                 }
         }
+        current_app.config["AUTHORIZED_SERVICES_KEY"] = "service_key"
         user = UserFactory.create()
         user.set_password('1234')
         user_repo.save(user)
         self.signin(email=user.email_addr, password='1234')
-        project = ProjectFactory.create(owner=user)
+
+        ext_config = {"authorized_services": {"service_key": ["test-service-name"]}}
+        project = ProjectFactory.create(owner=user, info={"ext_config": ext_config})
         task = TaskFactory.create(project=project)
 
         # invalid payload
@@ -11290,7 +11527,7 @@ class TestServiceRequest(web.Helper):
                     }
                 }
         }
-
+        current_app.config["AUTHORIZED_SERVICES_KEY"] = "service_key"
         valid_request = {
             'data': { 'queryTest':{
                 'context':"test_context",
@@ -11302,7 +11539,8 @@ class TestServiceRequest(web.Helper):
         user.set_password('1234')
         user_repo.save(user)
         self.signin(email=user.email_addr, password='1234')
-        project = ProjectFactory.create(owner=user)
+        ext_config = {"authorized_services": {"service_key": ["test-service-name"]}}
+        project = ProjectFactory.create(owner=user, info={"ext_config": ext_config})
         task = TaskFactory.create(project=project)
 
         res = self.app_post_json(url,
@@ -11310,3 +11548,57 @@ class TestServiceRequest(web.Helper):
                             follow_redirects=False,
                             )
         assert res.data.decode() == mock_response.content, res.data
+
+    @with_context
+    @patch("pybossa.api.requests.post")
+    @patch("pybossa.api.has_lock")
+    def test_service_request_with_unauthorized_service(self, has_lock, post):
+        """Test with valid payload but to an unauthorized service"""
+        from flask import current_app, Response
+
+        class MockResponse(object):
+            def __init__(self, content):
+                self.content = content
+
+        has_lock.return_value = True
+        mock_response = MockResponse('{"test": "test"}')
+        post.return_value = mock_response
+
+        current_app.config["PROXY_SERVICE_CONFIG"] = {
+            "uri": "http://test-service.com:8080",
+            "services": {
+                "test-service-name": {
+                    "headers": {"CCRT-test": "test"},
+                    "requests": ["queryTest"],
+                    "context": ["test_context"],
+                    "validators": ["is_valid_query", "is_valid_context"],
+                }
+            },
+        }
+        current_app.config["AUTHORIZED_SERVICES_KEY"] = "service_key"
+        valid_request = {
+            "data": {
+                "queryTest": {
+                    "context": "test_context",
+                    "query": "foo",
+                    "maxresults": 10,
+                }
+            }
+        }
+
+        url = "/api/task/1/services/test-service-name/1/37"
+        user = UserFactory.create()
+        user.set_password("1234")
+        user_repo.save(user)
+        self.signin(email=user.email_addr, password="1234")
+        ext_config = {"authorized_services": {"service_key": ["a-random-service"]}}
+        project = ProjectFactory.create(owner=user, info={"ext_config": ext_config})
+        task = TaskFactory.create(project=project)
+
+        res = self.app_post_json(
+            url,
+            data=valid_request,
+            follow_redirects=False,
+        )
+        data = json.loads(res.data)
+        assert data.get("status_code") == 403, data

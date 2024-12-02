@@ -540,3 +540,6 @@ SWAGGER_TEMPLATE = {
     'favicon': '/static/img/favicon/favicon.ico',
     'title': 'GIGwork - Local API',
 }
+
+# perform task deletes in batches in absence of session_replication_role on db
+SESSION_REPLICATION_ROLE_DISABLED = True

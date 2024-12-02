@@ -25,7 +25,6 @@ This package adds GET, POST, PUT and DELETE methods for:
     * task_runs,
     * users,
     * global_stats,
-
 """
 
 from functools import partial
@@ -78,6 +77,7 @@ from pybossa.sched import (get_scheduler_and_timeout, has_lock, release_lock, Sc
 from pybossa.jobs import send_mail
 from pybossa.api.project_by_name import ProjectByNameAPI, project_name_to_oid
 from pybossa.api.project_details import ProjectDetailsAPI
+from pybossa.api.project_locks import ProjectLocksAPI
 from pybossa.api.pwd_manager import get_pwd_manager
 from pybossa.data_access import data_access_levels
 from pybossa.task_creator_helper import set_gold_answers
@@ -166,6 +166,7 @@ register_api(CompletedTaskAPI, 'api_completedtask', '/completedtask', pk='oid', 
 register_api(CompletedTaskRunAPI, 'api_completedtaskrun', '/completedtaskrun', pk='oid', pk_type='int')
 register_api(ProjectByNameAPI, 'api_projectbyname', '/projectbyname', pk='key', pk_type='string')
 register_api(ProjectDetailsAPI, 'api_projectdetails', '/projectdetails', pk='oid', pk_type='int')
+register_api(ProjectLocksAPI, 'api_projectlocks', '/locks', pk='oid', pk_type='int')
 register_api(PerformanceStatsAPI, 'api_performancestats', '/performancestats', pk='oid', pk_type='int')
 register_api(BulkTasksAPI, 'api_bulktasks', '/bulktasks', pk='oid', pk_type='int')
 
@@ -210,8 +211,21 @@ def new_task(project_id, task_id=None):
                 else:
                     # user returning back for the same task
                     # original presented time has not expired yet
-                    # to continue original presented time, extend expiry
-                    guard.extend_task_presented_timestamp_expiry(task, user_id_or_ip)
+                    # reset presented time for projects configured to reset it
+                    project = project_repo.get(project_id)
+                    if not project:
+                        return abort(400)
+                    reset_presented_time = project.info.get("reset_presented_time", False)
+                    if reset_presented_time:
+                        cancelled_task = guard.retrieve_cancelled_timestamp(task, user_id_or_ip)
+                        if cancelled_task:
+                            # user is returning to same task upon cancelling the task
+                            # reset presented time when configured under project settings
+                            guard.stamp_presented_time(task, user_id_or_ip)
+                            guard.remove_cancelled_timestamp(task, get_user_id_or_ip())
+                    else:
+                        # to continue original presented time, extend expiry
+                        guard.extend_task_presented_timestamp_expiry(task, user_id_or_ip)
 
             data = [TaskAuth.dictize_with_access_control(task) for task in tasks]
             add_task_signature(data)
@@ -578,6 +592,7 @@ def cancel_task(task_id=None):
 
     user_id = current_user.id
     scheduler, timeout = get_scheduler_and_timeout(project)
+    reset_presented_time = project.info.get("reset_presented_time", False)
     if scheduler in (Schedulers.locked, Schedulers.user_pref, Schedulers.task_queue):
         task_locked_by_user = has_lock(task_id, user_id, timeout)
         if task_locked_by_user:
@@ -586,6 +601,15 @@ def cancel_task(task_id=None):
                 'Project {} - user {} cancelled task {}'
                 .format(project.id, current_user.id, task_id))
             release_reserve_task_lock_by_id(project.id, task_id, current_user.id, timeout, expiry=EXPIRE_LOCK_DELAY, release_all_task=True)
+            # presented time would reset only upon cancel task when reset is
+            # configured under project settings. add an entry to the cache
+            # to make note that task has been cancelled. with this, obtaining
+            # the same task again would reset the presented time.
+            if reset_presented_time:
+                guard = ContributionsGuard(sentinel.master, timeout=timeout)
+                user_id_or_ip = get_user_id_or_ip()
+                task = task_repo.get_task(task_id)
+                guard.stamp_cancelled_time(task, user_id_or_ip)
 
     return Response(json.dumps({'success': True}), 200, mimetype="application/json")
 
@@ -696,19 +720,30 @@ def get_service_request(task_id, service_name, major_version, minor_version):
     task = task_repo.get_task(task_id)
     project = project_repo.get(task.project_id)
 
+    authorized_services_key = current_app.config.get("AUTHORIZED_SERVICES_KEY", None)
+    authorized_services = (
+        project.info.get("ext_config", {})
+        .get("authorized_services", {})
+        .get(authorized_services_key, [])
+    )
+    if service_name not in authorized_services:
+        return abort(403, "The project is not authorized to access this service")
+
     if not (task and proxy_service_config and service_name and major_version and minor_version):
         return abort(400)
 
     timeout = project.info.get('timeout', ContributionsGuard.STAMP_TTL)
     task_locked_by_user = has_lock(task.id, current_user.id, timeout)
     payload = request.json if isinstance(request.json, dict) else None
+    can_create_gold_tasks = (current_user.subadmin and current_user.id in project.owners_ids) or current_user.admin
 
-    if payload and task_locked_by_user:
+    if payload and (task_locked_by_user or can_create_gold_tasks):
         service = _get_valid_service(task_id, service_name, payload, proxy_service_config)
         if isinstance(service, dict):
             url = '{}/{}/{}/{}'.format(proxy_service_config['uri'], service_name, major_version, minor_version)
             headers = service.get('headers')
-            ret = requests.post(url, headers=headers, json=payload['data'])
+            ssl_cert = current_app.config.get('SSL_CERT_PATH', True)
+            ret = requests.post(url, headers=headers, json=payload['data'], verify=ssl_cert)
             return Response(ret.content, 200, mimetype="application/json")
 
     current_app.logger.info(
@@ -851,6 +886,31 @@ def user_has_partial_answer(short_name=None):
     response = {"has_answer": bool(task_id_map)}
     return Response(json.dumps(response), status=200, mimetype="application/json")
 
+def get_prompt_data():
+    '''
+    Get data from request and validate it.
+    '''
+    try:
+        data = request.get_json(force=True)
+    except:
+        return abort(400, "Invalid JSON data")
+
+    if "prompts" in data:
+        prompts = data.get("prompts")
+    elif "instances" in data:
+        prompts = data.get("instances")
+    else:
+        return abort(400, "The JSON should have either 'prompts' or 'instances'")
+
+    if not prompts:
+        return abort(400, 'prompts should not be empty')
+    if isinstance(prompts, list):
+        prompts = prompts[0]  # Batch request temporarily NOT supported
+    if not (isinstance(prompts, str) or isinstance(prompts, dict)):
+        return abort(400, f'prompts should be a string or a dict')
+
+    return prompts
+
 
 @jsonpify
 @csrf.exempt
@@ -861,64 +921,60 @@ def large_language_model(model_name):
     """Large language model endpoint
     The JSON data in the POST request can be one of the following:
     {
-        "instances": [
+        "model_name": "mixtral-8x7b-instruct"
+        "payload":
             {
-                "context": "Identify the company name: Microsoft will release Windows 20 next year.",
-                "temperature": 1.0,
-                "seed": 12345,
-                "repetition_penalty": 1.05
+            "prompts": [ "Identify the company name: Microsoft will release Windows 20 next year." ]
+            "params":
+                {
+                    "seed": 1234,
+                    "temperature": 0.9,
+                    "max_tokens": 128,
+
+                }
             }
-        ]
-    }
-    or
-    {
-        "prompts": "Identify the company name: Microsoft will release Windows 20 next year."
+        "proxies": proxies,
+        "user_uuid": 30812532,
+        "project_name": "Inference_Proxy_test",
     }
     """
-    if model_name is None:
-        model_name = 'flan-ul2'
-    endpoints = current_app.config.get('LLM_ENDPOINTS')
-    model_endpoint = endpoints.get(model_name.lower())
-
-    if not model_endpoint:
-        return abort(400, f'{model_name} LLM is unsupported on this platform.')
-
+    available_models = current_app.config.get('LLM_MODEL_NAMES')
+    endpoint = current_app.config.get('INFERENCE_ENDPOINT')
     proxies = current_app.config.get('LLM_PROXIES')
 
-    try:
-        data = request.get_json(force=True)
-    except:
-        return abort(400, "Invalid JSON data")
+    if model_name is None:
+        model_name = 'mixtral-8x7b-instruct'
 
-    if "prompts" not in data and "instances" not in data:
-        return abort(400, "The JSON should have either 'prompts' or 'instances'")
+    if model_name not in available_models:
+        return abort(400, "LLM is unsupported")
 
-    if "prompts" in data:
-        prompts = data.get("prompts")
-        if not prompts:
-            return abort(400, 'prompts should not be empty')
-        if isinstance(prompts, list):
-            prompts = prompts[0]  # Batch request temporarily NOT supported
-        if not isinstance(prompts, str):
-            return abort(400, f'prompts should be a string or a list of strings')
-        data = {
-            "instances": [
-                {
-                    "context": prompts + ' ',
-                    "temperature": 1.0,
-                    "seed": 12345,
-                    "repetition_penalty": 1.05
-                }
-            ]
+    prompts = get_prompt_data()
+
+    data = {
+        "prompts": [prompts.get("context", '')],
+        "params":
+            {
+                "max_tokens": prompts.get("max_new_tokens", 16),
+                "temperature": prompts.get("temperature", 1.0),
+                "seed": 12345
+            }
         }
 
-    body = {
-        "inference_endpoint": model_endpoint,
-        "payload": data,
+    headers = {
+        "llm-access-token": current_app.config.get('AUTOLAB_ACCESS_TOKEN'),
     }
-    r = requests.post(url=current_app.config.get('INFERENCE_ENDPOINT'), json=body, proxies=proxies)
+
+    body = {
+        "model_name": model_name,
+        "payload": data,
+        "proxies": proxies,
+        "user_uuid": current_user.id,
+        "project_name": request.json.get('projectname', None)
+    }
+
+    r = requests.post(url=endpoint, json=body, headers=headers)
     out = json.loads(r.text)
-    predictions = out["inference_response"]["predictions"][0]["output"]
+    predictions = out["inference_response"]["predictions"][0]["choices"][0]["text"]
     response = {"Model: ": model_name, "predictions: ": predictions}
 
     return Response(json.dumps(response), status=r.status_code, mimetype="application/json")
@@ -940,3 +996,29 @@ def get_gold_annotations(project_id):
 
     tasks = project_repo.get_gold_annotations(project_id)
     return Response(json.dumps(tasks), status=200, mimetype="application/json")
+
+
+@jsonpify
+@blueprint.route('/project/<int:project_id>/projectprogress')
+@blueprint.route('/project/<short_name>/projectprogress')
+@ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
+def get_project_progress(project_id=None, short_name=None):
+    """View progress of a project. Returns count of total and completed tasks."""
+
+    if current_user.is_anonymous:
+        return abort(401)
+
+    if not (project_id or short_name):
+        return abort(404)
+    if short_name:
+        project = project_repo.get_by_shortname(short_name)
+    elif project_id:
+        project = project_repo.get(project_id)
+    if not project:
+        return abort(404)
+
+    if current_user.admin or (current_user.subadmin and current_user.id in project.owners_ids):
+        response = project_repo.get_total_and_completed_task_count(project.id)
+        return Response(json.dumps(response), status=200, mimetype="application/json")
+    else:
+        return abort(403)

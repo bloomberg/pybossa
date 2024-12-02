@@ -16,11 +16,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 import json
-from test import with_context
+from test import with_context, with_request_context
 from test.helper.web import Helper
 from test.factories import ProjectFactory, UserFactory
 from unittest.mock import patch
-
+from nose.tools import assert_raises
+from pybossa.view.projects import sanitize_project_owner
 
 class TestProjectContact(Helper):
 
@@ -178,3 +179,30 @@ class TestProjectContact(Helper):
 
         # Verify status code from response.
         assert res.status_code == 405
+
+    @with_request_context
+    @patch('pybossa.cache.users.public_get_user_summary')
+    def test_project_sanitize_project_no_owner_not_project_owner(self, public_get_user_summary):
+        """Test Project sanitize_project_owner when no owner returned and current user not owner."""
+        admin, owner, user = UserFactory.create_batch(3)
+        project = ProjectFactory.create(owner=owner, short_name='test-app', name='My New Project')
+
+        # Simulate no returned user.
+        public_get_user_summary.return_value = None
+
+        # Verify error is raised from owner_sanitized.pop().
+        with assert_raises(AttributeError) as ex:
+            sanitize_project_owner(project, owner, user)
+
+    @with_request_context
+    @patch('pybossa.cache.users.get_user_summary')
+    def test_project_sanitize_project_no_owner_is_project_owner(self, get_user_summary):
+        """Test Project sanitize_project_owner when no owner returned and current user is owner."""
+        admin, owner, user = UserFactory.create_batch(3)
+        project = ProjectFactory.create(owner=owner, short_name='test-app', name='My New Project')
+
+        get_user_summary.return_value = None
+
+        # Verify error is raised from owner_sanitized.pop().
+        with assert_raises(AttributeError) as ex:
+            sanitize_project_owner(project, owner, owner)

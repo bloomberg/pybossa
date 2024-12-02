@@ -30,7 +30,7 @@ from flask_login import current_user
 from .api_base import APIBase
 from pybossa.model.project import Project
 from pybossa.cache.categories import get_all as get_categories
-from pybossa.util import is_reserved_name, description_from_long_description
+from pybossa.util import is_reserved_name, description_from_long_description, validate_ownership_id
 from pybossa.core import auditlog_repo, result_repo, http_signer
 from pybossa.auditlogger import AuditLogger
 from pybossa.data_access import ensure_user_assignment_to_project, set_default_amp_store
@@ -51,7 +51,7 @@ class ProjectAPI(APIBase):
     __class__ = Project
     reserved_keys = set(['id', 'created', 'updated', 'completed', 'contacted', 'secret_key'])
     private_keys = set(['secret_key'])
-    restricted_keys = set()
+    restricted_keys = set(['info::ext_config::authorized_services'])
 
     def _has_filterable_attribute(self, attribute):
         if attribute not in ["coowner_id"]:
@@ -140,14 +140,14 @@ class ProjectAPI(APIBase):
 
     def _update_attribute(self, new, old):
         for key, value in old.info.items():
-            if not new.info.get(key):
-                new.info[key] = value
+            new.info.setdefault(key, value)
 
     def _validate_instance(self, project):
         if project.short_name and is_reserved_name('project', project.short_name):
             msg = "Project short_name is not valid, as it's used by the system."
             raise ValueError(msg)
         ensure_user_assignment_to_project(project)
+        validate_ownership_id(project.info.get('ownership_id'))
 
     def _log_changes(self, old_project, new_project):
         auditlogger.add_log_entry(old_project, new_project, current_user)

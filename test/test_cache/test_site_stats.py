@@ -17,6 +17,7 @@
 # along with PYBOSSA.  If not,  see <http://www.gnu.org/licenses/>.
 
 import datetime
+from collections import OrderedDict
 from test import db, Test, with_context, with_request_context
 from pybossa.cache import site_stats as stats
 from test.factories import (UserFactory, ProjectFactory, AnonymousTaskRunFactory,
@@ -25,6 +26,7 @@ from pybossa.repositories import ResultRepository
 from unittest.mock import patch
 from pybossa.cache import management_dashboard_stats, delete_cache_group
 from pybossa.jobs import get_management_dashboard_stats, load_usage_dashboard_data
+from pybossa.view.admin import sort_stats_by_last_submission
 from flask import current_app
 import pybossa.cache.project_stats as project_stats
 
@@ -569,7 +571,25 @@ class TestSiteStatsCache(Test):
         ProjectFactory.create(created=date_12_mo, updated=date_12_mo, info=project_info)
 
         res = stats.n_projects_using_component(days=183, component='text-tagging')
-        assert res == 1, "Expected 1 project in last 6 months using text-tagging"
+        assert len(res) == 1, "Expected 1 project in last 6 months using text-tagging"
 
         res = stats.n_projects_using_component(days='all', component='text-tagging')
-        assert res == 2, "Expected 2 projects in all time using text-tagging"
+        assert len(res) == 2, "Expected 2 projects in all time using text-tagging"
+
+    @with_context
+    def test_n_projects_using_component_sort(self):
+        """Test number of projects using component works correctly with sort"""
+        data = OrderedDict([('Task Presenter', [(1, '34', 'second-project', '1', 'User One', 'user@user.com', '2024-11-12T15:42:43.020270', 'true'), (1, '35', 'helloworld2', '1', 'User One', 'user@user.com', None, 'true'), (1, '36', 'helloworld3', '1', 'User One', 'user@user.com', None, 'false'), (1, '37', 'first-project', '1', 'User One', 'user@user.com', '2024-11-12T16:37:45.682369', 'false')]), ('All Buttons', []), ('Submit Button', []), ('Submit and Leave Button', []), ('Cancel Button', []), ('Task Timer', [(1, '37', 'first-project', '1', 'User One', 'user@user.com', '2024-11-12T16:37:45.682369', 'false')]), ('Conditional Display', []), ('File Upload', []), ('Text Input', [(1, '35', 'helloworld2', '1', 'User One', 'user@user.com', None, 'true'), (1, '36', 'helloworld3', '1', 'User One', 'user@user.com', None, 'false'), (1, '37', 'first-project', '1', 'User One', 'user@user.com', '2024-11-12T16:37:45.682369', 'false')]), ('Checkbox Input', [(1, '36', 'helloworld3', '1', 'User One', 'user@user.com', None, 'false')]), ('Radio Group Input', []), ('Dropdown Input', []), ('Multiselect Input', []), ('Table', []), ('Input Text Area', []), ('Assistant LLM', []), ('compx', [])])
+
+        # Sort mock data.
+        sorted_data = sort_stats_by_last_submission(data)
+
+        # Verify the correct sort is returned for first-project, second-project, followed by projects with no data provided.
+        assert sorted_data['Task Presenter'][0][2] == 'first-project'
+        assert sorted_data['Task Presenter'][1][2] == 'second-project'
+
+        # Verify correct dates in sorted descending order.
+        assert sorted_data['Task Presenter'][0][6] == '2024-11-12T16:37:45.682369'
+        assert sorted_data['Task Presenter'][1][6] == '2024-11-12T15:42:43.020270'
+        assert sorted_data['Task Presenter'][2][6] == None
+        assert sorted_data['Task Presenter'][3][6] == None

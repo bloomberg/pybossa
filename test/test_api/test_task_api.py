@@ -735,6 +735,19 @@ class TestTaskAPI(TestAPI):
         assert error['exception_msg'] == "Reserved keys in payload", error
 
     @with_context
+    def test_task_post_with_notfound_project_id(self):
+        user = UserFactory.create()
+        project_id = 99999
+        data = dict(project_id=project_id, info='my task data')
+
+        res = self.app.post('/api/task?api_key=' + user.api_key,
+                            data=json.dumps(data))
+
+        assert res.status_code == 404, res.status_code
+        error = json.loads(res.data)
+        assert error['exception_msg'] == f"404 Not Found: Non existing project id {project_id}", error
+
+    @with_context
     def test_task_post_with_reserved_fav_user_ids(self):
         user = UserFactory.create()
         project = ProjectFactory.create(owner=user)
@@ -950,20 +963,23 @@ class TestTaskAPI(TestAPI):
         root_task = TaskFactory.create(project=project)
 
         ## anonymous
-        res = self.app.delete('/api/task/%s' % task.id)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete('/api/task/%s' % task.id)
         error_msg = 'Anonymous should not be allowed to delete'
         print(res.status)
         assert_equal(res.status, '401 UNAUTHORIZED', error_msg)
 
         ### real user but not allowed as not owner!
         url = '/api/task/%s?api_key=%s' % (task.id, non_owner.api_key)
-        res = self.app.delete(url)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete(url)
         error_msg = 'Should not be able to update tasks of others'
         assert_equal(res.status, '403 FORBIDDEN', error_msg)
 
         #### real user
         # DELETE with not allowed args
-        res = self.app.delete(url + "&foo=bar")
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete(url + "&foo=bar")
         err = json.loads(res.data)
         assert res.status_code == 415, err
         assert err['status'] == 'failed', err
@@ -973,34 +989,20 @@ class TestTaskAPI(TestAPI):
 
         # DELETE returns 204
         url = '/api/task/%s?api_key=%s' % (task.id, user.api_key)
-        res = self.app.delete(url)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete(url)
         assert_equal(res.status, '204 NO CONTENT', res.data)
         assert res.data == b'', res.data  # res.data is bytes type
 
         #### root user
         url = '/api/task/%s?api_key=%s' % (root_task.id, admin.api_key)
-        res = self.app.delete(url)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete(url)
         assert_equal(res.status, '204 NO CONTENT', res.data)
 
         tasks = task_repo.filter_tasks_by(project_id=project.id)
         assert task not in tasks, tasks
         assert root_task not in tasks, tasks
-
-
-    @with_context
-    @patch('pybossa.repositories.task_repository.uploader')
-    def test_task_delete_deletes_zip_files(self, uploader):
-        """Test API task delete deletes also zip files with tasks and taskruns"""
-        admin = UserFactory.create()
-        project = ProjectFactory.create(owner=admin)
-        task = TaskFactory.create(project=project)
-        url = '/api/task/%s?api_key=%s' % (task.id, admin.api_key)
-        res = self.app.delete(url)
-        expected = [call('1_project1_task_json.zip', 'user_1'),
-                    call('1_project1_task_csv.zip', 'user_1'),
-                    call('1_project1_task_run_json.zip', 'user_1'),
-                    call('1_project1_task_run_csv.zip', 'user_1')]
-        assert uploader.delete_file.call_args_list == expected
 
     @with_context
     def test_delete_task_cascade(self):
@@ -1008,10 +1010,12 @@ class TestTaskAPI(TestAPI):
         task = TaskFactory.create()
         task_runs = TaskRunFactory.create_batch(3, task=task)
         url = '/api/task/%s?api_key=%s' % (task.id, task.project.owner.api_key)
-        res = self.app.delete(url)
+        task_id = task.id
+        with patch.dict(self.flask_app.config, {'SESSION_REPLICATION_ROLE_DISABLED': True}):
+            res = self.app.delete(url)
 
         assert_equal(res.status, '204 NO CONTENT', res.data)
-        task_runs = task_repo.filter_task_runs_by(task_id=task.id)
+        task_runs = task_repo.filter_task_runs_by(task_id=task_id)
         assert len(task_runs) == 0, "There should not be any task run for task"
 
     @with_context
@@ -1050,7 +1054,8 @@ class TestTaskAPI(TestAPI):
 
         url = '/api/task/%s?api_key=%s' % (result.task_id,
                                            admin.api_key)
-        res = self.app.delete(url)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete(url)
         assert_equal(res.status, '204 NO CONTENT', res.status)
 
     @with_context
@@ -1067,64 +1072,9 @@ class TestTaskAPI(TestAPI):
 
         url = '/api/task/%s?api_key=%s' % (result.task_id,
                                            admin.api_key)
-        res = self.app.delete(url)
+        with patch.dict(self.flask_app.config, {'SQLALCHEMY_BINDS': {'bulkdel': "dbconn"}}):
+            res = self.app.delete(url)
         assert_equal(res.status, '204 NO CONTENT', res.status)
-
-    @with_context
-    def test_counter_table(self):
-        """Test API Counter table is updated accordingly."""
-        project = ProjectFactory.create()
-        task = TaskFactory.create(project=project)
-
-        items = db.session.query(Counter).filter_by(project_id=project.id).all()
-        assert len(items) == 1
-
-        TaskFactory.create_batch(9, project=project)
-        items = db.session.query(Counter).filter_by(project_id=project.id).all()
-        assert len(items) == 10
-
-        task_id = task.id
-        task_repo.delete(task)
-        items = db.session.query(Counter).filter_by(project_id=project.id).all()
-        assert len(items) == 9
-        items = db.session.query(Counter).filter_by(task_id=task_id).all()
-        assert len(items) == 0
-
-    @with_context
-    def test_counter_table_api(self):
-        """Test API Counter table is updated accordingly via api."""
-        project = ProjectFactory.create()
-
-        task = dict(project_id=project.id, info=dict(foo=1))
-
-        url = '/api/task?api_key=%s' % project.owner.api_key
-
-        res = self.app.post(url, data=json.dumps(task))
-
-        data = json.loads(res.data)
-
-        assert data.get('id') is not None, res.data
-
-        items = db.session.query(Counter).filter_by(project_id=project.id).all()
-        assert len(items) == 1
-        items = db.session.query(Counter).filter_by(task_id=data.get('id')).all()
-        assert len(items) == 1
-        assert items[0].task_id == data.get('id')
-
-        for i in range(9):
-            task['info']['bar'] = i
-            res = self.app.post(url, data=json.dumps(task))
-            print(res)
-            created_task = json.loads(res.data)
-        items = db.session.query(Counter).filter_by(project_id=project.id).all()
-        assert len(items) == 10, len(items)
-
-        res = self.app.delete('/api/task/%s?api_key=%s' % (created_task['id'],
-                                                           project.owner.api_key))
-        items = db.session.query(Counter).filter_by(project_id=project.id).all()
-        assert len(items) == 9
-        items = db.session.query(Counter).filter_by(task_id=created_task.get('id')).all()
-        assert len(items) == 0
 
     @with_context
     def test_create_update_gold_answers(self):
@@ -1237,3 +1187,30 @@ class TestTaskAPI(TestAPI):
 
         url = tasks.upload_gold_data(task, 1, {'ans1': 'test'})
         assert url == 'testURL', url
+
+
+    @with_context
+    def test_create_task_with_hdfs_payload(self):
+        [admin, subadminowner, subadmin, reguser] = UserFactory.create_batch(4)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+        make_subadmin(subadmin)
+
+        project = ProjectFactory.create(owner=subadminowner)
+        admin_headers = dict(Authorization=admin.api_key)
+        task_info = dict(field_1='one', field_2='/fileproxy/hdfs/my_hdfs_file.txt')
+
+        # POST fails with error 400
+        data = dict(project_id=project.id, info=task_info, n_answers=2)
+        res = self.app.post('/api/task', data=json.dumps(data), headers=admin_headers)
+        assert res.status_code == 400
+        response = json.loads(res.data)
+        assert response["exception_msg"] == "Invalid task payload. HDFS is not supported"
+
+        # POST successful with hdfs not present in task payload
+        task_info["field_2"] = "xyz"
+        data = dict(project_id=project.id, info=task_info, n_answers=2)
+        res = self.app.post('/api/task', data=json.dumps(data), headers=admin_headers)
+        task = json.loads(res.data)
+        assert res.status_code == 200
+        assert task["info"] == {"field_1": "one", "field_2": "xyz"}

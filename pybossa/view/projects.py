@@ -59,7 +59,7 @@ from pybossa.util import (Pagination, admin_required, get_user_id_or_ip, rank,
                           check_annex_response,
                           process_annex_load, process_tp_components,
                           process_table_component, PARTIAL_ANSWER_POSITION_KEY,
-                          SavedTaskPositionEnum, delete_redis_keys,
+                          SavedTaskPositionEnum, delete_redis_keys, get_last_name,
                           PARTIAL_ANSWER_PREFIX, PARTIAL_ANSWER_KEY)
 from pybossa.auth import ensure_authorized_to
 from pybossa.cache import projects as cached_projects, ONE_DAY
@@ -107,7 +107,8 @@ import pybossa.app_settings as app_settings
 from copy import deepcopy
 from pybossa.cache import delete_memoized
 from sqlalchemy.orm.attributes import flag_modified
-from pybossa.util import admin_or_project_owner
+from pybossa.util import admin_or_project_owner, validate_ownership_id
+from pybossa.api.project import ProjectAPI
 
 cors_headers = ['Content-Type', 'Authorization']
 
@@ -146,7 +147,8 @@ def project_id_route_converter(projectid, path):
 
 def sanitize_project_owner(project, owner, current_user, ps=None):
     """Sanitize project and owner data."""
-    if current_user.is_authenticated and owner.id == current_user.id:
+    is_current_user_owner = current_user.is_authenticated and owner.id == current_user.id
+    if is_current_user_owner:
         if isinstance(project, Project):
             project_sanitized = project.dictize()   # Project object
         else:
@@ -166,6 +168,14 @@ def sanitize_project_owner(project, owner, current_user, ps=None):
                 project_sanitized = project             # dict object
         owner_sanitized = cached_users.public_get_user_summary(owner.name)
     project_sanitized = deepcopy(project_sanitized)
+
+    if not owner_sanitized:
+        current_app.logger.info("""owner_sanitized is None after %sget_user_summary().
+                            project id %s, project name %s, owner id %s, owner name %s, current user id %s,
+                            current user name %s, current user authenticated %s, is_current_user == owner %s""",
+                            "public_" if not is_current_user_owner else "",
+                            project.id, project.name, owner.id, owner.name, current_user.id, current_user.name,
+                            current_user.is_authenticated, is_current_user_owner)
 
     # remove project, owner creds so that they're unavailable under json response
     project_sanitized['info'].pop('passwd_hash', None)
@@ -949,6 +959,21 @@ def update(short_name):
                     prodsubprods=prodsubprods)
     return handle_content_type(response)
 
+
+@blueprint.route('/<short_name>/remove-password', methods=['POST'])
+@login_required
+@csrf.exempt
+def remove_password(short_name):
+    if current_app.config.get('PROJECT_PASSWORD_REQUIRED'):
+        flash(gettext('Project password required'), 'error')
+        return redirect_content_type(url_for('.update', short_name=short_name))
+    project, owner, ps = project_by_shortname(short_name)
+    project.set_password("")
+    project_repo.update(project)
+    flash(gettext('Project password has been removed!'), 'success')
+    return redirect_content_type(url_for('.update', short_name=short_name))
+
+
 @blueprint.route('/<short_name>/')
 @login_required
 def details(short_name):
@@ -959,7 +984,6 @@ def details(short_name):
     redirect_to_password = _check_if_redirect_to_password(project)
     if redirect_to_password:
         return redirect_to_password
-
     num_available_tasks = n_available_tasks(project.id)
     num_completed_tasks_by_user = n_completed_tasks_by_user(project.id, current_user.id)
     oldest_task = oldest_available_task(project.id, current_user.id)
@@ -1723,6 +1747,11 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             args["regular_user"] = regular_user
             # default page size for worker view is 100
             per_page = records_per_page if records_per_page in allowed_records_per_page else task_list_default_records_per_page
+        elif view_type == 'tasklist' and n_available_tasks_for_user(project, current_user.id) == 0:
+            # When no tasks are available, redirect to browse all tasks view.
+            flash("No new tasks available")
+            new_path = '/project/{}/tasks/browse'.format(project.short_name)
+            return redirect_content_type(new_path)
         else:
             abort(403)
     except (ValueError, TypeError) as err:
@@ -2470,10 +2499,9 @@ def show_stats(short_name):
                                                                 owner,
                                                                 current_user,
                                                                 ps)
-
     if not ((ps.n_tasks > 0) and (ps.n_task_runs > 0)):
         project = add_custom_contrib_button_to(project, get_user_id_or_ip(),
-                                               ps=ps)
+                                           ps=ps)
         response = dict(template='/projects/non_stats.html',
                         title=title,
                         project=project_sanitized,
@@ -2482,7 +2510,8 @@ def show_stats(short_name):
                         overall_progress=ps.overall_progress,
                         n_volunteers=ps.n_volunteers,
                         n_completed_tasks=ps.n_completed_tasks,
-                        pro_features=pro)
+                        pro_features=pro,
+                        private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')))
         return handle_content_type(response)
 
     dates_stats = ps.info['dates_stats']
@@ -2544,7 +2573,8 @@ def show_stats(short_name):
                     n_volunteers=ps.n_volunteers,
                     n_completed_tasks=ps.n_completed_tasks,
                     avg_contrib_time=formatted_contrib_time,
-                    pro_features=pro)
+                    pro_features=pro,
+                    private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')))
 
     return handle_content_type(response)
 
@@ -3571,7 +3601,7 @@ def sync_project(short_name):
         # Perform sync
         is_new_project = False
         project_syncer = ProjectSyncer(
-            default_sync_target, target_key)
+            default_sync_target, target_key, current_app.config.get('DEFAULT_SYNC_TARGET_PROXIES'))
         synced_url = '{}/project/{}'.format(
             project_syncer.target_url, project.short_name)
         if request.body.get('btn') == 'sync':
@@ -3658,6 +3688,12 @@ def sync_project(short_name):
     return redirect_content_type(
         url_for('.publish', short_name=short_name))
 
+def remove_restricted_keys(forms):
+    for restricted_key in list(ProjectAPI.restricted_keys):
+        restricted_key = restricted_key.split("::")[-1]
+        if not current_user.admin:
+            forms.pop(restricted_key, None)
+
 @blueprint.route('/<short_name>/project-config', methods=['GET', 'POST'])
 @login_required
 @admin_or_subadmin_required
@@ -3671,6 +3707,7 @@ def project_config(short_name):
                                                             current_user,
                                                             ps)
     forms = current_app.config.get('EXTERNAL_CONFIGURATIONS_VUE', {})
+    remove_restricted_keys(forms)
 
     def generate_input_forms_and_external_config_dict():
         '''
@@ -3717,12 +3754,14 @@ def project_config(short_name):
     if request.method == 'POST':
         try:
             data = json.loads(request.data)
-            project.info['ext_config'] = integrate_ext_config(data.get('config'))
+            if (data.get('config')):
+                project.info['ext_config'] = integrate_ext_config(data.get('config'))
             if bool(data_access_levels):
                 # for private gigwork
                 project.info['data_access'] = data.get('data_access')
             project.info['completed_tasks_cleanup_days'] = data.get('completed_tasks_cleanup_days')
             project.info["allow_taskrun_edit"] = data.get("allow_taskrun_edit")
+            project.info["reset_presented_time"] = data.get("reset_presented_time")
             project_repo.save(project)
             flash(gettext('Configuration updated successfully'), 'success')
         except Exception as e:
@@ -3736,14 +3775,18 @@ def project_config(short_name):
     data_access = project.info.get('data_access') or []
     completed_tasks_cleanup_days = project.info.get('completed_tasks_cleanup_days')
     allow_taskrun_edit = project.info.get("allow_taskrun_edit") or False
+    reset_presented_time = project.info.get("reset_presented_time") or False
     response = dict(template='/projects/summary.html',
                     external_config_dict=json.dumps(ext_config_dict),
+                    authorized_services=ext_config.get('authorized_services', {}).get(current_app.config.get('AUTHORIZED_SERVICES_KEY', ''), []),
+                    is_admin=current_user.admin,
                     forms=input_forms,
                     data_access=json.dumps(data_access),
                     valid_access_levels=data_access_levels.get('valid_access_levels'),
                     csrf=generate_csrf(),
                     completed_tasks_cleanup_days=completed_tasks_cleanup_days,
-                    allow_taskrun_edit=allow_taskrun_edit
+                    allow_taskrun_edit=allow_taskrun_edit,
+                    reset_presented_time=reset_presented_time
                     )
 
     return handle_content_type(response)
@@ -3805,6 +3848,7 @@ def ext_config(short_name):
         project=sanitize_project,
         title=gettext("Configure external services"),
         forms=template_forms,
+        authorized_services=ext_conf.get('authorized_services', {}).get(current_app.config.get('AUTHORIZED_SERVICES_KEY', ''), []),
         pro_features=pro_features()
     )
 
@@ -3831,10 +3875,6 @@ def assign_users(short_name):
     ensure_authorized_to('read', project)
     ensure_authorized_to('update', project)
     access_levels = project.info.get('data_access', None)
-    if not data_access_levels or not access_levels:
-        flash('Cannot assign users to a project without data access levels', 'warning')
-        return redirect_content_type(
-            url_for('.settings', short_name=project.short_name))
 
     users = cached_users.get_users_for_data_access(access_levels)
     if not users:
@@ -3842,6 +3882,10 @@ def assign_users(short_name):
             'Project id {} no user matching data access level {} for this project.'.format(project.id, access_levels))
         flash('Cannot assign users. There is no user matching data access level for this project', 'warning')
         return redirect_content_type(url_for('.settings', short_name=project.short_name))
+
+    # Update users with last_name for sorting.
+    for user in users:
+        user['last_name'] = get_last_name(user.get('fullname'))
 
     form = DataAccessForm(request.body)
     project_users = json.loads(request.data).get("select_users", []) if request.data else request.form.getlist('select_users')

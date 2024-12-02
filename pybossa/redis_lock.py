@@ -106,9 +106,16 @@ def get_locked_tasks_project(project_id):
             if not task_project_id:
                 # Import at runtime due to order of execution for global initialization of task_repo.
                 from pybossa.core import task_repo
-                task_project_id = task_repo.get_task(task_id).project_id
+                task = task_repo.get_task(task_id)
+                if task:
+                    task_project_id = task.project_id
+                else:
+                    # Locked task has been deleted.
+                    task_users_key = get_task_users_key(task_id)
+                    lock_manager.release_lock(task_users_key, user_id)
+                    lock_manager.release_lock(user_tasks_key, task_id)
             # Match the requested project id.
-            if int(task_project_id) == project_id:
+            if task_project_id and int(task_project_id) == project_id:
                 # Calculate seconds remaining.
                 seconds_remaining = LockManager.seconds_remaining(user_tasks[task_id])
                 if seconds_remaining > 0:

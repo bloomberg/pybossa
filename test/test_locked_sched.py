@@ -297,6 +297,24 @@ class TestLockedSched(sched.Helper):
         assert task.id == task_id
 
     @with_context
+    @patch('pybossa.sched.task_repo.get_task')
+    def test_get_task_id_and_duration_for_project_user_invalid_task_id(self, get_task):
+        user = UserFactory.create()
+        project = ProjectFactory.create(owner=user, short_name='egil', name='egil',
+                  description='egil')
+        task = TaskFactory.create_batch(1, project=project, n_answers=1)[0]
+        limit = 1
+        timeout = 100
+        acquire_locks(task.id, user.id, limit, timeout)
+
+        # Simulate invalid task.
+        get_task.return_value =  None
+        task_id, seconds = get_task_id_and_duration_for_project_user(project.id, user.id)
+
+        assert task_id is None
+        assert seconds == -1
+
+    @with_context
     def test_tasks_assigned_as_per_user_access_levels_l1(self):
         """ Test tasks assigned by locked scheduler are as per access levels set for user, task and project"""
 
@@ -591,3 +609,30 @@ class TestLockedSched(sched.Helper):
                         .format(project.id, user.api_key))
         task_served = json.loads(res.data)
         assert not task_served, "all expired tasks have expiration set. no task should be served."
+
+    @with_context
+    @patch('pybossa.api.ContributionsGuard')
+    def test_obtaining_task_again_reset_presented_time(self, guard):
+        owner = UserFactory.create(id=500)
+
+        project = ProjectFactory.create(owner=owner, info={"reset_presented_time": True})
+        project.info['sched'] = Schedulers.locked
+        project_repo.save(project)
+
+        task1 = TaskFactory.create(project=project, info='task 1', n_answers=1)
+        # making first call to task; mock cancel task not called
+        guard.return_value.retrieve_cancelled_timestamp.return_value = False
+        res = self.app.get('api/project/{}/newtask?api_key={}'
+                           .format(project.id, owner.api_key))
+        rec_task1 = json.loads(res.data)
+
+        # making second call to task upon cancel; mock cancel task
+        guard.return_value.retrieve_cancelled_timestamp.return_value = True
+        res = self.app.get('api/project/{}/newtask?api_key={}'
+                           .format(project.id, owner.api_key))
+        rec_task2 = json.loads(res.data)
+        # same task obtained again
+        assert rec_task1['id'] == task1.id
+        assert rec_task2['id'] == rec_task1['id']
+        assert guard.return_value.stamp_presented_time.called
+        assert guard.return_value.remove_cancelled_timestamp.called

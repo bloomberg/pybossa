@@ -19,6 +19,7 @@
 import base64
 import codecs
 import csv
+import ctypes
 import hashlib
 import hmac
 import io
@@ -34,6 +35,8 @@ from functools import update_wrapper
 from functools import wraps
 from math import ceil
 from tempfile import NamedTemporaryFile
+
+from pybossa import app_settings
 
 import dateutil.parser
 import dateutil.tz
@@ -58,11 +61,15 @@ from bs4 import BeautifulSoup
 
 misaka = Misaka()
 TP_COMPONENT_TAGS = ["text-input", "dropdown-input", "radio-group-input",
-                     "checkbox-input", "multi-select-input", "input-text-area"]
+                     "checkbox-input", "multi-select-input", "input-text-area", "text-tagging"]
 
 PARTIAL_ANSWER_PREFIX = "partial_answer:project:{project_id}:user:{user_id}"
 PARTIAL_ANSWER_KEY = PARTIAL_ANSWER_PREFIX + ":task:{task_id}"
 PARTIAL_ANSWER_POSITION_KEY = PARTIAL_ANSWER_PREFIX + ":position"
+
+# Configure csv.reader() for max file size. Reference: https://stackoverflow.com/questions/15063936/csv-error-field-larger-than-field-limit-131072/15063941#15063941
+MAX_SIGNED_LONG = (1 << (8 * ctypes.sizeof(ctypes.c_long) - 1)) - 1
+csv.field_size_limit(MAX_SIGNED_LONG)
 
 class SavedTaskPositionEnum(str, Enum):
     FIRST = "first"
@@ -365,6 +372,13 @@ def datetime_filter(source, fmt):
     source = source.replace(tzinfo=utc).astimezone(est)
     return source.strftime(fmt)
 
+
+def validate_ownership_id(o_id):
+    ownership_id_title = current_app.config.get('OWNERSHIP_ID_TITLE', 'Ownership ID')
+    if o_id == None or len(o_id) == 0:
+        return
+    if not (o_id.isnumeric() and len(o_id) <= 20):
+        raise ValueError(f"{ownership_id_title} must be numeric and less than 20 characters. Got: {o_id}")
 
 class Pagination(object):
 
@@ -1237,7 +1251,6 @@ def process_tp_components(tp_code, user_response):
     from user_response(a dict). The response data is then used to set the
     :initial-value' """
     soup = BeautifulSoup(tp_code, 'html.parser')
-
     # Disable autosave so that response for different users will be different
     task_presenter_elements = soup.find_all("task-presenter")
     for task_presenter in task_presenter_elements:
@@ -1413,3 +1426,57 @@ def delete_redis_keys(sentinel, pattern):
     if not keys_to_delete:
         return False
     return bool(sentinel.master.delete(*keys_to_delete))
+
+
+def map_locations(locations):
+    if locations is None:
+        return {
+            'locations': None,
+            'country_codes': None,
+            'country_names': None
+        }
+
+    country_codes_set = set()
+    country_names_set = set()
+
+    for location in locations:
+        if len(location) == 2:
+            country_codes_set.add(location)
+            mapped_cn = app_settings.upref_mdata.get_country_name_by_country_code(location)
+            if mapped_cn is not None:
+                country_names_set.add(mapped_cn)
+            else:
+                current_app.logger.warning(f"Invalid country code '{location}' in map_locations")
+        else:
+            country_names_set.add(location)
+            mapped_cc = app_settings.upref_mdata.get_country_code_by_country_name(location)
+            if mapped_cc is not None:
+                country_codes_set.add(mapped_cc)
+            else:
+                current_app.logger.warning(f"Invalid country name '{location}' in map_locations")
+
+    return {
+        'locations': list(country_codes_set.union(country_names_set)),
+        'country_codes': list(country_codes_set),
+        'country_names': list(country_names_set)
+    }
+
+
+def get_last_name(fullname):
+    """
+    Returns the last name from a fullname, ignoring parenthesis and digits. Used for sorting.
+    """
+    last_name = ''
+
+    if fullname:
+        # Remove content within parentheses in name: Jane Doe (ai)
+        cleaned_name = re.sub(r'\s*\(.*?\)', '', fullname)
+        full_name_parts = cleaned_name.strip().split(' ')
+
+        # Check if the last part is a number and use the second last if available.
+        if full_name_parts[-1].isdigit():
+            last_name = full_name_parts[-2] if len(full_name_parts) > 1 else fullname
+        else:
+            last_name = full_name_parts[-1]
+
+    return last_name

@@ -24,12 +24,19 @@ from pybossa.jobs import send_email_notifications
 from test.factories import TaskFactory, ProjectFactory, UserFactory, TaskRunFactory
 from pybossa.sched import get_user_pref_task, Schedulers
 from pybossa.cache.helpers import n_available_tasks_for_user
+from pybossa.cache.users import get_user_preferences
 import datetime
 from test.helper.gig_helper import make_admin, make_subadmin
 import json
 
 
 class TestSched(sched.Helper):
+
+    map_locations = {
+        'country_codes': ['US'],
+        'country_names': ['United States'],
+        'locations': ['US', 'United States']
+    }
 
     @with_context
     def test_no_pref(self):
@@ -130,7 +137,8 @@ class TestSched(sched.Helper):
         assert not tasks
 
     @with_context
-    def test_task_4(self):
+    @patch('pybossa.cache.users.map_locations')
+    def test_task_4(self, map_locations):
         """
         User has multiple preferences of different kinds,
         task has single preference, match
@@ -142,11 +150,13 @@ class TestSched(sched.Helper):
         task = TaskFactory.create_batch(1, project=project, n_answers=10)[0]
         task.user_pref = {'languages': ['de']}
         task_repo.save(task)
+        map_locations.return_value = self.map_locations
         tasks = get_user_pref_task(1, 500)
         assert tasks
 
     @with_context
-    def test_task_5(self):
+    @patch('pybossa.cache.users.map_locations')
+    def test_task_5(self, map_locations):
         """
         User has multiple preferences of different kinds,
         task has single preference, match
@@ -158,11 +168,13 @@ class TestSched(sched.Helper):
         task = TaskFactory.create_batch(1, project=project, n_answers=10)[0]
         task.user_pref = {'locations': ['us']}
         task_repo.save(task)
+        map_locations.return_value = self.map_locations
         tasks = get_user_pref_task(1, 500)
         assert tasks
 
     @with_context
-    def test_task_6(self):
+    @patch('pybossa.cache.users.map_locations')
+    def test_task_6(self, map_locations):
         """
         User has multiple preferences of different kinds,
         task has multiple preferences of different kinds, no match
@@ -174,6 +186,7 @@ class TestSched(sched.Helper):
         task = TaskFactory.create_batch(1, project=project, n_answers=10)[0]
         task.user_pref = {'languages': ['en', 'zh'], 'locations': ['es']}
         task_repo.save(task)
+        map_locations.return_value = self.map_locations
         tasks = get_user_pref_task(1, 500)
         assert not tasks
 
@@ -191,6 +204,57 @@ class TestSched(sched.Helper):
         task_repo.save(task)
         tasks = get_user_pref_task(1, 500)
         assert not tasks
+
+    @with_context
+    @patch('pybossa.cache.users.map_locations')
+    def test_get_user_preferences_cc(self, map_locations):
+        """
+        Test mapping from country code to country name
+        """
+        user = UserFactory.create()
+        user.user_pref = {'locations': ['US']}
+        user_repo.save(user)
+
+        map_locations.return_value = self.map_locations
+
+        prefs = get_user_preferences(user.id)
+        assert 'us' in prefs and 'united states' in prefs
+
+    @with_context
+    @patch('pybossa.cache.users.map_locations')
+    def test_get_user_preferences_cn(self, map_locations):
+        """
+        Test mapping from country name to country code
+        """
+        user = UserFactory.create()
+        user.user_pref = {'locations': ['United States']}
+        user_repo.save(user)
+
+        map_locations.return_value = self.map_locations
+
+        prefs = get_user_preferences(user.id)
+
+        assert 'us' in prefs and 'united states' in prefs
+
+    @with_context
+    @patch('pybossa.cache.users.map_locations')
+    def test_get_user_preferences_invalid(self, map_locations):
+        """
+        Test invalid location preference
+        """
+        user = UserFactory.create()
+        user.user_pref = {'locations': ['invalid country']}
+        user_repo.save(user)
+
+        map_locations.return_value = {
+        'country_codes': [],
+        'country_names': [],
+        'locations': ['invalid country']
+    }
+
+        prefs = get_user_preferences(user.id)
+
+        assert 'invalid country' in prefs
 
     @with_context
     def test_get_unique_user_pref(self):

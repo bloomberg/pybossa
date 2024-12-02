@@ -7,7 +7,7 @@ from werkzeug.exceptions import BadRequest
 from pybossa.cache import memoize, ONE_DAY
 from pybossa.core import db
 from pybossa.util import (convert_est_to_utc,
-    get_user_pref_db_clause, get_user_filter_db_clause)
+    get_user_pref_db_clause, get_user_filter_db_clause, map_locations)
 from flask import current_app
 import pybossa.app_settings as app_settings
 from functools import reduce
@@ -63,6 +63,16 @@ def get_task_filters(args):
         datestring = convert_est_to_utc(args['created_to']).isoformat()
         params['created_to'] = datestring
         filters += " AND task.created <= :created_to"
+    if args.get('assign_user'):
+        params['assign_user'] = f"%{args['assign_user']}%"
+        # url parameter must have %keyword% for partial match.
+        filters += """
+            AND EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements_text(task.user_pref -> 'assign_user') elem
+              WHERE elem ILIKE :assign_user
+            )
+        """
     if args.get('ftime_from'):
         datestring = convert_est_to_utc(args['ftime_from']).isoformat()
         params['ftime_from'] = datestring
@@ -253,6 +263,8 @@ def parse_tasks_browse_args(args):
         else:
             raise ValueError('ftime_to date format error, value: %s'
                              .format(args['ftime_to']))
+    if args.get('assign_user') is not None:
+        parsed_args["assign_user"] = args['assign_user']
     if args.get('priority_from') is not None:
         parsed_args['priority_from'] = float(args['priority_from'])
     if args.get('priority_to') is not None:
@@ -362,6 +374,8 @@ def validate_user_preferences(user_pref):
         raise ValueError('invalid locations user preference: {}'
                         .format(loc))
 
+    user_pref['locations'] = map_locations(loc)['locations']
+
 
 def _get_field_filters(filters):
     filters = filters if type(filters) is list else json.loads(filters)
@@ -424,12 +438,11 @@ def get_user_fullname_from_email(email_addr):
 
 
 def get_users_fullnames_from_emails(emails):
-    # given list of user emails as an input,
-    # obtain user full names, sort and return
-    # full names as comma separated string
-    users_fullnames = []
+    # Given list of user emails as an input,
+    # obtain user full names, sort and return.
+    users_info = {}
     for email_addr in emails:
         user_fullname = get_user_fullname_from_email(email_addr)
-        users_fullnames.append(user_fullname)
-    users_fullnames.sort()
-    return ", ".join(users_fullnames)
+        users_info[user_fullname] = email_addr
+    sorted_users_info = dict(sorted(users_info.items()))
+    return sorted_users_info

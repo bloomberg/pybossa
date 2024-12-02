@@ -895,7 +895,7 @@ class TestProjectAPI(TestAPI):
         from flask import current_app
         from pybossa.core import setup_task_presenter_editor
 
-        current_app.config['DISABLE_TASK_PRESENTER_EDITOR'] = True
+        current_app.config['DISABLE_TASK_PRESENTER_EDITOR_PAYLOAD'] = True
         setup_task_presenter_editor(current_app)
 
         [admin, subadmin] = UserFactory.create_batch(2)
@@ -1422,7 +1422,7 @@ class TestProjectAPI(TestAPI):
         # Get an empty task
         url = '/api/project/%s/newtask?offset=1000&api_key=%s' % (project.id, user.api_key)
         res = self.app.get(url)
-        assert res.data == b'{}', res.data
+        assert res.status == "400 BAD REQUEST", "locked scheduler with offset > 2 to return 400"
 
         # Test new task with a task ID as a parameter to simulate cherry pick
         project.info['sched'] = Schedulers.task_queue
@@ -1432,43 +1432,6 @@ class TestProjectAPI(TestAPI):
         assert res, res
         task = json.loads(res.data)
         assert task['id'] == tasks[0].id
-
-    @with_context
-    @patch('pybossa.api.pwd_manager.ProjectPasswdManager.password_needed')
-    def test_newtask_without_race_condition(self, password_needed):
-        """Test API project new_task method without race condition
-           It simulates 10 users grabbing 1 to 10 tasks simultaneously
-        """
-        password_needed.return_value = False
-        concurrent_user = 10
-
-        n_answers_list = list(range(1, concurrent_user + 1))
-        for n_answers in n_answers_list:
-            project = ProjectFactory.create()
-            project.info['sched'] = Schedulers.locked
-            project_repo.save(project)
-            users = UserFactory.create_batch(concurrent_user)
-            responses = []
-
-            def api_call(user):
-                with patch.dict(flask_app.config, {'RATE_LIMIT_BY_USER_ID': True}):
-                    url = f'/api/project/{project.id}/newtask?api_key={user.api_key}'
-                    # self.set_proj_passwd_cookie(project, user)
-                    res = self.app.get(url)
-                    if res.status_code == 200 and res.data != b'{}':
-                        responses.append(json.loads(res.data))
-
-            task = TaskFactory.create(n_answers=n_answers, project=project)
-
-            threads = []
-            for u in users:
-                thread = threading.Thread(target=api_call, args=(u,))
-                threads.append(thread)
-                thread.start()
-
-            for thread in threads:
-                thread.join()
-            assert_equal(len(responses), task.n_answers)
 
     @with_context
     @patch('pybossa.repositories.project_repository.uploader')
@@ -2515,3 +2478,84 @@ class TestProjectAPI(TestAPI):
         assert res.status_code == 400, "BadRequest"
         assert res_data['action'] == 'PUT', res_data
         assert "content exceeds " + str(current_app.config.get('TASK_PRESENTER_MAX_SIZE_MB')) + " MB" in res_data['exception_msg'], res_data
+
+
+    @with_context
+    def test_project_progress(self):
+        """Test API projectprogress as admin works"""
+        [admin, subadminowner, subadmin, reguser] = UserFactory.create_batch(4)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+        make_subadmin(subadmin)
+
+        project = ProjectFactory.create(owner=subadminowner, short_name="testproject")
+        n_answers = 2
+        tasks = TaskFactory.create_batch(3, project=project, n_answers=n_answers)
+        headers = [('Authorization', subadminowner.api_key)]
+
+        tasks[0].info = {}
+        # check 404 response when the project doesn't exist
+        res = self.app.get('/api/project//projectprogress', follow_redirects=True, headers=headers)
+        error_msg = "A valid project must be used"
+        assert res.status_code == 404, error_msg
+
+        # check 404 response when the project doesn't exist
+        res = self.app.get('/api/project/9999/projectprogress', follow_redirects=True, headers=headers)
+        error_msg = "A valid project must be used"
+        assert res.status_code == 404, error_msg
+
+        # check 404 response when the project doesn't exist
+        res = self.app.get('/api/project/xyz/projectprogress', follow_redirects=True, headers=headers)
+        error_msg = "A valid project must be used"
+        assert res.status_code == 404, error_msg
+
+        # query for the count of all tasks in the propject
+        res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+        assert res.json == dict(n_completed_tasks=0, n_tasks=3)
+
+        # mark 2 out of total 3 tasks as complete
+        for i in range(n_answers):
+            TaskRunFactory.create(task=tasks[0], project=project)
+            TaskRunFactory.create(task=tasks[1], project=project)
+
+        # query for the count of all tasks in the propject
+        res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+        assert res.json == dict(n_completed_tasks=2, n_tasks=3)
+
+        # mark third task also complete
+        for i in range(n_answers):
+            TaskRunFactory.create(task=tasks[2], project=project)
+        # query for the count of all tasks in the propject
+        res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+        assert res.json == dict(n_completed_tasks=3, n_tasks=3)
+
+        # accessing api with subadmin user who's not owner fails
+        headers = [('Authorization', subadmin.api_key)]
+        res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
+        assert res.status_code == 403
+
+        # accessing api with regular user fails
+        headers = [('Authorization', reguser.api_key)]
+        # query for the count of all tasks in the propject
+        res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
+        assert res.status_code == 403
+
+        # accessing api with anonymous user fails
+        res = self.app.get('/api/project/1/projectprogress')
+        data = json.loads(res.data)
+        assert data['status_code'] == 401, "anonymous user should not have acess to project api"
+
+        # accessing api with admin user pass
+        headers = [('Authorization', admin.api_key)]
+        # query for the count of total tasks and completed tasks in the propject
+        res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+        assert res.json == dict(n_completed_tasks=3, n_tasks=3)
+
+        # accessing api using project short_name pass
+        res = self.app.get('/api/project/testproject/projectprogress', follow_redirects=True, headers=headers)
+        assert res.status_code == 200
+        assert res.json == dict(n_completed_tasks=3, n_tasks=3)

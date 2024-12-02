@@ -35,6 +35,7 @@ from flask import current_app
 from sqlalchemy import or_
 from sqlalchemy.sql import case as sqlalchemy_case
 from pybossa.task_creator_helper import get_task_expiration
+import time
 
 
 class TaskRepository(Repository):
@@ -200,12 +201,76 @@ class TaskRepository(Repository):
         except IntegrityError as e:
             raise DBIntegrityError(e)
 
-    def delete(self, element):
+    def _delete(self, element):
+        table = element.__class__
+        inst = self.db.session.query(table).filter(table.id==element.id).first()
+        self.db.session.delete(inst)
+
+    def delete_taskrun(self, element):
         self._delete(element)
-        project = element.project
         self.db.session.commit()
         cached_projects.clean_project(element.project_id)
-        self._delete_zip_files_from_store(project)
+
+    def delete(self, element):
+        # task repo is shared between task and taskun
+        # call taskrun specific delete for taskrun deletes
+        self._validate_can_be('deleted', element)
+        if element.__tablename__ == "task_run":
+            self.delete_taskrun(element)
+            return
+
+        tstart = time.perf_counter()
+        self._validate_can_be('deleted', element)
+        tend = time.perf_counter()
+        time_validate = tend - tstart
+
+        tstart = time.perf_counter()
+        project_id, task_id = element.project_id, element.id
+        tend = time.perf_counter()
+        time_pid_tid = tend - tstart
+
+        if current_app.config.get("SESSION_REPLICATION_ROLE_DISABLED"):
+            # with session_replication_role disabled, follow regular path of data cleanup
+            # from child tables via ON CASCADE DELETE configured on task table
+            sql = text('''
+                DELETE FROM task WHERE project_id=:project_id AND id=:task_id;
+                ''')
+        else:
+            # expedite the deletion process that cleans up data from child tables
+            # using set session_replication_role within db transaction. 'bulkdel'
+            # when configured has session_replication_role set and its not required
+            # to set it explicitly within db transaction
+            sql_session_repl = ''
+            if not 'bulkdel' in current_app.config.get('SQLALCHEMY_BINDS'):
+                sql_session_repl = 'SET session_replication_role TO replica;'
+
+            sql = text('''
+                BEGIN;
+                {}
+                DELETE FROM result WHERE project_id=:project_id AND task_id=:task_id;
+                DELETE FROM task_run WHERE project_id=:project_id AND task_id=:task_id;
+                DELETE FROM task WHERE project_id=:project_id AND id=:task_id;
+                COMMIT;
+                '''.format(sql_session_repl))
+
+        tstart = time.perf_counter()
+        self.db.bulkdel_session.execute(sql, dict(project_id=project_id, task_id=task_id))
+        tend = time.perf_counter()
+        time_sql_exec = tend - tstart
+
+        tstart = time.perf_counter()
+        self.db.bulkdel_session.commit()
+        tend = time.perf_counter()
+        time_commit = tend - tstart
+
+        tstart = time.perf_counter()
+        cached_projects.clean_project(project_id)
+        tend = time.perf_counter()
+        time_clean_project = tend - tstart
+
+        time_total = time_validate + time_pid_tid + time_sql_exec + time_commit + time_clean_project
+        current_app.logger.info("Delete task profiling task %d, project %d Total time %.10f seconds. self._validate_can_be %.10f seconds, element.project_id task_id %.10f seconds, db.session.execute %.10f seconds, db.session.commit %.10f seconds, cached_projects.clean_project %.10f seconds",
+                                task_id, project_id, time_total, time_validate, time_pid_tid, time_sql_exec, time_commit, time_clean_project)
 
     def delete_task_by_id(self, project_id, task_id):
         from pybossa.jobs import check_and_send_task_notifications
@@ -243,7 +308,8 @@ class TaskRepository(Repository):
             # when bulkdel is not configured, make explict sql query to set
             # session replication role to replica
             sql_session_repl = ''
-            if not 'bulkdel' in current_app.config.get('SQLALCHEMY_BINDS'):
+            if not ('bulkdel' in current_app.config.get('SQLALCHEMY_BINDS') or
+                     current_app.config.get("SESSION_REPLICATION_ROLE_DISABLED")):
                 sql_session_repl = 'SET session_replication_role TO replica;'
             sql = text('''
                 BEGIN;
@@ -456,12 +522,6 @@ class TaskRepository(Repository):
             msg = '%s cannot be %s by %s' % (name, action, self.__class__.__name__)
             raise WrongObjectError(msg)
 
-    def _delete(self, element):
-        self._validate_can_be('deleted', element)
-        table = element.__class__
-        inst = self.db.session.query(table).filter(table.id==element.id).first()
-        self.db.session.delete(inst)
-
     def _delete_zip_files_from_store(self, project):
         from pybossa.core import json_exporter, csv_exporter
         global uploader
@@ -472,6 +532,7 @@ class TaskRepository(Repository):
         json_taskruns_filename = json_exporter.download_name(project, 'task_run')
         csv_taskruns_filename = csv_exporter.download_name(project, 'task_run')
         container = "user_%s" % project.owner_id
+        current_app.logger.info("delete_zip_files_from_store. project %d container %s. delete files %s, %s, %s, %s", project.id, container, json_tasks_filename, csv_tasks_filename, json_taskruns_filename, csv_taskruns_filename)
         uploader.delete_file(json_tasks_filename, container)
         uploader.delete_file(csv_tasks_filename, container)
         uploader.delete_file(json_taskruns_filename, container)

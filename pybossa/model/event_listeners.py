@@ -33,7 +33,6 @@ from pybossa.model.task_run import TaskRun
 from pybossa.model.webhook import Webhook
 from pybossa.model.user import User
 from pybossa.model.result import Result
-from pybossa.model.counter import Counter
 from pybossa.core import result_repo, db, task_repo
 from pybossa.jobs import webhook, notify_blog_users, check_and_send_task_notifications
 from pybossa.jobs import push_notification
@@ -329,36 +328,6 @@ def make_admin(mapper, conn, target):
     if users == 0:
         target.admin = True
 
-
-@event.listens_for(Task, 'after_insert')
-def create_zero_counter(mapper, conn, target):
-    sql_query = ("insert into counter(created, project_id, task_id, n_task_runs) \
-                 VALUES (TIMESTAMP '%s', %s, %s, 0)"
-                 % (make_timestamp(), target.project_id, target.id))
-    conn.execute(sql_query)
-
-
-@event.listens_for(Task, 'after_delete')
-def delete_task_counter(mapper, conn, target):
-    sql_query = ("delete from counter where project_id=%s and task_id=%s"
-                 % (target.project_id, target.id))
-    conn.execute(sql_query)
-
-
-@event.listens_for(TaskRun, 'after_insert')
-def increase_task_counter(mapper, conn, target):
-    sql_query = ("insert into counter(created, project_id, task_id, n_task_runs) \
-                 VALUES (TIMESTAMP '%s', %s, %s, 1)"
-                 % (make_timestamp(), target.project_id, target.task_id))
-    conn.execute(sql_query)
-
-
-@event.listens_for(TaskRun, 'after_delete')
-def decrease_task_counter(mapper, conn, target):
-    sql_query = ("insert into counter(created, project_id, task_id, n_task_runs) \
-                 VALUES (TIMESTAMP '%s', %s, %s, -1)"
-                 % (make_timestamp(), target.project_id, target.task_id))
-    conn.execute(sql_query)
 
 def set_task_export(task_id):
     sql_query = ("UPDATE task SET exported = False \

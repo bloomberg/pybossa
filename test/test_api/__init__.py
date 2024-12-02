@@ -55,57 +55,90 @@ class TestAPI(Test):
 class TestLargeLanguageModel(unittest.TestCase):
     def setUp(self):
         self.app = create_app(run_as_server=False)
-        self.app.config['LLM_ENDPOINTS'] = {
-            'flan-ul2': 'http://localhost:5000/llm'
-        }
+        self.default_model_name = 'mixtral-8x7b-instruct'
+        self.default_payload = '''{
+                                    "prompts": [
+                                        "Identify the company name: Microsoft will release Windows 20 next year."
+                                    ],
+                                    "params": {
+                                        "max_tokens": 16,
+                                        "temperature": 1,
+                                        "seed": 12345
+                                    }
+                                }'''
         self.client = self.app.test_client()
 
+    @patch('pybossa.api.current_user')
     @patch('requests.post')
-    def test_valid_request(self, mock_post):
+    def test_valid_request(self, mock_post, mock_current_user):
+        mock_current_user.id = 123
         response_data = {
-            "inference_response": {
-                "predictions": [{
-                    "output": "Microsoft"
-                }]
-            }
-        }
+                        "inference_response": {
+                            "predictions": [
+                                {
+                                    "choices": [
+                                        {
+                                            "text": "Microsoft"
+                                        }
+                                    ]}
+                                ]}
+                            }
         mock_post.return_value = MagicMock(status_code=200, text=json.dumps(response_data))
         with self.app.test_request_context('/', json={
-            "prompts": "Identify the company name: Microsoft will release Windows 20 next year."
-        }):
-            response = large_language_model('flan-ul2')
+                                                        "instances": {
+                                                            "context":
+                                                                "Identify the company name: Microsoft will release Windows 20 next year.",
+                                                                "max_tokens": 16,
+                                                                "temperature": 1,
+                                                                "seed": 12345
+                                                            }
+                                                        },
+                                                    ):
+            response = large_language_model(self.default_model_name)
             self.assertEqual(response.status_code, 200)
             self.assertIn('Model: ', response.json)
             self.assertIn('predictions: ', response.json)
 
+    @patch('pybossa.api.current_user')
     @patch('requests.post')
-    def test_valid_request_with_list_of_prompts(self, mock_post):
+    def test_valid_request_with_list_of_prompts(self, mock_post, mock_current_user):
+        mock_current_user.id = 123
         response_data = {
-            "inference_response": {
-                "predictions": [{
-                    "output": "Microsoft"
-                }]
-            }
-        }
+                        "inference_response": {
+                            "predictions": [
+                                {
+                                    "choices": [{
+                                            "text": "Microsoft"
+                                        }]}
+                                ]}
+                            }
         mock_post.return_value = MagicMock(status_code=200,
                                            text=json.dumps(response_data))
         with self.app.test_request_context('/', json={
-            "prompts": ["Identify the company name: Microsoft will release Windows 20 next year.", "test"]
-        }):
-            response = large_language_model('flan-ul2')
+                                                        "instances": {
+                                                            "context": [
+                                                                "Identify the company name: Microsoft will release Windows 20 next year.", "test"
+                                                            ]
+                                                        },
+                                                    }):
+            response = large_language_model(self.default_model_name)
             self.assertEqual(response.status_code, 200)
             self.assertIn('Model: ', response.json)
             self.assertIn('predictions: ', response.json)
 
+    @patch('pybossa.api.current_user')
     @patch('requests.post')
-    def test_valid_request_with_instances_key_in_json(self, mock_post):
+    def test_valid_request_with_instances_key_in_json(self, mock_post, mock_current_user):
+        mock_current_user.id = 123
         response_data = {
-            "inference_response": {
-                "predictions": [{
-                    "output": "Microsoft"
-                }]
-            }
-        }
+                        "inference_response": {
+                            "predictions": [
+                                {
+                                    "choices": [{
+                                            "text": "Microsoft"
+                                        }]}
+                                ]}
+                            }
         mock_post.return_value = MagicMock(status_code=200,
                                            text=json.dumps(response_data))
         with self.app.test_request_context('/', json={
@@ -118,25 +151,38 @@ class TestLargeLanguageModel(unittest.TestCase):
                 }
             ]
         }):
-            response = large_language_model('flan-ul2')
+            response = large_language_model(self.default_model_name)
             self.assertEqual(response.status_code, 200)
             self.assertIn('Model: ', response.json)
             self.assertIn('predictions: ', response.json)
 
+    @patch('pybossa.api.current_user')
     @patch('requests.post')
-    def test_valid_request_no_model_name(self, mock_post):
+    def test_valid_request_no_model_name(self, mock_post, mock_current_user):
+        mock_current_user.id = 123
         response_data = {
-            "inference_response": {
-                "predictions": [{
-                    "output": "Microsoft"
-                }]
-            }
-        }
+                        "inference_response": {
+                            "predictions": [
+                                {
+                                    "choices": [{
+                                            "text": "Microsoft"
+                                        }]}
+                                ]}
+                            }
         mock_post.return_value = MagicMock(status_code=200,
                                            text=json.dumps(response_data))
         with self.app.test_request_context('/', json={
-            "prompts": ["Identify the company name: Microsoft will release Windows 20 next year.", "test"]
-        }):
+                                                        "instances": {
+                                                            "context": [
+                                                                "Identify the company name: Microsoft will release Windows 20 next year.", "test"
+                                                            ],
+                                                            "params": {
+                                                                "max_tokens": 16,
+                                                                "temperature": 1,
+                                                                "seed": 12345
+                                                            }
+                                                        },
+                                                    }):
             response = large_language_model(None)
             self.assertEqual(response.status_code, 200)
             self.assertIn('Model: ', response.json)
@@ -155,7 +201,7 @@ class TestLargeLanguageModel(unittest.TestCase):
     @patch('requests.post')
     def test_invalid_json(self, mock_post):
         with self.app.test_request_context('/', data='invalid-json', content_type='application/json'):
-            response = large_language_model('flan-ul2')
+            response = large_language_model(self.default_model_name)
             self.assertEqual(response.status_code, 400)
             self.assertIn('Invalid JSON', response.json.get('exception_msg'))
 
@@ -178,7 +224,7 @@ class TestLargeLanguageModel(unittest.TestCase):
                 }
             ]
         }):
-            response = large_language_model('flan-ul2')
+            response = large_language_model(self.default_model_name)
             self.assertEqual(response.status_code, 400)
             self.assertIn('The JSON should have', response.json.get('exception_msg'))
 
@@ -187,16 +233,16 @@ class TestLargeLanguageModel(unittest.TestCase):
         with self.app.test_request_context('/', json={
             "prompts": ""
         }):
-            response = large_language_model('flan-ul2')
+            response = large_language_model(self.default_model_name)
             self.assertEqual(response.status_code, 400)
             self.assertIn('prompts should not be empty', response.json.get('exception_msg'))
 
     @patch('requests.post')
     def test_invalid_prompts_type(self, mock_post):
         with self.app.test_request_context('/', json={
-            "prompts": 123
+            "prompts": 12345
         }):
-            response = large_language_model('flan-ul2')
+            response = large_language_model(self.default_model_name)
             self.assertEqual(response.status_code, 400)
             self.assertIn('prompts should be a string', response.json.get('exception_msg'))
 

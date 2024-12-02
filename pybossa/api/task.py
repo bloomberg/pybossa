@@ -24,7 +24,7 @@ This package adds GET, POST, PUT and DELETE methods for:
 """
 from flask import abort, current_app
 from flask_login import current_user
-from werkzeug.exceptions import BadRequest, Conflict
+from werkzeug.exceptions import BadRequest, Conflict, NotFound
 from pybossa.model.task import Task
 from pybossa.model.project import Project
 from pybossa.core import result_repo
@@ -86,6 +86,10 @@ class TaskAPI(APIBase):
     def _preprocess_post_data(self, data):
         project_id = data["project_id"]
         info = data["info"]
+        if isinstance(info, dict):
+            hdfs_task = any([val.startswith("/fileproxy/hdfs/") for val in info.values() if isinstance(val, str)])
+            if hdfs_task:
+                raise BadRequest("Invalid task payload. HDFS is not supported")
         duplicate = task_repo.find_duplicate(project_id=project_id, info=info)
         if duplicate:
             message = {
@@ -97,6 +101,8 @@ class TaskAPI(APIBase):
 
         if 'n_answers' not in data:
             project = project_repo.get(project_id)
+            if not project:
+                raise NotFound(f'Non existing project id {project_id}')
             data['n_answers'] = project.get_default_n_answers()
         user_pref = data.get('user_pref', {})
         if user_pref.get('languages'):

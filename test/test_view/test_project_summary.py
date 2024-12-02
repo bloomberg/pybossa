@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from test import db, with_context
 from test.factories import ProjectFactory
+from test.factories.user_factory import UserFactory
 from test.helper import web
 from pybossa.repositories import ProjectRepository, UserRepository
 
@@ -12,6 +13,21 @@ user_repo = UserRepository(db)
 
 
 class TestSummary(web.Helper):
+    external_config_patch = {
+        "EXTERNAL_CONFIGURATIONS_VUE": {
+            "authorized_services": {
+                "display": "Authorized Services",
+                "fields": [
+                    {
+                        "type": "MultiSelect",
+                        "choices": ["test-service-1", "test-service-2"],
+                        "name": "service_key",
+                    }
+                ],
+            }
+        }
+    }
+
     @with_context
     def test_get_config(self):
         project = ProjectFactory.create(published=True)
@@ -21,8 +37,53 @@ class TestSummary(web.Helper):
         assert 'ownership-setting' in str(res.data), res.data
         assert 'task-setting' in str(res.data), res.data
         assert 'fields-config' in str(res.data), res.data
-        assert 'consensus-config' in str(res.data), res.data
+        assert 'redundancy-config' in str(res.data), res.data
+        assert 'consensus-setting' in str(res.data), res.data
         assert 'quiz-setting' in str(res.data), res.data
+
+    @with_context
+    def test_post_project_config_authorized_servcies_as_admin(self):
+        with patch.dict(self.flask_app.config, self.external_config_patch):
+            admin = UserFactory.create(admin=True)
+            user = UserFactory.create(admin=False)
+            project = ProjectFactory.create(owner=user)
+            headers = [("Authorization", admin.api_key)]
+            url = "/project/%s/project-config" % (project.short_name)
+            payload = {"config": {"service_key": ["test-service"]}}
+            self.app.post(
+                url,
+                method="POST",
+                headers=headers,
+                content_type="application/json",
+                data=json.dumps(payload),
+            )
+            updated_project = project_repo.get(project.id)
+
+            # Only admins user can update 'authorized_services'
+            assert updated_project.info["ext_config"] == {
+                "authorized_services": {"service_key": ["test-service"]}
+            }
+
+    @with_context
+    def test_post_project_config_authorized_servcies_as_non_admin(self):
+        with patch.dict(self.flask_app.config, self.external_config_patch):
+            admin = UserFactory.create(admin=True)
+            user = UserFactory.create(admin=False)
+            project = ProjectFactory.create(owner=user)
+            headers = [("Authorization", user.api_key)]
+            url = "/project/%s/project-config" % (project.short_name)
+            payload = {"config": {"service_key": ["test-service"]}}
+            self.app.post(
+                url,
+                method="POST",
+                headers=headers,
+                content_type="application/json",
+                data=json.dumps(payload),
+            )
+            updated_project = project_repo.get(project.id)
+
+            # Regular user cannot update 'authorized_services'
+            assert updated_project.info.get("ext_config") == None
 
     @with_context
     def test_post_project_config_setting(self):

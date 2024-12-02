@@ -159,7 +159,7 @@ class ProjectRepository(Repository):
             project.owners_ids.append(project.owner_id)
 
     def _verify_has_password(self, project):
-        if not project.info.get('passwd_hash'):
+        if current_app.config.get('PROJECT_PASSWORD_REQUIRED') and not project.info.get('passwd_hash'):
             raise BadRequest('Project must have a password')
 
     def _verify_data_classification(self, project):
@@ -405,14 +405,29 @@ class ProjectRepository(Repository):
                     '''
                         SELECT
                         task.id AS task_id, task.gold_answers,
-                        result.info AS consensus_annotations 
-                        FROM task INNER JOIN result  
+                        result.info AS consensus_annotations
+                        FROM task INNER JOIN result
                         ON task.id = result.task_id
                         WHERE task.project_id=:project_id
-                        AND task.calibration=1 
-                        AND result.last_version=True 
+                        AND task.calibration=1
+                        AND result.last_version=True
                         ORDER BY task_id;
                     '''
                     )
         rows = self.db.session.execute(sql, dict(project_id=project_id)).fetchall()
         return [dict(row) for row in rows]
+
+    def get_total_and_completed_task_count(self, project_id):
+        sql = text(
+                    '''
+                        SELECT
+                            (SELECT COUNT(*) FROM task
+                            WHERE task.project_id=:project_id AND task.state='completed') as n_completed,
+                            (SELECT COUNT(task.id) AS n_tasks FROM task
+                            WHERE task.project_id=:project_id AND calibration != 1) as n_tasks;
+                    '''
+                    )
+        response = self.db.session.execute(sql, dict(project_id=project_id)).fetchall()
+        n_completed, n_tasks = response[0]
+        result = dict(n_completed_tasks=n_completed, n_tasks=n_tasks)
+        return result

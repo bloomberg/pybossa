@@ -176,7 +176,10 @@ class TestPrivacyWebPublic(web_helper.Helper):
         self.signout()
 
     @with_context
-    def test_06_user_public_profile(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_06_user_public_profile(self, upref_mdata):
         '''Test PRIVACY user public profile privacy is respected'''
         # As Anonymous user
         url = '/account/%s' % self.name
@@ -200,7 +203,10 @@ class TestPrivacyWebPublic(web_helper.Helper):
         self.signout()
 
     @with_request_context
-    def test_07_user_public_profile_json(self):
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_07_user_public_profile_json(self, upref_mdata):
         '''Test PRIVACY user public profile privacy is respected for API access'''
         # As Anonymous user
         admin, user, owner = UserFactory.create_batch(3)
@@ -433,8 +439,11 @@ class TestPrivacyWebPrivacy(web_helper.Helper):
         self.signout()
 
     @patch.dict(flask_app.config, {'ENFORCE_PRIVACY': True})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
     @with_context
-    def test_06_user_public_profile(self):
+    def test_06_user_public_profile(self, upref_mdata):
         '''Test PRIVACY user public profile privacy is respected'''
         admin, user, owner = UserFactory.create_batch(3)
         # As Anonymou user

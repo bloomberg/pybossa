@@ -41,7 +41,7 @@ DEFAULT_CONN = 'S3_DEFAULT'
 def check_type(filename):
     mime_type = magic.from_file(filename, mime=True)
     if mime_type not in allowed_mime_types:
-        raise BadRequest('File type not supported: {}'.format(mime_type))
+        raise BadRequest('File type not supported for {}: {}'.format(filename, mime_type))
 
 
 def validate_directory(directory_name):
@@ -125,9 +125,19 @@ def s3_upload_tmp_file(s3_bucket, tmp_file, filename,
         fp = io.BytesIO(content)  # BytesIO accepts bytes string
         url = s3_upload_file(s3_bucket, fp, filename, headers, upload_root_dir,
                              directory, return_key_only, conn_name)
+        bcosv2_prod_util_url = app.config.get('BCOSV2_PROD_UTIL_URL')
+
+        # generate url path to be stored as metadata
+        # which can be different from actual uploaded url
+        # and is based upon the type of uploaded url path
+        meta_url = url
+        if bcosv2_prod_util_url and url.startswith(bcosv2_prod_util_url):
+            meta_url = url.replace("-util", "")
+            app.logger.info("bcosv2 url paths. uploaded path %s, metadata path %s", url, meta_url)
+
     finally:
         os.unlink(tmp_file.name)
-    return url
+    return meta_url
 
 
 def form_upload_directory(directory, filename, upload_root_dir):
@@ -228,6 +238,6 @@ def upload_json_data(json_data, upload_path, file_name, encryption,
     if not bucket:
         bucket = app.config.get("S3_BUCKET_V2") if app.config.get("S3_CONN_TYPE_V2") else app.config.get("S3_BUCKET")
 
-    return s3_upload_from_string(bucket, content, file_name,
+    return s3_upload_from_string(bucket, content, file_name, file_type_check=False,
         directory=upload_path, conn_name=conn_name,
         with_encryption=encryption, upload_root_dir=upload_root_dir)

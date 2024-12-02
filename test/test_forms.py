@@ -393,6 +393,8 @@ class TestRegisterFormWithUserPrefMetadata(Test):
 
         self.upref_mdata_valid_choices = dict(languages=[("en", "en"), ("sp", "sp")],
                                     locations=[("us", "us"), ("uk", "uk")],
+                                    country_codes=[("us", "us"), ("uk", "uk")],
+                                    country_names=[("us", "us"), ("uk", "uk")],
                                     timezones=[("", ""), ("ACT", "Australia Central Time")],
                                     user_types=[("Researcher", "Researcher"), ("Analyst", "Analyst")])
 

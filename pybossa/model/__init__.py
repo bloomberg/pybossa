@@ -23,7 +23,6 @@ from sqlalchemy.orm import class_mapper
 
 import logging
 
-
 log = logging.getLogger(__name__)
 
 

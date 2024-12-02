@@ -978,7 +978,7 @@ class TestPybossaUtil(Test):
         tp_code = """  <task-presenter auto-save-seconds="15" />
         <task-presenter :auto-save-seconds="15" v-bind:allow-save-work="true">
             <text-input id='_kp6zwx2rs' type='text' :validations='[]' pyb-answer='freeText' initial-value='nothing special'></text-input>
-            
+
             <div class="row">
               <div class="col-sm-3">
                 <div class="form-group">
@@ -989,11 +989,11 @@ class TestPybossaUtil(Test):
                 </div>
               </div>
             </div>
-        
+
             <radio-group-input pyb-answer='answer' name='userAnswer'
               :choices='{&quot;Chinese&quot;:&quot;Chinese&quot;,&quot;Korean&quot;:&quot;Korean&quot;,&quot;Japanese&quot;:&quot;Japanese&quot;}'
               initial-value='Chinese' :validations='["required"]'></radio-group-input>
-        
+
             <div id="_e9pm92ges">
               <div class="checkbox">
                       <label for="_mg59znxa7">
@@ -1001,7 +1001,7 @@ class TestPybossaUtil(Test):
                       </label>
                 </div>
             </div>
-        
+
             <multi-select-input
               pyb-answer='subjects'
               :choices='[&quot;Math&quot;,&quot;English&quot;,&quot;Social Study&quot;,&quot;Python&quot;]'
@@ -1060,31 +1060,31 @@ class TestPybossaUtil(Test):
             <div slot="name" slot-scope="props">
                 <text-input :row="props.row" :initial-value="props.row.name" :validations='["required"]' pyb-table-answer="name"></text-input>
             </div>
-        
+
             <div slot="position" slot-scope="props">
                 <text-input :row="props.row" :initial-value="props.row.position" :validations='["required"]' pyb-table-answer="position"></text-input>
             </div>
-        
+
             <div slot="phoneNumber" slot-scope="props">
                 <text-input :row="props.row" :initial-value="props.row.phoneNumber" :validations='["required"]' pyb-table-answer="phoneNumber"></text-input>
             </div>
-        
+
             <div slot="emailAddress" slot-scope="props">
                 <text-input :row="props.row" :initial-value="props.row.emailAddress" :validations='["required"]' pyb-table-answer="emailAddress"></text-input>
             </div>
-        
+
             <div slot="physicalLocation" slot-scope="props">
                 <text-input :row="props.row" :initial-value="props.row.physicalLocation" :validations='["required"]' pyb-table-answer="physicalLocation"></text-input>
             </div>
-        
+
             <div slot="linkedIn" slot-scope="props">
                 <text-input :row="props.row" :initial-value="props.row.linkedIn" :validations='["required"]' pyb-table-answer="linkedIn"></text-input>
             </div>
-        
+
             <div slot="zoomInfo" slot-scope="props">
                 <text-input :row="props.row" :initial-value="props.row.zoomInfo" :validations='["required"]' pyb-table-answer="zoomInfo"></text-input initial-value="">
             </div>
-        
+
             <div slot="moreInfo" slot-scope="props">
                 <!--
                     Please enter you custom component in this area.
@@ -1092,7 +1092,7 @@ class TestPybossaUtil(Test):
                  -->
                 <input-text-area cols="50" rows="4" :row="props.row" :initial-value="props.row.moreInfo" pyb-table-answer="moreInfo"></input-text-area>
             </div>
-        
+
         </table-element>
         """
         user_response = {"all_info":
@@ -1137,13 +1137,13 @@ class TestPybossaUtil(Test):
                   <label for="_hc921dja4">My test notes</label>
                   <input-text-area id='_hc921dja4' :validations='["required"]' rows='5' cols='100' pyb-answer='test notes'></input-text-area>
                 </div>
-                
+
                 <table-element
                   :key='task.id'
                    name='all_info'
                   :data='task.info.a.b'
                   :columns='["concept","actual_forecast","concept_period","hgrt_variable","hgrt_variable_type","hgrt_feedback","variable_notes","QC_Reason","QC_Notes"]'
-                  column-id='and_id'  
+                  column-id='and_id'
                     :options='{
                         "columnsClasses": {"QC_Notes":"min-width-class", "QC_Reason":"min-width-dropdown-class"},
                         "headings": {
@@ -1166,12 +1166,12 @@ class TestPybossaUtil(Test):
                           :choices="{&quot;bestpractices-provideqcnote&quot;:&quot;Best Practices - Provide QCNOTE&quot;,&quot;correct&quot;:&quot;Correct&quot;,&quot;datapointcanbeextracted-provideqcnote&quot;:&quot;Data point can be extracted - Provide QCNOTE&quot;,&quot;incorrectvariable&quot;:&quot;Incorrect Variable&quot;,&quot;incorrectwffeedback&quot;:&quot;Incorrect WF Feedback&quot;,&quot;incorrectwffeedback&amp;bestpractices-provideqcnote&quot;:&quot;Incorrect WF Feedback &amp; Best Practices - Provide QCNOTE&quot;,&quot;incorrectwffeedback&amp;incorrectrule-provideqcnote&quot;:&quot;Incorrect WF Feedback &amp; Incorrect Rule - Provide QCNOTE&quot;,&quot;n&#x2F;a-borgupdate&quot;:&quot;N&#x2F;A - Borg Update&quot;,&quot;n&#x2F;a-blocked&quot;:&quot;N&#x2F;A - Blocked&quot;,&quot;nocomparisonordirectionallanguage&quot;:&quot;No Comparison or Directional Language&quot;,&quot;nocurrencyparameter&quot;:&quot;No Currency Parameter&quot;,&quot;nomultiplierselected&quot;:&quot;No Multiplier Selected&quot;,&quot;noperiodreference&quot;:&quot;No Period Reference&quot;,&quot;nostartinganchor&quot;:&quot;No Starting Anchor&quot;,&quot;other-provideqcnote&quot;:&quot;Other - Provide QCNOTE&quot;}"
                       ></dropdown-input>
                     </div>
-                
+
                     <div slot="QC_Notes" slot-scope="props">
                      <!-- <text-input :row="props.row" pyb-table-answer="QC_Notes"></text-input> -->
-                      <input-text-area :initial-value="props.row.QC_Notes" initial-value="" cols="50" rows="4" pyb-table-answer="QC_Notes" :row="props.row"></input-text-area>  
+                      <input-text-area :initial-value="props.row.QC_Notes" initial-value="" cols="50" rows="4" pyb-table-answer="QC_Notes" :row="props.row"></input-text-area>
                     </div>
-                
+
                 </table-element>
                     <table-element
                       :key='task.id'
@@ -1370,6 +1370,17 @@ class TestPybossaUtil(Test):
         assert result == True
         assert len(list(test_sentinel.slave.keys(pattern))) == 0
 
+    def test_get_last_name(self):
+        assert util.get_last_name('Sara Smith') == 'Smith'
+        assert util.get_last_name('Sara Two Smith') == 'Smith'
+        assert util.get_last_name('Sara Smith 2') == 'Smith'
+        assert util.get_last_name('3 Sara Smith') == 'Smith'
+        assert util.get_last_name('Smith 1') == 'Smith'
+        assert util.get_last_name('Smith') == 'Smith'
+        assert util.get_last_name('Sara Smith ') == 'Smith'
+        assert util.get_last_name(' Sara Smith ') == 'Smith'
+        assert util.get_last_name('') == ''
+        assert util.get_last_name(None) == ''
 
 class TestIsReservedName(object):
     from test import flask_app as app
@@ -1823,3 +1834,85 @@ class TestAccessControl(Test):
         assert set(disabled.keys()) == {'user_type'}
         assert set(hidden.keys()) == {'profile'}
         assert util.can_update_user_info(normal_user, normal_user2) == (False, None, None)
+
+
+class TestMapLocations(Test):
+
+    @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_name_by_country_code')
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_map_locations_maps_cc(self, upref_mdata, get_country_name_by_country_code):
+
+        get_country_name_by_country_code.return_value = 'United States'
+
+        input_locations = ['US']
+        expected_locations = ['US', 'United States']
+        mapped_locations = util.map_locations(input_locations)
+
+        assert sorted(mapped_locations['locations']) == expected_locations
+
+    @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_map_locations_maps_cn(self, upref_mdata, get_country_code_by_country_name):
+
+        get_country_code_by_country_name.return_value = 'US'
+
+        input_locations = ['United States']
+        expected_locations = ['US', 'United States']
+        mapped_locations = util.map_locations(input_locations)
+
+        assert sorted(mapped_locations['locations']) == expected_locations
+
+    @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_name_by_country_code')
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_map_locations_invalid_cc(self, upref_mdata, get_country_name_by_country_code):
+
+        get_country_name_by_country_code.return_value = None
+
+        input_locations = ['XX']
+        expected_locations = ['XX']
+        mapped_locations = util.map_locations(input_locations)
+
+        assert sorted(mapped_locations['locations']) == expected_locations
+
+    @with_context
+    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_map_locations_invalid_cn(self, upref_mdata, get_country_code_by_country_name):
+
+        get_country_code_by_country_name.return_value = None
+
+        input_locations = ['invalid country']
+        expected_locations = ['invalid country']
+        mapped_locations = util.map_locations(input_locations)
+
+        assert sorted(mapped_locations['locations']) == expected_locations
+
+    @with_context
+    def test_map_locations_none(self):
+
+        input_locations = None
+        expected_locations = None
+        mapped_locations = util.map_locations(input_locations)
+
+        assert mapped_locations['locations'] == expected_locations
+
+    @with_context
+    def test_validate_ownership_id(self):
+        # valid ownership_id
+        ownership_id = "1111"
+        util.validate_ownership_id(ownership_id)
+
+        # empty ownership_id
+        ownership_id = ""
+        util.validate_ownership_id(ownership_id)
+
+        # ownership_id too long (> 20 chars)
+        ownership_id = "123412341234123412341234"
+        assert_raises(ValueError, util.validate_ownership_id, ownership_id)
+
+        # ownership_id not numeric
+        ownership_id = "1234abcd1234"
+        assert_raises(ValueError, util.validate_ownership_id, ownership_id)

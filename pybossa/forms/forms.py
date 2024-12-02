@@ -84,6 +84,19 @@ BooleanField.false_values = {False, 'false', '', 'off', 'n', 'no'}
 
 
 class ProjectCommonForm(Form):
+    def __init__(self, *args, **kwargs):
+        super(ProjectCommonForm, self).__init__(*args, **kwargs)
+        if current_app.config.get('PROJECT_PASSWORD_REQUIRED'):
+            self.password.validators = [pb_validator.CheckPasswordStrength(
+                                        min_len=PROJECT_PWD_MIN_LEN,
+                                        special=False,
+                                        password_required=True), validators.Required()]
+        else:
+            self.password.validators = [pb_validator.CheckPasswordStrength(
+                                        min_len=PROJECT_PWD_MIN_LEN,
+                                        special=False,
+                                        password_required=False), validators.Optional()]
+
     name = TextField(lazy_gettext('Name'),
                      [validators.Required(),
                       pb_validator.Unique(project_repo.get_by, 'name',
@@ -99,20 +112,16 @@ class ProjectCommonForm(Form):
 
     password = PasswordField(
                     lazy_gettext('Password'),
-                    [validators.Required(),
-                        pb_validator.CheckPasswordStrength(
-                                        min_len=PROJECT_PWD_MIN_LEN,
-                                        special=False)],
                     render_kw={'placeholder': 'Minimum length {} characters, 1 uppercase, 1 lowercase and 1 numeric.'.format(PROJECT_PWD_MIN_LEN)})
     input_data_class = SelectFieldWithProps(lazy_gettext('Input Data Classification'),
                                             validators=[validators.Required()], choices=[], default='')
     output_data_class = SelectFieldWithProps(lazy_gettext('Output Data Classification'),
                                              validators=[validators.Required()], choices=[], default='')
-    def __init__(self, *args, **kwargs):
-        Form.__init__(self, *args, **kwargs)
+
 
 class ProjectForm(ProjectCommonForm):
-
+    def __init__(self, *args, **kwargs):
+        super(ProjectForm, self).__init__(*args, **kwargs)
     long_description = TextAreaField(lazy_gettext('Long Description'),
                                      [validators.Required()])
     description = TextAreaField(lazy_gettext('Description'),
@@ -150,6 +159,7 @@ class ProjectUpdateForm(ProjectForm):
                                         min_len=PROJECT_PWD_MIN_LEN,
                                         special=False)],
                     render_kw={'placeholder': 'Minimum length {} characters, 1 uppercase, 1 lowercase and 1 numeric.'.format(PROJECT_PWD_MIN_LEN)})
+
     webhook = TextField(lazy_gettext('Webhook'),
                         [pb_validator.Webhook()])
     sync_enabled = BooleanField(lazy_gettext('Enable Project Syncing'))
@@ -232,7 +242,6 @@ class TaskDefaultRedundancyForm(Form):
                                         task_repo.MAX_REDUNDANCY
                                     )))])
 
-
 class TaskRedundancyForm(Form):
     n_answers = IntegerField(lazy_gettext('Redundancy'),
                              [validators.Required(),
@@ -245,7 +254,6 @@ class TaskRedundancyForm(Form):
                                           task_repo.MIN_REDUNDANCY,
                                           task_repo.MAX_REDUNDANCY
                                       )))])
-
 
 class TaskPriorityForm(Form):
     task_ids = TextField(lazy_gettext('Task IDs'),
@@ -279,6 +287,7 @@ class TaskTimeoutForm(Form):
 class TaskNotificationForm(Form):
     remaining = IntegerField(lazy_gettext('Notify when the number of remaining tasks is less than or equal to'))
     webhook = TextField(lazy_gettext('Webhook URL'))
+
 
 class TaskSchedulerForm(Form):
     _translate_names = lambda variant: (variant[0], lazy_gettext(variant[1]))
@@ -785,6 +794,10 @@ class UserPrefMetadataForm(Form):
         lazy_gettext('Language(s)'), choices=[],default="")
     locations = Select2Field(
         lazy_gettext('Location(s)'), choices=[], default="")
+    country_codes = Select2Field(
+        lazy_gettext('Location - Country Code(s)'), choices=[], default="")
+    country_names = Select2Field(
+        lazy_gettext('Location - Country Name(s)'), choices=[], default="")
     work_hours_from = TimeField(
         lazy_gettext('Work Hours From'),
         [TimeFieldsValidator(["work_hours_to", "timezone"],
@@ -823,6 +836,8 @@ class UserPrefMetadataForm(Form):
         upref_mdata_choices = app_settings.upref_mdata.get_upref_mdata_choices()
         self.languages.choices = upref_mdata_choices['languages']
         self.locations.choices = upref_mdata_choices['locations']
+        self.country_codes.choices = upref_mdata_choices['country_codes']
+        self.country_names.choices = upref_mdata_choices['country_names']
         self.timezone.choices = upref_mdata_choices['timezones']
         self.user_type.choices = upref_mdata_choices['user_types']
 
