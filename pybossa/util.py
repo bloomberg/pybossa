@@ -1456,10 +1456,28 @@ def map_locations(locations):
                 current_app.logger.warning(f"Invalid country name '{location}' in map_locations")
 
     return {
-        'locations': list(country_codes_set.union(country_names_set)),
-        'country_codes': list(country_codes_set),
-        'country_names': list(country_names_set)
+        'locations': group_and_sort_countries(list(country_codes_set.union(country_names_set))),
+        'country_codes': sorted(list(country_codes_set)),
+        'country_names': sorted(list(country_names_set))
     }
+
+
+def group_and_sort_countries(input_list):
+    country_names = set()
+    for item in input_list:
+        if item in app_settings.upref_mdata.country_name_to_country_code:
+            country_names.add(item)
+        elif item in app_settings.upref_mdata.country_code_to_country_name:
+            country_names.add(app_settings.upref_mdata.country_code_to_country_name[item])
+        else:
+            current_app.logger.warning(f"'{item}' not found in country code mappings")
+    sorted_country_names = sorted(country_names)
+
+    output_items = []
+    for name in sorted_country_names:
+        code = app_settings.upref_mdata.country_name_to_country_code[name]
+        output_items.extend([name, code])
+    return output_items
 
 
 def get_last_name(fullname):
