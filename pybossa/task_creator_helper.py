@@ -183,7 +183,9 @@ def read_encrypted_file(store, project, bucket, key_name):
 
 def generate_checksum(task):
     from pybossa.cache.projects import get_project_data
-    if not (task and task.id and isinstance(task.info, dict)):
+    from pybossa.core import private_required_fields
+
+    if not (task and isinstance(task.info, dict)):
         return
 
     project = get_project_data(task.project_id)
@@ -202,6 +204,8 @@ def generate_checksum(task):
     task_contents = {}
     if current_app.config.get("PRIVATE_INSTANCE"):
         for field, value in task.info.items():
+            if field in private_required_fields:
+                continue
             if field.endswith("__upload_url"):
                 _, fileproxy, encrypted, store, bucket, project_id, hash_key, filename = value.split('/')
                 content, _ = read_encrypted_file(store, project, bucket, filename)
@@ -209,7 +213,7 @@ def generate_checksum(task):
                     content = json.loads(content)
                     task_contents.update(content)
                 except Exception as e:
-                    current_app.logger.info("duplicate task checksum error parsing task payload for project %d, task %d. %s", project.id, task.id, str(e))
+                    current_app.logger.info("duplicate task checksum error parsing task payload for project %d, %s", project.id, str(e))
                     return
             elif field == "private_json__encrypted_payload":
                 encrypted_content = task.info.get("private_json__encrypted_payload")
@@ -221,6 +225,7 @@ def generate_checksum(task):
     else:
         # public instance has all task fields under task.info
         task_contents = task.info
+
     checksum_fields = task_contents.keys() if not dup_fields_configured else dup_fields_configured
     checksum_payload = {field:task_contents[field] for field in checksum_fields}
     checksum = hashlib.sha256()

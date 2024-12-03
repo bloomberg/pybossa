@@ -97,6 +97,7 @@ def create_app(run_as_server=True):
     setup_task_presenter_editor(app)
     setup_schedulers(app)
     setup_swagger(app)
+    setup_global_configs(app)
     return app
 
 # construct rq_dashboard config
@@ -1033,3 +1034,15 @@ def setup_swagger(app):
         app.logger.warning(msg)
     Swagger.DEFAULT_CONFIG.update(app.config.get('SWAGGER_TEMPLATE'))
     Swagger(app, template=app.config.get('SWAGGER_TEMPLATE'))
+
+def setup_global_configs(app):
+    """Setup global configs that requires extraction / parsing from settings"""
+    global private_required_fields
+
+    # settings that require additional extraction / parsing
+    # can go here so that it can be done just once upon app load
+    # instead of on each api / endpoint call thereby reducing
+    # repeatative logic resulting into quick response time
+    private_required_fields = list(app.config.get("TASK_REQUIRED_FIELDS", {}).keys())
+    if "data_access_level" not in private_required_fields:
+        private_required_fields.append("data_access_level")
