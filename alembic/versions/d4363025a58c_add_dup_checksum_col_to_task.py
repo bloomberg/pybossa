@@ -16,8 +16,10 @@ import sqlalchemy as sa
 
 def upgrade():
     op.add_column('task', sa.Column('dup_checksum', sa.String, nullable=True))
-    op.create_index('task_project_id_dup_checksum', 'task', ['project_id', 'dup_checksum'])
+    op.execute('COMMIT')
+    op.execute('CREATE INDEX CONCURRENTLY IF NOT EXISTS task_project_id_dup_checksum ON task (project_id, dup_checksum);')
 
 def downgrade():
     op.drop_column('task', 'dup_checksum')
-    op.drop_index('task_project_id_dup_checksum', table_name='task')
+    op.execute('COMMIT')
+    op.execute('DROP INDEX CONCURRENTLY IF EXISTS task_project_id_dup_checksum;')
