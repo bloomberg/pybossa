@@ -19,6 +19,7 @@
 import base64
 import codecs
 import csv
+import ctypes
 import hashlib
 import hmac
 import io
@@ -65,6 +66,10 @@ TP_COMPONENT_TAGS = ["text-input", "dropdown-input", "radio-group-input",
 PARTIAL_ANSWER_PREFIX = "partial_answer:project:{project_id}:user:{user_id}"
 PARTIAL_ANSWER_KEY = PARTIAL_ANSWER_PREFIX + ":task:{task_id}"
 PARTIAL_ANSWER_POSITION_KEY = PARTIAL_ANSWER_PREFIX + ":position"
+
+# Configure csv.reader() for max file size. Reference: https://stackoverflow.com/questions/15063936/csv-error-field-larger-than-field-limit-131072/15063941#15063941
+MAX_SIGNED_LONG = (1 << (8 * ctypes.sizeof(ctypes.c_long) - 1)) - 1
+csv.field_size_limit(MAX_SIGNED_LONG)
 
 class SavedTaskPositionEnum(str, Enum):
     FIRST = "first"

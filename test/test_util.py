@@ -81,6 +81,19 @@ class TestPybossaUtil(Test):
     #     assert res.status_code == 200, err_msg
 
     @with_context
+    @patch('pybossa.util.delete_file_from_s3')
+    @patch('pybossa.util.os.remove')
+    def test_delete_import_csv_file(self, mock_remove, mock_delete_file_from_s3):
+        with patch.dict(self.flask_app.config, {'S3_IMPORT_BUCKET': 's3-import-bucket'}):
+            path = '/file/path'
+            util.delete_import_csv_file(path)
+            mock_delete_file_from_s3.assert_called_with('s3-import-bucket', '/file/path', conn_name='S3_IMPORT')
+
+        path = '/file/path'
+        util.delete_import_csv_file(path)
+        mock_remove.assert_called_with('/file/path')
+
+    @with_context
     @patch('pybossa.util.hmac.HMAC')
     @patch('pybossa.util.base64.b64encode')
     def test_disqus_sso_payload_auth_user(self, mock_b64encode, mock_hmac):

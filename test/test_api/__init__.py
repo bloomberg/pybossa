@@ -55,7 +55,7 @@ class TestAPI(Test):
 class TestLargeLanguageModel(unittest.TestCase):
     def setUp(self):
         self.app = create_app(run_as_server=False)
-        self.default_model_name = 'mixtral-8x7b-instruct'
+        self.default_model_name = 'mistral-nemo-instruct'
         self.default_payload = '''{
                                     "prompts": [
                                         "Identify the company name: Microsoft will release Windows 20 next year."

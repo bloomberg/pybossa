@@ -638,8 +638,7 @@ def count_rows_to_delete(project_id):
     total_task = count_records("task", project_id)
     total_taskrun = count_records("task_run", project_id)
     total_result = count_records("result", project_id)
-    total_counter = count_records("counter", project_id)
-    return total_task, total_taskrun, total_result, total_counter
+    return total_task, total_taskrun, total_result
 
 
 def cleanup_task_records(project_id, limit, force_reset, task_filter_args):
@@ -657,7 +656,7 @@ def cleanup_task_records(project_id, limit, force_reset, task_filter_args):
         sql = text('''
             SELECT id FROM task WHERE project_id=:project_id {} LIMIT :limit;
             '''.format(conditions))
-        tables = ["counter", "result", "task_run", "task"]
+        tables = ["result", "task_run", "task"]
     else:
         sql = text('''
             SELECT t.id FROM task t
@@ -686,20 +685,19 @@ def delete_bulk_tasks_in_batches(project_id, force_reset, task_filter_args):
     """Delete bulk tasks in batches from project."""
 
     batch_size = BATCH_SIZE_BULK_DELETE_TASKS
-    total_task, total_taskrun, total_result, total_counter = count_rows_to_delete(project_id)
-    current_app.logger.info("total records to delete. task %d, task_run %d, result %d, counter %d", 
-                            total_task, total_taskrun, total_result, total_counter)
+    total_task, total_taskrun, total_result = count_rows_to_delete(project_id)
+    current_app.logger.info("total records to delete. task %d, task_run %d, result %d",
+                            total_task, total_taskrun, total_result)
 
     # count iterations required to delete records from all tables
-    counter_iterations = int(total_counter / batch_size) + (1 if total_counter % batch_size else 0)
     result_iterations = int(total_result / batch_size) + (1 if total_result % batch_size else 0)
     taskrun_iterations = int(total_taskrun / batch_size) + (1 if total_taskrun % batch_size else 0)
     task_iterations = int(total_task / batch_size) + (1 if total_task % batch_size else 0)
-    current_app.logger.info("total iterations. task %d, task_run %d, result %d, counter %d", 
-                            task_iterations, taskrun_iterations, result_iterations, counter_iterations)
+    current_app.logger.info("total iterations. task %d, task_run %d, result %d",
+                            task_iterations, taskrun_iterations, result_iterations)
 
     limit = batch_size
-    total_iterations = max(counter_iterations, result_iterations, taskrun_iterations, task_iterations)
+    total_iterations = max(result_iterations, taskrun_iterations, task_iterations)
     total_iterations = min(total_iterations, MAX_BULK_DELETE_TASK_ITERATIONS)
     for i in range(total_iterations):
         count_deleted_records = i * batch_size
@@ -728,7 +726,6 @@ def delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_arg
         params = {}
         sql = text('''
                 BEGIN;
-                SELECT task_id FROM counter WHERE project_id=:project_id FOR UPDATE;
                 SELECT task_id FROM task_run WHERE project_id=:project_id FOR UPDATE;
                 SELECT id FROM task WHERE project_id=:project_id FOR UPDATE;
 
@@ -742,8 +739,6 @@ def delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_arg
                     GROUP BY result.task_id)
                 );
 
-                DELETE FROM counter WHERE project_id=:project_id
-                        AND task_id IN (SELECT id FROM to_delete);
                 DELETE FROM task_run WHERE project_id=:project_id
                         AND task_id IN (SELECT id FROM to_delete);
                 DELETE FROM task WHERE project_id=:project_id
@@ -755,7 +750,6 @@ def delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_arg
         conditions, params = get_task_filters(task_filter_args)
         sql = text('''
                 BEGIN;
-                SELECT task_id FROM counter WHERE project_id=:project_id FOR UPDATE;
                 SELECT task_id FROM result WHERE project_id=:project_id FOR UPDATE;
                 SELECT task_id FROM task_run WHERE project_id=:project_id FOR UPDATE;
                 SELECT id FROM task WHERE project_id=:project_id FOR UPDATE;
@@ -774,8 +768,6 @@ def delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_arg
                     WHERE task.project_id=:project_id {}
                 );
 
-                DELETE FROM counter WHERE project_id=:project_id
-                        AND task_id IN (SELECT id FROM to_delete);
                 DELETE FROM result WHERE project_id=:project_id
                        AND task_id in (SELECT id FROM to_delete);
                 DELETE FROM task_run WHERE project_id=:project_id
