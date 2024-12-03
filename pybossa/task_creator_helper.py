@@ -195,9 +195,7 @@ def generate_checksum(task):
         return
 
     dup_fields_configured = dup_task_config.get("duplicate_fields", [])
-    if not len(dup_fields_configured):
-        # include all task.info fields
-        pass
+    # include all task.info fields with no field configured under duplicate_fields
 
     secret = get_encryption_key(project) if current_app.config.get("PRIVATE_INSTANCE") else None
     cipher = AESWithGCM(secret) if secret else None
