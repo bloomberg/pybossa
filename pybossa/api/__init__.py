@@ -921,7 +921,7 @@ def large_language_model(model_name):
     """Large language model endpoint
     The JSON data in the POST request can be one of the following:
     {
-        "model_name": "mixtral-8x7b-instruct"
+        "model_name": "mistral-nemo-instruct"
         "payload":
             {
             "prompts": [ "Identify the company name: Microsoft will release Windows 20 next year." ]
@@ -943,7 +943,7 @@ def large_language_model(model_name):
     proxies = current_app.config.get('LLM_PROXIES')
 
     if model_name is None:
-        model_name = 'mixtral-8x7b-instruct'
+        model_name = 'mistral-nemo-instruct'
 
     if model_name not in available_models:
         return abort(400, "LLM is unsupported")
