@@ -1466,14 +1466,14 @@ def group_and_sort_countries(input_list):
     country_names = set()
     for item in input_list:
         if item in app_settings.upref_mdata.country_code_to_country_name:
-            country_names.add(app_settings.upref_mdata.country_code_to_country_name[item])
+            country_names.add(app_settings.upref_mdata.country_code_to_country_name.get(item))
         else:
             country_names.add(item)
     sorted_country_names = sorted(country_names)
 
     output_items = []
     for name in sorted_country_names:
-        code = app_settings.upref_mdata.country_name_to_country_code[name]
+        code = app_settings.upref_mdata.country_name_to_country_code.get(name)
         if code:
             output_items.extend([name, code])
         else:

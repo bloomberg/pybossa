@@ -1838,12 +1838,29 @@ class TestAccessControl(Test):
 
 class TestMapLocations(Test):
 
-    @with_context
-    @patch('pybossa.util.app_settings.upref_mdata.get_country_name_by_country_code')
-    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_map_locations_maps_cc(self, upref_mdata, get_country_name_by_country_code):
+    def _setup_upref_mdata(self, upref_mdata):
+        upref_mdata.country_name_to_country_code = {
+            "United States": "US",
+        }
 
-        get_country_name_by_country_code.return_value = 'United States'
+        upref_mdata.country_code_to_country_name = {
+            "US":"United States"
+        }
+
+        def get_country_code_by_country_name(country):
+            return upref_mdata.country_name_to_country_code.get(country)
+
+        def get_country_name_by_country_code(country_code):
+            upref_mdata.country_code_to_country_name.get(country_code)
+
+        upref_mdata.get_country_code_by_country_name = get_country_code_by_country_name
+        upref_mdata.get_country_name_by_country_code = get_country_name_by_country_code
+
+    @with_context
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_map_locations_maps_cc(self, upref_mdata):
+
+        self._setup_upref_mdata(upref_mdata)
 
         input_locations = ['US']
         expected_locations = ['United States', 'US']
@@ -1853,11 +1870,10 @@ class TestMapLocations(Test):
         (mapped_locations['locations'], expected_locations)
 
     @with_context
-    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_map_locations_maps_cn(self, upref_mdata, get_country_code_by_country_name):
+    def test_map_locations_maps_cn(self, upref_mdata):
 
-        get_country_code_by_country_name.return_value = 'US'
+        self._setup_upref_mdata(upref_mdata)
 
         input_locations = ['United States']
         expected_locations = ['United States', 'US']
@@ -1867,11 +1883,10 @@ class TestMapLocations(Test):
         (mapped_locations['locations'], expected_locations)
 
     @with_context
-    @patch('pybossa.util.app_settings.upref_mdata.get_country_name_by_country_code')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_map_locations_invalid_cc(self, upref_mdata, get_country_name_by_country_code):
+    def test_map_locations_invalid_cc(self, upref_mdata):
 
-        get_country_name_by_country_code.return_value = None
+        self._setup_upref_mdata(upref_mdata)
 
         input_locations = ['XX']
         expected_locations = ['XX']
@@ -1880,11 +1895,10 @@ class TestMapLocations(Test):
         assert mapped_locations['locations'] == expected_locations
 
     @with_context
-    @patch('pybossa.util.app_settings.upref_mdata.get_country_code_by_country_name')
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
-    def test_map_locations_invalid_cn(self, upref_mdata, get_country_code_by_country_name):
+    def test_map_locations_invalid_cn(self, upref_mdata):
 
-        get_country_code_by_country_name.return_value = None
+        self._setup_upref_mdata(upref_mdata)
 
         input_locations = ['invalid country']
         expected_locations = ['invalid country']
