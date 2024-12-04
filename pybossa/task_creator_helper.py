@@ -228,6 +228,7 @@ def generate_checksum(task):
 
     checksum_fields = task_contents.keys() if not dup_fields_configured else dup_fields_configured
     checksum_payload = {field:task_contents[field] for field in checksum_fields}
+    current_app.logger.info("Project %d duplicate check fields %s", task.project_id, str(list(checksum_fields)))
     checksum = hashlib.sha256()
     checksum.update(json.dumps(checksum_payload, sort_keys=True).encode("utf-8"))
     return checksum.hexdigest()
