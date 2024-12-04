@@ -25,6 +25,7 @@ import shutil
 import urllib.request, urllib.parse, urllib.error
 import zipfile
 from io import StringIO, BytesIO
+import hashlib
 from pybossa.sched import Schedulers
 from test import db, Fixtures, with_context, with_context_settings, \
     FakeResponse, mock_contributions_guard, with_request_context
@@ -62,6 +63,8 @@ from pybossa.view.account import get_user_data_as_form
 from pybossa.cloud_store_api.s3 import upload_json_data
 from pybossa.task_creator_helper import get_gold_answers
 from pybossa.core import setup_error_handlers
+from pybossa.task_creator_helper import generate_checksum
+
 
 class TestWeb(web.Helper):
     pkg_json_not_found = {
@@ -10282,6 +10285,194 @@ class TestWeb(web.Helper):
         res = self.app_get_json(f"/api/project/{project.id}/gold_annotations")
         assert res.status_code == 200, data
 
+    @with_context
+    @patch("pybossa.task_creator_helper.get_encryption_key")
+    @patch("pybossa.task_creator_helper.read_encrypted_file")
+    def test_generate_checksum_errors(self, mock_read_enc_file, mock_get_enc_key):
+        """Test checksum generation handles exception and returns no checksum"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        mock_get_enc_key.return_value = "xyz"
+        mock_read_enc_file.return_value = (b"bad data", "path/contents.txt")
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+
+        # no checksum returned for missing/none task
+        assert generate_checksum(task=None) == None
+
+        # exception handled for bad priv data under file
+        # so that no checksum is returned
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": ["a", "c"]
+                }
+            })
+        task_info = {
+            "priv_data__upload_url": f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"
+        }
+        task = TaskFactory.create(
+            project=project,
+            info=task_info
+        )
+
+        # with bad data under file, exception was handled and no checksum returned
+        checksum = generate_checksum(task=task)
+        assert not checksum
+
+    @with_context
+    @patch("pybossa.cache.projects.get_project_data")
+    def test_generate_checksum_missing_project(self, mock_project):
+        """Test checksum generation handles missing project and returns no checksum"""
+        from flask import current_app
+
+        mock_project.return_value = None
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": ["a", "c"]
+                }
+            })
+        task = TaskFactory.create(
+            project=project,
+            info={"a": 1, "b": 2, "c": 3}
+        )
+
+        # with missing project no checksum returned
+        checksum = generate_checksum(task=task)
+        assert not checksum
+
+    @with_context
+    def test_generate_checksum_public_data(self):
+        """Test checksum is generated for public data"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = False
+        checksum = hashlib.sha256()
+        expected_dupcheck_payload = {"a": 1, "c": 3}
+        checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
+        expected_checksum =  checksum.hexdigest()
+
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": ["a", "c"]
+                }
+            })
+
+        task = TaskFactory.create(
+            project=project,
+            info={"a": 1, "b": 2, "c": 3}
+        )
+        checksum = generate_checksum(task)
+        assert checksum == expected_checksum
+
+    @with_context
+    @patch("pybossa.task_creator_helper.get_encryption_key")
+    @patch("pybossa.task_creator_helper.read_encrypted_file")
+    def test_checksum_private_data_files(self, mock_read_enc_file, mock_get_enc_key):
+        """Test checksum is generated for private data stored under files"""
+
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        public_data = {"a": 1}
+        private_data = {"b": 2, "c": 3}
+        duplicate_fields = ["a", "c"]
+        all_task_data = {}
+        all_task_data.update(public_data)
+        all_task_data.update(private_data)
+
+        checksum = hashlib.sha256()
+        expected_dupcheck_payload = {field: all_task_data[field] for field in duplicate_fields}
+        checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
+        expected_checksum =  checksum.hexdigest()
+
+        mock_get_enc_key.return_value = "xyz"
+        mock_read_enc_file.return_value = (json.dumps(private_data), "path/contents.txt")
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": duplicate_fields
+                }
+            })
+
+        task_info = {}
+        task_info.update(public_data)
+        task_info["priv_data__upload_url"] = f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"
+        task = TaskFactory.create(
+            project=project,
+            info=task_info
+        )
+        checksum = generate_checksum(task)
+        assert checksum == expected_checksum
+
+    @with_context
+    @patch("pybossa.task_creator_helper.get_encryption_key")
+    def test_generate_checksum_encrypted_payload(self, mock_get_enc_key):
+        """Test checksum is generated for private data stored as encrypted payload"""
+
+        from flask import current_app
+        from pybossa.encryption import AESWithGCM
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        public_data = {"a": 1}
+        private_data = {"b": 2, "c": 3}
+        duplicate_fields = ["a", "c"]
+
+        all_task_data = {}
+        all_task_data.update(public_data)
+        all_task_data.update(private_data)
+
+        # encrypt private data
+        secret = "topsecret".encode("utf-8")
+        cipher = AESWithGCM(secret)
+        payload = json.dumps(private_data).encode("utf-8")
+        encrypted_payload = cipher.encrypt(payload)
+
+        checksum = hashlib.sha256()
+        expected_dupcheck_payload = {field: all_task_data[field] for field in duplicate_fields}
+        checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
+        expected_checksum =  checksum.hexdigest()
+
+        mock_get_enc_key.return_value = secret
+        # mock_read_enc_file.return_value = (json.dumps(private_data), "path/contents.txt")
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": duplicate_fields
+                }
+            })
+
+        task_info = {}
+        task_info.update(public_data)
+        task_info["private_json__encrypted_payload"] = encrypted_payload
+        task = TaskFactory.create(
+            project=project,
+            info=task_info
+        )
+        checksum = generate_checksum(task)
+        assert checksum == expected_checksum
 
 class TestWebUserMetadataUpdate(web.Helper):
 

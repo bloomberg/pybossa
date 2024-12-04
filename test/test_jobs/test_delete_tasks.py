@@ -60,7 +60,8 @@ class TestDeleteTasks(Test):
     @patch('pybossa.jobs.cleanup_task_records')
     @patch('pybossa.core.db.session.execute')
     @patch('pybossa.jobs.send_mail')
-    def test_delete_bulk_tasks_in_batches(self, mock_send_mail, mock_db, mock_cleanup_task_records, mock_sleep):
+    @patch('pybossa.cache.projects.get_project_data')
+    def test_delete_bulk_tasks_in_batches(self, mock_project, mock_send_mail, mock_db, mock_cleanup_task_records, mock_sleep):
         """Test delete_bulk_tasks_in_batches deletes tasks and sends email"""
         user = UserFactory.create(admin=True)
         project = ProjectFactory.create(name='test_project')
@@ -78,6 +79,7 @@ class TestDeleteTasks(Test):
             'force_reset': True, 'coowners': [], 'current_user_fullname': "usera", 'url': "https://a.com"
         }
 
+        mock_project.return_value = project
         with patch.dict(self.flask_app.config, {"SESSION_REPLICATION_ROLE_DISABLED": True}):
             delete_bulk_tasks(data)
 

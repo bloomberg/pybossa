@@ -33,7 +33,7 @@ from pybossa.core import task_repo, signer
 from pybossa.encryption import AESWithGCM
 # from pybossa.pybhdfs.client import HDFSKerberos
 from pybossa.sched import has_lock
-from pybossa.cloud_store_api.s3 import get_content_and_key_from_s3
+from pybossa.task_creator_helper import get_encryption_key, read_encrypted_file
 
 
 blueprint = Blueprint('fileproxy', __name__)
@@ -71,7 +71,7 @@ def check_allowed(user_id, task_id, project, is_valid_url):
 
     raise Forbidden('FORBIDDEN')
 
-def read_encrypted_file(store, project_id, bucket, key_name, signature):
+def read_encrypted_file_with_signature(store, project_id, bucket, key_name, signature):
     if not signature:
         current_app.logger.exception('Project id {} no signature {}'.format(project_id, key_name))
         raise Forbidden('No signature')
@@ -89,23 +89,7 @@ def read_encrypted_file(store, project_id, bucket, key_name, signature):
     task_id = payload['task_id']
 
     check_allowed(current_user.id, task_id, project, lambda v: v == request.path)
-
-    conn_name = "S3_TASK_REQUEST_V2" if store == current_app.config.get("S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
-    ## download file
-    if bucket not in [current_app.config.get("S3_REQUEST_BUCKET"), current_app.config.get("S3_REQUEST_BUCKET_V2")]:
-        secret = get_encryption_key(project)
-    else:
-        secret = current_app.config.get('FILE_ENCRYPTION_KEY')
-
-    try:
-        decrypted, key = get_content_and_key_from_s3(
-            bucket, key_name, conn_name, decrypt=secret, secret=secret)
-    except S3ResponseError as e:
-        current_app.logger.exception('Project id {} get task file {} {}'.format(project_id, key_name, e))
-        if e.error_code == 'NoSuchKey':
-            raise NotFound('File Does Not Exist')
-        else:
-            raise InternalServerError('An Error Occurred')
+    decrypted, key = read_encrypted_file(store, project, bucket, key_name)
 
     response = Response(decrypted, content_type=key.content_type)
     if hasattr(key, "content_encoding") and key.content_encoding:
@@ -123,7 +107,7 @@ def encrypted_workflow_file(store, bucket, workflow_uid, project_id, path):
     key_name = '/workflow_request/{}/{}/{}'.format(workflow_uid, project_id, path)
     signature = request.args.get('task-signature')
     current_app.logger.info('Project id {} decrypt workflow file. {}'.format(project_id, path))
-    return read_encrypted_file(store, project_id, bucket, key_name, signature)
+    return read_encrypted_file_with_signature(store, project_id, bucket, key_name, signature)
 
 
 @blueprint.route('/encrypted/<string:store>/<string:bucket>/<int:project_id>/<path:path>')
@@ -135,40 +119,7 @@ def encrypted_file(store, bucket, project_id, path):
     signature = request.args.get('task-signature')
     current_app.logger.info('Project id {} decrypt file. {}'.format(project_id, path))
     current_app.logger.info("store %s, bucket %s, project_id %s, path %s", store, bucket, str(project_id), path)
-    return read_encrypted_file(store, project_id, bucket, key_name, signature)
-
-
-def get_path(dict_, path):
-    if not path:
-        return dict_
-    return get_path(dict_[path[0]], path[1:])
-
-
-def get_secret_from_vault(project_encryption):
-    config = current_app.config['VAULT_CONFIG']
-    res = requests.get(config['url'].format(**project_encryption), **config['request'])
-    res.raise_for_status()
-    data = res.json()
-    try:
-        return get_path(data, config['response'])
-    except Exception:
-        raise RuntimeError(get_path(data, config['error']))
-
-
-def get_project_encryption(project):
-    encryption_jpath = current_app.config.get('ENCRYPTION_CONFIG_PATH')
-    if not encryption_jpath:
-        return None
-    data = project['info']
-    for segment in encryption_jpath:
-        data = data.get(segment, {})
-    return data
-
-
-def get_encryption_key(project):
-    project_encryption = get_project_encryption(project)
-    if project_encryption:
-        return get_secret_from_vault(project_encryption)
+    return read_encrypted_file_with_signature(store, project_id, bucket, key_name, signature)
 
 
 def encrypt_task_response_data(task_id, project_id, data):
