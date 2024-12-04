@@ -1864,7 +1864,7 @@ class TestMapLocations(Test):
             return upref_mdata.country_name_to_country_code.get(country)
 
         def get_country_name_by_country_code(country_code):
-            upref_mdata.country_code_to_country_name.get(country_code)
+            return upref_mdata.country_code_to_country_name.get(country_code)
 
         upref_mdata.get_country_code_by_country_name = get_country_code_by_country_name
         upref_mdata.get_country_name_by_country_code = get_country_name_by_country_code
@@ -1905,7 +1905,8 @@ class TestMapLocations(Test):
         expected_locations = ['XX']
         mapped_locations = util.map_locations(input_locations)
 
-        assert mapped_locations['locations'] == expected_locations
+        assert mapped_locations['locations'] == expected_locations, \
+        (mapped_locations, expected_locations)
 
     @with_context
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
