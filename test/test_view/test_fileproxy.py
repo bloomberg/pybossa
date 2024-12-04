@@ -198,7 +198,7 @@ class TestFileproxy(web.Helper):
     @with_context
     @patch('pybossa.cloud_store_api.s3.create_connection')
     @patch('pybossa.view.fileproxy.has_lock')
-    @patch('pybossa.view.fileproxy.get_secret_from_vault')
+    @patch('pybossa.task_creator_helper.get_secret_from_vault')
     def test_file_user_key_from_vault(self, get_secret, has_lock, create_connection):
         has_lock.return_value = True
         admin, owner, user = UserFactory.create_batch(3)
