@@ -16,10 +16,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
+import unittest
+
 from test import Test, assert_not_raises, with_context
 from pybossa.auth import ensure_authorized_to
 from nose.tools import assert_raises
-from werkzeug.exceptions import Forbidden, Unauthorized
+from werkzeug.exceptions import Forbidden, Unauthorized, Locked
 from unittest.mock import patch
 from test.test_authorization import mock_current_user
 from test.factories import ProjectFactory, UserFactory, TaskFactory
@@ -96,6 +98,18 @@ class TestProjectAuthorization(Test):
 
         assert project.owner.id != self.mock_authenticated.id, project.owner
         assert_raises(Forbidden, ensure_authorized_to, 'read', project)
+
+    @with_context
+    @patch('pybossa.auth.current_user', new=mock_authenticated)
+    def test_forbidden_code_override_423(self):
+        """Test forbidden code override throws the correct error"""
+        project = ProjectFactory.create(published=False)
+
+        assert project.owner.id != self.mock_authenticated.id, project.owner
+        testcase = unittest.TestCase()
+        with testcase.assertRaises(Locked):
+            ensure_authorized_to('read', project, forbidden_code_override=423)
+
 
     @with_context
     @patch('pybossa.auth.current_user', new=mock_authenticated)

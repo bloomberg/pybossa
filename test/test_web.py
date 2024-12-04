@@ -31,7 +31,7 @@ from test import db, Fixtures, with_context, with_context_settings, \
 from test.helper import web
 from test.test_authorization import mock_current_user
 from unittest.mock import patch, Mock, call, MagicMock
-from flask import redirect
+from flask import redirect, abort
 from itsdangerous import BadSignature
 from pybossa.util import get_user_signup_method, unicode_csv_reader
 from bs4 import BeautifulSoup
@@ -61,7 +61,7 @@ import six
 from pybossa.view.account import get_user_data_as_form
 from pybossa.cloud_store_api.s3 import upload_json_data
 from pybossa.task_creator_helper import get_gold_answers
-
+from pybossa.core import setup_error_handlers
 
 class TestWeb(web.Helper):
     pkg_json_not_found = {
@@ -11602,3 +11602,22 @@ class TestServiceRequest(web.Helper):
         )
         data = json.loads(res.data)
         assert data.get("status_code") == 403, data
+
+class TestErrorHandlers(web.Helper):
+    @with_context
+    def test_locked_handler(self):
+        setup_error_handlers(self.flask_app)
+
+        @self.flask_app.route("/locked")
+        def locked_route():
+            abort(423)
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            res = self.app.get("/locked")
+            assert res.status_code == 423
+            assert 'Private GIGwork' in str(res.data)
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': False}):
+            res = self.app.get("/locked")
+            assert res.status_code == 423
+            assert 'Public GIGwork' in str(res.data)

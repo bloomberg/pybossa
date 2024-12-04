@@ -30,11 +30,11 @@ This module exports the following variables:
     * UNAUTHORIZED
 
 """
-from werkzeug.exceptions import Forbidden, Unauthorized, InternalServerError
+from werkzeug.exceptions import Forbidden, Unauthorized, InternalServerError, Locked
 from werkzeug.exceptions import NotFound, BadRequest
 
 __all__ = ['SUCCESS', 'ERROR', 'WARNING', 'FORBIDDEN', 'NOTFOUND', 'BADREQUEST',
-           'INFO', 'FAILED', 'NOTFOUND', 'INTERNALSERVERERROR', 'UNAUTHORIZED']
+           'INFO', 'FAILED', 'NOTFOUND', 'INTERNALSERVERERROR', 'UNAUTHORIZED', 'LOCKED']
 
 SUCCESS = "success"
 
@@ -48,6 +48,8 @@ FAILED = "failed"
 
 FORBIDDEN = Forbidden.description
 
+LOCKED = Locked.description
+
 NOTFOUND = NotFound.description
 
 BADREQUEST = BadRequest.description
@@ -60,6 +62,7 @@ assert SUCCESS
 assert ERROR
 assert WARNING
 assert FORBIDDEN
+assert LOCKED
 assert NOTFOUND
 assert BADREQUEST
 assert INTERNALSERVERERROR

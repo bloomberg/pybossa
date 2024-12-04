@@ -581,6 +581,12 @@ def setup_error_handlers(app):
                         description=UNAUTHORIZED)
         return handle_content_type(response)
 
+    @app.errorhandler(423)
+    def _locked(e):
+        response = dict(template='423.html', code=423,
+                        private_instance=app.config.get('PRIVATE_INSTANCE'),
+                        description=LOCKED)
+        return handle_content_type(response)
 
 def setup_hooks(app):
     """Setup hooks."""
