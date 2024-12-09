@@ -584,9 +584,13 @@ def setup_error_handlers(app):
 
     @app.errorhandler(423)
     def _locked(e):
+        short_name = request.view_args.get('short_name')
+        project = project_repo.get_by_shortname(short_name)
+        owner = project.owner.name
         response = dict(template='423.html', code=423,
                         private_instance=app.config.get('PRIVATE_INSTANCE'),
-                        description=LOCKED)
+                        description=LOCKED,
+                        owner=owner)
         return handle_content_type(response)
 
 def setup_hooks(app):
