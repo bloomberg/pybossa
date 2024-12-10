@@ -958,11 +958,19 @@ def export_tasks(current_user_email_addr, short_name,
             with export_fn(project, ty, expanded, filters, disclose_gold) as fp:
                 filename = fp.filename
                 content = fp.read()
-            data = project.info
-            bucket_name = current_app.config.get('EXPORT_BUCKET')
-            max_size = current_app.config.get('EXPORT_MAX_SIZE', float('Inf'))
 
-            if len(content) > max_size and bucket_name:
+            bucket_name = current_app.config.get('EXPORT_BUCKET')
+            max_email_size = current_app.config.get('EXPORT_MAX_EMAIL_SIZE', float('Inf'))
+            max_s3_upload_size = current_app.config.get('EXPORT_MAX_UPLOAD_SIZE', float('Inf'))
+
+            if len(content) > max_s3_upload_size:
+                current_app.logger.info(f"task export exceeded max size. Project ID: {project.id}, Size: {len(content)}")
+                mail_dict['subject'] = 'Data export exceeded max file size: {0}'.format(project.name)
+                msg = '<p>Your export exceeded the maximum file upload size. ' + \
+                    'Please try again with a smaller subset of tasks or ' + \
+                    'reach out to a {0} administrator for help.</p>'
+                msg = msg.format(current_app.config.get('BRAND'))
+            elif len(content) > max_email_size and bucket_name:
                 current_app.logger.info(f"uploading exporting tasks to s3 for project {project.id}")
                 conn_kwargs = current_app.config.get('S3_EXPORT_CONN', {})
                 conn = create_connection(**conn_kwargs)
@@ -979,7 +987,7 @@ def export_tasks(current_user_email_addr, short_name,
                 mail_dict['attachments'] = [Attachment(filename, "application/zip", content)]
 
             current_app.logger.info(
-                'Tasks exported successfully - Project: {0}'.format(project.name))
+                'Tasks export completed - Project: {0}'.format(project.name))
         else:
             # Failure email
             mail_dict['subject'] = 'Data export failed for your project: {0}'.format(project.name)
