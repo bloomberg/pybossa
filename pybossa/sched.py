@@ -64,7 +64,6 @@ def new_task(project_id, sched, user_id=None, user_ip=None,
     sched_map = {
         'default': get_locked_task,
         Schedulers.locked: get_locked_task,
-        'incremental': get_incremental_task,
         Schedulers.user_pref: get_user_pref_task,
         Schedulers.task_queue: get_user_pref_task
     }
@@ -132,72 +131,6 @@ def after_save(task_run, conn):
     if is_locking_scheduler(scheduler):
         release_lock(task_run.task_id, uid, TIMEOUT)
         release_reserve_task_lock_by_id(task_run.project_id, task_run.task_id, uid, TIMEOUT)
-
-
-def get_incremental_task(project_id, user_id=None, user_ip=None,
-                         external_uid=None, offset=0, limit=1, orderby='id',
-                         desc=False, **kwargs):
-    """Get a new task for a given project with its last given answer.
-
-    It is an important strategy when dealing with large tasks, as
-    transcriptions.
-    """
-    candidate_tasks = get_candidate_task_ids(project_id, user_id, user_ip,
-                                                external_uid, limit, offset,
-                                                orderby='priority_0', desc=True)
-    total_remaining = len(candidate_tasks)
-    if total_remaining == 0:
-        return None
-    rand = random.randrange(0, total_remaining)
-    task = candidate_tasks[rand]
-    # Find last answer for the task
-    q = session.query(TaskRun)\
-        .filter(TaskRun.task_id == task.id)\
-        .order_by(TaskRun.finish_time.desc())
-    last_task_run = q.first()
-    if last_task_run:
-        task.info['last_answer'] = last_task_run.info
-        # TODO: As discussed in GitHub #53
-        # it is necessary to create a lock in the task!
-    return [task]
-
-
-def get_candidate_task_ids(project_id, user_id=None, user_ip=None,
-                           external_uid=None, limit=1, offset=0,
-                           orderby='priority_0', desc=True, completed=True):
-    """Get all available tasks for a given project and user."""
-    data = None
-    if user_id and not user_ip and not external_uid:
-        subquery = session.query(TaskRun.task_id).filter_by(project_id=project_id, user_id=user_id)
-    else:
-        if not user_ip:
-            user_ip = '127.0.0.1'
-        if user_ip and not external_uid:
-            subquery = session.query(TaskRun.task_id).filter_by(project_id=project_id, user_ip=user_ip)
-        else:
-            subquery = session.query(TaskRun.task_id).filter_by(project_id=project_id, external_uid=external_uid)
-
-    query = (
-        session.query(Task)
-        .filter(and_(~Task.id.in_(subquery.subquery()),
-                    Task.project_id == project_id,
-                    Task.state != 'completed',
-                    Task.state != 'enrich'))
-        .filter(or_(Task.expiration == None, Task.expiration > datetime.utcnow()))
-
-        if completed else # completed means filter out completed
-
-        session.query(Task)
-        .filter(and_(
-            ~Task.id.in_(subquery.subquery()),
-            Task.project_id == project_id,
-            Task.state != 'enrich'
-        ))
-    )
-
-    query = _set_orderby_desc(query, orderby, desc)
-    data = query.limit(limit).offset(offset).all()
-    return _handle_tuples(data)
 
 
 def locked_scheduler(query_factory):
@@ -805,32 +738,3 @@ def randomizable_scheds():
     if DEFAULT_SCHEDULER in scheds:
         scheds.append('default')
     return scheds
-
-
-def _set_orderby_desc(query, orderby, descending):
-    """Set order by to query."""
-    if orderby == 'fav_user_ids':
-        n_favs = func.coalesce(func.array_length(Task.fav_user_ids, 1), 0).label('n_favs')
-        query = query.add_column(n_favs)
-        if descending:
-            query = query.order_by(desc("n_favs"))
-        else:
-            query = query.order_by("n_favs")
-    else:
-        if descending:
-            query = query.order_by(getattr(Task, orderby).desc())
-        else:
-            query = query.order_by(getattr(Task, orderby).asc())
-    query = query.order_by(Task.id.asc())
-    return query
-
-
-def _handle_tuples(data):
-    """Handle tuples when query returns several columns."""
-    tmp = []
-    for datum in data:
-        if isinstance(datum, DomainObject):
-            tmp.append(datum)
-        else:
-            tmp.append(datum[0])
-    return tmp
