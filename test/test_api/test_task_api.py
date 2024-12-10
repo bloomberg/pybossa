@@ -21,7 +21,6 @@ from unittest.mock import patch, call
 from nose.tools import assert_equal
 
 from pybossa.api.task import TaskAPI
-from pybossa.model.counter import Counter
 from pybossa.repositories import ProjectRepository
 from pybossa.repositories import ResultRepository
 from pybossa.repositories import TaskRepository

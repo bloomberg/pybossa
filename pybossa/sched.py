@@ -23,7 +23,6 @@ from sqlalchemy.sql import and_, or_
 from pybossa.model import DomainObject
 from pybossa.model.task import Task
 from pybossa.model.task_run import TaskRun
-from pybossa.model.counter import Counter
 from pybossa.core import db, sentinel, project_repo, task_repo
 from .redis_lock import (LockManager, get_active_user_key, get_user_tasks_key,
                          get_task_users_key, get_task_id_project_id_key,
@@ -64,12 +63,9 @@ def new_task(project_id, sched, user_id=None, user_ip=None,
     """Get a new task by calling the appropriate scheduler function."""
     sched_map = {
         'default': get_locked_task,
-        'breadth_first': get_breadth_first_task,
-        'depth_first': get_depth_first_task,
         Schedulers.locked: get_locked_task,
         'incremental': get_incremental_task,
         Schedulers.user_pref: get_user_pref_task,
-        'depth_first_all': get_depth_first_all_task,
         Schedulers.task_queue: get_user_pref_task
     }
     scheduler = sched_map.get(sched, sched_map['default'])
@@ -136,59 +132,6 @@ def after_save(task_run, conn):
     if is_locking_scheduler(scheduler):
         release_lock(task_run.task_id, uid, TIMEOUT)
         release_reserve_task_lock_by_id(task_run.project_id, task_run.task_id, uid, TIMEOUT)
-
-
-def get_breadth_first_task(project_id, user_id=None, user_ip=None,
-                           external_uid=None, offset=0, limit=1, orderby='id',
-                           desc=False, **kwargs):
-    """Get a new task which have the least number of task runs."""
-    project_query = session.query(Task.id).filter(Task.project_id==project_id,
-                                                  Task.state!='completed',
-                                                  Task.state!='enrich')
-    if user_id and not user_ip and not external_uid:
-        subquery = session.query(TaskRun.task_id).filter_by(project_id=project_id,
-                                                            user_id=user_id)
-    else:
-        if not user_ip:  # pragma: no cover
-            user_ip = '127.0.0.1'
-        if user_ip and not external_uid:
-            subquery = session.query(TaskRun.task_id).filter_by(project_id=project_id,
-                                                                user_ip=user_ip)
-        else:
-            subquery = session.query(TaskRun.task_id).filter_by(project_id=project_id,
-                                                                external_uid=external_uid)
-
-    tmp = project_query.except_(subquery)
-    query = session.query(Task, func.sum(Counter.n_task_runs).label('n_task_runs'))\
-                   .filter(Task.id==Counter.task_id)\
-                   .filter(Counter.task_id.in_(tmp))\
-                   .filter(or_(Task.expiration == None, Task.expiration > datetime.utcnow()))\
-                   .group_by(Task.id)\
-                   .order_by(text('n_task_runs ASC'))\
-
-    query = _set_orderby_desc(query, orderby, desc)
-    data = query.limit(limit).offset(offset).all()
-    return _handle_tuples(data)
-
-
-def get_depth_first_task(project_id, user_id=None, user_ip=None,
-                         external_uid=None, offset=0, limit=1,
-                         orderby='priority_0', desc=True, **kwargs):
-    """Get a new task for a given project."""
-    tasks = get_candidate_task_ids(project_id, user_id,
-                                   user_ip, external_uid, limit, offset,
-                                   orderby=orderby, desc=desc)
-    return tasks
-
-
-def get_depth_first_all_task(project_id, user_id=None, user_ip=None,
-                             external_uid=None, offset=0, limit=1,
-                             orderby='priority_0', desc=True, **kwargs):
-    """Get a new task for a given project."""
-    tasks = get_candidate_task_ids(project_id, user_id,
-                                   user_ip, external_uid, limit, offset,
-                                   orderby=orderby, desc=desc, completed=False)
-    return tasks
 
 
 def get_incremental_task(project_id, user_id=None, user_ip=None,
@@ -850,11 +793,9 @@ def get_project_scheduler(project_id, conn):
 
 
 def sched_variants():
-    return [('default', 'Default'), ('breadth_first', 'Breadth First'),
-            ('depth_first', 'Depth First'),
+    return [('default', 'Default'),
             (Schedulers.locked, 'Locked'),
             (Schedulers.user_pref, 'User Preference Scheduler'),
-            ('depth_first_all', 'Depth First All'),
             (Schedulers.task_queue, 'Task Queues')
             ]
 
