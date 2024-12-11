@@ -152,7 +152,7 @@ class TestExport(Test):
         key.generate_url.return_value = 'https://s3.com/buck/key'
 
         with patch.dict(self.flask_app.config, {
-            'EXPORT_MAX_SIZE': 0,
+            'EXPORT_MAX_EMAIL_SIZE': 0,
             'EXPORT_BUCKET': 'export-bucket'
         }):
             export_tasks(user.email_addr, project.short_name, 'consensus', False, 'csv')
@@ -180,7 +180,7 @@ class TestExport(Test):
         key.generate_url.return_value = 'https://s3.com/buck/key'
 
         with patch.dict(self.flask_app.config, {
-            'EXPORT_MAX_SIZE': 0,
+            'EXPORT_MAX_EMAIL_SIZE': 0,
             'EXPORT_BUCKET': 'export-bucket'
         }):
             export_tasks(user.email_addr, project.short_name, 'consensus', False, 'csv')
@@ -216,3 +216,29 @@ class TestExport(Test):
         message = args[0]
         assert message.recipients[0] == user.email_addr, message.recipients
         assert 'Email delivery failed for your project' in message.subject
+
+    @with_context
+    @patch('pybossa.jobs.mail')
+    @patch('pybossa.jobs.create_connection')
+    def test_export_size_limit(self, create_conn, mail):
+        """Test JOB export_tasks to bucket works."""
+        user = UserFactory.create(admin=True)
+        project = ProjectFactory.create(name='test_project', info={'export-bucket': 'buck'})
+        task = TaskFactory.create(project=project)
+        task_run = TaskRunFactory.create(project=project, task=task)
+        conn = create_conn.return_value
+        buck = conn.get_bucket.return_value
+        key = buck.new_key.return_value
+        key.generate_url.return_value = 'https://s3.com/buck/key'
+
+        with patch.dict(self.flask_app.config, {
+            'EXPORT_MAX_UPLOAD_SIZE': 0,
+            'EXPORT_BUCKET': 'export-bucket'
+        }):
+            export_tasks(user.email_addr, project.short_name, 'consensus', False, 'csv')
+        args, kwargs = mail.send.call_args
+        message = args[0]
+        assert message.recipients[0] == user.email_addr, message.recipients
+        assert message.subject == 'Data export exceeded max file size: test_project', message.subject
+        assert not message.attachments
+        assert 'https://s3.com/buck/key' not in message.html
