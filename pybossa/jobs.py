@@ -964,7 +964,8 @@ def export_tasks(current_user_email_addr, short_name,
             max_s3_upload_size = current_app.config.get('EXPORT_MAX_UPLOAD_SIZE', float('Inf'))
 
             if len(content) > max_s3_upload_size:
-                current_app.logger.info("task export exceeded max size. Project ID: %s, Size: %d", project.id, len(content))
+                current_app.logger.info("Task export project id %s: Task export exceeded max size %d, actual size: %d",
+                                        project.id, max_s3_upload_size, len(content))
                 mail_dict['subject'] = 'Data export exceeded max file size: {0}'.format(project.name)
                 msg = '<p>Your export exceeded the maximum file upload size. ' + \
                     'Please try again with a smaller subset of tasks'
@@ -978,14 +979,15 @@ def export_tasks(current_user_email_addr, short_name,
                 key.set_contents_from_string(content)
                 expires_in = current_app.config.get('EXPORT_EXPIRY', 12 * 3600)
                 url = key.generate_url(expires_in)
-                current_app.logger.info("uploading to s3 done for project %s", project.id)
+                current_app.logger.info("Task export project id %s: Exported file uploaded to s3 %s",
+                                        project.id, url)
                 msg = '<p>You can download your file <a href="{}">here</a>.</p>'.format(url)
             else:
                 msg = '<p>Your exported data is attached.</p>'
                 mail_dict['attachments'] = [Attachment(filename, "application/zip", content)]
+                current_app.logger.info("Task export project id %s. Exported file attached to email to send",
+                                        project.id)
 
-            current_app.logger.info(
-                'Tasks export completed - Project: %s', project.name)
         else:
             # Failure email
             mail_dict['subject'] = 'Data export failed for your project: {0}'.format(project.name)
