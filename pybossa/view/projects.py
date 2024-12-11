@@ -1324,7 +1324,7 @@ def task_presenter(short_name, task_id, task_submitter_id=None):
     """
     mode = request.args.get('mode')
     project, owner, ps = project_by_shortname(short_name)
-    ensure_authorized_to('read', project)
+    ensure_authorized_to('read', project, forbidden_code_override=423)
     task = task_repo.get_task(id=task_id)
     if task is None:
         raise abort(404)
@@ -1333,7 +1333,7 @@ def task_presenter(short_name, task_id, task_submitter_id=None):
         if redirect_to_password:
             return redirect_to_password
     else:
-        ensure_authorized_to('read', project)
+        ensure_authorized_to('read', project, forbidden_code_override=423)
 
     if current_user.is_anonymous:
         if not project.allow_anonymous_contributors:
@@ -1465,7 +1465,7 @@ def presenter(short_name):
     project, owner, ps = project_by_shortname(short_name)
     project.timeout = project.info.get('timeout', DEFAULT_TASK_TIMEOUT)
 
-    ensure_authorized_to('read', project)
+    ensure_authorized_to('read', project, forbidden_code_override=423)
 
     if project.needs_password():
         redirect_to_password = _check_if_redirect_to_password(project)
@@ -1532,7 +1532,7 @@ def presenter(short_name):
 @blueprint.route('/<short_name>/tutorial')
 def tutorial(short_name):
     project, owner, ps = project_by_shortname(short_name)
-    ensure_authorized_to('read', project)
+    ensure_authorized_to('read', project, forbidden_code_override=423)
     title = project_title(project, "Tutorial")
 
     if project.needs_password():
@@ -1631,7 +1631,7 @@ def _get_locks(project_id, task_id):
 @login_required
 def tasks(short_name):
     project, owner, ps = project_by_shortname(short_name)
-    ensure_authorized_to('read', project)
+    ensure_authorized_to('read', project, forbidden_code_override=423)
     title = project_title(project, "Tasks")
 
     if project.needs_password():
@@ -1671,7 +1671,7 @@ def tasks(short_name):
 @login_required
 def tasks_browse(short_name, page=1, records_per_page=None):
     project, owner, ps = project_by_shortname(short_name)
-    ensure_authorized_to('read', project)
+    ensure_authorized_to('read', project, forbidden_code_override=423)
 
     title = project_title(project, "Tasks")
     pro = pro_features()
@@ -2584,7 +2584,7 @@ def task_settings(short_name):
     """Settings page for tasks of the project"""
     project, owner, ps = project_by_shortname(short_name)
 
-    ensure_authorized_to('read', project)
+    ensure_authorized_to('read', project, forbidden_code_override=423)
     ensure_authorized_to('update', project)
     pro = pro_features()
     project = add_custom_contrib_button_to(project, get_user_id_or_ip(), ps=ps)
@@ -2815,7 +2815,7 @@ def task_timeout(short_name):
     title = project_title(project, gettext('Timeout'))
     form = TaskTimeoutForm(request.body) if request.data else TaskTimeoutForm()
 
-    ensure_authorized_to('read', project)
+    ensure_authorized_to('read', project, forbidden_code_override=423)
     ensure_authorized_to('update', project)
     pro = pro_features()
     if request.method == 'GET':
