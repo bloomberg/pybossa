@@ -3586,7 +3586,7 @@ class TestWeb(web.Helper):
 
     @with_context
     def test_task_presenter_with_allow_taskrun_edit_raises_forbidden(self):
-        """Test WEB with taskrun edit permitted, task_submitter_id not passed raises 403"""
+        """Test WEB with taskrun edit permitted, task_submitter_id not passed raises 423"""
         self.register()
         self.signin()
         self.create()
@@ -3613,7 +3613,7 @@ class TestWeb(web.Helper):
         user_repo.save(regular_user)
         self.signin(email=regular_user.email_addr, password='1234')
         res = self.app.get('/project/%s/task/%s' % (project_short_name, task.id))
-        assert res.status_code == 403, res.status_code
+        assert res.status_code == 423, res.status_code
 
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
@@ -7762,7 +7762,7 @@ class TestWeb(web.Helper):
         self.signin(email="juan@example.com", password="p4ssw0rd")
         res = self.app.get(url, follow_redirects=True)
         err_msg = "User should not be allowed to access this page"
-        assert res.status_code == 403, err_msg
+        assert res.status_code == 423, err_msg
         self.signout()
 
         # As an anonymous user
