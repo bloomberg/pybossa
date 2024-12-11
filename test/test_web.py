@@ -7827,7 +7827,7 @@ class TestWeb(web.Helper):
         for i in range(0, 1):
             if i == 0:
                 self.signin()
-                sched = 'depth_first'
+                sched = 'locked_scheduler'
             else:
                 sched = 'default'
                 self.signin()
@@ -7868,6 +7868,10 @@ class TestWeb(web.Helper):
         self.new_project()
         url = "/project/sampleapp/tasks/scheduler"
         form_id = 'task_scheduler'
+        supported_schedulers = [
+            'default', 'locked_scheduler', 'user_pref_scheduler', 'task_queue_scheduler',
+            'userPrefLang', 'userPrefLoc'
+        ]
         from pybossa.core import setup_schedulers
 
         try:
@@ -7901,7 +7905,9 @@ class TestWeb(web.Helper):
         options = dom.find_all('option')
         scheds = [o.attrs['value'] for o in options]
         assert 'user_pref_scheduler' in scheds
-        assert 'breadth_first' in scheds
+
+        all_enabled_schedulers = all([sched in supported_schedulers for sched in scheds])
+        assert all_enabled_schedulers, scheds
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -7918,7 +7924,7 @@ class TestWeb(web.Helper):
             if i == 0:
                 # As owner
                 new_url = url + '?api_key=%s' % owner.api_key
-                sched = 'depth_first'
+                sched = 'locked_scheduler'
             else:
                 new_url = url + '?api_key=%s' % admin.api_key
                 sched = 'default'
