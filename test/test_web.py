@@ -11822,19 +11822,29 @@ class TestServiceRequest(web.Helper):
 
 class TestErrorHandlers(web.Helper):
     @with_context
-    def test_locked_handler(self):
+    @patch('pybossa.core.project_repo.get_by_shortname')
+    def test_locked_handler(self, get_by_shortname):
         setup_error_handlers(self.flask_app)
 
         @self.flask_app.route("/locked")
         def locked_route():
             abort(423)
 
+        owner_name = "My Project Owner"
+        admin = UserFactory.create(admin=True, name=owner_name)
+        get_by_shortname.return_value = ProjectFactory.create(owner=admin)
         with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
             res = self.app.get("/locked")
+            res_str = str(res.data)
+
             assert res.status_code == 423
-            assert 'Private GIGwork' in str(res.data)
+            assert 'Private GIGwork' in res_str
+            assert owner_name in res_str
 
         with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': False}):
             res = self.app.get("/locked")
+            res_str = str(res.data)
+
             assert res.status_code == 423
             assert 'Public GIGwork' in str(res.data)
+            assert owner_name in res_str
