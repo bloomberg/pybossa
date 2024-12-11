@@ -1265,7 +1265,7 @@ def delete_autoimporter(short_name):
 @login_required
 def password_required(short_name):
     project, owner, ps = project_by_shortname(short_name)
-    ensure_authorized_to('read', project)
+    ensure_authorized_to('read', project, forbidden_code_override=423)
     form = PasswordForm(request.form)
 
     # if is_own_url_or_else returns None, use the default url.
