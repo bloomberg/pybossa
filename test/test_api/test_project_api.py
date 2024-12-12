@@ -2559,3 +2559,31 @@ class TestProjectAPI(TestAPI):
         res = self.app.get('/api/project/testproject/projectprogress', follow_redirects=True, headers=headers)
         assert res.status_code == 200
         assert res.json == dict(n_completed_tasks=3, n_tasks=3)
+
+
+    @with_context
+    def test_clone_project(self):
+        """Test API clone project works"""
+        [admin, subadminowner, subadmin, reguser] = UserFactory.create_batch(4)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+        make_subadmin(subadmin)
+
+        project = ProjectFactory.create(owner=subadminowner, short_name="testproject")
+        tasks = TaskFactory.create_batch(3, project=project)
+        headers = [('Authorization', subadminowner.api_key)]
+
+        # check 404 response when no project param
+        res = self.app.post('/api/project//clone', follow_redirects=True, headers=headers)
+        error_msg = "A valid project must be used"
+        assert res.status_code == 404, error_msg
+
+        # check 404 response when the project doesn't exist
+        res = self.app.post('/api/project/9999/clone', follow_redirects=True, headers=headers)
+        error_msg = "A valid project must be used"
+        assert res.status_code == 404, error_msg
+
+        # check 404 response when the project doesn't exist
+        res = self.app.post('/api/project/xyz/clone', follow_redirects=True, headers=headers)
+        error_msg = "A valid project must be used"
+        assert res.status_code == 404, error_msg
