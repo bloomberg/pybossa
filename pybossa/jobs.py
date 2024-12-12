@@ -963,7 +963,7 @@ def export_tasks(current_user_email_addr, short_name,
             max_email_size = current_app.config.get('EXPORT_MAX_EMAIL_SIZE', float('Inf'))
             max_s3_upload_size = current_app.config.get('EXPORT_MAX_UPLOAD_SIZE', float('Inf'))
 
-            if len(content) > max_s3_upload_size:
+            if len(content) > max_s3_upload_size and bucket_name:
                 current_app.logger.info("Task export project id %s: Task export exceeded max size %d, actual size: %d",
                                         project.id, max_s3_upload_size, len(content))
                 mail_dict['subject'] = 'Data export exceeded max file size: {0}'.format(project.name)
