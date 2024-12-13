@@ -2562,14 +2562,16 @@ class TestProjectAPI(TestAPI):
 
 
     @with_context
-    def test_clone_project(self):
-        """Test API clone project works"""
+    def test_clone_project_access(self):
+        """Test API clone project access control and edge cases"""
         [admin, subadminowner, subadmin, reguser] = UserFactory.create_batch(4)
         make_admin(admin)
         make_subadmin(subadminowner)
         make_subadmin(subadmin)
 
-        project = ProjectFactory.create(owner=subadminowner, short_name="testproject")
+        short_name = "testproject"
+
+        project = ProjectFactory.create(owner=subadminowner, short_name=short_name)
         tasks = TaskFactory.create_batch(3, project=project)
         headers = [('Authorization', subadminowner.api_key)]
 
@@ -2587,3 +2589,19 @@ class TestProjectAPI(TestAPI):
         res = self.app.post('/api/project/xyz/clone', follow_redirects=True, headers=headers)
         error_msg = "A valid project must be used"
         assert res.status_code == 404, error_msg
+
+        # check 401 response when user not logged in
+        res = self.app.post('/api/project/xyz/clone', follow_redirects=True)
+        error_msg = "User must be logged in"
+        assert res.status_code == 401, error_msg
+
+        # check 400 response when user does not post a payload
+        res = self.app.post(f'/api/project/{short_name}/clone', follow_redirects=True)
+        error_msg = "User must post valid payload"
+        assert res.status_code == 400, error_msg
+
+        # check 401 response when use is not authorized
+        headers = [('Authorization', reguser.api_key)]
+        res = self.app.post('/api/project/xyz/clone', follow_redirects=True)
+        error_msg = "User must have permissions"
+        assert res.status_code == 401, error_msg
