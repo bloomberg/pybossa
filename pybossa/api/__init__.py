@@ -1049,6 +1049,10 @@ def project_clone(project_id=None, short_name=None):
     # User must post a payload
     if not payload:
         return abort(400)
+    # check required fields
+    if not (payload.get('input_data_class') and payload.get('output_data_class') \
+        and payload.get('name') and payload.get('short_name')):
+        return abort(400)
 
     project.input_data_class = project.info.get('data_classification', {}).get('input_data')
     project.output_data_class = project.info.get('data_classification', {}).get('output_data')

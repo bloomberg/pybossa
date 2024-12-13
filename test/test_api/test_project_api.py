@@ -2576,32 +2576,38 @@ class TestProjectAPI(TestAPI):
         headers = [('Authorization', subadminowner.api_key)]
 
         # check 404 response when no project param
-        res = self.app.post('/api/project//clone', follow_redirects=True, headers=headers)
+        res = self.app.post('/api/project//clone', headers=headers)
         error_msg = "A valid project must be used"
         assert res.status_code == 404, error_msg
 
         # check 404 response when the project doesn't exist
-        res = self.app.post('/api/project/9999/clone', follow_redirects=True, headers=headers)
+        res = self.app.post('/api/project/9999/clone', headers=headers)
         error_msg = "A valid project must be used"
         assert res.status_code == 404, error_msg
 
         # check 404 response when the project doesn't exist
-        res = self.app.post('/api/project/xyz/clone', follow_redirects=True, headers=headers)
+        res = self.app.post('/api/project/xyz/clone', headers=headers)
         error_msg = "A valid project must be used"
         assert res.status_code == 404, error_msg
 
         # check 401 response when user not logged in
-        res = self.app.post('/api/project/xyz/clone', follow_redirects=True)
+        res = self.app.post(f'/api/project/{short_name}/clone')
         error_msg = "User must be logged in"
         assert res.status_code == 401, error_msg
 
         # check 400 response when user does not post a payload
-        res = self.app.post(f'/api/project/{short_name}/clone', follow_redirects=True)
+        res = self.app.post(f'/api/project/{short_name}/clone', headers=headers)
+        error_msg = "User must post valid payload"
+        assert res.status_code == 400, error_msg
+
+        # check 400 response when user posts payload missed req fields
+        data = { "name": "Test Project Clone"}
+        res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data))
         error_msg = "User must post valid payload"
         assert res.status_code == 400, error_msg
 
         # check 401 response when use is not authorized
         headers = [('Authorization', reguser.api_key)]
-        res = self.app.post('/api/project/xyz/clone', follow_redirects=True)
+        res = self.app.post('/api/project/xyz/clone', headers=headers)
         error_msg = "User must have permissions"
         assert res.status_code == 401, error_msg
