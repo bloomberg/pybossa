@@ -365,6 +365,12 @@ TASK_REQUIRED_FIELDS = {
 # TASK_RUN_CSV_EXPORT_INFO_KEY = 'key2'
 # RESULT_CSV_EXPORT_INFO_KEY = 'key3'
 
+# Specify export max content sizes (json or csv)
+# max size of email attachment
+EXPORT_MAX_EMAIL_SIZE = 6 * 1024 * 1024 # 6 MB
+# max size of s3 upload
+EXPORT_MAX_UPLOAD_SIZE = 1024 * 1024 * 1024 # 1 GB
+
 # A 32 char string for AES encryption of public IPs.
 # NOTE: this is really important, don't use the following one
 # as anyone with the source code of pybossa will be able to reverse

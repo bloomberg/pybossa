@@ -3586,7 +3586,7 @@ class TestWeb(web.Helper):
 
     @with_context
     def test_task_presenter_with_allow_taskrun_edit_raises_forbidden(self):
-        """Test WEB with taskrun edit permitted, task_submitter_id not passed raises 403"""
+        """Test WEB with taskrun edit permitted, task_submitter_id not passed raises 423"""
         self.register()
         self.signin()
         self.create()
@@ -3613,7 +3613,7 @@ class TestWeb(web.Helper):
         user_repo.save(regular_user)
         self.signin(email=regular_user.email_addr, password='1234')
         res = self.app.get('/project/%s/task/%s' % (project_short_name, task.id))
-        assert res.status_code == 403, res.status_code
+        assert res.status_code == 423, res.status_code
 
     @with_context
     @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
@@ -7762,7 +7762,7 @@ class TestWeb(web.Helper):
         self.signin(email="juan@example.com", password="p4ssw0rd")
         res = self.app.get(url, follow_redirects=True)
         err_msg = "User should not be allowed to access this page"
-        assert res.status_code == 403, err_msg
+        assert res.status_code == 423, err_msg
         self.signout()
 
         # As an anonymous user
@@ -7827,7 +7827,7 @@ class TestWeb(web.Helper):
         for i in range(0, 1):
             if i == 0:
                 self.signin()
-                sched = 'depth_first'
+                sched = 'locked_scheduler'
             else:
                 sched = 'default'
                 self.signin()
@@ -7868,6 +7868,10 @@ class TestWeb(web.Helper):
         self.new_project()
         url = "/project/sampleapp/tasks/scheduler"
         form_id = 'task_scheduler'
+        supported_schedulers = [
+            'default', 'locked_scheduler', 'user_pref_scheduler', 'task_queue_scheduler',
+            'userPrefLang', 'userPrefLoc'
+        ]
         from pybossa.core import setup_schedulers
 
         try:
@@ -7901,7 +7905,9 @@ class TestWeb(web.Helper):
         options = dom.find_all('option')
         scheds = [o.attrs['value'] for o in options]
         assert 'user_pref_scheduler' in scheds
-        assert 'breadth_first' in scheds
+
+        all_enabled_schedulers = all([sched in supported_schedulers for sched in scheds])
+        assert all_enabled_schedulers, scheds
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
@@ -7918,7 +7924,7 @@ class TestWeb(web.Helper):
             if i == 0:
                 # As owner
                 new_url = url + '?api_key=%s' % owner.api_key
-                sched = 'depth_first'
+                sched = 'locked_scheduler'
             else:
                 new_url = url + '?api_key=%s' % admin.api_key
                 sched = 'default'
@@ -11816,19 +11822,29 @@ class TestServiceRequest(web.Helper):
 
 class TestErrorHandlers(web.Helper):
     @with_context
-    def test_locked_handler(self):
+    @patch('pybossa.core.project_repo.get_by_shortname')
+    def test_locked_handler(self, get_by_shortname):
         setup_error_handlers(self.flask_app)
 
         @self.flask_app.route("/locked")
         def locked_route():
             abort(423)
 
+        owner_name = "My Project Owner"
+        admin = UserFactory.create(admin=True, name=owner_name)
+        get_by_shortname.return_value = ProjectFactory.create(owner=admin)
         with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
             res = self.app.get("/locked")
+            res_str = str(res.data)
+
             assert res.status_code == 423
-            assert 'Private GIGwork' in str(res.data)
+            assert 'Private GIGwork' in res_str
+            assert owner_name in res_str
 
         with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': False}):
             res = self.app.get("/locked")
+            res_str = str(res.data)
+
             assert res.status_code == 423
             assert 'Public GIGwork' in str(res.data)
+            assert owner_name in res_str

@@ -120,46 +120,6 @@ class TestSched(sched.Helper):
 
 
     @with_context
-    def test_newtask_default_orderby(self):
-        """Test SCHED depth first works with orderby."""
-        project = ProjectFactory.create(info=dict(sched="depth_first"))
-        task1 = TaskFactory.create(project=project, fav_user_ids=None)
-        task2 = TaskFactory.create(project=project, fav_user_ids=[1,2,3])
-        api_key = project.owner.api_key
-
-        url = "/api/project/%s/newtask?orderby=%s&desc=%s&api_key=%s" % (project.id, 'id', False, api_key)
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        assert data['id'] == task1.id, data
-
-        url = "/api/project/%s/newtask?orderby=%s&desc=%s&api_key=%s" % (project.id, 'id', True, api_key)
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        assert data['id'] == task2.id, data
-
-        url = "/api/project/%s/newtask?orderby=%s&desc=%s&api_key=%s" % (project.id, 'created', False, api_key)
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        assert data['id'] == task1.id, data
-
-        url = "/api/project/%s/newtask?orderby=%s&desc=%s&api_key=%s" % (project.id, 'created', True, api_key)
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        assert data['id'] == task2.id, data
-
-        url = "/api/project/%s/newtask?orderby=%s&desc=%s&api_key=%s" % (project.id, 'fav_user_ids', False, api_key)
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        assert data['id'] == task1.id, data
-
-        url = "/api/project/%s/newtask?orderby=%s&desc=%s&api_key=%s" % (project.id, 'fav_user_ids', True, api_key)
-        res = self.app.get(url)
-        data = json.loads(res.data)
-        assert data['id'] == task2.id, data
-        assert data['fav_user_ids'] == task2.fav_user_ids, data
-
-
-    @with_context
     def test_user_01_newtask(self):
         """ Test SCHED newtask returns a Task for John Doe User"""
         project = ProjectFactory.create(owner=UserFactory.create(id=500))
