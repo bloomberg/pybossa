@@ -1032,7 +1032,6 @@ def project_clone(project_id=None, short_name=None):
 
     if current_user.is_anonymous:
         return abort(401)
-
     if not (project_id or short_name):
         return abort(404)
     if short_name:
@@ -1041,16 +1040,13 @@ def project_clone(project_id=None, short_name=None):
         project = project_repo.get(project_id)
     if not project:
         return abort(404)
-
     if not (current_user.admin or (current_user.subadmin and current_user.id in project.owners_ids)):
         return abort(401)
 
     payload = json.loads(request.form['request_json']) if 'request_json' in request.form else request.json
-    # User must post a payload
-    if not payload:
-        return abort(400)
+
     # check required fields
-    if not (payload.get('input_data_class') and payload.get('output_data_class') \
+    if not (payload and payload.get('input_data_class') and payload.get('output_data_class') \
         and payload.get('name') and payload.get('short_name')):
         return abort(400)
 
