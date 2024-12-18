@@ -36,6 +36,7 @@ from flask_login import current_user, login_required
 from time import time
 from datetime import datetime, timedelta
 from werkzeug.exceptions import NotFound
+from pybossa.exc.repository import DBIntegrityError
 from pybossa.util import jsonpify, get_user_id_or_ip, fuzzyboolean, \
     PARTIAL_ANSWER_KEY, SavedTaskPositionEnum, PARTIAL_ANSWER_POSITION_KEY, \
     get_user_saved_partial_tasks
@@ -1046,7 +1047,6 @@ def project_clone(project_id=None, short_name=None):
 
     payload = json.loads(request.form['request_json']) if 'request_json' in request.form else request.json
 
-    # check required fields
     if not (payload and payload.get('input_data_class') and payload.get('output_data_class') \
         and payload.get('name') and payload.get('short_name')):
         return abort(400)
@@ -1059,8 +1059,6 @@ def project_clone(project_id=None, short_name=None):
 
     try:
         new_project = clone_project(project, payload)
-        if not new_project:
-            raise Exception("Failed to clone project.")
         current_app.logger.info(
                             current_user,
                             'clone',
@@ -1070,10 +1068,17 @@ def project_clone(project_id=None, short_name=None):
                             )
 
         return Response(json.dumps(new_project.dictize()), status=200, mimetype="application/json")
-    except Exception as e:
+    except DBIntegrityError as e:
         current_app.logger.error(
             'clone',
             'project.clone',
             e.message
+            )
+        raise abort(400, "Duplicate project keys.")
+    except Exception as e:
+        current_app.logger.error(
+            'clone',
+            'project.clone',
+            str(e)
             )
         raise abort(400, "Invalid project metadata.")

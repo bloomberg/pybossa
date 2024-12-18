@@ -2563,7 +2563,7 @@ class TestProjectAPI(TestAPI):
 
     @with_context
     def test_clone_project_access(self):
-        """Test API clone project access control and edge cases"""
+        """Test API clone project access control"""
         [admin, subadminowner, subadmin, reguser] = UserFactory.create_batch(4)
         make_admin(admin)
         make_subadmin(subadminowner)
@@ -2590,19 +2590,75 @@ class TestProjectAPI(TestAPI):
         error_msg = "A valid project must be used"
         assert res.status_code == 404, error_msg
 
+        # check 401 response when use is not authorized
+        headers = [('Authorization', reguser.api_key)]
+        res = self.app.post(f'/api/project/{short_name}/clone', headers=headers)
+        error_msg = "User must have permissions"
+        assert res.status_code == 401, error_msg
+
+        # check 401 response when use is not authorized
+        headers = [('Authorization', subadmin.api_key)]
+        res = self.app.post(f'/api/project/{short_name}/clone', headers=headers)
+        error_msg = "User must have permissions"
+        assert res.status_code == 401, error_msg
+
+
+    @with_context
+    def test_clone_project_edge_cases(self):
+        """Test API clone project edge cases"""
+        [admin, subadminowner] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+
+        short_name = "testproject"
+
+        project = ProjectFactory.create(owner=subadminowner, short_name=short_name)
+        tasks = TaskFactory.create_batch(3, project=project)
+        headers = [('Authorization', subadminowner.api_key)]
+
         # check 400 response when user does not post a payload
         res = self.app.post(f'/api/project/{short_name}/clone', headers=headers)
         error_msg = "User must post valid payload"
         assert res.status_code == 400, error_msg
 
         # check 400 response when user posts payload missed req fields
-        data = { "name": "Test Project Clone"}
+        data = { "name": "Test Project Clone" }
         res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data))
         error_msg = "User must post valid payload"
         assert res.status_code == 400, error_msg
 
-        # check 401 response when use is not authorized
-        headers = [('Authorization', reguser.api_key)]
-        res = self.app.post(f'/api/project/{short_name}/clone', headers=headers)
-        error_msg = "User must have permissions"
-        assert res.status_code == 401, error_msg
+        # test duplicate short name
+        from pybossa.view.projects import data_access_levels
+
+        data = {
+            "name": "Test Project Clone",
+            "short_name": short_name + 'clone',
+            "input_data_class": "L4 - Public Third-Party Data",
+            "output_data_class": "L4 - Public Third-Party Data"
+        }
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=data, content_type='application/json')
+            error_msg = "User must post a unique project short name"
+            assert res.status_code == 400, error_msg
+
+
+    @with_context
+    def test_clone_project_success(self):
+        """Test API clone project success state"""
+        from pybossa.view.projects import data_access_levels
+
+        [admin, subadminowner] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+
+        short_name = "testproject"
+
+        project = ProjectFactory.create(owner=subadminowner, short_name=short_name)
+        tasks = TaskFactory.create_batch(3, project=project)
+        headers = [('Authorization', subadminowner.api_key)]
+
+        data = {'short_name': 'newname', 'name': 'newname', 'password': 'Test123', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public'}
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data), content_type='application/json')
+            error_msg = "Error cloning project"
+            assert res.status_code == 200, error_msg
