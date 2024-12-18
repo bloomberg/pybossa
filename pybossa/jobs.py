@@ -623,54 +623,29 @@ def send_mail(message_dict, mail_all=False):
         if not spam:
             mail.send(message)
 
-def count_records(table, project_id):
+def count_records(table, task_ids):
     from pybossa.core import db
 
-    sql = text('''
-        SELECT COUNT(*) FROM {} WHERE
-        project_id=:project_id;
-        '''.format(table))
-    params = dict(project_id=project_id)
-    return db.session.execute(sql, params).scalar()
+    task_ids_tuple = tuple(task_ids)
+    sql = f"SELECT COUNT(*) FROM {table} WHERE task_id IN :taskids;"
+    response = db.session.execute(sql, {"taskids": task_ids_tuple}).scalar()
+    return response
 
 
-def count_rows_to_delete(project_id):
-    total_task = count_records("task", project_id)
-    total_taskrun = count_records("task_run", project_id)
-    total_result = count_records("result", project_id)
+def count_rows_to_delete(task_ids):
+    total_task = len(task_ids)
+    total_taskrun = count_records("task_run", task_ids)
+    total_result = count_records("result", task_ids)
     return total_task, total_taskrun, total_result
 
 
-def cleanup_task_records(project_id, limit, force_reset, task_filter_args):
+def cleanup_task_records(task_ids, force_reset):
     """Cleanup records associated with task from all related tables."""
 
     from pybossa.core import db
     from pybossa.cache.task_browse_helpers import get_task_filters
 
-    task_ids = []
-    conditions, params = get_task_filters(task_filter_args)
-    params["project_id"] = project_id
-    params["limit"] = limit
-
-    if force_reset:
-        sql = text('''
-            SELECT id FROM task WHERE project_id=:project_id {} LIMIT :limit;
-            '''.format(conditions))
-        tables = ["result", "task_run", "task"]
-    else:
-        sql = text('''
-            SELECT t.id FROM task t
-            LEFT JOIN task_run tr
-            ON t.id = tr.task_id
-            WHERE t.project_id=:project_id AND tr.task_id IS NULL {}
-            LIMIT :limit;
-        '''.format(conditions))
-        tables = ["task"]
-    response = db.session.execute(sql, params).fetchall()
-    task_ids = [id[0] for id in response]
-    if not task_ids:
-        return
-
+    tables = ["result", "task_run", "task"] if force_reset else ["task"]
     current_app.logger.info("Task ids staged for deletion: %s", task_ids)
     task_ids_tuple = tuple(task_ids)
     for table in tables:
@@ -678,14 +653,37 @@ def cleanup_task_records(project_id, limit, force_reset, task_filter_args):
         sql += "WHERE id IN :taskids;" if table == "task" else "WHERE task_id IN :taskids;"
         db.session.execute(sql, {"taskids": task_ids_tuple})
         db.session.commit()
-    current_app.logger.info("Task ids staged deleted from tables %s", tables)
+
+    current_app.logger.info("Total %d tasks deleted from db tables %s", len(task_ids), tables)
+
+def get_tasks_to_delete(project_id, task_filter_args):
+    from pybossa.core import db
+    from pybossa.cache.task_browse_helpers import get_task_filters
+
+    conditions, params = get_task_filters(task_filter_args)
+    sql = text('''
+            SELECT task.id as id,
+                coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
+                priority_0, task.created
+                FROM task LEFT OUTER JOIN
+                (SELECT task_id, CAST(COUNT(id) AS FLOAT) AS ct,
+                MAX(finish_time) as ft FROM task_run
+                WHERE project_id=:project_id GROUP BY task_id) AS log_counts
+                ON task.id=log_counts.task_id
+                WHERE task.project_id=:project_id {}
+                ORDER BY task.id;
+            '''.format(conditions))
+    response = db.bulkdel_session.execute(sql, dict(project_id=project_id, **params)).fetchall()
+    task_ids = [id[0] for id in response]
+    return task_ids
 
 
 def delete_bulk_tasks_in_batches(project_id, force_reset, task_filter_args):
     """Delete bulk tasks in batches from project."""
 
     batch_size = BATCH_SIZE_BULK_DELETE_TASKS
-    total_task, total_taskrun, total_result = count_rows_to_delete(project_id)
+    task_ids = get_tasks_to_delete(project_id, task_filter_args)
+    total_task, total_taskrun, total_result = count_rows_to_delete(task_ids)
     current_app.logger.info("total records to delete. task %d, task_run %d, result %d",
                             total_task, total_taskrun, total_result)
 
@@ -700,9 +698,10 @@ def delete_bulk_tasks_in_batches(project_id, force_reset, task_filter_args):
     total_iterations = max(result_iterations, taskrun_iterations, task_iterations)
     total_iterations = min(total_iterations, MAX_BULK_DELETE_TASK_ITERATIONS)
     for i in range(total_iterations):
-        count_deleted_records = i * batch_size
-        current_app.logger.info("Count of records deleted: %d", count_deleted_records)
-        cleanup_task_records(project_id, limit, force_reset, task_filter_args)
+        start_position = i * batch_size
+        end_position = start_position + batch_size
+        batched_task_ids = task_ids[start_position:end_position]
+        cleanup_task_records(batched_task_ids, force_reset)
         time.sleep(BATCH_DELETE_TASK_DELAY) # allow sql queries other than delete records to execute
 
 

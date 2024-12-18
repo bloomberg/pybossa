@@ -19,7 +19,7 @@ from test import Test, with_context, flask_app, db
 from test.factories import ProjectFactory, UserFactory, TaskFactory
 from pybossa.jobs import delete_bulk_tasks, delete_bulk_tasks_in_batches, cleanup_task_records
 from pybossa.repositories import TaskRepository
-from unittest.mock import patch
+from unittest.mock import patch, call
 
 task_repo = TaskRepository(db)
 
@@ -98,19 +98,29 @@ class TestDeleteTasks(Test):
     def test_cleanup_task_records(self, mock_db):
         """"Test cleanup task pick records to delete and perform cleanup from all tables"""
 
-        project_id = 123
-        limit = 100
+        # with force_reset True, records are cleaned up from task, task_run, result
+        cleanup_tables = ["result", "task_run", "task"]
+        task_ids = [123, 124, 125]
         mock_db.return_value.fetchall.side_effect = [[(1,), (2,), (3,), (4,)]]
-        cleanup_task_records(project_id, limit, force_reset=True, task_filter_args={})
-        mock_db.call_count = 5
+        cleanup_task_records(task_ids, force_reset=True)
+        calls = []
+        for table in cleanup_tables:
+            task_id_col = "id" if table == "task" else "task_id"
+            sql = f"DELETE FROM {table} WHERE {task_id_col} IN :taskids;"
+            calls.append(call(sql, {"taskids": tuple(task_ids)}))
+        mock_db.assert_has_calls(calls, any_order=True)
+        mock_db.call_count == len(cleanup_tables)
 
 
     @with_context
     @patch('pybossa.core.db.session.execute')
     def test_cleanup_task_records_without_force_reset(self, mock_db):
         """"Test cleanup task pick records to delete and perform cleanup from task table"""
-        project_id = 123
-        limit = 100
+        task_ids = [123, 124, 125]
+        cleanup_tables = ["task"]
         mock_db.return_value.fetchall.side_effect = [[(1,), (2,), (3,), (4,)]]
-        cleanup_task_records(project_id, limit, force_reset=False, task_filter_args={})
-        mock_db.call_count = 2
+        cleanup_task_records(task_ids, force_reset=False)
+        sql = "DELETE FROM task WHERE id IN :taskids;"
+        calls = [call(sql, {"taskids": tuple(task_ids)})]
+        mock_db.assert_has_calls(calls, any_order=True)
+        mock_db.call_count == len(cleanup_tables)
