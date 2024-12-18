@@ -1025,6 +1025,7 @@ def get_project_progress(project_id=None, short_name=None):
 
 
 @jsonpify
+@csrf.exempt
 @blueprint.route('/project/<int:project_id>/clone',  methods=['POST'])
 @blueprint.route('/project/<short_name>/clone',  methods=['POST'])
 @login_required
@@ -1050,17 +1051,29 @@ def project_clone(project_id=None, short_name=None):
         and payload.get('name') and payload.get('short_name')):
         return abort(400)
 
+    if not payload.get('password'):
+        payload['password'] = ""
+
     project.input_data_class = project.info.get('data_classification', {}).get('input_data')
     project.output_data_class = project.info.get('data_classification', {}).get('output_data')
 
-    new_project = clone_project(project, payload)
-
-    current_app.logger.info(  project,
+    try:
+        new_project = clone_project(project, payload)
+        if not new_project:
+            raise Exception("Failed to clone project.")
+        current_app.logger.info(
                             current_user,
                             'clone',
                             'project.clone',
-                            # TODO: clean logs
-                            json.dumps(project),
-                            json.dumps(new_project))
+                            'old project id: %s'.format(project.id),
+                            'new project id: %s'.format(new_project.id)
+                            )
 
-    return Response(json.dumps(new_project), status=200, mimetype="application/json")
+        return Response(json.dumps(new_project.dictize()), status=200, mimetype="application/json")
+    except Exception as e:
+        current_app.logger.error(
+            'clone',
+            'project.clone',
+            e.message
+            )
+        raise abort(400, "Invalid project metadata.")
