@@ -24,6 +24,7 @@ import math
 import requests
 from io import StringIO
 import six
+import copy
 from pybossa.cache.helpers import n_unexpired_gold_tasks, n_priority_x_tasks
 from flask import Blueprint, request, url_for, flash, redirect, abort, Response, current_app
 from flask import render_template, render_template_string, make_response, session
@@ -3705,7 +3706,7 @@ def project_config(short_name):
                                                             owner,
                                                             current_user,
                                                             ps)
-    forms = current_app.config.get('EXTERNAL_CONFIGURATIONS_VUE', {})
+    forms = copy.deepcopy(current_app.config.get('EXTERNAL_CONFIGURATIONS_VUE', {}))
     remove_restricted_keys(forms)
 
     def generate_input_forms_and_external_config_dict():
