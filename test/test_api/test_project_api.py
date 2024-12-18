@@ -2572,7 +2572,6 @@ class TestProjectAPI(TestAPI):
         short_name = "testproject"
 
         project = ProjectFactory.create(owner=subadminowner, short_name=short_name)
-        tasks = TaskFactory.create_batch(3, project=project)
         headers = [('Authorization', subadminowner.api_key)]
 
         # check 404 response when no project param
@@ -2613,7 +2612,6 @@ class TestProjectAPI(TestAPI):
         short_name = "testproject"
 
         project = ProjectFactory.create(owner=subadminowner, short_name=short_name)
-        tasks = TaskFactory.create_batch(3, project=project)
         headers = [('Authorization', subadminowner.api_key)]
 
         # check 400 response when user does not post a payload
@@ -2653,12 +2651,51 @@ class TestProjectAPI(TestAPI):
 
         short_name = "testproject"
 
-        project = ProjectFactory.create(owner=subadminowner, short_name=short_name)
-        tasks = TaskFactory.create_batch(3, project=project)
+        task_presenter = 'test; url="project/oldname/" pybossa.run("oldname"); test;'
+        project = ProjectFactory.create(id=40,
+                                        short_name=short_name,
+                                        info={'task_presenter': task_presenter,
+                                              'quiz': {'test': 123},
+                                              'enrichments': [{'test': 123}],
+                                              'passwd_hash': 'testpass',
+                                              'ext_config': {'test': 123}
+                                            },
+                                        owner=subadminowner)
+
         headers = [('Authorization', subadminowner.api_key)]
 
         data = {'short_name': 'newname', 'name': 'newname', 'password': 'Test123', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public'}
         with patch.dict(data_access_levels, self.patch_data_access_levels):
             res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data), content_type='application/json')
-            error_msg = "Error cloning project"
-            assert res.status_code == 200, error_msg
+            data = json.loads(res.data)
+            assert res.status_code == 200, data
+
+
+    @with_context
+    def test_clone_project_success_no_password(self):
+        """Test API clone project success state without project password"""
+        from pybossa.view.projects import data_access_levels
+
+        [admin, subadminowner] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+
+        short_name = "testproject"
+
+        task_presenter = 'test; url="project/oldname/" pybossa.run("oldname"); test;'
+        project = ProjectFactory.create(id=40,
+                                        short_name=short_name,
+                                        info={'task_presenter': task_presenter,
+                                              'quiz': {'test': 123},
+                                              'enrichments': [{'test': 123}],
+                                              'ext_config': {'test': 123}
+                                            },
+                                        owner=subadminowner)
+
+        headers = [('Authorization', subadminowner.api_key)]
+
+        data = {'short_name': 'newname', 'name': 'newname', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public'}
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data), content_type='application/json')
+            data = json.loads(res.data)
+            assert res.status_code == 200, data

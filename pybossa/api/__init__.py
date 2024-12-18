@@ -1060,25 +1060,20 @@ def project_clone(project_id=None, short_name=None):
     try:
         new_project = clone_project(project, payload)
         current_app.logger.info(
-                            current_user,
-                            'clone',
-                            'project.clone',
-                            'old project id: %s'.format(project.id),
-                            'new project id: %s'.format(new_project.id)
-                            )
-
+                'project.clone: user: %s, old project id: %s, new project id: %s'.format(
+                    current_user.id,
+                    project.id,
+                    new_project.id
+                )
+            )
         return Response(json.dumps(new_project.dictize()), status=200, mimetype="application/json")
-    except DBIntegrityError as e:
-        current_app.logger.error(
-            'clone',
-            'project.clone',
-            e.message
-            )
-        raise abort(400, "Duplicate project keys.")
+
     except Exception as e:
+        msg = e.message if hasattr(e, 'message') else str(e)
         current_app.logger.error(
-            'clone',
-            'project.clone',
-            str(e)
+            'project.clone: user: %s, msg: %s'.format(
+            current_user.id,
+            msg
             )
-        raise abort(400, "Invalid project metadata.")
+        )
+        raise abort(400, f"Error cloning project - {e}")
