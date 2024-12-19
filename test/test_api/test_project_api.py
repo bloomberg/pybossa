@@ -2561,6 +2561,18 @@ class TestProjectAPI(TestAPI):
         assert res.json == dict(n_completed_tasks=3, n_tasks=3)
 
 
+    def _setup_project(self, short_name, owner):
+        task_presenter = 'test; url="project/oldname/" pybossa.run("oldname"); test;'
+        return ProjectFactory.create(id=40,
+                                        short_name=short_name,
+                                        info={'task_presenter': task_presenter,
+                                              'quiz': {'test': 123},
+                                              'enrichments': [{'test': 123}],
+                                              'passwd_hash': 'testpass',
+                                              'ext_config': {'test': 123}
+                                            },
+                                        owner=owner)
+
     @with_context
     def test_clone_project_access(self):
         """Test API clone project access control"""
@@ -2570,8 +2582,7 @@ class TestProjectAPI(TestAPI):
         make_subadmin(subadmin)
 
         short_name = "testproject"
-
-        project = ProjectFactory.create(owner=subadminowner, short_name=short_name)
+        self._setup_project(short_name, subadminowner)
         headers = [('Authorization', subadminowner.api_key)]
 
         # check 404 response when no project param
@@ -2610,8 +2621,7 @@ class TestProjectAPI(TestAPI):
         make_subadmin(subadminowner)
 
         short_name = "testproject"
-
-        project = ProjectFactory.create(owner=subadminowner, short_name=short_name)
+        self._setup_project(short_name, subadminowner)
         headers = [('Authorization', subadminowner.api_key)]
 
         # check 400 response when user does not post a payload
@@ -2650,18 +2660,7 @@ class TestProjectAPI(TestAPI):
         make_subadmin(subadminowner)
 
         short_name = "testproject"
-
-        task_presenter = 'test; url="project/oldname/" pybossa.run("oldname"); test;'
-        project = ProjectFactory.create(id=40,
-                                        short_name=short_name,
-                                        info={'task_presenter': task_presenter,
-                                              'quiz': {'test': 123},
-                                              'enrichments': [{'test': 123}],
-                                              'passwd_hash': 'testpass',
-                                              'ext_config': {'test': 123}
-                                            },
-                                        owner=subadminowner)
-
+        self._setup_project(short_name, subadminowner)
         headers = [('Authorization', subadminowner.api_key)]
 
         data = {'short_name': 'newname', 'name': 'newname', 'password': 'Test123', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public'}
@@ -2681,16 +2680,7 @@ class TestProjectAPI(TestAPI):
         make_subadmin(subadminowner)
 
         short_name = "testproject"
-
-        task_presenter = 'test; url="project/oldname/" pybossa.run("oldname"); test;'
-        project = ProjectFactory.create(id=40,
-                                        short_name=short_name,
-                                        info={'task_presenter': task_presenter,
-                                              'quiz': {'test': 123},
-                                              'enrichments': [{'test': 123}],
-                                              'ext_config': {'test': 123}
-                                            },
-                                        owner=subadminowner)
+        self._setup_project(short_name, subadminowner)
 
         headers = [('Authorization', subadminowner.api_key)]
 
