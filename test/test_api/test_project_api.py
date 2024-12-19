@@ -2607,13 +2607,13 @@ class TestProjectAPI(TestAPI):
         headers = [('Authorization', reguser.api_key)]
         res = self.app.post(f'/api/project/{short_name}/clone', headers=headers)
         error_msg = "User must have permissions"
-        assert res.status_code == 401, error_msg
+        assert res.status_code == 403, error_msg
 
         # check 401 response when use is not authorized
         headers = [('Authorization', subadmin.api_key)]
         res = self.app.post(f'/api/project/{short_name}/clone', headers=headers)
         error_msg = "User must have permissions"
-        assert res.status_code == 401, error_msg
+        assert res.status_code == 403, error_msg
 
 
     @with_context
@@ -2671,6 +2671,28 @@ class TestProjectAPI(TestAPI):
             res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data), content_type='application/json')
             data = json.loads(res.data)
             assert res.status_code == 200, data
+
+
+    @with_context
+    @patch('pybossa.api.clone_project')
+    def test_clone_project_error(self, clone_project):
+        """Test API clone project success state"""
+        from pybossa.view.projects import data_access_levels
+
+        clone_project.side_effect = Exception("Project clone error!")
+        [admin, subadminowner] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+
+        short_name = "testproject"
+        self._setup_project(short_name, subadminowner)
+        headers = [('Authorization', subadminowner.api_key)]
+
+        data = {'short_name': 'newname', 'name': 'newname', 'password': 'Test123', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public'}
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data), content_type='application/json')
+            data = json.loads(res.data)
+            assert res.status_code == 400, data
 
 
     @with_context
