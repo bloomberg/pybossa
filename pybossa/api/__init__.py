@@ -36,6 +36,7 @@ from flask_login import current_user, login_required
 from time import time
 from datetime import datetime, timedelta
 from werkzeug.exceptions import NotFound
+from pybossa.exc.repository import DBIntegrityError
 from pybossa.util import jsonpify, get_user_id_or_ip, fuzzyboolean, \
     PARTIAL_ANSWER_KEY, SavedTaskPositionEnum, PARTIAL_ANSWER_POSITION_KEY, \
     get_user_saved_partial_tasks
@@ -90,7 +91,7 @@ from pybossa.core import db
 from pybossa.cache import users as cached_users, ONE_MONTH
 from pybossa.cache.task_browse_helpers import get_searchable_columns
 from pybossa.cache.users import get_user_pref_metadata
-from pybossa.view.projects import get_locked_tasks
+from pybossa.view.projects import get_locked_tasks, clone_project
 from pybossa.redis_lock import EXPIRE_LOCK_DELAY
 from pybossa.api.bulktasks import BulkTasksAPI
 
@@ -1022,3 +1023,57 @@ def get_project_progress(project_id=None, short_name=None):
         return Response(json.dumps(response), status=200, mimetype="application/json")
     else:
         return abort(403)
+
+
+@jsonpify
+@csrf.exempt
+@blueprint.route('/project/<int:project_id>/clone',  methods=['POST'])
+@blueprint.route('/project/<short_name>/clone',  methods=['POST'])
+@login_required
+def project_clone(project_id=None, short_name=None):
+
+    if current_user.is_anonymous:
+        return abort(401)
+    if not (project_id or short_name):
+        return abort(404)
+    if short_name:
+        project = project_repo.get_by_shortname(short_name)
+    elif project_id:
+        project = project_repo.get(project_id)
+    if not project:
+        return abort(404)
+    if not (current_user.admin or (current_user.subadmin and current_user.id in project.owners_ids)):
+        return abort(401)
+
+    payload = json.loads(request.form['request_json']) if 'request_json' in request.form else request.json
+
+    if not (payload and payload.get('input_data_class') and payload.get('output_data_class') \
+        and payload.get('name') and payload.get('short_name')):
+        return abort(400)
+
+    if not payload.get('password'):
+        payload['password'] = ""
+
+    project.input_data_class = project.info.get('data_classification', {}).get('input_data')
+    project.output_data_class = project.info.get('data_classification', {}).get('output_data')
+
+    try:
+        new_project = clone_project(project, payload)
+        current_app.logger.info(
+                'project.clone: user: %s, old project id: %s, new project id: %s'.format(
+                    current_user.id,
+                    project.id,
+                    new_project.id
+                )
+            )
+        return Response(json.dumps(new_project.dictize()), status=200, mimetype="application/json")
+
+    except Exception as e:
+        msg = e.message if hasattr(e, 'message') else str(e)
+        current_app.logger.error(
+            'project.clone: user: %s, msg: %s'.format(
+            current_user.id,
+            msg
+            )
+        )
+        raise abort(400, f"Error cloning project - {e}")
