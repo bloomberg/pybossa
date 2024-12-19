@@ -1043,7 +1043,7 @@ def project_clone(project_id=None, short_name=None):
     if not (current_user.admin or (current_user.subadmin and current_user.id in project.owners_ids)):
         return abort(403)
 
-    payload = json.loads(request.form['request_json']) if 'request_json' in request.form else request.json
+    payload = request.json
 
     if not (payload and payload.get('input_data_class') and payload.get('output_data_class') \
         and payload.get('name') and payload.get('short_name')):
