@@ -17,6 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 from sqlalchemy import Integer, Boolean, Float, UnicodeText, Text, DateTime
+from sqlalchemy import String
 import sqlalchemy
 from sqlalchemy.schema import Column, ForeignKey, Index
 from sqlalchemy.orm import relationship, backref
@@ -65,6 +66,8 @@ class Task(db.Model, DomainObject):
     gold_answers = Column(JSONB)
     #: Task.expiration field to determine when a task should no longer be scheduled. As UTC timestamp without timezone
     expiration = Column(DateTime, nullable=True)
+    #: Task.dup_checksum field to contain checksum for duplicate check
+    dup_checksum = Column(String(64), nullable=True)
 
     task_runs = relationship(TaskRun, cascade='all, delete, delete-orphan', backref='task')
 

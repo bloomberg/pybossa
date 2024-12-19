@@ -185,9 +185,7 @@ class TaskRepository(Repository):
             # set task default expiration
             if element.__class__.__name__ == "Task":
                 element.expiration = get_task_expiration(element.expiration, make_timestamp())
-                checksum = generate_checksum(element)
-                current_app.logger.info("Project %d duplicate checksum %s", element.project_id, checksum)
-                # element.checksum = generate_checksum(element)   TODO: upon task table updated
+                element.dup_checksum = generate_checksum(element)
             self.db.session.add(element)
             self.db.session.commit()
             if clean_project:

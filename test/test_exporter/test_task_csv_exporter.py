@@ -154,7 +154,7 @@ class TestExporters(Test):
 
         expected_headers = ['info', 'fav_user_ids', 'user_pref', 'n_answers', 'quorum', 'calibration',
             'created', 'state', 'gold_answers_best_job', 'gold_answers_best_boss', 'exported',
-            'project_id', 'id', 'priority_0', 'expiration', 'worker_pref', 'worker_filter']
+            'project_id', 'id', 'priority_0', 'expiration', 'worker_pref', 'worker_filter', 'dup_checksum']
         obj_keys = list(task1_data.keys())
 
         self._compare_object_keys(obj_keys, expected_headers)
@@ -163,7 +163,7 @@ class TestExporters(Test):
 
         expected_headers = ['info', 'fav_user_ids', 'user_pref', 'n_answers', 'quorum', 'calibration',
             'created', 'state', 'gold_answers', 'exported', 'project_id', 'id', 'priority_0', 'expiration',
-            'worker_pref', 'worker_filter']
+            'worker_pref', 'worker_filter', 'dup_checksum']
         obj_keys = list(task2_data.keys())
 
         self._compare_object_keys(obj_keys, expected_headers)
