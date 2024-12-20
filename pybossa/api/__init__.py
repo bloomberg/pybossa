@@ -727,7 +727,8 @@ def get_service_request(task_id, service_name, major_version, minor_version):
         .get(authorized_services_key, [])
     )
     if service_name not in authorized_services:
-        return abort(403, "The project is not authorized to access this service")
+        authorized_services_403 = current_app.config.get("AUTHORIZED_SERVICES_403", "")
+        return abort(403, authorized_services_403.format(project_id=project.id, service_name=service_name))
 
     if not (task and proxy_service_config and service_name and major_version and minor_version):
         return abort(400)

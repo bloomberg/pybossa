@@ -11810,6 +11810,7 @@ class TestServiceRequest(web.Helper):
                 }
             }
         }
+        current_app.config["AUTHORIZED_SERVICES_403"] = 'The project {project_id} is not authorized to access the service {service_name}.'
 
         url = "/api/task/1/services/test-service-name/1/37"
         user = UserFactory.create()
@@ -11826,6 +11827,7 @@ class TestServiceRequest(web.Helper):
             follow_redirects=False,
         )
         data = json.loads(res.data)
+        assert data.get("exception_msg") == 'The project 1 is not authorized to access the service test-service-name.', data
         assert data.get("status_code") == 403, data
 
 class TestErrorHandlers(web.Helper):
