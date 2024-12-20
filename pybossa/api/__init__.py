@@ -33,6 +33,7 @@ import jwt
 from flask import Blueprint, request, abort, Response, make_response
 from flask import current_app
 from flask_login import current_user, login_required
+from flasgger import swag_from
 from time import time
 from datetime import datetime, timedelta
 from werkzeug.exceptions import NotFound
@@ -1030,6 +1031,7 @@ def get_project_progress(project_id=None, short_name=None):
 @blueprint.route('/project/<int:project_id>/clone',  methods=['POST'])
 @blueprint.route('/project/<short_name>/clone',  methods=['POST'])
 @login_required
+@swag_from('docs/project/project_clone.yaml')
 def project_clone(project_id=None, short_name=None):
 
     if current_user.is_anonymous:
