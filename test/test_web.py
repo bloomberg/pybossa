@@ -10386,8 +10386,16 @@ class TestWeb(web.Helper):
             project=project,
             info={"a": 1, "b": 2, "c": 3}
         )
+        # confirm task payload populated with checksum generated
+        task.dup_checksum == expected_checksum
         checksum = generate_checksum(task)
         assert checksum == expected_checksum
+
+        # project w/o duplicate checksum configured gets
+        # tasks created with null checksum value
+        project2 = ProjectFactory.create(owner=subadmin, info={"x": 123}, short_name="xyz")
+        task2 = TaskFactory.create(project=project2, info={"a": 1, "b": 2, "c": 3})
+        assert task2.dup_checksum == None
 
     @with_context
     @patch("pybossa.task_creator_helper.get_encryption_key")
