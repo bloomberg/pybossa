@@ -26,6 +26,10 @@ definitions:
         type: string
         description: Password for the new project (optional)
         example: mypassword123
+      copy_users:
+        type: boolean
+        description: Keep same list of assigned users (optional, default=false)
+        example: false
     required:
       - input_data_class
       - output_data_class
