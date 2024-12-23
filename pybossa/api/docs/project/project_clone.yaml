@@ -1,0 +1,73 @@
+Clone a project by project ID or short name
+---
+tags:
+  - name: project
+definitions:
+  CloneProjectRequestBody:
+    type: object
+    properties:
+      input_data_class:
+        type: string
+        description: Classification of input data
+        example: L4 - Public Internal Data
+      output_data_class:
+        type: string
+        description: Classification of output data
+        example: L4 - Public Internal Data
+      name:
+        type: string
+        description: Name of the new project
+        example: My Project Clone
+      short_name:
+        type: string
+        description: Short name of the new project
+        example: myprojectclone
+      password:
+        type: string
+        description: Password for the new project (optional)
+        example: mypassword123
+      copy_users:
+        type: boolean
+        description: Keep same list of assigned users (optional, default=false)
+        example: false
+    required:
+      - input_data_class
+      - output_data_class
+      - name
+      - short_name
+parameters:
+  - name: project_id
+    in: path
+    type: integer
+    required: false
+    description: The project ID to clone
+  - name: short_name
+    in: path
+    type: string
+    required: false
+    description: The short name of the project to clone
+  - name: payload
+    in: body
+    required: true
+    description: Information required to clone the project
+    schema:
+      $ref: '#/definitions/CloneProjectRequestBody'
+      example:
+        input_data_class: L4 - Public Internal Data
+        output_data_class: L4 - Public Internal Data
+        name: My Project Clone
+        short_name: myprojectclone
+        password: mypassword
+responses:
+  200:
+    description: New cloned project information
+    schema:
+      $ref: '#definitions/Project'
+  400:
+    description: Bad request - Missing or invalid payload
+  401:
+    description: Unauthorized - User is not logged in
+  403:
+    description: Forbidden - User does not have permission to clone project
+  404:
+    description: Not found - Project does not exist

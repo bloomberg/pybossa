@@ -33,6 +33,7 @@ from test.factories import (ProjectFactory, TaskFactory, TaskRunFactory,
                             CategoryFactory, AuditlogFactory)
 from test.helper.gig_helper import make_subadmin, make_admin
 from test.test_api import TestAPI
+from test.test_authorization import mock_current_user
 
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)
@@ -2559,3 +2560,177 @@ class TestProjectAPI(TestAPI):
         res = self.app.get('/api/project/testproject/projectprogress', follow_redirects=True, headers=headers)
         assert res.status_code == 200
         assert res.json == dict(n_completed_tasks=3, n_tasks=3)
+
+
+    def _setup_project(self, short_name, owner):
+        task_presenter = 'test; url="project/oldname/" pybossa.run("oldname"); test;'
+        return ProjectFactory.create(id=40,
+                                        short_name=short_name,
+                                        info={'task_presenter': task_presenter,
+                                              'quiz': {'test': 123},
+                                              'enrichments': [{'test': 123}],
+                                              'passwd_hash': 'testpass',
+                                              'ext_config': {'test': 123}
+                                            },
+                                        owner=owner)
+
+    @with_context
+    def test_clone_project_access(self):
+        """Test API clone project access control"""
+        [admin, subadminowner, subadmin, reguser] = UserFactory.create_batch(4)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+        make_subadmin(subadmin)
+
+        short_name = "testproject"
+        self._setup_project(short_name, subadminowner)
+        headers = [('Authorization', subadminowner.api_key)]
+
+        # check 401 response for anonymous user
+        mock_anonymous = mock_current_user()
+        with patch('pybossa.api.current_user', new=mock_anonymous):
+            res = self.app.post(f'/api/project/{short_name}/clone', headers=headers)
+            error_msg = "User must have access"
+            assert res.status_code == 401, res.status_code
+
+        # check 404 response when the project doesn't exist
+        res = self.app.post('/api/project/9999/clone', headers=headers)
+        error_msg = "A valid project must be used"
+        assert res.status_code == 404, error_msg
+
+        # check 404 response when the project doesn't exist
+        res = self.app.post('/api/project/xyz/clone', headers=headers)
+        error_msg = "A valid project must be used"
+        assert res.status_code == 404, error_msg
+
+        # check 401 response when use is not authorized
+        headers = [('Authorization', reguser.api_key)]
+        res = self.app.post(f'/api/project/{short_name}/clone', headers=headers)
+        error_msg = "User must have permissions"
+        assert res.status_code == 403, error_msg
+
+        # check 401 response when use is not authorized
+        headers = [('Authorization', subadmin.api_key)]
+        res = self.app.post(f'/api/project/{short_name}/clone', headers=headers)
+        error_msg = "User must have permissions"
+        assert res.status_code == 403, error_msg
+
+
+    @with_context
+    def test_clone_project_edge_cases(self):
+        """Test API clone project edge cases"""
+        [admin, subadminowner] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+
+        short_name = "testproject"
+        self._setup_project(short_name, subadminowner)
+        headers = [('Authorization', subadminowner.api_key)]
+
+        # check 400 response when user does not post a payload
+        res = self.app.post(f'/api/project/{short_name}/clone', headers=headers)
+        error_msg = "User must post valid payload"
+        assert res.status_code == 400, error_msg
+
+        # check 400 response when user posts payload missed req fields
+        data = { "name": "Test Project Clone" }
+        res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data))
+        error_msg = "User must post valid payload"
+        assert res.status_code == 400, error_msg
+
+        # test duplicate short name
+        from pybossa.view.projects import data_access_levels
+
+        data = {
+            "name": "Test Project Clone",
+            "short_name": short_name + 'clone',
+            "input_data_class": "L4 - Public Third-Party Data",
+            "output_data_class": "L4 - Public Third-Party Data"
+        }
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=data, content_type='application/json')
+            error_msg = "User must post a unique project short name"
+            assert res.status_code == 400, error_msg
+
+
+    @with_context
+    def test_clone_project_success(self):
+        """Test API clone project success state"""
+        from pybossa.view.projects import data_access_levels
+
+        [admin, subadminowner] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+
+        short_name = "testproject"
+        self._setup_project(short_name, subadminowner)
+        headers = [('Authorization', subadminowner.api_key)]
+
+        data = {'short_name': 'newname', 'name': 'newname', 'password': 'Test123', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public'}
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data), content_type='application/json')
+            data = json.loads(res.data)
+            assert res.status_code == 200, data
+
+
+    @with_context
+    @patch('pybossa.api.clone_project')
+    def test_clone_project_error(self, clone_project):
+        """Test API clone project error when cloning project"""
+        from pybossa.view.projects import data_access_levels
+
+        clone_project.side_effect = Exception("Project clone error!")
+        [admin, subadminowner] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+
+        short_name = "testproject"
+        self._setup_project(short_name, subadminowner)
+        headers = [('Authorization', subadminowner.api_key)]
+
+        data = {'short_name': 'newname', 'name': 'newname', 'password': 'Test123', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public'}
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data), content_type='application/json')
+            data = json.loads(res.data)
+            assert res.status_code == 400, data
+
+
+    @with_context
+    def test_clone_project_by_id_success(self):
+        """Test API clone project by id success state"""
+        from pybossa.view.projects import data_access_levels
+
+        [admin, subadminowner] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+
+        short_name = "testproject"
+        self._setup_project(short_name, subadminowner)
+        headers = [('Authorization', subadminowner.api_key)]
+
+        data = {'short_name': 'newname', 'name': 'newname', 'password': 'Test123', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public'}
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            res = self.app.post(f'/api/project/40/clone', headers=headers, data=json.dumps(data), content_type='application/json')
+            data = json.loads(res.data)
+            assert res.status_code == 200, data
+
+
+    @with_context
+    def test_clone_project_no_password(self):
+        """Test API clone project success state without project password"""
+        from pybossa.view.projects import data_access_levels
+
+        [admin, subadminowner] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+
+        short_name = "testproject"
+        self._setup_project(short_name, subadminowner)
+
+        headers = [('Authorization', subadminowner.api_key)]
+
+        data = {'short_name': 'newname', 'name': 'newname', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public'}
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data), content_type='application/json')
+            data = json.loads(res.data)
+            assert res.status_code == 200, data
