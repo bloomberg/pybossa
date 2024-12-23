@@ -2654,7 +2654,7 @@ class TestProjectAPI(TestAPI):
 
 
     @with_context
-    def test_clone_project(self):
+    def test_clone_project_success(self):
         """Test API clone project success state"""
         from pybossa.view.projects import data_access_levels
 
@@ -2676,7 +2676,7 @@ class TestProjectAPI(TestAPI):
     @with_context
     @patch('pybossa.api.clone_project')
     def test_clone_project_error(self, clone_project):
-        """Test API clone project success state"""
+        """Test API clone project error when cloning project"""
         from pybossa.view.projects import data_access_levels
 
         clone_project.side_effect = Exception("Project clone error!")
@@ -2696,7 +2696,7 @@ class TestProjectAPI(TestAPI):
 
 
     @with_context
-    def test_clone_project_by_id(self):
+    def test_clone_project_by_id_success(self):
         """Test API clone project by id success state"""
         from pybossa.view.projects import data_access_levels
 

@@ -1049,13 +1049,10 @@ def project_clone(project_id=None, short_name=None):
 
     if not (payload and payload.get('input_data_class') and payload.get('output_data_class') \
         and payload.get('name') and payload.get('short_name')):
-        return abort(400)
+        return abort(400, 'Request is missing one or more of the required fields: name, short_name, input_data_class, output_data_class')
 
     if not payload.get('password'):
         payload['password'] = ""
-
-    project.input_data_class = project.info.get('data_classification', {}).get('input_data')
-    project.output_data_class = project.info.get('data_classification', {}).get('output_data')
 
     try:
         new_project = clone_project(project, payload)
