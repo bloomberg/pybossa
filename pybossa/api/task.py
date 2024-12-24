@@ -45,6 +45,9 @@ import json
 import copy
 from pybossa.task_creator_helper import get_task_expiration
 from pybossa.model import make_timestamp
+from pybossa.task_creator_helper import generate_checksum
+from pybossa.cache.projects import get_project_data
+
 
 
 class TaskAPI(APIBase):
@@ -90,7 +93,10 @@ class TaskAPI(APIBase):
             hdfs_task = any([val.startswith("/fileproxy/hdfs/") for val in info.values() if isinstance(val, str)])
             if hdfs_task:
                 raise BadRequest("Invalid task payload. HDFS is not supported")
-        duplicate = task_repo.find_duplicate(project_id=project_id, info=info)
+        project = get_project_data(project_id)
+        dup_checksum = generate_checksum(project=project, task=data)
+        data["dup_checksum"] = dup_checksum
+        duplicate = task_repo.find_duplicate(project_id=project_id, info=info, dup_checksum=dup_checksum)
         if duplicate:
             message = {
                 'reason': 'DUPLICATE_TASK',
