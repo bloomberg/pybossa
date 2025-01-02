@@ -10295,6 +10295,7 @@ class TestWeb(web.Helper):
         res = self.app_get_json(f"/api/project/{project.id}/gold_annotations")
         assert res.status_code == 200, data
 
+class TestChecksum(web.Helper):
     @with_context
     @patch("pybossa.task_creator_helper.get_encryption_key")
     @patch("pybossa.task_creator_helper.read_encrypted_file")
