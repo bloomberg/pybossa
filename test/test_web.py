@@ -10362,6 +10362,45 @@ class TestWeb(web.Helper):
         assert not checksum
 
     @with_context
+    def test_generate_checksum_private_data(self):
+        """Test checksum is generated for private data"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        current_app.config["TASK_REQUIRED_FIELDS"] = {
+            'b': {'val': None, 'check_val': False, 'require_int': True},
+        }
+        checksum = hashlib.sha256()
+        expected_dupcheck_payload = {"a": 1, "c": 3}
+        checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
+        expected_checksum =  checksum.hexdigest()
+
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": ["a", "b", "c"]
+                }
+            })
+
+        task = TaskFactory.create(
+            project=project,
+            info={"a": 1, "b": 2, "c": 3},
+            dup_checksum=expected_checksum
+        )
+        # confirm task payload populated with checksum generated
+        assert task.dup_checksum == expected_checksum, task.dup_checksum
+
+        # project w/o duplicate checksum configured gets
+        # tasks created with null checksum value
+        project2 = ProjectFactory.create(owner=subadmin, info={"x": 123}, short_name="xyz")
+        task2 = TaskFactory.create(project=project2, info={"a": 1, "b": 2, "c": 3})
+        assert task2.dup_checksum == None
+
+    @with_context
     def test_generate_checksum_public_data(self):
         """Test checksum is generated for public data"""
         from flask import current_app
@@ -10379,7 +10418,7 @@ class TestWeb(web.Helper):
             short_name="testproject",
             info={
                 "duplicate_task_check": {
-                    "duplicate_fields": ["a", "c"]
+                    "duplicate_fields": ["a", "b", "c"]
                 }
             })
 
