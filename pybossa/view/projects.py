@@ -472,7 +472,10 @@ def clone_project(project, form):
         proj_dict['info'].pop('ext_config', None)
 
     proj_dict['owner_id'] = current_user.id
-    proj_dict['owners_ids'] = [current_user.id]
+    if form.get('copy_coowners', False):
+        proj_dict['owners_ids'] = project.owners_ids
+    else:
+        proj_dict['owners_ids'] = deepcopy([current_user.id])
     proj_dict['name'] = form['name']
 
     task_presenter = proj_dict['info'].get('task_presenter', '')
