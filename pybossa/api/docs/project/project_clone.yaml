@@ -30,6 +30,10 @@ definitions:
         type: boolean
         description: Keep same list of assigned users (optional, default=false)
         example: false
+      copy_coowners:
+        type: boolean
+        description: Keep same list of co-owners (optional, default=false)
+        example: false
     required:
       - input_data_class
       - output_data_class
