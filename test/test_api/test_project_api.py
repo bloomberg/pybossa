@@ -2734,3 +2734,22 @@ class TestProjectAPI(TestAPI):
             res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data), content_type='application/json')
             data = json.loads(res.data)
             assert res.status_code == 200, data
+
+    @with_context
+    def test_clone_project_copy_coowners(self):
+        """Test API clone project success state"""
+        from pybossa.view.projects import data_access_levels
+
+        [admin, subadminowner] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+
+        short_name = "testproject"
+        self._setup_project(short_name, subadminowner)
+        headers = [('Authorization', subadminowner.api_key)]
+
+        data = {'short_name': 'newname', 'name': 'newname', 'password': 'Test123', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public', 'copy_coowners': True}
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data), content_type='application/json')
+            data = json.loads(res.data)
+            assert res.status_code == 200, data
