@@ -10308,9 +10308,6 @@ class TestWeb(web.Helper):
         subadmin = UserFactory.create(subadmin=True)
         self.signin_user(subadmin)
 
-        # no checksum returned for missing/none task
-        assert generate_checksum(task=None) == None
-
         # exception handled for bad priv data under file
         # so that no checksum is returned
         project = ProjectFactory.create(
@@ -10321,6 +10318,10 @@ class TestWeb(web.Helper):
                     "duplicate_fields": ["a", "c"]
                 }
             })
+
+        # no checksum returned for missing/none task
+        assert generate_checksum(project=project, task=None) == None
+
         task_info = {
             "priv_data__upload_url": f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"
         }
@@ -10330,7 +10331,7 @@ class TestWeb(web.Helper):
         )
 
         # with bad data under file, exception was handled and no checksum returned
-        checksum = generate_checksum(task=task)
+        checksum = generate_checksum(project=project, task=task)
         assert not checksum
 
     @with_context
@@ -10357,7 +10358,7 @@ class TestWeb(web.Helper):
         )
 
         # with missing project no checksum returned
-        checksum = generate_checksum(task=task)
+        checksum = generate_checksum(project=None, task=task)
         assert not checksum
 
     @with_context
@@ -10382,20 +10383,20 @@ class TestWeb(web.Helper):
                 }
             })
 
-        task = TaskFactory.create(
-            project=project,
-            info={"a": 1, "b": 2, "c": 3}
+        task = dict(
+            project_id = project.id,
+            info = {"a": 1, "b": 2, "c": 3}
         )
+
+        dup_checksum = generate_checksum(project, task)
         # confirm task payload populated with checksum generated
-        task.dup_checksum == expected_checksum
-        checksum = generate_checksum(task)
-        assert checksum == expected_checksum
+        assert dup_checksum == expected_checksum, dup_checksum
 
         # project w/o duplicate checksum configured gets
         # tasks created with null checksum value
         project2 = ProjectFactory.create(owner=subadmin, info={"x": 123}, short_name="xyz")
-        task2 = TaskFactory.create(project=project2, info={"a": 1, "b": 2, "c": 3})
-        assert task2.dup_checksum == None
+        dup_checksum = generate_checksum(project2, task)
+        assert dup_checksum == None
 
     @with_context
     @patch("pybossa.task_creator_helper.get_encryption_key")
@@ -10434,12 +10435,14 @@ class TestWeb(web.Helper):
         task_info = {}
         task_info.update(public_data)
         task_info["priv_data__upload_url"] = f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"
+        task_info["data_access_level"] = "L2"
         task = TaskFactory.create(
             project=project,
             info=task_info
         )
-        checksum = generate_checksum(task)
-        assert checksum == expected_checksum
+        task_payload = {"id": task.id, "info": task.info}
+        checksum = generate_checksum(project= project, task=task_payload)
+        assert checksum == expected_checksum, checksum
 
     @with_context
     @patch("pybossa.task_creator_helper.get_encryption_key")
@@ -10489,8 +10492,40 @@ class TestWeb(web.Helper):
             project=project,
             info=task_info
         )
-        checksum = generate_checksum(task)
+        task_payload = {"id": task.id, "info": task.info}
+        checksum = generate_checksum(project=project, task=task_payload)
         assert checksum == expected_checksum
+
+    @with_context
+    @patch("pybossa.task_creator_helper.json.loads")
+    @patch("pybossa.task_creator_helper.read_encrypted_file")
+    def test_generate_checksum_handle_exception(self, mock_read_enc_file, mock_json):
+        """Test checksum generation handles exception and returns no checksum"""
+        from flask import current_app
+
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        from requests.exceptions import RequestException
+        mock_json.side_effect = RequestException
+        mock_read_enc_file.return_value = ("some data", "path/contents.txt")
+
+        # exception handled for bad priv data under file
+        # so that no checksum is returned
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": ["a", "c"]
+                }
+            })
+
+        task_payload = {"id": 123, "info": {"a": 1, "b__upload_url": f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"}}
+        checksum = generate_checksum(project=project, task=task_payload)
+        assert not checksum, checksum
+
 
 class TestWebUserMetadataUpdate(web.Helper):
 

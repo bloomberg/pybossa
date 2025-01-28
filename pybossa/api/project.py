@@ -35,6 +35,8 @@ from pybossa.core import auditlog_repo, result_repo, http_signer
 from pybossa.auditlogger import AuditLogger
 from pybossa.data_access import ensure_user_assignment_to_project, set_default_amp_store
 from sqlalchemy.orm.base import _entity_descriptor
+from pybossa.cache import delete_memoized
+from pybossa.cache.projects import get_project_data
 
 auditlogger = AuditLogger(auditlog_repo, caller='api')
 
@@ -205,3 +207,6 @@ class ProjectAPI(APIBase):
         else:
             data = self._filter_private_data(data)
             return data
+
+    def _after_save(self, original_data, instance):
+        delete_memoized(get_project_data, instance.id)

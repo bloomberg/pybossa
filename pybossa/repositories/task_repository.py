@@ -35,7 +35,6 @@ from flask import current_app
 from sqlalchemy import or_
 from sqlalchemy.sql import case as sqlalchemy_case
 from pybossa.task_creator_helper import get_task_expiration
-from pybossa.task_creator_helper import generate_checksum
 import time
 
 
@@ -185,7 +184,6 @@ class TaskRepository(Repository):
             # set task default expiration
             if element.__class__.__name__ == "Task":
                 element.expiration = get_task_expiration(element.expiration, make_timestamp())
-                element.dup_checksum = generate_checksum(element)
             self.db.session.add(element)
             self.db.session.commit()
             if clean_project:
@@ -497,22 +495,34 @@ class TaskRepository(Repository):
         self.db.session.commit()
         cached_projects.clean_project(project_id)
 
-    def find_duplicate(self, project_id, info):
+    def find_duplicate(self, project_id, info, dup_checksum=None):
         """
         Find a task id in the given project with the project info using md5
         index on info column casted as text. Md5 is used to avoid key size
         limitations in BTree indices
         """
-        sql = text('''
-                   SELECT task.id as task_id
-                   FROM task
-                   WHERE task.project_id=:project_id
-                   AND task.state='ongoing'
-                   AND md5(task.info::text)=md5(((:info)::jsonb)::text)
-                   ''')
-        info = json.dumps(info, allow_nan=False)
-        row = self.db.session.execute(
-            sql, dict(info=info, project_id=project_id)).first()
+        # with task payload containing dup_checksum value, perform duplicate
+        # check based on checkum instead of comparing entire task payload info
+        if dup_checksum:
+            sql = text('''
+                    SELECT task.id as task_id
+                    FROM task
+                    WHERE task.project_id=:project_id
+                    AND task.dup_checksum=:dup_checksum
+                    ''')
+            row = self.db.session.execute(
+                sql, dict(project_id=project_id, dup_checksum=dup_checksum)).first()
+        else:
+            sql = text('''
+                    SELECT task.id as task_id
+                    FROM task
+                    WHERE task.project_id=:project_id
+                    AND task.state='ongoing'
+                    AND md5(task.info::text)=md5(((:info)::jsonb)::text)
+                    ''')
+            info = json.dumps(info, allow_nan=False)
+            row = self.db.session.execute(
+                sql, dict(info=info, project_id=project_id)).first()
         if row:
             return row[0]
 

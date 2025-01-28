@@ -41,6 +41,7 @@ from flask import url_for
 from pybossa.task_creator_helper import set_gold_answers, upload_files_priv, get_task_expiration
 from pybossa.data_access import data_access_levels
 from pybossa.model import make_timestamp
+from pybossa.task_creator_helper import generate_checksum
 
 
 def validate_s3_bucket(task, *args):
@@ -212,14 +213,16 @@ class Importer(object):
                 create_date = make_timestamp()
                 task_data['expiration'] = get_task_expiration(task_data.get('expiration'), create_date)
 
-                task = Task(project_id=project.id, n_answers=n_answers)
+                dup_checksum = generate_checksum(project=project, task=task_data)
+                task = Task(project_id=project.id, n_answers=n_answers, dup_checksum=dup_checksum)
                 [setattr(task, k, v) for k, v in task_data.items()]
 
                 gold_answers = task_data.pop('gold_answers', None)
                 set_gold_answers(task, gold_answers)
 
                 found = task_repo.find_duplicate(project_id=project.id,
-                                                info=task.info)
+                                                info=task.info,
+                                                dup_checksum=task.dup_checksum)
                 if found is not None:
                     continue
                 if not validator.validate(task):
