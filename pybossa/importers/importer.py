@@ -224,6 +224,7 @@ class Importer(object):
                                                 info=task.info,
                                                 dup_checksum=task.dup_checksum)
                 if found is not None:
+                    current_app.logger.info("Project %d, task checksum %s. Duplicate task found with task id %d", project.id, task.dup_checksum, found)
                     continue
                 if not validator.validate(task):
                     continue

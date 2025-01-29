@@ -97,6 +97,7 @@ class TaskAPI(APIBase):
         data["dup_checksum"] = dup_checksum
         duplicate = task_repo.find_duplicate(project_id=project_id, info=info, dup_checksum=dup_checksum)
         if duplicate:
+            current_app.logger.info("Project %d, task checksum %s. Duplicate task found with task id %d. Ignoring task creation", project_id, dup_checksum, duplicate)
             message = {
                 'reason': 'DUPLICATE_TASK',
                 'task_id': duplicate
