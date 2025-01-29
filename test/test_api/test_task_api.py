@@ -30,7 +30,7 @@ from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, \
     UserFactory
 from test.helper.gig_helper import make_subadmin, make_admin
 from test.test_api import TestAPI
-import datetime
+import hashlib
 
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)
@@ -1187,7 +1187,6 @@ class TestTaskAPI(TestAPI):
         url = tasks.upload_gold_data(task, 1, {'ans1': 'test'})
         assert url == 'testURL', url
 
-
     @with_context
     def test_create_task_with_hdfs_payload(self):
         [admin, subadminowner, subadmin, reguser] = UserFactory.create_batch(4)
@@ -1213,3 +1212,53 @@ class TestTaskAPI(TestAPI):
         task = json.loads(res.data)
         assert res.status_code == 200
         assert task["info"] == {"field_1": "one", "field_2": "xyz"}
+
+    @with_context
+    def test_create_task_find_duplicate_with_checksum(self):
+        """Test create tasks performing duplicate check using dup_checksum value"""
+
+        subadmin = UserFactory.create(subadmin=True)
+        # self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": ["a", "c"]
+                }
+            })
+
+        task_data = dict(
+            project_id = project.id,
+            info = {"a": 1, "b": 2, "c": 3}
+        )
+        checksum = hashlib.sha256()
+        expected_dupcheck_payload = {"a": 1, "c": 3}
+        checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
+        expected_checksum =  checksum.hexdigest()
+
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        # task created with checksum as per project configuration
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        task = json.loads(res.data)
+        assert res.status_code == 200
+        assert task["dup_checksum"] == expected_checksum, task["dup_checksum"]
+
+        # duplicate task creation failed
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        res.status == "409 CONFLICT"
+
+        # with duplicate task check not configured, dup_checksum not generated
+        project2 = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject2",
+            info={})
+        task_data = dict(
+            project_id = project2.id,
+            info = {"a": 1, "b": 2, "c": 3}
+        )
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        task = json.loads(res.data)
+        assert res.status_code == 200
+        assert not task["dup_checksum"]
