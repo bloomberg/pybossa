@@ -181,29 +181,29 @@ def read_encrypted_file(store, project, bucket, key_name):
     return decrypted, key
 
 
-def generate_checksum(task):
+def generate_checksum(project, task):
     from pybossa.cache.projects import get_project_data
     from pybossa.core import private_required_fields
 
-    if not (task and isinstance(task.info, dict)):
+    if not (task and isinstance(task, dict) and "info" in task):
         return
 
-    project = get_project_data(task.project_id)
     if not project:
         return
 
+    task_info = task["info"]
     dup_task_config = project.info.get("duplicate_task_check")
     if not dup_task_config:
         return
 
     dup_fields_configured = dup_task_config.get("duplicate_fields", [])
-    # include all task.info fields with no field configured under duplicate_fields
+    # include all task_info fields with no field configured under duplicate_fields
 
     secret = get_encryption_key(project) if current_app.config.get("PRIVATE_INSTANCE") else None
     cipher = AESWithGCM(secret) if secret else None
     task_contents = {}
     if current_app.config.get("PRIVATE_INSTANCE"):
-        for field, value in task.info.items():
+        for field, value in task_info.items():
             if field in private_required_fields:
                 continue
             if field.endswith("__upload_url"):
@@ -216,21 +216,19 @@ def generate_checksum(task):
                     current_app.logger.info("duplicate task checksum error parsing task payload for project %d, %s", project.id, str(e))
                     return
             elif field == "private_json__encrypted_payload":
-                encrypted_content = task.info.get("private_json__encrypted_payload")
+                encrypted_content = task_info.get("private_json__encrypted_payload")
                 content = cipher.decrypt(encrypted_content) if cipher else encrypted_content
                 content = json.loads(content)
                 task_contents.update(content)
             else:
                 task_contents[field] = value
     else:
-        # public instance has all task fields under task.info
-        task_contents = task.info
+        # public instance has all task fields under task_info
+        task_contents = task_info
 
     checksum_fields = task_contents.keys() if not dup_fields_configured else dup_fields_configured
     checksum_payload = {field:task_contents[field] for field in checksum_fields}
-    current_app.logger.info("Project %d duplicate check fields %s", task.project_id, str(list(checksum_fields)))
     checksum = hashlib.sha256()
     checksum.update(json.dumps(checksum_payload, sort_keys=True).encode("utf-8"))
     checksum_value = checksum.hexdigest()
-    current_app.logger.info("Project %d duplicate checksum %s", project.id, checksum_value)
     return checksum_value
