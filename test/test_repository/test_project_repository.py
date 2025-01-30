@@ -233,6 +233,26 @@ class TestProjectRepositoryForProjects(Test):
 
 
     @with_context
+    def test_get_nested_value(self):
+        """Test _get_nested_value() helper method"""
+        data = {
+            "foo": {
+                "bar": {
+                    "bas": "hello"
+                }
+            }
+        }
+        result = ProjectRepository._get_nested_value(self, data, "foo::bar::bas", separator="::")
+        assert result == 'hello', result
+
+        result = ProjectRepository._get_nested_value(self, data, "bad::path", separator="::")
+        assert result == None, result
+
+        result = ProjectRepository._get_nested_value(self, data, "", separator="::")
+        assert result == None, result
+
+
+    @with_context
     def test_save_project_password_required(self):
         """Test save project without password fails when password required"""
         with patch.dict(self.flask_app.config,
