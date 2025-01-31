@@ -3711,6 +3711,7 @@ def project_config(short_name):
                                                             ps)
     forms = copy.deepcopy(current_app.config.get('EXTERNAL_CONFIGURATIONS_VUE', {}))
     remove_restricted_keys(forms)
+    error_msg = None
 
     def generate_input_forms_and_external_config_dict():
         '''
@@ -3768,6 +3769,7 @@ def project_config(short_name):
             project_repo.save(project)
             flash(gettext('Configuration updated successfully'), 'success')
         except Exception as e:
+            error_msg = str(e)
             current_app.logger.error('project-config post error. project id %d, data %s, error %s ',
                     project.id, request.data, str(e))
             flash(gettext('An error occurred.'), 'error')
@@ -3789,7 +3791,8 @@ def project_config(short_name):
                     csrf=generate_csrf(),
                     completed_tasks_cleanup_days=completed_tasks_cleanup_days,
                     allow_taskrun_edit=allow_taskrun_edit,
-                    reset_presented_time=reset_presented_time
+                    reset_presented_time=reset_presented_time,
+                    error_msg=error_msg
                     )
 
     return handle_content_type(response)

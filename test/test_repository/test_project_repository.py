@@ -32,6 +32,16 @@ class TestProjectRepositoryForProjects(Test):
     def setUp(self):
         super(TestProjectRepositoryForProjects, self).setUp()
         self.project_repo = ProjectRepository(db)
+        self.project_info = dict(
+                    data_classification=dict(input_data="L4 - public", output_data="L4 - public"),
+                    kpi=1,
+                    product='abc',
+                    subproduct='def')
+        self.validate_fields = [{
+            "path": "ext_config::service::file_path",
+            "regex": [r"[\\\{\}\`\[\]\"\'\^\%\*\>\<\~\#\|\s]", r'[\x00-\x1f]', r'[\x80-\xff]', '\x7f'],
+            "error_msg": "File path contains invalid characters."
+        }]
 
 
     @with_context
@@ -180,6 +190,66 @@ class TestProjectRepositoryForProjects(Test):
         self.project_repo.save(project)
 
         assert self.project_repo.get(project.id) == project, "Project not saved"
+
+
+    @with_context
+    def test_save_config_file_path(self):
+        """Test save with valid characters in project info"""
+        with patch.dict(self.flask_app.config, {'PROJECT_INFO_FIELDS_TO_VALIDATE': self.validate_fields}):
+            project = ProjectFactory.build(
+                info=dict(
+                    ext_config=dict(service=dict(file_path="abc/def")),
+                    **self.project_info))
+            assert self.project_repo.get(project.id) is None
+            self.project_repo.save(project)
+            assert self.project_repo.get(project.id) == project, "Project not saved"
+
+
+    @with_context
+    def test_save_config_file_path_fail(self):
+        """Test save with invalid characters in project info"""
+        with patch.dict(self.flask_app.config, {'PROJECT_INFO_FIELDS_TO_VALIDATE': self.validate_fields}):
+            project1 = ProjectFactory.build(
+                info=dict(
+                    ext_config=dict(service=dict(file_path="abc/ def")),
+                    **self.project_info))
+            assert self.project_repo.get(project1.id) is None
+            with assert_raises(BadRequest) as err:
+                self.project_repo.save(project1)
+
+            # path contains a space
+            assert err.exception.description == "File path contains invalid characters.", err.exception.description
+
+            project2 = ProjectFactory.build(
+                info=dict(
+                    ext_config=dict(service=dict(file_path="abc/%20def")),
+                    **self.project_info))
+            assert self.project_repo.get(project2.id) is None
+            with assert_raises(BadRequest) as err:
+                self.project_repo.save(project2)
+
+            # path contains a %
+            assert err.exception.description == "File path contains invalid characters.", err.exception.description
+
+
+    @with_context
+    def test_get_nested_value(self):
+        """Test _get_nested_value() helper method"""
+        data = {
+            "foo": {
+                "bar": {
+                    "bas": "hello"
+                }
+            }
+        }
+        result = ProjectRepository._get_nested_value(self, data, "foo::bar::bas", separator="::")
+        assert result == 'hello', result
+
+        result = ProjectRepository._get_nested_value(self, data, "bad::path", separator="::")
+        assert result == None, result
+
+        result = ProjectRepository._get_nested_value(self, data, "", separator="::")
+        assert result == None, result
 
 
     @with_context

@@ -31,6 +31,7 @@ import pandas.io.sql as sqlio
 import pandas as pd
 from flask import current_app
 import re
+from functools import reduce
 
 
 class ProjectRepository(Repository):
@@ -70,6 +71,7 @@ class ProjectRepository(Repository):
         self._verify_annotation_config(project)
         self._verify_required_fields(project)
         self._verify_product_subproduct(project)
+        self._verify_project_info_fields(project)
         try:
             self.db.session.add(project)
             self.db.session.commit()
@@ -157,6 +159,29 @@ class ProjectRepository(Repository):
             project.owners_ids = []
         if project.owner_id not in project.owners_ids:
             project.owners_ids.append(project.owner_id)
+
+    def _validate_string(self, value, regex_list=[]):
+        for expr in regex_list:
+            if(re.search(expr, value)):
+                return False
+        return True
+
+    def _get_nested_value(self, d, path, separator="::"):
+        try:
+            return reduce(lambda d, key: d[key], path.split(separator), d)
+        except (KeyError, TypeError):
+            return None
+
+    def _verify_project_info_fields(self, project):
+        fields = current_app.config.get('PROJECT_INFO_FIELDS_TO_VALIDATE', []);
+        if fields:
+            for field in fields:
+                path = field.get('path', '')
+                regex = field.get('regex', [])
+                error_msg = field.get('error_msg', f'Project info {path} contains invalid characters.')
+                value = self._get_nested_value(project.info, path)
+                if value and not self._validate_string(value, regex):
+                    raise BadRequest(error_msg)
 
     def _verify_has_password(self, project):
         if current_app.config.get('PROJECT_PASSWORD_REQUIRED') and not project.info.get('passwd_hash'):
