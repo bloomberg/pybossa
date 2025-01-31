@@ -148,7 +148,7 @@ class Importer(object):
         self._importer_constructor_params['youtube'] = youtube_params
 
     def upload_private_data(self, task, project_id):
-        private_fields = task.pop('private_fields', None)
+        private_fields = task.get('private_fields', None)
         if not private_fields:
             return
         file_name = 'task_private_data.json'
@@ -208,12 +208,21 @@ class Importer(object):
         n_answers = project.get_default_n_answers()
         try:
             for task_data in tasks:
+                # private data uploaded to files under persistent storage
                 self.upload_private_data(task_data, project.id)
+
                 # As tasks are getting created, pass current date as create_date
                 create_date = make_timestamp()
                 task_data['expiration'] = get_task_expiration(task_data.get('expiration'), create_date)
 
+                # generate dup_checksum from private data as per config
                 dup_checksum = generate_checksum(project=project, task=task_data)
+                # task_data["dup_checksum"] = dup_checksum
+
+                # remove private data from task payload so that
+                # its not visible in plain text form under task
+                task_data.pop('private_fields', None)
+
                 task = Task(project_id=project.id, n_answers=n_answers, dup_checksum=dup_checksum)
                 [setattr(task, k, v) for k, v in task_data.items()]
 
