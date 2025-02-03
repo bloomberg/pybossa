@@ -10399,6 +10399,42 @@ class TestWeb(web.Helper):
         assert dup_checksum == None
 
     @with_context
+    def test_checksum_csv_private_data(self):
+        """Test checksum is generated for private data stored under csv"""
+
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+
+        task_info = {"a": 1, "b": 2}
+        # # _priv fields from csv gets included as "private_fields" under task payload
+        task_payload = {"id": 1, "info": task_info, "private_fields": {"c": 3, "d": 4}}
+
+        duplicate_fields = ["a", "c", "d"]
+        all_task_data = {}
+        all_task_data.update(task_info)
+        all_task_data.update(task_payload["private_fields"])
+
+        checksum = hashlib.sha256()
+        expected_dupcheck_payload = {field: all_task_data[field] for field in duplicate_fields}
+        checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
+        expected_checksum =  checksum.hexdigest()
+
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": duplicate_fields
+                }
+            })
+
+        checksum = generate_checksum(project= project, task=task_payload)
+        assert checksum == expected_checksum, checksum
+
+    @with_context
     @patch("pybossa.task_creator_helper.get_encryption_key")
     @patch("pybossa.task_creator_helper.read_encrypted_file")
     def test_checksum_private_data_files(self, mock_read_enc_file, mock_get_enc_key):
@@ -10443,6 +10479,54 @@ class TestWeb(web.Helper):
         task_payload = {"id": task.id, "info": task.info}
         checksum = generate_checksum(project= project, task=task_payload)
         assert checksum == expected_checksum, checksum
+
+    @with_context
+    @patch("pybossa.task_creator_helper.get_encryption_key")
+    @patch("pybossa.task_creator_helper.read_encrypted_file")
+    def test_checksum_private_data_files_errors(self, mock_read_enc_file, mock_get_enc_key):
+        """Test checksum is generated for private data stored under files"""
+
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        public_data = {"a": 1}
+        private_data = {"b": 2, "c": 3}
+        duplicate_fields = ["a", "c"]
+        all_task_data = {}
+        all_task_data.update(public_data)
+        all_task_data.update(private_data)
+
+        checksum = hashlib.sha256()
+        expected_dupcheck_payload = {field: all_task_data[field] for field in duplicate_fields}
+        checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
+        expected_checksum =  checksum.hexdigest()
+
+        mock_get_enc_key.return_value = "xyz"
+        mock_read_enc_file.return_value = (json.dumps(private_data), "path/contents.txt")
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": duplicate_fields
+                }
+            })
+
+        task_info = {}
+        task_info.update(public_data)
+        invalid_project_id = 9999
+        task_info["priv_data__upload_url"] = f"/fileproxy/encrypted/bcosv2-dev/testbucket/{invalid_project_id}/path/contents.txt"
+        task_info["priv_data_2__upload_url"] = f"/fileproxy/encrypted/testbucket/bad_url_path.txt"
+        task_info["data_access_level"] = "L2"
+        task = TaskFactory.create(
+            project=project,
+            info=task_info
+        )
+        task_payload = {"id": task.id, "info": task.info}
+        with assert_raises(KeyError):
+            checksum = generate_checksum(project= project, task=task_payload)
 
     @with_context
     @patch("pybossa.task_creator_helper.get_encryption_key")
