@@ -125,3 +125,39 @@ class TestProjectExtConfig(web.Helper):
         project = project_repo.get(self.project_id)
         print(project)
         assert 'ext_config' not in project.info.keys()
+
+    @with_context
+    def test_update_path_for_responses(self):
+        config = {
+            "PROJECT_INFO_FIELDS_TO_VALIDATE": [{
+                "path": "ext_config::service::file_path",
+                "regex": [r"[\\\{\}\`\[\]\"\'\^\%\*\>\<\~\#\|\s]", r'[\x00-\x1f]', r'[\x80-\xff]', '\x7f'],
+                "error_msg": "File path contains invalid characters."
+            }],
+            "EXTERNAL_CONFIGURATIONS": {
+                "service": {
+                    'display': 'Response File Location',
+                    'fields': {
+                        'file_path': ('TextField', 'Path for responses', None)
+                    }
+                }
+            }
+        }
+
+        with patch.dict(self.flask_app.config, config):
+            project = project_repo.get(self.project_id)
+            project.info['ext_config'] = {
+                "service": {
+                    "file_path": "",
+                }
+            }
+            project_repo.save(project)
+            data = {
+                "service": True,
+                "file_path": "abc/ def",
+            }
+            res = self.app.post('/project/%s/ext-config' % project.short_name, data=data)
+            project = project_repo.get(self.project_id)
+
+            # file_path contains a space
+            assert "400 Bad Request: File path contains invalid characters" in str(res.data)
