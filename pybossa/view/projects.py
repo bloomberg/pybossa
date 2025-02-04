@@ -705,12 +705,9 @@ def task_presenter_editor(short_name):
             msg_1 = gettext('<strong>Note</strong> You will need to upload the'
                             ' tasks using the')
             msg_2 = gettext('CSV importer')
-            msg_3 = gettext(' or download the project bundle and run the'
-                            ' <strong>createTasks.py</strong> script in your'
-                            ' computer')
             url = '<a href="%s"> %s</a>' % (url_for('project.import_task',
                                                     short_name=project.short_name), msg_2)
-            msg = msg_1 + url + msg_3
+            msg = msg_1 + url
             flash(Markup(msg), 'info')
 
             wrap = lambda i: "projects/presenters/%s.html" % i
