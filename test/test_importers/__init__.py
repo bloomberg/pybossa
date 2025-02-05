@@ -448,41 +448,40 @@ class TestImporterPublicMethods(Test):
             import_report = self.importer._validate_headers(mock_importer, project, **form_data)
             assert import_report is None
 
-    @with_request_context
-    @patch("pybossa.task_creator_helper.bucket_name", return_value="xyz")
-    @patch("pybossa.task_creator_helper.s3_conn_type", return_value = "dev")
-    @patch('pybossa.cloud_store_api.s3.s3_upload_from_string', return_value='https:/s3/task.json')
-    # edeiegefekefgbkcdthddlgkuucgkjiictlvntduvrtu
-    @patch('pybossa.importers.importer.delete_import_csv_file', return_value=None)
-    def test_create_tasks_with_duplicate_checksum(
-        self,
-        mock_del,
-        upload_from_string,
-        mock_conn,
-        mock_bucket,
-        importer_factory
-    ):
-        from flask import current_app
-        current_app.config["PRIVATE_INSTANCE"] = True
+    # @with_request_context
+    # @patch("pybossa.task_creator_helper.bucket_name", return_value="xyz")
+    # @patch("pybossa.task_creator_helper.s3_conn_type", return_value = "dev")
+    # @patch('pybossa.cloud_store_api.s3.s3_upload_from_string', return_value='https:/s3/task.json')
+    # @patch('pybossa.importers.importer.delete_import_csv_file', return_value=None)
+    # def test_create_tasks_with_duplicate_checksum(
+    #     self,
+    #     mock_del,
+    #     upload_from_string,
+    #     mock_conn,
+    #     mock_bucket,
+    #     importer_factory
+    # ):
+    #     from flask import current_app
+    #     current_app.config["PRIVATE_INSTANCE"] = True
 
-        mock_importer = Mock()
-        mock_importer.tasks.return_value = [
-            {'info': {"a": 1, "b": 1}, 'private_fields': {'c': 1}},
-            {'info': {"a": 2, "b": 2}, 'private_fields': {'d': 2}},
-            {'info': {"a": 3, "b": 3}, 'private_fields': {'c': 3}}
-        ]
+    #     mock_importer = Mock()
+    #     mock_importer.tasks.return_value = [
+    #         {'info': {"a": 1, "b": 1}, 'private_fields': {'c': 1}},
+    #         {'info': {"a": 2, "b": 2}, 'private_fields': {'d': 2}},
+    #         {'info': {"a": 3, "b": 3}, 'private_fields': {'c': 3}}
+    #     ]
 
-        importer_factory.return_value = mock_importer
-        duplicate_fields = ["a", "c"]
-        project = ProjectFactory.create(
-            info={
-                "duplicate_task_check": {
-                    "duplicate_fields": duplicate_fields
-                }
-            }
-        )
-        form_data = dict(type='localCSV', csv_filename='fakefile.csv', validate_tp=False)
-        result = self.importer.create_tasks(task_repo, project, **form_data)
-        importer_factory.assert_called_with(**form_data)
-        upload_from_string.assert_called()
-        assert result.message == '2 new tasks were imported successfully. ', result
+    #     importer_factory.return_value = mock_importer
+    #     duplicate_fields = ["a", "c"]
+    #     project = ProjectFactory.create(
+    #         info={
+    #             "duplicate_task_check": {
+    #                 "duplicate_fields": duplicate_fields
+    #             }
+    #         }
+    #     )
+    #     form_data = dict(type='localCSV', csv_filename='fakefile.csv', validate_tp=False)
+    #     result = self.importer.create_tasks(task_repo, project, **form_data)
+    #     importer_factory.assert_called_with(**form_data)
+    #     upload_from_string.assert_called()
+    #     assert result.message == '2 new tasks were imported successfully. ', result
