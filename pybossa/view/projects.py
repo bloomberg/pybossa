@@ -3840,10 +3840,15 @@ def ext_config(short_name):
                     flash(gettext('At least one response file & consensus location must be provided. {} was not updated').format(display), 'error')
                 else:
                     project.info['ext_config'] = ext_conf
-                    project_repo.save(project)
-                    current_app.logger.info('Project id {} external configurations set. {} {}'.format(
-                            project.id, form_name, form.data))
-                    flash(gettext('Configuration for {} was updated').format(display), 'success')
+                    try:
+                        project_repo.save(project)
+                        current_app.logger.info('Project id {} external configurations set. {} {}'.format(
+                                project.id, form_name, form.data))
+                        flash(gettext('Configuration for {} was updated').format(display), 'success')
+                    except Exception as e:
+                        current_app.logger.error('ext-config post error. project id %d, data %s, error %s ',
+                                project.id, request.data, str(e))
+                        flash(gettext(f'An error occurred. {e}'), 'error')
 
     sanitize_project, _ = sanitize_project_owner(project, owner, current_user, ps)
     template_forms = [(name, disp, cl(MultiDict(ext_conf.get(name, {}))))
