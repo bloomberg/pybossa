@@ -10483,8 +10483,8 @@ class TestWeb(web.Helper):
     @with_context
     @patch("pybossa.task_creator_helper.get_encryption_key")
     @patch("pybossa.task_creator_helper.read_encrypted_file")
-    def test_checksum_private_data_files_errors(self, mock_read_enc_file, mock_get_enc_key):
-        """Test checksum is generated for private data stored under files"""
+    def test_checksum_private_data_filepath_incorrect_project(self, mock_read_enc_file, mock_get_enc_key):
+        """Test checksum fails with private data file path containing project id not matching task payload project id"""
 
         from flask import current_app
 
@@ -10492,14 +10492,6 @@ class TestWeb(web.Helper):
         public_data = {"a": 1}
         private_data = {"b": 2, "c": 3}
         duplicate_fields = ["a", "c"]
-        all_task_data = {}
-        all_task_data.update(public_data)
-        all_task_data.update(private_data)
-
-        checksum = hashlib.sha256()
-        expected_dupcheck_payload = {field: all_task_data[field] for field in duplicate_fields}
-        checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
-        expected_checksum =  checksum.hexdigest()
 
         mock_get_enc_key.return_value = "xyz"
         mock_read_enc_file.return_value = (json.dumps(private_data), "path/contents.txt")
@@ -10525,8 +10517,8 @@ class TestWeb(web.Helper):
             info=task_info
         )
         task_payload = {"id": task.id, "info": task.info}
-        with assert_raises(KeyError):
-            checksum = generate_checksum(project= project, task=task_payload)
+        with assert_raises(Exception):
+            generate_checksum(project=project, task=task_payload)
 
     @with_context
     @patch("pybossa.task_creator_helper.get_encryption_key")
@@ -10557,7 +10549,6 @@ class TestWeb(web.Helper):
         expected_checksum =  checksum.hexdigest()
 
         mock_get_enc_key.return_value = secret
-        # mock_read_enc_file.return_value = (json.dumps(private_data), "path/contents.txt")
         subadmin = UserFactory.create(subadmin=True)
         self.signin_user(subadmin)
         project = ProjectFactory.create(
@@ -10607,8 +10598,8 @@ class TestWeb(web.Helper):
             })
 
         task_payload = {"id": 123, "info": {"a": 1, "b__upload_url": f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"}}
-        checksum = generate_checksum(project=project, task=task_payload)
-        assert not checksum, checksum
+        with assert_raises(Exception):
+            generate_checksum(project=project, task=task_payload)
 
 
 class TestWebUserMetadataUpdate(web.Helper):

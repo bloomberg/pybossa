@@ -1262,3 +1262,47 @@ class TestTaskAPI(TestAPI):
         task = json.loads(res.data)
         assert res.status_code == 200
         assert not task["dup_checksum"]
+
+    @with_context
+    def test_create_task_with_duplicate_checksum_fails(self):
+        """Test create tasks performing duplicate check using dup_checksum value fails due to missing configured fields in task payload"""
+
+        subadmin = UserFactory.create(subadmin=True)
+        # self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": ["a", "c"]
+                }
+            })
+
+        task_data = dict(
+            project_id = project.id,
+            info = {"a": 1, "b": 2, "x": 3, "y": 4}  # missing field "c" in task payload as per duplicate_task_check field list configured
+        )
+        checksum = hashlib.sha256()
+        expected_dupcheck_payload = {"a": 1, "c": 3}
+        checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
+        expected_checksum =  checksum.hexdigest()
+
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        # duplicate task creation to fail
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        response = res.json
+        assert response["status_code"] == 400 and response["exception_msg"] == "Error generating duplicate checksum due to missing checksum configured fields ['a', 'c']"
+
+        # with duplicate task check not configured, no error reported and task created successfully
+        project2 = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject2",
+            info={})
+        task_data = dict(
+            project_id = project2.id,
+            info = {"a": 1, "b": 2, "c": 3}
+        )
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        task = json.loads(res.data)
+        assert res.status_code == 200
