@@ -162,9 +162,9 @@ class Importer(object):
 
         def get_error_message():
             if not validate_against_task_presenter:
-                return
+                return ""
             if not import_fields:
-                return
+                return ""
             if not project:
                 return gettext('Could not load project info')
 
@@ -175,7 +175,7 @@ class Importer(object):
             fields_not_in_import = task_presenter_fields - import_fields - get_enrichment_output_fields(project)
 
             if not fields_not_in_import:
-                return
+                return ""
 
             msg = 'Task presenter code uses fields not in import. '
             additional_msg = 'Fields missing from import: {}'.format((', '.join(fields_not_in_import))[:80])
@@ -183,7 +183,19 @@ class Importer(object):
             current_app.logger.error(', '.join(fields_not_in_import))
             return msg + additional_msg
 
-        msg = get_error_message()
+        reserved_genids = []
+        if hasattr(import_fields, "__iter__"):
+            if "genid_big_datastore_id" in import_fields:
+                reserved_genids.append("genid_big_datastore_id")
+            if "genid_transaction_id" in import_fields:
+                reserved_genids.append("genid_transaction_id")
+
+        msg = ""
+        if reserved_genids:
+            reserved_genid_names = ", ".join(reserved_genids)
+            msg += f"Reserved columns {reserved_genid_names} not allowed. "
+
+        msg += get_error_message()
 
         if msg:
             # Failed validation
