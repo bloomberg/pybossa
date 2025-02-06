@@ -18,7 +18,7 @@
 """Module with PyBossa create task helper."""
 from flask import current_app
 import hashlib
-import datetime
+import copy
 from flask import url_for
 import json
 import requests
@@ -199,23 +199,45 @@ def generate_checksum(project, task):
     dup_fields_configured = dup_task_config.get("duplicate_fields", [])
     # include all task_info fields with no field configured under duplicate_fields
 
-    secret = get_encryption_key(project) if current_app.config.get("PRIVATE_INSTANCE") else None
-    cipher = AESWithGCM(secret) if secret else None
     task_contents = {}
     if current_app.config.get("PRIVATE_INSTANCE"):
+        # csv import under private instance, may contain private data under _priv cols
+        # prior to this call, sucn _priv columns are combined together into task.private_fields
+        # collect fieldname and value from private_fields that are not part of task.info
+        private_fields = task.get('private_fields', None)
+        if private_fields:
+            for field, value in private_fields.items():
+                task_contents[field] = value
+
         for field, value in task_info.items():
+            # private required fields are excluded from building duplicate checksum
             if field in private_required_fields:
                 continue
+
             if field.endswith("__upload_url"):
-                _, fileproxy, encrypted, store, bucket, project_id, hash_key, filename = value.split('/')
-                content, _ = read_encrypted_file(store, project, bucket, filename)
-                try:
-                    content = json.loads(content)
-                    task_contents.update(content)
-                except Exception as e:
-                    current_app.logger.info("duplicate task checksum error parsing task payload for project %d, %s", project.id, str(e))
-                    return
+                tokens = value.split("/")
+                count_slash = value.count("/")
+                if count_slash >= 6 and tokens[1] == "fileproxy" and tokens[2] == "encrypted":
+                    store = tokens[3]
+                    bucket = tokens[4]
+                    project_id = int(tokens[5])
+                    if project_id != project.id:
+                        current_app.logger.info("error computing duplicate checksum. incorrect project id in url path. expected project id %d, url %s", project.id, value)
+                        continue
+
+                    filename = "/".join((tokens[6:]))
+                    path = f"{project_id}/{filename}"
+                    content, _ = read_encrypted_file(store, project, bucket, path)
+                    try:
+                        content = json.loads(content)
+                        task_contents.update(content)
+                    except Exception as e:
+                        current_app.logger.info("duplicate task checksum error parsing task payload for project %d, %s", project.id, str(e))
+                else:
+                    current_app.logger.info("error parsing task data url to compute duplicate checksum %s, %s", field, value)
             elif field == "private_json__encrypted_payload":
+                secret = get_encryption_key(project)
+                cipher = AESWithGCM(secret) if secret else None
                 encrypted_content = task_info.get("private_json__encrypted_payload")
                 content = cipher.decrypt(encrypted_content) if cipher else encrypted_content
                 content = json.loads(content)
@@ -227,8 +249,15 @@ def generate_checksum(project, task):
         task_contents = task_info
 
     checksum_fields = task_contents.keys() if not dup_fields_configured else dup_fields_configured
-    checksum_payload = {field:task_contents[field] for field in checksum_fields}
-    checksum = hashlib.sha256()
-    checksum.update(json.dumps(checksum_payload, sort_keys=True).encode("utf-8"))
-    checksum_value = checksum.hexdigest()
-    return checksum_value
+    try:
+        checksum_payload = {field:task_contents[field] for field in checksum_fields}
+        checksum = hashlib.sha256()
+        checksum.update(json.dumps(checksum_payload, sort_keys=True).encode("utf-8"))
+        checksum_value = checksum.hexdigest()
+        return checksum_value
+    except KeyError as e:
+        private_fields = task.get('private_fields', None)
+        task_payload = copy.deepcopy(task_info)
+        task_payload["private_fields_keys"] = list(private_fields.keys()) if private_fields else []
+        current_app.logger.info("error computing duplicate checksum. project id %d, error %s, task payload", project.id, str(e), json.dumps(task_payload))
+        raise Exception(f"Error generating duplicate checksum due to missing checksum configured fields {checksum_fields}")
