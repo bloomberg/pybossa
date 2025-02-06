@@ -74,3 +74,14 @@ class TestImporterValidation(Test):
         assert len(tasks) == 1, len(tasks)
         assert '1 task import failed due to invalid s3 bucket' in result.message, result.message
         importer_factory.assert_called_with(**form_data)
+
+    @with_request_context
+    def test_invalid_genid_columns(self, importer_factory):
+        mock_importer = Mock()
+        mock_importer.fields.return_value = ("question", "genid_big_datastore_id", "genid_transaction_id")
+        importer_factory.return_value = mock_importer
+
+        project = ProjectFactory.create()
+        form_data = dict(type='gdocs', googledocs_url='http://ggl.com', validate_tp=False)
+        result = self.importer.create_tasks(task_repo, project, **form_data)
+        assert result.message == 'Reserved columns genid_big_datastore_id, genid_transaction_id not allowed. '
