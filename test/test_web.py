@@ -10320,7 +10320,7 @@ class TestWeb(web.Helper):
             })
 
         # no checksum returned for missing/none task
-        assert generate_checksum(project=project, task=None) == None
+        assert generate_checksum(project_id=project.id, task=None) == None
 
         task_info = {
             "priv_data__upload_url": f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"
@@ -10331,7 +10331,7 @@ class TestWeb(web.Helper):
         )
 
         # with bad data under file, exception was handled and no checksum returned
-        checksum = generate_checksum(project=project, task=task)
+        checksum = generate_checksum(project_id=project.id, task=task)
         assert not checksum
 
     @with_context
@@ -10358,7 +10358,7 @@ class TestWeb(web.Helper):
         )
 
         # with missing project no checksum returned
-        checksum = generate_checksum(project=None, task=task)
+        checksum = generate_checksum(project_id=None, task=task)
         assert not checksum
 
     @with_context
@@ -10388,14 +10388,14 @@ class TestWeb(web.Helper):
             info = {"a": 1, "b": 2, "c": 3}
         )
 
-        dup_checksum = generate_checksum(project, task)
+        dup_checksum = generate_checksum(project_id=project.id, task=task)
         # confirm task payload populated with checksum generated
         assert dup_checksum == expected_checksum, dup_checksum
 
         # project w/o duplicate checksum configured gets
         # tasks created with null checksum value
         project2 = ProjectFactory.create(owner=subadmin, info={"x": 123}, short_name="xyz")
-        dup_checksum = generate_checksum(project2, task)
+        dup_checksum = generate_checksum(project_id=project2.id, task=task)
         assert dup_checksum == None
 
     @with_context
@@ -10431,7 +10431,7 @@ class TestWeb(web.Helper):
                 }
             })
 
-        checksum = generate_checksum(project= project, task=task_payload)
+        checksum = generate_checksum(project_id=project.id, task=task_payload)
         assert checksum == expected_checksum, checksum
 
     @with_context
@@ -10477,7 +10477,7 @@ class TestWeb(web.Helper):
             info=task_info
         )
         task_payload = {"id": task.id, "info": task.info}
-        checksum = generate_checksum(project= project, task=task_payload)
+        checksum = generate_checksum(project_id=project.id, task=task_payload)
         assert checksum == expected_checksum, checksum
 
     @with_context
@@ -10518,7 +10518,7 @@ class TestWeb(web.Helper):
         )
         task_payload = {"id": task.id, "info": task.info}
         with assert_raises(Exception):
-            generate_checksum(project=project, task=task_payload)
+            generate_checksum(project_id=project.id, task=task_payload)
 
     @with_context
     @patch("pybossa.task_creator_helper.get_encryption_key")
@@ -10568,7 +10568,7 @@ class TestWeb(web.Helper):
             info=task_info
         )
         task_payload = {"id": task.id, "info": task.info}
-        checksum = generate_checksum(project=project, task=task_payload)
+        checksum = generate_checksum(project_id=project.id, task=task_payload)
         assert checksum == expected_checksum
 
     @with_context
@@ -10599,7 +10599,7 @@ class TestWeb(web.Helper):
 
         task_payload = {"id": 123, "info": {"a": 1, "b__upload_url": f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"}}
         with assert_raises(Exception):
-            generate_checksum(project=project, task=task_payload)
+            generate_checksum(project_id=project.id, task=task_payload)
 
 
 class TestWebUserMetadataUpdate(web.Helper):

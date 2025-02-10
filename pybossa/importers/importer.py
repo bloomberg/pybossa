@@ -224,12 +224,7 @@ class Importer(object):
                 create_date = make_timestamp()
                 task_data['expiration'] = get_task_expiration(task_data.get('expiration'), create_date)
 
-                # generate dup_checksum from private data as per config
-                try:
-                    dup_checksum = generate_checksum(project=project, task=task_data)
-                except Exception as e:
-                    continue
-
+                dup_checksum = generate_checksum(project_id=project.id, task=task_data)
                 self.upload_private_data(task_data, project.id)
                 task = Task(project_id=project.id, n_answers=n_answers, dup_checksum=dup_checksum)
                 [setattr(task, k, v) for k, v in task_data.items()]
