@@ -181,14 +181,16 @@ def read_encrypted_file(store, project, bucket, key_name):
     return decrypted, key
 
 
-def generate_checksum(project, task):
+def generate_checksum(project_id, task):
     from pybossa.cache.projects import get_project_data
     from pybossa.core import private_required_fields
 
     if not (task and isinstance(task, dict) and "info" in task):
         return
 
+    project = get_project_data(project_id)
     if not project:
+        current_app.logger.info("Duplicate task checksum may not be generated. Incorrect project id %d", project_id)
         return
 
     task_info = task["info"]
