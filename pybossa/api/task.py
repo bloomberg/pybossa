@@ -92,9 +92,8 @@ class TaskAPI(APIBase):
             hdfs_task = any([val.startswith("/fileproxy/hdfs/") for val in info.values() if isinstance(val, str)])
             if hdfs_task:
                 raise BadRequest("Invalid task payload. HDFS is not supported")
-        project = get_project_data(project_id)
         try:
-            dup_checksum = generate_checksum(project=project, task=data)
+            dup_checksum = generate_checksum(project_id=project_id, task=data)
         except Exception as e:
             current_app.logger.info("Project %d. Error generating duplicate task checksum %s", project_id, str(e))
             raise BadRequest(str(e))
