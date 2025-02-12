@@ -846,10 +846,13 @@ def update(short_name):
             'input_data': form.input_data_class.data,
             'output_data': form.output_data_class.data
         }
-        new_project.info['duplicate_task_check'] = {
-            'duplicate_fields': form.duplicate_task_check_duplicate_fields.data,
-            'completed_tasks': form.duplicate_task_check_completed_tasks.data
-        }
+        if form.enable_duplicate_task_check.data:
+            new_project.info['duplicate_task_check'] = {
+                'duplicate_fields': form.duplicate_task_check_duplicate_fields.data,
+                'completed_tasks': form.duplicate_task_check_completed_tasks.data
+            }
+        else:
+            new_project.info.pop('duplicate_task_check')
         if "allow_taskrun_edit" in form:
             new_project.info["allow_taskrun_edit"] = form.allow_taskrun_edit.data
 
@@ -886,6 +889,7 @@ def update(short_name):
         duplicate_task_check_duplicate_fields = project.info.get("duplicate_task_check", {}).get("duplicate_fields", [])
         project.duplicate_task_check_duplicate_fields = duplicate_task_check_duplicate_fields
         project.duplicate_task_check_completed_tasks = project.info.get("duplicate_task_check", {}).get("completed_tasks", False)
+        project.enable_duplicate_task_check = True if project.info.get("duplicate_task_check") else False
         ensure_amp_config_applied_to_project(project, project.info.get('annotation_config', {}))
         form = dynamic_project_form(ProjectUpdateForm, None, data_access_levels, obj=project,
                                     products=prodsubprods, data_classes=data_classes)

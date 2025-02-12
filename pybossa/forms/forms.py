@@ -149,7 +149,8 @@ class ProjectUpdateForm(ProjectForm):
     if not private_instance:
         allow_taskrun_edit = BooleanField(lazy_gettext('Allow Editing of Task Submissions'))
     duplicate_task_check_duplicate_fields = Select2Field(lazy_gettext('Task.info field names to be included in duplication check'), choices=[], validate_choice=False)
-    duplicate_task_check_completed_tasks = BooleanField(lazy_gettext('Include completed tasks for task duplication check'))
+    duplicate_task_check_completed_tasks = BooleanField(lazy_gettext('Include completed tasks in task duplication check'))
+    enable_duplicate_task_check = BooleanField(lazy_gettext('Enable task duplication check'))
     zip_download = BooleanField(lazy_gettext('Allow ZIP data download'))
     category_id = SelectField(lazy_gettext('Category'), coerce=int)
     hidden = BooleanField(lazy_gettext('Hide?'))
