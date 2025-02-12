@@ -810,7 +810,6 @@ def delete(short_name):
 @blueprint.route('/<short_name>/update', methods=['GET', 'POST'])
 @login_required
 def update(short_name):
-
     sync_enabled = current_app.config.get('SYNC_ENABLED')
     project, owner, ps = project_by_shortname(short_name)
 
@@ -847,6 +846,10 @@ def update(short_name):
             'input_data': form.input_data_class.data,
             'output_data': form.output_data_class.data
         }
+        new_project.info['duplicate_task_check'] = {
+            'duplicate_fields': form.duplicate_task_check_duplicate_fields.data,
+            'completed_tasks': form.duplicate_task_check_completed_tasks.data
+        }
         if "allow_taskrun_edit" in form:
             new_project.info["allow_taskrun_edit"] = form.allow_taskrun_edit.data
 
@@ -880,6 +883,9 @@ def update(short_name):
         project.input_data_class = project.info.get('data_classification', {}).get('input_data')
         project.output_data_class = project.info.get('data_classification', {}).get('output_data')
         project.allow_taskrun_edit = project.info.get("allow_taskrun_edit", False)
+        duplicate_task_check_duplicate_fields = project.info.get("duplicate_task_check", {}).get("duplicate_fields", [])
+        project.duplicate_task_check_duplicate_fields = duplicate_task_check_duplicate_fields
+        project.duplicate_task_check_completed_tasks = project.info.get("duplicate_task_check", {}).get("completed_tasks", False)
         ensure_amp_config_applied_to_project(project, project.info.get('annotation_config', {}))
         form = dynamic_project_form(ProjectUpdateForm, None, data_access_levels, obj=project,
                                     products=prodsubprods, data_classes=data_classes)
@@ -891,6 +897,7 @@ def update(short_name):
         if project.category_id is None:
             project.category_id = categories[0].id
         form.populate_obj(project)
+        form.set_duplicate_task_check_duplicate_fields_options([(field, field) for field in duplicate_task_check_duplicate_fields])
 
 
     if request.method == 'POST':

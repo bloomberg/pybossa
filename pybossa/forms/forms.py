@@ -148,6 +148,8 @@ class ProjectUpdateForm(ProjectForm):
     private_instance = data_access.data_access_levels.get("valid_access_levels", []) == ["L1", "L2", "L3", "L4"]
     if not private_instance:
         allow_taskrun_edit = BooleanField(lazy_gettext('Allow Editing of Task Submissions'))
+    duplicate_task_check_duplicate_fields = Select2Field(lazy_gettext('Task.info field names to be included in duplication check'), choices=[], validate_choice=False)
+    duplicate_task_check_completed_tasks = BooleanField(lazy_gettext('Include completed tasks for task duplication check'))
     zip_download = BooleanField(lazy_gettext('Allow ZIP data download'))
     category_id = SelectField(lazy_gettext('Category'), coerce=int)
     hidden = BooleanField(lazy_gettext('Hide?'))
@@ -163,6 +165,9 @@ class ProjectUpdateForm(ProjectForm):
     webhook = TextField(lazy_gettext('Webhook'),
                         [pb_validator.Webhook()])
     sync_enabled = BooleanField(lazy_gettext('Enable Project Syncing'))
+
+    def set_duplicate_task_check_duplicate_fields_options(self, options):
+        self.duplicate_task_check_duplicate_fields.choices = options
 
 class AnnotationForm(Form):
     dataset_description = TextAreaField(lazy_gettext('Dataset Description'))
