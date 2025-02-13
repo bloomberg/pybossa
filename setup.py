@@ -72,7 +72,7 @@ requirements = [
     "isodate==0.6.0",
     "itsdangerous==2.0.1",
     "jeepney==0.7.1",
-    "Jinja2==3.0.1",
+    "Jinja2==3.1.5",
     "jsmin==3.0.0",
     "keyring==23.2.1",
     "keystoneauth1==4.4.0",
