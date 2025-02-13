@@ -77,6 +77,6 @@ jobs:
       - name: Run code coverage
         run: |
           python -m pip install coveralls
-          coveralls --service=github
+          coveralls --service=github --no-fail
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
