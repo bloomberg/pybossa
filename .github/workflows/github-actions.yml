@@ -74,9 +74,3 @@ jobs:
           echo "::remove-matcher owner=python::"
           ./run_tests
 
-      - name: Run code coverage
-        run: |
-          python -m pip install coveralls
-          coveralls --service=github
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -24,4 +24,10 @@ class Select2Field(SelectMultipleField):
     type.  The rendering logic must be handled in the client code which includes
     adding the select2 source files.
     '''
-    pass
+
+    def pre_validate(self, form):
+        if self.validate_choice and self.data:
+            values = list(c[0] for c in self.choices)
+            for d in self.data:
+                if d not in values:
+                    raise ValueError(self.gettext("'%(value)s' is not a valid choice for this field") % dict(value=d))
