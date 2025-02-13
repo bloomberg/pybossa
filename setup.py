@@ -154,7 +154,7 @@ requirements = [
     "twitter==1.19.3",
     "Unidecode==1.3.2",
     "uritemplate==3.0.1",
-    "urllib3==1.26.7",
+    "urllib3==1.26.19",
     "validators==0.18.2",
     "wcwidth==0.2.5",
     "webassets==2.0",
