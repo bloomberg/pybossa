@@ -852,7 +852,7 @@ def update(short_name):
                 'completed_tasks': form.duplicate_task_check_completed_tasks.data
             }
         else:
-            new_project.info.pop('duplicate_task_check')
+            new_project.info.pop('duplicate_task_check', None)
         if "allow_taskrun_edit" in form:
             new_project.info["allow_taskrun_edit"] = form.allow_taskrun_edit.data
 
