@@ -2513,7 +2513,7 @@ class TestProjectAPI(TestAPI):
         # query for the count of all tasks in the propject
         res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
         assert res.status_code == 200
-        assert res.json == dict(n_completed_tasks=0, n_tasks=3)
+        assert res.json == dict(n_completed_tasks=0, n_tasks=3, n_gold_tasks=0)
 
         # mark 2 out of total 3 tasks as complete
         for i in range(n_answers):
@@ -2523,7 +2523,7 @@ class TestProjectAPI(TestAPI):
         # query for the count of all tasks in the propject
         res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
         assert res.status_code == 200
-        assert res.json == dict(n_completed_tasks=2, n_tasks=3)
+        assert res.json == dict(n_completed_tasks=2, n_tasks=3, n_gold_tasks=0)
 
         # mark third task also complete
         for i in range(n_answers):
@@ -2531,7 +2531,7 @@ class TestProjectAPI(TestAPI):
         # query for the count of all tasks in the propject
         res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
         assert res.status_code == 200
-        assert res.json == dict(n_completed_tasks=3, n_tasks=3)
+        assert res.json == dict(n_completed_tasks=3, n_tasks=3, n_gold_tasks=0), res.json
 
         # accessing api with subadmin user who's not owner fails
         headers = [('Authorization', subadmin.api_key)]
@@ -2554,12 +2554,15 @@ class TestProjectAPI(TestAPI):
         # query for the count of total tasks and completed tasks in the propject
         res = self.app.get('/api/project/1/projectprogress', follow_redirects=True, headers=headers)
         assert res.status_code == 200
-        assert res.json == dict(n_completed_tasks=3, n_tasks=3)
+        assert res.json == dict(n_completed_tasks=3, n_tasks=3, n_gold_tasks=0)
+
+        # create gold tasks
+        tasks = TaskFactory.create_batch(2, project=project, calibration = 1)
 
         # accessing api using project short_name pass
         res = self.app.get('/api/project/testproject/projectprogress', follow_redirects=True, headers=headers)
         assert res.status_code == 200
-        assert res.json == dict(n_completed_tasks=3, n_tasks=3)
+        assert res.json == dict(n_completed_tasks=3, n_tasks=3, n_gold_tasks=2)
 
 
     def _setup_project(self, short_name, owner):
