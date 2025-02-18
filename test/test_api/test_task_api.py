@@ -1306,3 +1306,154 @@ class TestTaskAPI(TestAPI):
         res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
         task = json.loads(res.data)
         assert res.status_code == 200
+
+
+    @with_context
+    def test_create_task_fails_with_duplicate_against_all_tasks(self):
+        """Test create tasks performing duplicate check against all tasks fails with 409 conflict error"""
+
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        # project checking duplicate task against all tasks; ongoing and completed
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": ["a", "c"],
+                    "completed_tasks": True
+                }
+            })
+
+        # create task and complete it
+        task_data = dict(
+            project_id = project.id,
+            info = {"a": 1, "b": 1, "c": 111}
+        )
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status_code == 200, res
+        task1 = task_repo.get_task(res.json['id'])
+        res = TaskRunFactory.create(task=task1, user=subadmin)
+        assert res.task_id == task1.id, f"taskrun should be submitted against task {task1.id}"
+
+        task_data["info"] = {"a": 2, "b": 22, "c": 222}
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status_code == 200, res
+
+        task_data["info"] = {"a": 3, "b": 33, "c": 333}
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status_code == 200, res
+
+        # create task duplicate of completed task
+        # a and c are configured for dup check.
+        # difft value of b doesn't matter and task creation should still fail w/ 409
+        task_data = dict(
+            project_id = project.id,
+            info = {"a": 1, "b": 2, "c": 111}
+        )
+
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+        # duplicate task creation failed
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status == "409 CONFLICT", res
+
+    @with_context
+    def test_create_task_pass_with_duplicate_against_ongoing_tasks(self):
+        """Test create tasks performing duplicate check against ongoing tasks only"""
+
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        # project checking duplicate task against all tasks; ongoing and completed
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": ["a", "c"],
+                    "completed_tasks": False        # only ongoing tasks
+                }
+            })
+
+        # create task and complete it
+        task_data = dict(
+            project_id = project.id,
+            info = {"a": 1, "b": 1, "c": 111}
+        )
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status_code == 200, res
+        task1 = task_repo.get_task(res.json['id'])
+        res = TaskRunFactory.create(task=task1, user=subadmin)
+        assert res.task_id == task1.id, f"taskrun should be submitted against task {task1.id}"
+
+        task_data["info"] = {"a": 2, "b": 22, "c": 222}
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status_code == 200, res
+
+        task_data["info"] = {"a": 3, "b": 33, "c": 333}
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status_code == 200, res
+
+        # create task duplicate of completed task
+        # a and c are configured for dup check.
+        # difft value of b doesn't matter and task creation should still pass
+        # as similar task has been completed and project is configured to
+        # perform duplicate check against ongoing tasks only
+        task_data = dict(
+            project_id = project.id,
+            info = {"a": 1, "b": 2, "c": 111}
+        )
+
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+        # task creation should pass as duplicate check is against ongoing noncompleted tasks
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status_code == 200, res
+
+    @with_context
+    def test_create_task_pass_with_duplicate_against_ongoing_unexipred_tasks(self):
+        """Test create tasks performing duplicate check against ongoing unexpired tasks"""
+
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        # project checking duplicate task against all tasks; ongoing and completed
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": ["a", "c"],
+                    "completed_tasks": False        # only ongoing tasks
+                }
+            })
+
+        # create expired task
+        task_data = dict(
+            project_id = project.id,
+            info = {"a": 1, "b": 1, "c": 111},
+            expiration="2022-02-22T19:25:45.762592"
+        )
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.json["expiration"] == "2022-02-22T19:25:45.762592"
+
+        task_data["info"] = {"a": 2, "b": 22, "c": 222}
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+
+        task_data["info"] = {"a": 3, "b": 33, "c": 333}
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+
+        # create task duplicate of completed task
+        # a and c are configured for dup check.
+        # difft value of b doesn't matter and task creation should still pass
+        # as similar task has been completed and project is configured to
+        # perform duplicate check against ongoing tasks only
+        task_data = dict(
+            project_id = project.id,
+            info = {"a": 1, "b": 2, "c": 111}
+        )
+
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+        # task creation to pass as similar task that is present has already expired
+        res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status_code == 200, res
