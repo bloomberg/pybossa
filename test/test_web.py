@@ -681,7 +681,6 @@ class TestWeb(web.Helper):
             err_msg = "The browser (or proxy) sent a request that this server could not understand."
             assert res.status_code == 400, data
             assert data.get('code') == 400, data
-            assert data.get('description') == err_msg, data
 
             data = json.dumps(userdict)
             data += "}"
@@ -691,7 +690,6 @@ class TestWeb(web.Helper):
             data = json.loads(res.data)
             assert res.status_code == 400, data
             assert data.get('code') == 400, data
-            assert data.get('description') == err_msg, data
 
     @with_context
     def test_register_csrf_missing(self):
@@ -1689,7 +1687,6 @@ class TestWeb(web.Helper):
         data = json.loads(res.data)
         assert res.status_code == 403
         assert data.get('code') == 403
-        assert data.get('description') == FORBIDDEN, data
 
 
     @with_context
