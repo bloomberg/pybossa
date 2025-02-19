@@ -87,6 +87,10 @@ class TaskAPI(APIBase):
 
     def _preprocess_post_data(self, data):
         project_id = data["project_id"]
+        project = project_repo.get(project_id)
+        if not project:
+            raise NotFound(f'Non existing project id {project_id}')
+
         info = data["info"]
         if isinstance(info, dict):
             hdfs_task = any([val.startswith("/fileproxy/hdfs/") for val in info.values() if isinstance(val, str)])
@@ -97,9 +101,14 @@ class TaskAPI(APIBase):
         except Exception as e:
             current_app.logger.info("Project %d. Error generating duplicate task checksum %s", project_id, str(e))
             raise BadRequest(str(e))
-
         data["dup_checksum"] = dup_checksum
-        duplicate = task_repo.find_duplicate(project_id=project_id, info=info, dup_checksum=dup_checksum)
+        completed_tasks = project.info.get("duplicate_task_check", {}).get("completed_tasks", False)
+        duplicate = task_repo.find_duplicate(
+            project_id=project_id,
+            info=info,
+            dup_checksum=dup_checksum,
+            completed_tasks=completed_tasks
+        )
         if duplicate:
             current_app.logger.info("Project %d, task checksum %s. Duplicate task found with task id %d. Ignoring task creation", project_id, dup_checksum, duplicate)
             message = {
@@ -110,9 +119,6 @@ class TaskAPI(APIBase):
 
 
         if 'n_answers' not in data:
-            project = project_repo.get(project_id)
-            if not project:
-                raise NotFound(f'Non existing project id {project_id}')
             data['n_answers'] = project.get_default_n_answers()
         user_pref = data.get('user_pref', {})
         if user_pref.get('languages'):

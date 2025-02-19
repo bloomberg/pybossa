@@ -495,7 +495,7 @@ class TaskRepository(Repository):
         self.db.session.commit()
         cached_projects.clean_project(project_id)
 
-    def find_duplicate(self, project_id, info, dup_checksum=None):
+    def find_duplicate(self, project_id, info, dup_checksum=None, completed_tasks=False):
         """
         Find a task id in the given project with the project info using md5
         index on info column casted as text. Md5 is used to avoid key size
@@ -504,12 +504,14 @@ class TaskRepository(Repository):
         # with task payload containing dup_checksum value, perform duplicate
         # check based on checkum instead of comparing entire task payload info
         if dup_checksum:
+            task_state_cond = "AND task.state='ongoing'" if not completed_tasks else ""
             sql = text('''
                     SELECT task.id as task_id
                     FROM task
                     WHERE task.project_id=:project_id
                     AND task.dup_checksum=:dup_checksum
-                    ''')
+                    AND task.expiration > (now() at time zone 'utc')::timestamp
+                    {};'''.format(task_state_cond))
             row = self.db.session.execute(
                 sql, dict(project_id=project_id, dup_checksum=dup_checksum)).first()
         else:
@@ -518,7 +520,7 @@ class TaskRepository(Repository):
                     FROM task
                     WHERE task.project_id=:project_id
                     AND task.state='ongoing'
-                    AND md5(task.info::text)=md5(((:info)::jsonb)::text)
+                    AND md5(task.info::text)=md5(((:info)::jsonb)::text);
                     ''')
             info = json.dumps(info, allow_nan=False)
             row = self.db.session.execute(

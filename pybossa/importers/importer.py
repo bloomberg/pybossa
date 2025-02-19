@@ -212,12 +212,14 @@ class Importer(object):
         num = 0
         importer = importer or self._create_importer_for(**form_data)
         tasks = importer.tasks()
+        total_tasks_count = len(tasks) if isinstance(tasks, list) else 0
         header_report = self._validate_headers(importer, project, **form_data)
         if header_report:
             return header_report
         msg = ''
         validator = TaskImportValidator(get_enrichment_output_fields(project))
         n_answers = project.get_default_n_answers()
+        completed_tasks = project.info.get("duplicate_task_check", {}).get("completed_tasks", False)
         try:
             for task_data in tasks:
                 # As tasks are getting created, pass current date as create_date
@@ -233,8 +235,10 @@ class Importer(object):
                 set_gold_answers(task, gold_answers)
 
                 found = task_repo.find_duplicate(project_id=project.id,
-                                                info=task.info,
-                                                dup_checksum=task.dup_checksum)
+                    info=task.info,
+                    dup_checksum=task.dup_checksum,
+                    completed_tasks=completed_tasks
+                )
                 if found is not None:
                     current_app.logger.info("Project %d, task checksum %s. Duplicate task found with task id %d", project.id, task.dup_checksum, found)
                     continue
@@ -260,6 +264,8 @@ class Importer(object):
             msg = str(num) + " " + gettext('new task was imported successfully. ')
         else:
             msg = str(num) + " " + gettext('new tasks were imported successfully. ')
+        if num > 0 and num < total_tasks_count:
+            msg += str(total_tasks_count - num) + " " + gettext('tasks not imported. ')
         msg += str(validator)
         if data_access_levels and 'data_access' in importer.headers():
             msg += gettext('Task data_access column will not impact data classification. This is done at project level only.')

@@ -10357,8 +10357,16 @@ class TestWeb(web.Helper):
             info={"a": 1, "b": 2, "c": 3}
         )
 
-        # with missing project no checksum returned
+        # task payload to be of type dict
         checksum = generate_checksum(project_id=None, task=task)
+        assert not checksum
+
+        # incorrect project id won't generate checksum
+        task_payload = {"project_id": 999, "info": {"a": 1, "b": 2, "c": 3}}
+        checksum = generate_checksum(project_id=None, task=task_payload)
+        assert not checksum
+        task_payload = {"project_id": 999, "info": {"a": 1, "b": 2, "c": 3}}
+        checksum = generate_checksum(project_id=999, task=task_payload)
         assert not checksum
 
     @with_context
