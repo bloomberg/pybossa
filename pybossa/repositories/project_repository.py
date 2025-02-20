@@ -446,13 +446,14 @@ class ProjectRepository(Repository):
         sql = text(
                     '''
                         SELECT
-                            (SELECT COUNT(*) FROM task
-                            WHERE task.project_id=:project_id AND task.state='completed') as n_completed,
-                            (SELECT COUNT(task.id) AS n_tasks FROM task
-                            WHERE task.project_id=:project_id AND calibration != 1) as n_tasks;
+                            SUM(CASE WHEN task.state = 'completed' THEN 1 ELSE 0 END) AS n_completed,
+                            SUM(CASE WHEN calibration != 1 THEN 1 ELSE 0 END) AS n_tasks,
+                            SUM(CASE WHEN calibration = 1 THEN 1 ELSE 0 END) AS n_gold_tasks
+                        FROM task
+                        WHERE task.project_id = :project_id;
                     '''
                     )
         response = self.db.session.execute(sql, dict(project_id=project_id)).fetchall()
-        n_completed, n_tasks = response[0]
-        result = dict(n_completed_tasks=n_completed, n_tasks=n_tasks)
+        n_completed, n_tasks, n_gold_tasks = response[0]
+        result = dict(n_completed_tasks=n_completed, n_tasks=n_tasks, n_gold_tasks=n_gold_tasks)
         return result
