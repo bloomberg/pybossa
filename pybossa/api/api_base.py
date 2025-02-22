@@ -348,6 +348,7 @@ class APIBase(MethodView):
             response_dict = inst.dictize()
             self._customize_response_dict(response_dict)
             json_response = json.dumps(response_dict)
+            current_app.logger.info("Created %s id %s", cls_name, json_response)
             return Response(json_response, mimetype='application/json')
         except Exception as e:
             return error.format_exception(
@@ -406,6 +407,7 @@ class APIBase(MethodView):
             self._delete_instance(oid)
             cls_name = self.__class__.__name__
             self.refresh_cache(cls_name, oid)
+            current_app.logger.info("Deleted %s id %d", cls_name, oid)
             return Response('', 204, mimetype='application/json')
         except Exception as e:
             return error.format_exception(
@@ -455,6 +457,7 @@ class APIBase(MethodView):
                                          repos,
                                          new_upload=data)
             self.refresh_cache(cls_name, oid)
+            current_app.logger.info("Updated %s id %d", cls_name, oid)
             return Response(json.dumps(inst.dictize()), 200,
                             mimetype='application/json')
         except Exception as e:
