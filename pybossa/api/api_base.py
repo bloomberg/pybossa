@@ -348,7 +348,7 @@ class APIBase(MethodView):
             response_dict = inst.dictize()
             self._customize_response_dict(response_dict)
             json_response = json.dumps(response_dict)
-            message = f"Created {cls_name} "
+            message = f"Created {cls_name}"
             self._log_operation(message, info=response_dict)
             return Response(json_response, mimetype='application/json')
         except Exception as e:
@@ -460,7 +460,7 @@ class APIBase(MethodView):
                                          new_upload=data)
             self.refresh_cache(cls_name, oid)
             response_dict = inst.dictize()
-            message = f"Updated {cls_name} "
+            message = f"Updated {cls_name}"
             self._log_operation(message, info=response_dict)
             return Response(json.dumps(response_dict), 200,
                             mimetype='application/json')
@@ -641,16 +641,11 @@ class APIBase(MethodView):
         """change if need to keep some information about the original request"""
         return item
 
-    def _log_operation(self, messsage, info=None):
+    def _log_operation(self, message, info=None):
         """Log api operation with message and additonal info provided"""
         if not info:
-            current_app.logger.info("%s", messsage)
+            current_app.logger.info("%s", message)
             return
 
-        log_info = []
-        log_info += [f"id {info['id']}"] if "id" in info else []
-        log_info += [f"name {info['name']}"] if "name" in info else []
-        log_info += [f"short_name {info['short_name']}"] if "short_name" in info else []
-        log_info += [f"owner_id {info['owner_id']}"] if "owner_id" in info else []
-        log_info += [f"project_id {info['project_id']}"] if "project_id" in info else []
-        current_app.logger.info("%s%s", messsage, ", ".join(log_info))
+        log_info = [f"{key} {info[key]}" for key in ["id", "name", "short_name", "owner_id", "project_id"] if key in info]
+        current_app.logger.info("%s %s", message, ", ".join(log_info))
