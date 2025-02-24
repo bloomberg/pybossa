@@ -348,7 +348,8 @@ class APIBase(MethodView):
             response_dict = inst.dictize()
             self._customize_response_dict(response_dict)
             json_response = json.dumps(response_dict)
-            current_app.logger.info("Created %s id %s", cls_name, json_response)
+            message = f"Created {cls_name} "
+            self._log_operation(message, info=response_dict)
             return Response(json_response, mimetype='application/json')
         except Exception as e:
             return error.format_exception(
@@ -407,7 +408,8 @@ class APIBase(MethodView):
             self._delete_instance(oid)
             cls_name = self.__class__.__name__
             self.refresh_cache(cls_name, oid)
-            current_app.logger.info("Deleted %s id %d", cls_name, oid)
+            message = f"Deleted {cls_name} id {oid}"
+            self._log_operation(message)
             return Response('', 204, mimetype='application/json')
         except Exception as e:
             return error.format_exception(
@@ -457,8 +459,10 @@ class APIBase(MethodView):
                                          repos,
                                          new_upload=data)
             self.refresh_cache(cls_name, oid)
-            current_app.logger.info("Updated %s id %d", cls_name, oid)
-            return Response(json.dumps(inst.dictize()), 200,
+            response_dict = inst.dictize()
+            message = f"Updated {cls_name} "
+            self._log_operation(message, info=response_dict)
+            return Response(json.dumps(response_dict), 200,
                             mimetype='application/json')
         except Exception as e:
             return error.format_exception(
@@ -636,3 +640,17 @@ class APIBase(MethodView):
     def _copy_original(self, item):
         """change if need to keep some information about the original request"""
         return item
+
+    def _log_operation(self, messsage, info=None):
+        """Log api operation with message and additonal info provided"""
+        if not info:
+            current_app.logger.info("%s", messsage)
+            return
+
+        log_info = []
+        log_info += [f"id {info['id']}"] if "id" in info else []
+        log_info += [f"name {info['name']}"] if "name" in info else []
+        log_info += [f"short_name {info['short_name']}"] if "short_name" in info else []
+        log_info += [f"owner_id {info['owner_id']}"] if "owner_id" in info else []
+        log_info += [f"project_id {info['project_id']}"] if "project_id" in info else []
+        current_app.logger.info("%s%s", messsage, ", ".join(log_info))
