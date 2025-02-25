@@ -11,6 +11,7 @@ from werkzeug.exceptions import BadRequest
 from pybossa.cloud_store_api.connection import create_connection
 from pybossa.encryption import AESWithGCM
 import json
+from time import perf_counter
 
 allowed_mime_types = ['application/pdf',
                       'text/csv',
@@ -199,22 +200,28 @@ def get_file_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN, decrypt=False):
 
 def get_content_and_key_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN,
         decrypt=False, secret=None):
+    begin_time = perf_counter()
     _, key = get_s3_bucket_key(s3_bucket, path, conn_name)
     content = key.get_contents_as_string()
+    duration = perf_counter() - begin_time
+    file_path = f"{s3_bucket}/{path}"
+    app.logger.info("get_content_and_key_from_s3. Load file contents %s duration %f seconds", file_path, duration)
+    begin_time = perf_counter()
     if decrypt:
         if not secret:
             secret = app.config.get('FILE_ENCRYPTION_KEY')
         cipher = AESWithGCM(secret)
         content = cipher.decrypt(content)
-    app.logger.info(f"get_content_and_key_from_s3. bucket {s3_bucket}, path {path}, content type {type(content)}")
+        duration = perf_counter() - begin_time
+        app.logger.info("get_content_and_key_from_s3. file %s decryption duration %f seconds", file_path, duration)
+    else:
+        app.logger.info("get_content_and_key_from_s3. file %s no decryption duration %f seconds", file_path, duration)
     try:
         if type(content) == bytes:
             content = content.decode()
             app.logger.info("get_content_and_key_from_s3. contents decoded")
-        else:
-            app.logger.info("get_content_and_key_from_s3. contents not decoded")
     except (UnicodeDecodeError, AttributeError) as e:
-        app.logger.info(f"get_content_and_key_from_s3. exception {str(e)}")
+        app.logger.info("get_content_and_key_from_s3. file %s exception %s", file_path, str(e))
         pass
     return content, key
 

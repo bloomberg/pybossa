@@ -78,10 +78,6 @@ class TaskAPI(APIBase):
             if not gold_task and (n_taskruns >= new.n_answers):
                 new.state = 'completed'
         new.calibration = int(gold_task)
-        current_app.logger.info("Updating task %d, old state: %s, new state: %s, "
-                                "old exported: %s, new exported: %s",
-                                new.id, old.state, new.state,
-                                str(old.exported), str(new.exported))
         if new.expiration is not None:
             new.expiration = get_task_expiration(new.expiration, old.created)
 

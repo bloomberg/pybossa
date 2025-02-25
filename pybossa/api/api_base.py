@@ -348,6 +348,8 @@ class APIBase(MethodView):
             response_dict = inst.dictize()
             self._customize_response_dict(response_dict)
             json_response = json.dumps(response_dict)
+            message = f"Created {cls_name}"
+            self._log_operation(message, info=response_dict)
             return Response(json_response, mimetype='application/json')
         except Exception as e:
             return error.format_exception(
@@ -406,6 +408,8 @@ class APIBase(MethodView):
             self._delete_instance(oid)
             cls_name = self.__class__.__name__
             self.refresh_cache(cls_name, oid)
+            message = f"Deleted {cls_name} id {oid}"
+            self._log_operation(message)
             return Response('', 204, mimetype='application/json')
         except Exception as e:
             return error.format_exception(
@@ -455,7 +459,10 @@ class APIBase(MethodView):
                                          repos,
                                          new_upload=data)
             self.refresh_cache(cls_name, oid)
-            return Response(json.dumps(inst.dictize()), 200,
+            response_dict = inst.dictize()
+            message = f"Updated {cls_name}"
+            self._log_operation(message, info=response_dict)
+            return Response(json.dumps(response_dict), 200,
                             mimetype='application/json')
         except Exception as e:
             return error.format_exception(
@@ -633,3 +640,12 @@ class APIBase(MethodView):
     def _copy_original(self, item):
         """change if need to keep some information about the original request"""
         return item
+
+    def _log_operation(self, message, info=None):
+        """Log api operation with message and additonal info provided"""
+        if not info:
+            current_app.logger.info("%s", message)
+            return
+
+        log_info = [f"{key} {info[key]}" for key in ["id", "name", "short_name", "owner_id", "project_id"] if key in info]
+        current_app.logger.info("%s %s", message, ", ".join(log_info))
