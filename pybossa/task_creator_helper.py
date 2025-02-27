@@ -217,20 +217,22 @@ def generate_checksum(project_id, task):
                 continue
 
             if field.endswith("__upload_url"):
+                current_app.logger.info("generate_checksum file payload name %s, path %s", field, value)
                 tokens = value.split("/")
                 count_slash = value.count("/")
                 if count_slash >= 6 and tokens[1] == "fileproxy" and tokens[2] == "encrypted":
                     store = tokens[3]
                     bucket = tokens[4]
                     project_id_from_url = int(tokens[5])
-                    if project_id != project_id_from_url:
-                        current_app.logger.info("error computing duplicate checksum. incorrect project id in url path. project id expected %d vs actual %d, url %s",
-                                                project_id, project_id_from_url, value)
+                    current_app.logger.info("generate_checksum file tokens %s", str(tokens))
+                    if int(project_id) != project_id_from_url:
+                        current_app.logger.info("error computing duplicate checksum. incorrect project id in url path. project id expected %s vs actual %s, url %s",
+                                                str(project_id), str(project_id_from_url), str(value))
                         continue
 
-                    filename = "/".join((tokens[6:]))
-                    path = f"{project_id}/{filename}"
+                    path = "/".join((tokens[5:]))
                     try:
+                        current_app.logger.info("generate_checksum parsed file info. store %s, bucket %s, path %s", store, bucket, path)
                         content, _ = read_encrypted_file(store, project, bucket, path)
                         content = json.loads(content)
                         task_contents.update(content)
