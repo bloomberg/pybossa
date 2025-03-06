@@ -76,12 +76,13 @@ class TestImporterValidation(Test):
         importer_factory.assert_called_with(**form_data)
 
     @with_request_context
-    def test_invalid_genid_columns(self, importer_factory):
+    def test_import_with_reserved_columns_fails(self, importer_factory):
         mock_importer = Mock()
-        mock_importer.fields.return_value = ("question", "genid_big_datastore_id", "genid_transaction_id")
+        mock_importer.fields.return_value = ("question", "col_abc", "col_xyz")
         importer_factory.return_value = mock_importer
 
         project = ProjectFactory.create()
         form_data = dict(type='gdocs', googledocs_url='http://ggl.com', validate_tp=False)
-        result = self.importer.create_tasks(task_repo, project, **form_data)
-        assert result.message == 'Reserved columns genid_big_datastore_id, genid_transaction_id not allowed. '
+        with patch.dict(self.flask_app.config, {"TASK_RESERVED_COLS": ["col_abc", "col_xyz"]}):
+            result = self.importer.create_tasks(task_repo, project, **form_data)
+            assert result.message == 'Reserved columns col_abc, col_xyz not allowed. ', result.message

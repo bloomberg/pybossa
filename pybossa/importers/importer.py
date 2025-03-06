@@ -183,17 +183,15 @@ class Importer(object):
             current_app.logger.error(', '.join(fields_not_in_import))
             return msg + additional_msg
 
-        reserved_genids = []
+        reserved_cols = []
+        task_reserved_cols = current_app.config.get("TASK_RESERVED_COLS", [])
         if hasattr(import_fields, "__iter__"):
-            if "genid_big_datastore_id" in import_fields:
-                reserved_genids.append("genid_big_datastore_id")
-            if "genid_transaction_id" in import_fields:
-                reserved_genids.append("genid_transaction_id")
+            reserved_cols += [k for k in import_fields if k in task_reserved_cols]
 
         msg = ""
-        if reserved_genids:
-            reserved_genid_names = ", ".join(reserved_genids)
-            msg += f"Reserved columns {reserved_genid_names} not allowed. "
+        if reserved_cols:
+            reserved_cols_in_csv = ", ".join(reserved_cols)
+            msg += f"Reserved columns {reserved_cols_in_csv} not allowed. "
 
         msg += get_error_message()
 
