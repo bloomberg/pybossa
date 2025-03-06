@@ -99,9 +99,11 @@ class TaskAPI(APIBase):
             raise BadRequest(str(e))
         data["dup_checksum"] = dup_checksum
         completed_tasks = project.info.get("duplicate_task_check", {}).get("completed_tasks", False)
+        task_reserved_cols = current_app.config.get("TASK_RESERVED_COLS", [])
+        filtered_info = {k:v for k, v in info.items() if k not in task_reserved_cols} if isinstance(info, dict) else info
         duplicate = task_repo.find_duplicate(
             project_id=project_id,
-            info=info,
+            info=filtered_info,
             dup_checksum=dup_checksum,
             completed_tasks=completed_tasks
         )
