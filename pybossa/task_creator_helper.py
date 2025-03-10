@@ -199,6 +199,10 @@ def generate_checksum(project_id, task):
     task_reserved_cols = current_app.config.get("TASK_RESERVED_COLS", [])
     task_info = {k:v for k, v in task["info"].items() if k not in task_reserved_cols} if isinstance(task["info"], dict) else task["info"]
 
+    # with task payload not proper dict, dup checksum cannot be computed and will be set to null
+    if not isinstance(task["info"], dict):
+        return
+
     task_contents = {}
     if current_app.config.get("PRIVATE_INSTANCE"):
         # csv import under private instance, may contain private data under _priv cols
