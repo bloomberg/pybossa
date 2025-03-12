@@ -1217,8 +1217,11 @@ class TestTaskAPI(TestAPI):
     def test_create_task_find_duplicate_with_checksum(self):
         """Test create tasks performing duplicate check using dup_checksum value"""
 
+        from flask import current_app
+        current_app.config["TASK_RESERVED_COLS"] = ["genid_xyz", "genid_abc"]
+
         subadmin = UserFactory.create(subadmin=True)
-        # self.signin_user(subadmin)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
         project = ProjectFactory.create(
             owner=subadmin,
             short_name="testproject",
@@ -1237,8 +1240,6 @@ class TestTaskAPI(TestAPI):
         checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
         expected_checksum =  checksum.hexdigest()
 
-        subadmin_headers = dict(Authorization=subadmin.api_key)
-
         # task created with checksum as per project configuration
         res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
         task = json.loads(res.data)
@@ -1249,19 +1250,24 @@ class TestTaskAPI(TestAPI):
         res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
         res.status == "409 CONFLICT"
 
-        # with duplicate task check not configured, dup_checksum not generated
+        # with duplicate task check not configured, dup_checksum generated dropping reserved fields
         project2 = ProjectFactory.create(
             owner=subadmin,
             short_name="testproject2",
             info={})
         task_data = dict(
             project_id = project2.id,
-            info = {"a": 1, "b": 2, "c": 3}
+            info = {"a": 1, "b": 2, "c": 3, "genid_xyz": "xyz123", "genid_abc": "abc123"}
         )
+        expected_dupcheck_payload = {k:v for k,v in task_data["info"].items() if k not in current_app.config["TASK_RESERVED_COLS"]}
+        checksum = hashlib.sha256()
+        checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
+        expected_checksum =  checksum.hexdigest()
+
         res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
         task = json.loads(res.data)
         assert res.status_code == 200
-        assert not task["dup_checksum"]
+        assert task["dup_checksum"] == expected_checksum, task["dup_checksum"]
 
     @with_context
     def test_create_task_with_duplicate_checksum_fails(self):

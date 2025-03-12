@@ -193,13 +193,15 @@ def generate_checksum(project_id, task):
         current_app.logger.info("Duplicate task checksum may not be generated. Incorrect project id %d", project_id)
         return
 
-    task_info = task["info"]
-    dup_task_config = project.info.get("duplicate_task_check")
-    if not dup_task_config:
+    # with task payload not proper dict, dup checksum cannot be computed and will be set to null
+    if not isinstance(task["info"], dict):
         return
 
-    dup_fields_configured = dup_task_config.get("duplicate_fields", [])
-    # include all task_info fields with no field configured under duplicate_fields
+    # drop reserved columns that are always going to have unique values in
+    # certain scenarios as this could miss duplicate task check correctly on
+    # remaining fields when all fields are included for duplicate check
+    task_reserved_cols = current_app.config.get("TASK_RESERVED_COLS", [])
+    task_info = {k:v for k, v in task["info"].items() if k not in task_reserved_cols}
 
     task_contents = {}
     if current_app.config.get("PRIVATE_INSTANCE"):
@@ -260,6 +262,9 @@ def generate_checksum(project_id, task):
         # public instance has all task fields under task_info
         task_contents = task_info
 
+    # include all task_info fields with no field configured under duplicate_fields
+    dup_task_config = project.info.get("duplicate_task_check", {})
+    dup_fields_configured = dup_task_config.get("duplicate_fields", [])
     checksum_fields = task_contents.keys() if not dup_fields_configured else dup_fields_configured
     try:
         checksum_payload = {field:task_contents[field] for field in checksum_fields}

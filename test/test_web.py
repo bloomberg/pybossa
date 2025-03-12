@@ -10375,6 +10375,7 @@ class TestWeb(web.Helper):
         from flask import current_app
 
         current_app.config["PRIVATE_INSTANCE"] = False
+        current_app.config["TASK_RESERVED_COLS"] = ["genid_xyz", "genid_abc"]
         checksum = hashlib.sha256()
         expected_dupcheck_payload = {"a": 1, "c": 3}
         checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
@@ -10395,16 +10396,23 @@ class TestWeb(web.Helper):
             project_id = project.id,
             info = {"a": 1, "b": 2, "c": 3}
         )
-
         dup_checksum = generate_checksum(project_id=project.id, task=task)
         # confirm task payload populated with checksum generated
         assert dup_checksum == expected_checksum, dup_checksum
 
-        # project w/o duplicate checksum configured gets
-        # tasks created with null checksum value
+        # checksum gets generated for project w/o duplicate checksum configured
+        # checksum value computed considering all fields except reserved fields
+        task2 = dict(
+            project_id = project.id,
+            info = {"a": 1, "b": 2, "c": 3, "genid_xyz": "xyz123", "genid_abc": "abc123"}
+        )
         project2 = ProjectFactory.create(owner=subadmin, info={"x": 123}, short_name="xyz")
-        dup_checksum = generate_checksum(project_id=project2.id, task=task)
-        assert dup_checksum == None
+        checksum = hashlib.sha256()
+        expected_dupcheck_payload = {k:v for k,v in task2["info"].items() if k not in current_app.config["TASK_RESERVED_COLS"]}
+        checksum.update(json.dumps(expected_dupcheck_payload, sort_keys=True).encode("utf-8"))
+        expected_checksum =  checksum.hexdigest()
+        dup_checksum = generate_checksum(project_id=project2.id, task=task2)
+        assert dup_checksum == expected_checksum, dup_checksum
 
     @with_context
     def test_checksum_csv_private_data(self):

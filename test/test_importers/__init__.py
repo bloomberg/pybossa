@@ -63,19 +63,25 @@ class TestImporterPublicMethods(Test):
         importer_factory.assert_called_with(**form_data)
 
     @with_request_context
-    def test_create_tasks_not_creates_duplicated_tasks(self, importer_factory):
+    @patch('pybossa.cloud_store_api.s3.s3_upload_from_string', return_value='https:/s3/task.json')
+    @patch('pybossa.importers.importer.delete_import_csv_file', return_value=None)
+    def test_create_tasks_not_creates_duplicated_tasks(
+        self,
+        mock_del,
+        upload_from_string,
+        importer_factory
+    ):
         mock_importer = Mock()
-        mock_importer.tasks.return_value = [{'info': {'question': 'question'}}]
+        mock_importer.tasks.return_value = [{'info': {'question': 'question'}}, {'info': {'question': 'question'}}]
         importer_factory.return_value = mock_importer
         project = ProjectFactory.create()
-        TaskFactory.create(project=project, info={'question': 'question'})
-        form_data = dict(type='flickr', album_id='1234', validate_tp=False)
+        form_data = dict(type='localCSV', csv_filename='fakefile.csv', validate_tp=False)
 
         result = self.importer.create_tasks(task_repo, project, **form_data)
         tasks = task_repo.filter_tasks_by(project_id=project.id)
 
         assert len(tasks) == 1, len(tasks)
-        assert result.message == 'It looks like there were no new records to import. ', result.message
+        assert result.message == "1 new task was imported successfully. 1 tasks not imported. ", result.message
         importer_factory.assert_called_with(**form_data)
 
     @with_request_context
