@@ -193,15 +193,15 @@ def generate_checksum(project_id, task):
         current_app.logger.info("Duplicate task checksum may not be generated. Incorrect project id %d", project_id)
         return
 
+    # with task payload not proper dict, dup checksum cannot be computed and will be set to null
+    if not isinstance(task["info"], dict):
+        return
+
     # drop reserved columns that are always going to have unique values in
     # certain scenarios as this could miss duplicate task check correctly on
     # remaining fields when all fields are included for duplicate check
     task_reserved_cols = current_app.config.get("TASK_RESERVED_COLS", [])
-    task_info = {k:v for k, v in task["info"].items() if k not in task_reserved_cols} if isinstance(task["info"], dict) else task["info"]
-
-    # with task payload not proper dict, dup checksum cannot be computed and will be set to null
-    if not isinstance(task["info"], dict):
-        return
+    task_info = {k:v for k, v in task["info"].items() if k not in task_reserved_cols}
 
     task_contents = {}
     if current_app.config.get("PRIVATE_INSTANCE"):
