@@ -19,6 +19,7 @@ import copy
 import json
 import threading
 from unittest.mock import patch, call, MagicMock
+from dateutil import parser
 
 from nose.tools import assert_equal
 
@@ -2666,7 +2667,7 @@ class TestProjectAPI(TestAPI):
         make_subadmin(subadminowner)
 
         short_name = "testproject"
-        self._setup_project(short_name, subadminowner)
+        original_project = self._setup_project(short_name, subadminowner)
         headers = [('Authorization', subadminowner.api_key)]
 
         data = {'short_name': 'newname', 'name': 'newname', 'password': 'Test123', 'input_data_class': 'L4 - public','output_data_class': 'L4 - public'}
@@ -2674,6 +2675,10 @@ class TestProjectAPI(TestAPI):
             res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data), content_type='application/json')
             data = json.loads(res.data)
             assert res.status_code == 200, data
+
+            # the cloned project should have newer created and updated timestamps
+            assert parser.parse(data['created']) > parser.parse(original_project.created), data
+            assert parser.parse(data['updated']) > parser.parse(original_project.updated), data
 
 
     @with_context

@@ -459,6 +459,8 @@ def clone_project(project, form):
     proj_dict['info'] = deepcopy(proj_dict['info'])
     proj_dict.pop('secret_key', None)
     proj_dict.pop('id', None)
+    proj_dict.pop('created', None)
+    proj_dict.pop('updated', None)
     proj_dict['info'].pop('passwd_hash', None)
     proj_dict['info'].pop('quiz', None)
     proj_dict['info'].pop('enrichments', None)
