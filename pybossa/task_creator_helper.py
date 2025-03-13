@@ -208,7 +208,7 @@ def generate_checksum(project_id, task):
     dup_fields_configured = dup_task_config.get("duplicate_fields", [])
 
     task_contents = {}
-    if current_app.config.get("PRIVATE_INSTANCE") and dup_fields_configured:
+    if current_app.config.get("PRIVATE_INSTANCE") and dup_task_config:
         # csv import under private instance, may contain private data under _priv cols
         # prior to this call, sucn _priv columns are combined together into task.private_fields
         # collect fieldname and value from private_fields that are not part of task.info
