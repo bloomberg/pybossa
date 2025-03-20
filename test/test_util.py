@@ -1930,19 +1930,19 @@ class TestMapLocations(Test):
         assert mapped_locations['locations'] == expected_locations, (mapped_locations['locations'], expected_locations)
 
     @with_context
-    def test_validate_ownership_id(self):
+    def test_valid_ownership_id(self):
         # valid ownership_id
         ownership_id = "1111"
-        util.validate_ownership_id(ownership_id)
+        assert util.valid_ownership_id(ownership_id) == True
 
         # empty ownership_id
         ownership_id = ""
-        util.validate_ownership_id(ownership_id)
+        assert util.valid_ownership_id(ownership_id) == True
 
         # ownership_id too long (> 20 chars)
         ownership_id = "123412341234123412341234"
-        assert_raises(ValueError, util.validate_ownership_id, ownership_id)
+        assert util.valid_ownership_id(ownership_id) == False
 
         # ownership_id not numeric
         ownership_id = "1234abcd1234"
-        assert_raises(ValueError, util.validate_ownership_id, ownership_id)
+        assert util.valid_ownership_id(ownership_id) == False

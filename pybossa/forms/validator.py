@@ -23,7 +23,7 @@ from wtforms.validators import ValidationError
 import re
 import requests
 
-from pybossa.util import is_reserved_name, check_password_strength
+from pybossa.util import is_reserved_name, check_password_strength, valid_ownership_id
 from pybossa.data_access import valid_user_type_based_data_access
 
 
@@ -254,3 +254,17 @@ class AmpPvfValidator(object):
         amp_store = form.amp_store.data
         if amp_store and not(amp_pvf and self.pvf_format.match(amp_pvf)):
             raise ValidationError("Invalid PVF format. Must contain <PVF name> <PVF val>.")
+
+
+class OwnershipIdValidator(object):
+    """Ensure Ownership ID is valid."""
+    def __init__(self, message=None):
+        self.ownership_id_title = current_app.config.get('OWNERSHIP_ID_TITLE', 'Ownership ID')
+        if not message:
+            message = lazy_gettext(f"Invalid {self.ownership_id_title}.")
+        self.message = message
+
+    def __call__(self, form, field):
+        o_id = form.ownership_id.data
+        if not valid_ownership_id(o_id):
+            raise ValidationError(f"{self.ownership_id_title} must be numeric and less than 20 characters. Got: {o_id}")
