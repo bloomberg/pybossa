@@ -99,17 +99,18 @@ class TaskAPI(APIBase):
             raise BadRequest(str(e))
         data["dup_checksum"] = dup_checksum
         completed_tasks = project.info.get("duplicate_task_check", {}).get("completed_tasks", False)
-        duplicate = task_repo.find_duplicate(
+        duplicate_task = task_repo.find_duplicate(
             project_id=project_id,
             info=info,
             dup_checksum=dup_checksum,
             completed_tasks=completed_tasks
         )
-        if duplicate:
-            current_app.logger.info("Project %d, task checksum %s. Duplicate task found with task id %d. Ignoring task creation", project_id, dup_checksum, duplicate)
+        if duplicate_task:
+            current_app.logger.info("Project %s, task checksum %s. Duplicate task found with task id %s. Ignoring task creation",
+                                    str(project_id), str(dup_checksum), str(duplicate_task))
             message = {
                 'reason': 'DUPLICATE_TASK',
-                'task_id': duplicate
+                'task_id': duplicate_task
             }
             raise Conflict(json.dumps(message))
 
