@@ -108,7 +108,7 @@ import pybossa.app_settings as app_settings
 from copy import deepcopy
 from pybossa.cache import delete_memoized
 from sqlalchemy.orm.attributes import flag_modified
-from pybossa.util import admin_or_project_owner, validate_ownership_id
+from pybossa.util import admin_or_project_owner, valid_ownership_id
 from pybossa.api.project import ProjectAPI
 
 cors_headers = ['Content-Type', 'Authorization']

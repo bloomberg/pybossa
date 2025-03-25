@@ -168,6 +168,25 @@ class TestValidator(Test):
         u = validator.AmpPvfValidator()
         u.__call__(form, form.amp_pvf)
 
+    @with_context
+    @raises(ValidationError)
+    def test_ownership_id_validator_raises_error(self):
+        """Test OwnershipIdValidator raise exception with invalid Ownership ID value """
+        form_data = dict()
+        form = dynamic_project_form(ProjectForm, form_data, [], {}, {})
+        form.ownership_id.data = 'xxx yyy'
+        u = validator.OwnershipIdValidator()
+        u.__call__(form, form.ownership_id)
+
+    @with_context
+    def test_ownership_id_validator_pass(self):
+        """Test OwnershipIdValidator pass with correct format Ownership ID value """
+        form_data = dict()
+        form = dynamic_project_form(ProjectForm, form_data, [], {}, {})
+        form.ownership_id.data = '123123123'
+        u = validator.OwnershipIdValidator()
+        u.__call__(form, form.ownership_id)
+
 
 class TestRegisterForm(Test):
 

@@ -1,8 +1,9 @@
+from flask import current_app
 from flask_babel import lazy_gettext
 from flask_wtf import FlaskForm as Form
 from wtforms import SelectField, validators, TextField, BooleanField
 from pybossa.forms.fields.select_two import Select2Field
-from .validator import AmpPvfValidator
+from .validator import AmpPvfValidator, OwnershipIdValidator
 
 import wtforms
 
@@ -37,6 +38,10 @@ def dynamic_project_form(class_type, form_data, data_access_levels, products=Non
         ProjectFormExtraInputs.amp_pvf = TextField(
             lazy_gettext('Annotation Store PVF'),
             [AmpPvfValidator()])
+
+    ProjectFormExtraInputs.ownership_id = TextField(
+        lazy_gettext(current_app.config.get('OWNERSHIP_ID_TITLE', 'Ownership ID')),
+        [OwnershipIdValidator()])
 
     generate_form = ProjectFormExtraInputs(form_data, obj=obj)
     if data_access_levels and not form_data:
