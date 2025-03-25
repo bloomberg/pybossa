@@ -190,11 +190,13 @@ def generate_checksum(project_id, task):
 
     project = get_project_data(project_id)
     if not project:
-        current_app.logger.info("Duplicate task checksum may not be generated. Incorrect project id %d", project_id)
+        current_app.logger.info("Duplicate task checksum not generated. Incorrect project id %s", str(project_id))
         return
 
     # with task payload not proper dict, dup checksum cannot be computed and will be set to null
     if not isinstance(task["info"], dict):
+        current_app.logger.info("Duplicate task checksum not generated for project %s. Task.info type is %s, expected dict",
+                                str(project_id), str(type(task["info"])))
         return
 
     # drop reserved columns that are always going to have unique values in
@@ -243,11 +245,11 @@ def generate_checksum(project_id, task):
                         content = json.loads(content)
                         task_contents.update(content)
                     except Exception as e:
-                        current_app.logger.info("error generating duplicate checksum with url contents for project %d, %s, %s %s",
-                                                project_id, field, value, str(e))
+                        current_app.logger.info("error generating duplicate checksum with url contents for project %s, %s, %s %s",
+                                                str(project_id), field, str(value), str(e))
                         raise Exception(f"Error generating duplicate checksum with url contents. url {field}, {value}")
                 else:
-                    current_app.logger.info("error parsing task data url to compute duplicate checksum %s, %s", field, value)
+                    current_app.logger.info("error parsing task data url to compute duplicate checksum %s, %s", field, str(value))
             elif field == "private_json__encrypted_payload":
                 try:
                     secret = get_encryption_key(project)
@@ -257,8 +259,8 @@ def generate_checksum(project_id, task):
                     content = json.loads(content)
                     task_contents.update(content)
                 except Exception as e:
-                    current_app.logger.info("error generating duplicate checksum with encrypted payload for project %d, %s, %s %s",
-                                            project_id, field, value, str(e))
+                    current_app.logger.info("error generating duplicate checksum with encrypted payload for project %s, %s, %s %s",
+                                            str(project_id), field, str(value), str(e))
                     raise Exception(f"Error generating duplicate checksum with encrypted payload. {field}, {value}")
             else:
                 task_contents[field] = value
@@ -277,5 +279,5 @@ def generate_checksum(project_id, task):
         private_fields = task.get('private_fields', None)
         task_payload = copy.deepcopy(task_info)
         task_payload["private_fields_keys"] = list(private_fields.keys()) if private_fields else []
-        current_app.logger.info("error generating duplicate checksum for project id %d, error %s, task payload %s", project_id, str(e), json.dumps(task_payload))
+        current_app.logger.info("error generating duplicate checksum for project id %s, error %s, task payload %s", str(project_id), str(e), json.dumps(task_payload))
         raise Exception(f"Error generating duplicate checksum due to missing checksum configured fields {checksum_fields}")
