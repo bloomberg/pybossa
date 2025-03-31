@@ -267,4 +267,4 @@ class OwnershipIdValidator(object):
     def __call__(self, form, field):
         o_id = form.ownership_id.data
         if not valid_ownership_id(o_id):
-            raise ValidationError(f"{self.ownership_id_title} must be numeric and less than 20 characters. Got: {o_id}")
+            raise ValidationError(f"{self.ownership_id_title} must be numeric and less than 20 characters.")

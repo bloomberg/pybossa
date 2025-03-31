@@ -374,11 +374,11 @@ def datetime_filter(source, fmt):
 
 
 def valid_ownership_id(o_id):
-    if o_id == None or len(o_id) == 0:
+    if not isinstance(o_id, str):
+        o_id = str(o_id)
+    if not o_id or (isinstance(o_id, str) and o_id.isnumeric() and len(o_id) <= 20):
         return True
-    if not (o_id.isnumeric() and len(o_id) <= 20):
-        return False
-    return True
+    return False
 
 class Pagination(object):
 
