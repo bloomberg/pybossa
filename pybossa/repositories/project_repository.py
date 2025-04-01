@@ -32,7 +32,7 @@ import pandas as pd
 from flask import current_app
 import re
 from functools import reduce
-
+from pybossa.util import valid_ownership_id
 
 class ProjectRepository(Repository):
 
@@ -72,6 +72,7 @@ class ProjectRepository(Repository):
         self._verify_required_fields(project)
         self._verify_product_subproduct(project)
         self._verify_project_info_fields(project)
+        self._verify_ownership_id(project)
         try:
             self.db.session.add(project)
             self.db.session.commit()
@@ -86,6 +87,7 @@ class ProjectRepository(Repository):
         self._verify_has_password(project)
         self._verify_data_classification(project)
         self._verify_annotation_config(project)
+        self._verify_ownership_id(project)
         try:
             self.db.session.merge(project)
             self.db.session.commit()
@@ -214,6 +216,12 @@ class ProjectRepository(Repository):
                 break
         if data_access:
             project.info['data_access'] = [data_access]
+
+    def _verify_ownership_id(self, project):
+        ownership_id = project.info.get('ownership_id')
+        if not valid_ownership_id(ownership_id):
+            ownership_id_title = current_app.config.get('OWNERSHIP_ID_TITLE', 'Ownership ID')
+            raise BadRequest(f"{ownership_id_title} must be numeric and less than 20 characters.")
 
     def _verify_annotation_config(self, project):
         data_access = project.info.get('data_access', [])[0]
