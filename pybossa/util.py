@@ -374,8 +374,6 @@ def datetime_filter(source, fmt):
 
 
 def valid_ownership_id(o_id):
-    if not isinstance(o_id, str):
-        o_id = str(o_id)
     if not o_id or (isinstance(o_id, str) and o_id.isnumeric() and len(o_id) <= 20):
         return True
     return False
