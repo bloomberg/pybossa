@@ -53,10 +53,8 @@ def create_app(run_as_server=True):
         'default-src': ['*', '\'unsafe-inline\'', '\'unsafe-eval\'', 'data:',
                         'blob:']
     }, force_https=app.config.get('FORCE_HTTPS', True))
-    if (run_as_server):
-        setup_theme(app)
-        setup_assets(app)
-
+    setup_theme(app)
+    setup_assets(app)
     setup_cache_timeouts(app)
     setup_ratelimits(app)
     setup_uploader(app)
