@@ -47,6 +47,7 @@ from pybossa.leaderboard.jobs import leaderboard
 from pybossa.model.webhook import Webhook
 from pybossa.util import with_cache_disabled, publish_channel, \
     mail_with_enabled_users
+from pybossa.core import email_service
 
 MINUTE = 60
 IMPORT_TASKS_TIMEOUT = (20 * MINUTE)
@@ -621,7 +622,10 @@ def send_mail(message_dict, mail_all=False):
                 spam = True
                 break
         if not spam:
-            mail.send(message)
+            if email_service:
+                email_service.send(message_dict)
+            else:
+                mail.send(message)
 
 def count_records(table, task_ids):
     from pybossa.core import db

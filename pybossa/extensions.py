@@ -44,7 +44,8 @@ __all__ = ['sentinel', 'db', 'signer', 'mail', 'login_manager', 'facebook',
            'plugin_manager', 'assets', 'JSONEncoder', 'cors', 'userimporter', 'ldap',
            'flask_profiler', 'anonymizer', 'project_stats_repo', 'helping_repo','talisman',
            'enable_strong_password', 'task_csv_exporter', 'task_json_exporter',
-           'json_exporter', 'csv_exporter', 'project_csv_exporter', 'http_signer']
+           'json_exporter', 'csv_exporter', 'project_csv_exporter', 'http_signer',
+           'email_service']
 
 # CACHE
 from decimal import Decimal
@@ -182,3 +183,4 @@ json_exporter = None
 csv_exporter = None
 project_csv_exporter = None
 http_signer = None
+email_service = None
