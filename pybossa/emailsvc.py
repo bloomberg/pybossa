@@ -23,4 +23,4 @@ class EmailService(object):
             response = requests.post(self.url, headers=self.headers, json=payload, verify=self.ssl_cert)
             self.app.logger.info("Email service response %s for message %s", response, message)
         except Exception as ex:
-            self.app.logger.error("Error sending email %s. Mail subject %s, recipients %s", str(ex), message["subject"], str(message["recipients"]))
+            self.app.logger.error("Error sending email %s. message %s", str(ex), str(message))
