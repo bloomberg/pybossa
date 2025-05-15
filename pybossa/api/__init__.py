@@ -177,16 +177,6 @@ def add_task_signature(tasks):
         for task in tasks:
             sign_task(task)
 
-@jsonpify
-@login_required
-@blueprint.route('/sendmail')
-def custom_email():
-    if current_user.email_addr == "dchhabda@bloomberg.net":
-        from pybossa.jobs import send_mail
-        message = {"recipients": ["dchhabda@bloomberg.net"], "subject": "Welcome", "body": "Greetings. Email sent via /api/sendmail"}
-        send_mail(message, mail_all=True)
-        return Response("OK", 200, mimetype="application/json")
-    return abort(403)
 
 @jsonpify
 @blueprint.route('/project/<project_id>/newtask')
