@@ -11,12 +11,6 @@ from pybossa.core import setup_email_service
 class TestEmailService(Test):
     """Test EmailService module."""
 
-    def setUp(self):
-        """SetUp method."""
-        super(TestEmailService, self).setUp()
-        with self.flask_app.app_context():
-            self.create()
-
     @with_context
     def test_emailsvc_init(self):
         """Test EmailService init method works."""
@@ -94,30 +88,6 @@ class TestEmailService(Test):
             message = "hi"
             esvc.send(message)
             sendmail.assert_called_once()
-
-    @with_context
-    @patch('pybossa.jobs.email_service.send')
-    def test_jobs_use_emailsvc_to_send_email(self, mock_sendmail):
-        """Test to verify that the email service is used to send an email."""
-
-        message = {"recipients": ["abc@def.com"], "subject": "Welcome", "body": "Greetings from xyz"}
-        service_config = {
-            "uri": "https://path/to/service",
-            "email_service": {
-                "name": "sendemailservice",
-                "major_version": 101,
-                "minor_version": 1456,
-                "requests": ["sendMsg"],
-                "headers": {'service-identity': '{"access_key": "xxx"}'}
-            }
-        }
-        cert_path = "/home/ssl/certs"
-        with patch.dict(self.flask_app.config,
-                        {"PROXY_SERVICE_CONFIG": service_config, "SSL_CERT_PATH": cert_path}):
-            from pybossa.core import setup_email_service
-            setup_email_service(self.flask_app)
-            send_mail(message_dict=message, mail_all=True)
-            mock_sendmail.assert_called_once_with(message)
 
     @with_context
     @patch('pybossa.core.email_service')

@@ -8,6 +8,7 @@ class EmailService(object):
             self.init_app(app)
 
     def init_app(self, app):
+        self.app = app
         proxy_service_config = app.config["PROXY_SERVICE_CONFIG"]
         uri = proxy_service_config["uri"]
         email_config = proxy_service_config["email_service"]
