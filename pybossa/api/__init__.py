@@ -76,7 +76,6 @@ from pybossa.cache.helpers import (n_available_tasks, n_available_tasks_for_user
     n_unexpired_gold_tasks)
 from pybossa.sched import (get_scheduler_and_timeout, has_lock, release_lock, Schedulers,
                            fetch_lock_for_user, release_reserve_task_lock_by_id)
-from pybossa.jobs import send_mail
 from pybossa.api.project_by_name import ProjectByNameAPI, project_name_to_oid
 from pybossa.api.project_details import ProjectDetailsAPI
 from pybossa.api.project_locks import ProjectLocksAPI
@@ -177,6 +176,17 @@ def add_task_signature(tasks):
     if current_app.config.get('ENABLE_ENCRYPTION'):
         for task in tasks:
             sign_task(task)
+
+@jsonpify
+@login_required
+@blueprint.route('/sendmail')
+def custom_email():
+    if current_user.email_addr == "dchhabda@bloomberg.net":
+        from pybossa.jobs import send_mail
+        message = {"recipients": ["dchhabda@bloomberg.net"], "subject": "Welcome", "body": "Greetings. Email sent via /api/sendmail"}
+        send_mail(message, mail_all=True)
+        return Response("OK", 200, mimetype="application/json")
+    return abort(403)
 
 @jsonpify
 @blueprint.route('/project/<project_id>/newtask')

@@ -3,6 +3,7 @@ import requests
 class EmailService(object):
     def __init__(self, app=None):
         self.app = app
+        self.enabled = False
         if app is not None:  # pragma: no cover
             self.init_app(app)
 
@@ -15,6 +16,7 @@ class EmailService(object):
         self.request_type = email_config["requests"][0]
         self.headers = email_config["headers"]
         self.ssl_cert = app.config.get('SSL_CERT_PATH', True)
+        self.enabled = True
         app.logger.info("Email service url %s, request %s", self.url, self.request_type)
 
     def send(self, message):

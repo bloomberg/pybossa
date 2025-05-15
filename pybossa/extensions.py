@@ -183,4 +183,6 @@ json_exporter = None
 csv_exporter = None
 project_csv_exporter = None
 http_signer = None
-email_service = None
+
+from pybossa.emailsvc import EmailService
+email_service = EmailService()

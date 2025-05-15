@@ -609,7 +609,6 @@ def disable_users_job():
             .format(len(users_disabled), ', '.join(users_disabled)))
     return True
 
-
 def send_mail(message_dict, mail_all=False):
     """Send email."""
 
@@ -621,10 +620,12 @@ def send_mail(message_dict, mail_all=False):
             if domain in current_app.config.get('SPAM', []):
                 spam = True
                 break
-        if not spam:
-            if email_service:
+        if not spam:            
+            if email_service.enabled:
+                current_app.logger.info("Send email calling email_service")
                 email_service.send(message_dict)
             else:
+                current_app.logger.info("Send email calling flask.mail")
                 mail.send(message)
 
 def count_records(table, task_ids):

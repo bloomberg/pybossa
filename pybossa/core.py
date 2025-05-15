@@ -1062,7 +1062,5 @@ def setup_email_service(app):
     uri = proxy_service_config.get("uri")
     email_config = proxy_service_config.get("email_service", None)
     if email_config and uri:
-        from .emailsvc import EmailService
-        email_service = EmailService(app)
-    else:
-        email_service = None
+        email_service.init_app(app)
+    print("email_service object", email_service, "  -- email_service.enabled", email_service.enabled)

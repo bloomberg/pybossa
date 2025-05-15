@@ -5,6 +5,7 @@ from pybossa.emailsvc import EmailService
 from unittest.mock import patch
 from requests.exceptions import ConnectionError
 from pybossa.jobs import send_mail
+from pybossa.core import setup_email_service
 
 
 class TestEmailService(Test):
@@ -88,17 +89,53 @@ class TestEmailService(Test):
         }
         cert_path = "/home/ssl/certs"
         with patch.dict(self.flask_app.config,
-                        {"PROXY_SERVICE_CONFIG": service_config, "SSL_CERT_PATH": cert_path}):        
+                        {"PROXY_SERVICE_CONFIG": service_config, "SSL_CERT_PATH": cert_path}):
             esvc = EmailService(self.flask_app)
             message = "hi"
             esvc.send(message)
             sendmail.assert_called_once()
 
     @with_context
-    @patch('pybossa.jobs.email_service')
-    def test_jobs_use_emailsvc_to_send_email(self, mock_email_service):
+    @patch('pybossa.jobs.email_service.send')
+    def test_jobs_use_emailsvc_to_send_email(self, mock_sendmail):
         """Test to verify that the email service is used to send an email."""
 
-        message = {"recipients": ["abc@def.com"], "subject": "Welcome", "body": "Greetings from xyz"}        
-        send_mail(message_dict=message, mail_all=True)
-        mock_email_service.send.assert_called_once_with(message)
+        message = {"recipients": ["abc@def.com"], "subject": "Welcome", "body": "Greetings from xyz"}
+        service_config = {
+            "uri": "https://path/to/service",
+            "email_service": {
+                "name": "sendemailservice",
+                "major_version": 101,
+                "minor_version": 1456,
+                "requests": ["sendMsg"],
+                "headers": {'service-identity': '{"access_key": "xxx"}'}
+            }
+        }
+        cert_path = "/home/ssl/certs"
+        with patch.dict(self.flask_app.config,
+                        {"PROXY_SERVICE_CONFIG": service_config, "SSL_CERT_PATH": cert_path}):
+            from pybossa.core import setup_email_service
+            setup_email_service(self.flask_app)
+            send_mail(message_dict=message, mail_all=True)
+            mock_sendmail.assert_called_once_with(message)
+
+    @with_context
+    @patch('pybossa.core.email_service')
+    def test_setup_email_service(self, mock_email_service):
+        service_config = {
+            "uri": "https://path/to/service",
+            "email_service": {
+                "name": "sendemailservice",
+                "major_version": 101,
+                "minor_version": 1456,
+                "requests": ["sendMsg"],
+                "headers": {'service-identity': '{"access_key": "xxx"}'}
+            }
+        }
+        cert_path = "/home/ssl/certs"
+        with self.flask_app.app_context():
+            from pybossa.core import email_service
+            with patch.dict(self.flask_app.config,
+                            {"PROXY_SERVICE_CONFIG": service_config, "SSL_CERT_PATH": cert_path}):
+                setup_email_service(self.flask_app)
+                assert mock_email_service.enabled
