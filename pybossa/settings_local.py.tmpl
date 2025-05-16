@@ -556,8 +556,8 @@ TASK_RESERVED_COLS = ["col_abc", "col_xyz"]
 
 # config to call external service to send emails
 PROXY_SERVICE_CONFIG = {
-    'uri': environ.get("PROXY_SERVICE_URI"),
     'email_service': {
+        'uri': "http/path/to/email/service:port",
         'name': "pybemailservice",
         'major_version': 1,
         'minor_version': 0

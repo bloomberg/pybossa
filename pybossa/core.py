@@ -1063,4 +1063,4 @@ def setup_email_service(app):
     email_config = proxy_service_config.get("email_service", None)
     if email_config and uri:
         email_service.init_app(app)
-    print("email_service object", email_service, "  -- email_service.enabled", email_service.enabled)
+    app.logger.info("email_service enabled %r", email_service.enabled)

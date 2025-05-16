@@ -10,10 +10,9 @@ class EmailService(object):
     def init_app(self, app):
         self.app = app
         proxy_service_config = app.config["PROXY_SERVICE_CONFIG"]
-        uri = proxy_service_config["uri"]
         email_config = proxy_service_config["email_service"]
         
-        self.url = f'{uri}/{email_config["name"]}/{email_config["major_version"]}/{email_config["minor_version"]}'
+        self.url = f'{email_config["uri"]}/{email_config["name"]}/{email_config["major_version"]}/{email_config["minor_version"]}'
         self.request_type = email_config["requests"][0]
         self.headers = email_config["headers"]
         self.ssl_cert = app.config.get('SSL_CERT_PATH', True)
