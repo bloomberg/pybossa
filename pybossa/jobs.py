@@ -47,7 +47,8 @@ from pybossa.leaderboard.jobs import leaderboard
 from pybossa.model.webhook import Webhook
 from pybossa.util import with_cache_disabled, publish_channel, \
     mail_with_enabled_users
-from pybossa.core import email_service
+from pybossa.core import email_service, signer
+from pybossa.cloud_store_api.s3 import upload_email_attachment
 
 MINUTE = 60
 IMPORT_TASKS_TIMEOUT = (20 * MINUTE)
@@ -987,11 +988,15 @@ def export_tasks(current_user_email_addr, short_name,
                                         project.id, url)
                 msg = '<p>You can download your file <a href="{}">here</a>.</p>'.format(url)
             else:
-                msg = '<p>Your exported data is attached.</p>'
-                mail_dict['attachments'] = [Attachment(filename, "application/zip", content)]
-                current_app.logger.info("Task export project id %s. Exported file attached to email to send",
-                                        project.id)
-
+                if email_service.enabled:
+                    url = upload_email_attachment(content, filename, current_user_email_addr, project.id)
+                    msg = f'\nYour exported data can be downloaded from {url}\n'
+                    current_app.logger.info("Email service export_task attachment link %s", url)
+                else:
+                    msg = '<p>Your exported data is attached.</p>'
+                    mail_dict['attachments'] = [Attachment(filename, "application/zip", content)]
+                    current_app.logger.info("Task export project id %s. Exported file attached to email to send",
+                                            project.id)
         else:
             # Failure email
             mail_dict['subject'] = 'Data export failed for your project: {0}'.format(project.name)
@@ -1000,14 +1005,19 @@ def export_tasks(current_user_email_addr, short_name,
                   'to a {0} administrator.</p>'
             msg = msg.format(current_app.config.get('BRAND'))
 
-        body = '<p>Hello,</p>' + msg + '<p>The {0} team.</p>'
-        body = body.format(current_app.config.get('BRAND'))
-        mail_dict['html'] = body
-        message = Message(**mail_dict)
-        mail.send(message)
-        current_app.logger.info(
-            'Email sent successfully - Project: %s', project.name)
-        job_response = '{0} {1} file was successfully exported for: {2}'
+        if email_service.enabled:
+            mail_dict["body"] = f'\nHello,\n{msg}\nThe {current_app.config.get("BRAND")} team\n'
+            current_app.logger.info("Send email calling email_service. %s", mail_dict)
+            email_service.send(mail_dict)
+        else:
+            body = '<p>Hello,</p>' + msg + '<p>The {0} team.</p>'
+            body = body.format(current_app.config.get('BRAND'))
+            mail_dict['html'] = body
+            message = Message(**mail_dict)
+            mail.send(message)
+            current_app.logger.info(
+                'Email sent successfully - Project: %s', project.name)
+            job_response = '{0} {1} file was successfully exported for: {2}'
         return job_response.format(
                 ty.capitalize(), filetype.upper(), project.name)
     except Exception as e:
