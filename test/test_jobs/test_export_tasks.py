@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 from nose.tools import assert_raises
 from unidecode import unidecode
@@ -7,7 +7,7 @@ from pybossa.jobs import export_tasks
 from test import Test, with_context
 from test.factories import ProjectFactory, UserFactory, TaskFactory, \
     TaskRunFactory
-
+from pybossa.core import signer
 
 class TestExport(Test):
 
@@ -242,3 +242,40 @@ class TestExport(Test):
         assert message.subject == 'Data export exceeded max file size: test_project', message.subject
         assert not message.attachments
         assert 'https://s3.com/buck/key' not in message.html
+
+    @with_context
+    @patch('pybossa.cloud_store_api.s3.datetime')
+    @patch('pybossa.cloud_store_api.s3.create_connection')
+    def test_export_tasks_emailsvc_attachment(self, create_conn, datetime):
+        """Test JOB export_tasks to bucket generates attachment url for emailsvc service."""
+
+        user = UserFactory.create(admin=True)
+        project = ProjectFactory.create(name='test_project', info={'export-bucket': 'buck'})
+        task = TaskFactory.create(project=project)
+        TaskRunFactory.create(project=project, task=task)
+
+        conn = create_conn.return_value
+        buck = conn.get_bucket.return_value
+        key = buck.new_key.return_value
+        key.set_contents_from_string.return_value = None
+        datetime.utcnow.return_value.isoformat.return_value = "01-01-2025"
+
+        payload = {"project_id": project.id}
+        payload["user_email"] = user.email_addr
+        expected_signature = signer.dumps(payload)
+
+        with patch('pybossa.jobs.email_service') as mock_emailsvc:
+            mock_emailsvc.enabled = True
+            with patch.dict(self.flask_app.config, {
+                'EXPORT_MAX_EMAIL_SIZE': 0,
+                'S3_REQUEST_BUCKET_V2': 'export-bucket',
+                'SERVER_URL': "https://testserver.com"
+            }):
+                expected_url = f"{self.flask_app.config['SERVER_URL']}/attachment/{expected_signature}/01-01-2025-1_project1_consensus_csv.zip"
+                export_tasks(user.email_addr, project.short_name, 'consensus', False, 'csv')
+                args, _ = mock_emailsvc.send.call_args
+                message = args[0]
+
+                assert message['recipients'][0] == user.email_addr, message['recipients']
+                assert message['subject'] == 'Data exported for your project: test_project', message['subject']
+                assert expected_url in message['body'], message['body']

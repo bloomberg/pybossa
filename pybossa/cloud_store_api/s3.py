@@ -255,7 +255,7 @@ def upload_email_attachment(content, filename, user_email, project_id=None):
     """Upload file to storage location and generate url to download file later"""
 
     # generate signature for authorised access to the attachment
-    from pybossa.core import email_service, signer
+    from pybossa.core import signer
     payload = {"project_id": project_id} if project_id else {}
     payload["user_email"] = user_email
     signature = signer.dumps(payload)
@@ -273,16 +273,13 @@ def upload_email_attachment(content, filename, user_email, project_id=None):
     # Generate a unique file path using UTC timestamp and secure filename
     timestamp = datetime.utcnow().isoformat()
     secure_file_name = secure_filename(filename)
-    file_path = f"{timestamp}-{secure_file_name}"
+    file_path = f"{signature}/{timestamp}-{secure_file_name}"
 
     # Upload content to S3
     key = bucket.new_key(file_path)
     key.set_contents_from_string(content)
-
-    expires_in = app.config.get('EXPORT_EXPIRY', 12 * 3600)
-    file_url = key.generate_url(expires_in)
     server_url = app.config.get('SERVER_URL')
-    url = f"{server_url}/attachment/{signature}/{file_url}"
+    url = f"{server_url}/attachment/{file_path}"
     return url
 
 
@@ -292,7 +289,7 @@ def s3_get_email_attachment(path):
     response = {
         "name": "",
         "type": "application/octet-stream",
-        "contents": b""
+        "content": b""
     }
 
     bucket = app.config.get("S3_REQUEST_BUCKET_V2")
@@ -301,8 +298,7 @@ def s3_get_email_attachment(path):
 
     conn_name = "S3_TASK_REQUEST_V2"
     content, key = get_content_and_key_from_s3(bucket, path, conn=conn_name)
-
-    response["name"] = key["key"]
-    response["type"] = key["ContentType"]
+    response["name"] = key.name
+    response["type"] = key.content_type
     response["content"] = content
     return response

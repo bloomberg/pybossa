@@ -94,6 +94,8 @@ from pybossa.cache.users import get_user_pref_metadata
 from pybossa.view.projects import get_locked_tasks, clone_project
 from pybossa.redis_lock import EXPIRE_LOCK_DELAY
 from pybossa.api.bulktasks import BulkTasksAPI
+from pybossa.util import admin_required
+
 
 task_fields = [
     "id",
@@ -176,6 +178,40 @@ def add_task_signature(tasks):
     if current_app.config.get('ENABLE_ENCRYPTION'):
         for task in tasks:
             sign_task(task)
+
+
+@jsonpify
+@admin_required
+@blueprint.route('/verify/<string:op_type>')
+def verify_operations(op_type):
+    from pybossa.jobs import send_mail
+    from pybossa.jobs import export_tasks
+
+    if op_type == "export_tasks":
+        project_shortname = request.args.get("project_shortname")
+        export_type = request.args.get("export_type") # task, taskrun, consensus
+        filetype = request.args.get("filetype") # csv, json
+
+        # Validate export_type
+        valid_export_types = ["task", "taskrun", "consensus"]
+        if export_type not in valid_export_types:
+            return Response("Invalid export_type parameter", 400, mimetype="application/json")
+
+        return export_tasks(current_user.email_addr, project_shortname,
+                 export_type, False, filetype)
+
+    if op_type == "email_service":
+        email = request.args.get('email')
+        if not email:
+            return Response("Missing email parameter", 400, mimetype="application/json")
+
+        message = {
+            "recipients": [email],
+            "subject": "Welcome",
+            "body": "Greetings. Email sent via /api/sendmail"
+        }
+        send_mail(message, mail_all=True)
+        return Response("OK", 200, mimetype="application/json")
 
 
 @jsonpify

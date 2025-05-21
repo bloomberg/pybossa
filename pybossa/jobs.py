@@ -29,7 +29,6 @@ import pandas as pd
 import requests
 from flask import current_app, render_template
 from flask_mail import Message, Attachment
-from pbsonesignal import PybossaOneSignal
 from rq.timeouts import JobTimeoutException
 from sqlalchemy.sql import text
 
@@ -47,7 +46,7 @@ from pybossa.leaderboard.jobs import leaderboard
 from pybossa.model.webhook import Webhook
 from pybossa.util import with_cache_disabled, publish_channel, \
     mail_with_enabled_users
-from pybossa.core import email_service, signer
+from pybossa.core import email_service
 from pybossa.cloud_store_api.s3 import upload_email_attachment
 
 MINUTE = 60
@@ -621,7 +620,7 @@ def send_mail(message_dict, mail_all=False):
             if domain in current_app.config.get('SPAM', []):
                 spam = True
                 break
-        if not spam:            
+        if not spam:
             if email_service.enabled:
                 current_app.logger.info("Send email calling email_service")
                 email_service.send(message_dict)
@@ -687,6 +686,7 @@ def get_tasks_to_delete(project_id, task_filter_args):
 def delete_bulk_tasks_in_batches(project_id, force_reset, task_filter_args):
     """Delete bulk tasks in batches from project."""
 
+    current_app.logger.info("Deleting tasks in batches for project %d", project_id)
     batch_size = BATCH_SIZE_BULK_DELETE_TASKS
     task_ids = get_tasks_to_delete(project_id, task_filter_args)
     total_task, total_taskrun, total_result = count_rows_to_delete(task_ids)
@@ -709,6 +709,7 @@ def delete_bulk_tasks_in_batches(project_id, force_reset, task_filter_args):
         batched_task_ids = task_ids[start_position:end_position]
         cleanup_task_records(batched_task_ids, force_reset)
         time.sleep(BATCH_DELETE_TASK_DELAY) # allow sql queries other than delete records to execute
+    current_app.logger.info("Completed deleting tasks in batches for project %d", project_id)
 
 
 def delete_bulk_tasks_with_session_repl(project_id, force_reset, task_filter_args):
@@ -886,6 +887,7 @@ def import_tasks(project_id, current_user_fullname, from_auto=False, **form_data
     from pybossa.core import project_repo, user_repo
     import pybossa.cache.projects as cached_projects
 
+    current_app.logger.info("Importing tasks for project %d", project_id)
     project = project_repo.get(project_id)
     recipients = []
     for user in user_repo.get_users(project.owners_ids):
@@ -927,6 +929,7 @@ def import_tasks(project_id, current_user_fullname, from_auto=False, **form_data
         project.set_autoimporter(form_data)
         project_repo.save(project)
     msg = report.message + ' to your project {0} by {1}.'.format(project.name, current_user_fullname)
+    current_app.logger.info("Task import status %s", msg)
     subject = 'Tasks Import to your project %s' % project.name
     body = 'Hello,\n\n' + msg + '\n\nAll the best,\nThe %s team.'\
         % current_app.config.get('BRAND')
@@ -1015,9 +1018,9 @@ def export_tasks(current_user_email_addr, short_name,
             mail_dict['html'] = body
             message = Message(**mail_dict)
             mail.send(message)
-            current_app.logger.info(
-                'Email sent successfully - Project: %s', project.name)
-            job_response = '{0} {1} file was successfully exported for: {2}'
+        current_app.logger.info(
+            'Email sent successfully - Project: %s', project.name)
+        job_response = '{0} {1} file was successfully exported for: {2}'
         return job_response.format(
                 ty.capitalize(), filetype.upper(), project.name)
     except Exception as e:
@@ -1335,22 +1338,6 @@ def check_failed():
         return "JOBS: %s You have failed the system." % job_ids
     else:
         return "You have not failed the system"
-
-
-def push_notification(project_id, **kwargs):
-    """Send push notification."""
-    from pybossa.core import project_repo
-    project = project_repo.get(project_id)
-    if project.info.get('onesignal'):
-        app_id = current_app.config.get('ONESIGNAL_APP_ID')
-        api_key = current_app.config.get('ONESIGNAL_API_KEY')
-        client = PybossaOneSignal(app_id=app_id, api_key=api_key)
-        filters = [{"field": "tag", "key": project_id, "relation": "exists"}]
-        return client.push_msg(contents=kwargs['contents'],
-                               headings=kwargs['headings'],
-                               launch_url=kwargs['launch_url'],
-                               web_buttons=kwargs['web_buttons'],
-                               filters=filters)
 
 
 def mail_project_report(info, email_addr):

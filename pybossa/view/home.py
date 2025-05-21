@@ -84,29 +84,3 @@ def result():
 @blueprint.route("app")
 def default_app():
     return project_index(1)
-
-@blueprint.route('/attachment/<string:signature>/<string:path>')
-@login_required
-def download_attachment(signature, path):
-    """download attachment from storage location"""
-
-    from pybossa.core import project_repo
-
-    signed_payload = signer.loads(signature)
-    project_id = signed_payload.get("project_id")
-    user_email = signed_payload.get("user_email")
-
-    # admins and project owners are authorized to download the attachment
-    if project_id:
-        project = project_repo.get(project_id)
-        if not admin_or_project_owner(current_user, project):
-            return abort(403)
-
-    # admins and user tagged in signature can download the attachment
-    if not (current_user.admin and current_user.email_addr == user_email):
-        return abort(403)
-
-    resp = s3_get_email_attachment(path)
-    response = Response(resp["content"], mimetype=resp["type"])
-    response.headers[f'Content-Disposition'] = 'attachment; filename={content.filename}'
-    return response

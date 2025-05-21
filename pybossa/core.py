@@ -1061,6 +1061,10 @@ def setup_email_service(app):
     proxy_service_config = app.config.get("PROXY_SERVICE_CONFIG", {})
     uri = proxy_service_config.get("uri")
     email_config = proxy_service_config.get("email_service", None)
+    from pybossa.view.attachment import blueprint as attachment_bp
+    app.register_blueprint(attachment_bp, url_prefix='/attachment')
+
     if email_config and uri:
         email_service.init_app(app)
+
     app.logger.info("email_service enabled %r", email_service.enabled)
