@@ -20,6 +20,7 @@ import requests
 class EmailService(object):
     def __init__(self, app=None):
         self.app = app
+        self.required_keys = {"recipients", "subject", "body"}
         self.enabled = False
         if app is not None:  # pragma: no cover
             self.init_app(app)
@@ -28,7 +29,7 @@ class EmailService(object):
         self.app = app
         proxy_service_config = app.config["PROXY_SERVICE_CONFIG"]
         email_config = proxy_service_config["email_service"]
-        
+
         self.url = f'{email_config["uri"]}/{email_config["name"]}/{email_config["major_version"]}/{email_config["minor_version"]}'
         self.request_type = email_config["requests"][0]
         self.headers = email_config["headers"]
@@ -38,7 +39,17 @@ class EmailService(object):
 
     def send(self, message):
         try:
-            payload = {self.request_type: message}
+            # validate  message
+            if not (isinstance(message, dict) and self.required_keys.issubset(message.keys())):
+                raise ValueError(f"Incorrect email message format. message {message}")
+
+            payload = {
+                self.request_type: {
+                    "recipients": message["recipients"],
+                    "subject": message["subject"],
+                    "body": message["body"]
+                }
+            }
             response = requests.post(self.url, headers=self.headers, json=payload, verify=self.ssl_cert)
             self.app.logger.info("Email service response %s for message %s", response, message)
         except Exception as ex:
