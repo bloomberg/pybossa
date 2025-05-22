@@ -182,16 +182,17 @@ def add_task_signature(tasks):
 
 @jsonpify
 @admin_required
-@blueprint.route('/verify/<string:op_type>')
+@blueprint.route('/verify/<string:op_type>', methods=['POST'])
 def verify_operations(op_type):
     from pybossa.jobs import send_mail
     from pybossa.jobs import export_tasks
     from html import escape
 
     if op_type == "export_tasks":
-        project_shortname = request.args.get("project_shortname")
-        export_type = request.args.get("export_type") # task, taskrun, consensus
-        filetype = request.args.get("filetype") # csv, json
+        data = request.json or {}
+        project_shortname = data.get("project_shortname")
+        export_type = data.get("export_type") # task, taskrun, consensus
+        filetype = data.get("filetype") # csv, json
 
         project_shortname = escape(project_shortname) if project_shortname else project_shortname
         export_type = escape(export_type) if export_type else export_type
@@ -202,21 +203,23 @@ def verify_operations(op_type):
         if export_type not in valid_export_types:
             return Response("Invalid export_type parameter", 400, mimetype="application/json")
 
-        return export_tasks(current_user.email_addr, project_shortname,
-                 export_type, False, filetype)
+        resp = export_tasks(current_user.email_addr, project_shortname, export_type, False, filetype)
+        return Response(resp, 200, mimetype="application/json")
 
     if op_type == "email_service":
-        email = request.args.get('email')
+        data = request.json or {}
+        email = data.get('email')
         if not email:
             return Response("Missing email parameter", 400, mimetype="application/json")
 
         message = {
             "recipients": [email],
             "subject": "Welcome",
-            "body": "Greetings. Email sent via /api/sendmail"
+            "body": "Greetings. Email sent via /api/verify/email_service"
         }
         send_mail(message, mail_all=True)
         return Response("OK", 200, mimetype="application/json")
+    return Response("Bad Request", 400, mimetype="application/json")
 
 
 @jsonpify
