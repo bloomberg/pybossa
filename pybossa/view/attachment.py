@@ -51,14 +51,14 @@ def download_attachment(signature, path):
             response.headers['Content-Disposition'] = f'attachment; filename={resp["name"]}'
     except BadSignature as ex:
         current_app.logger.exception("BadSignature. %s, signature %s, path %s",str(ex), signature, path)
-        response = Response(f"BadSignature. {str(ex)}", mimetype="text/plain")
+        response = Response(f"An internal error has occurred.", mimetype="text/plain")
     except BadRequest as ex:
         current_app.logger.exception("%s, signature %s, path %s",str(ex), signature, path)
-        response = Response(f"{str(ex)}", mimetype="text/plain")
+        response = Response(f"An internal error has occurred.", mimetype="text/plain")
     except Forbidden as ex:
         current_app.logger.exception("%s, signature %s, path %s",str(ex), signature, path)
-        response = Response(f"{str(ex)}", mimetype="text/plain")
+        response = Response(f"An internal error has occurred.", mimetype="text/plain")
     except Exception as ex:
         current_app.logger.exception("%s, signature %s, path %s", str(ex), signature, path)
-        response = Response(f"Failed loading requested url. {str(ex)}", mimetype="text/plain")
+        response = Response(f"Failed loading requested url.", mimetype="text/plain")
     return response

@@ -12039,12 +12039,12 @@ class TestEmailAttachment(web.Helper):
         # invalid signature
         with patch('pybossa.view.attachment.TASK_SIGNATURE_MAX_SIZE', 2):
             res = self.app.get("/attachment/sign/path", follow_redirects=True)
-            assert res.data.decode() == "400 Bad Request: Invalid signature", res.data
+            assert res.data.decode() == "An internal error has occurred.", res.data
 
         # signed payload
         signature = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(120))
         res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
-        assert res.data.decode() == "BadSignature. No b'.' found in value", res.data
+        assert res.data.decode() == "An internal error has occurred.", res.data
 
         # 400 when invalid project is passed in signature
         sign_payload = {
@@ -12053,7 +12053,7 @@ class TestEmailAttachment(web.Helper):
         }
         signature = signer.dumps(sign_payload)
         res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
-        assert res.data.decode() == "400 Bad Request: Invalid project id 123", res.data
+        assert res.data.decode() == "An internal error has occurred.", res.data
 
         # 403 for non project owner
         project = ProjectFactory.create(owner=owner)
@@ -12063,19 +12063,19 @@ class TestEmailAttachment(web.Helper):
         sign_payload["project_id"] = project.id
         signature = signer.dumps(sign_payload)
         res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
-        assert "403 Forbidden" in res.data.decode(), res.data
+        assert "An internal error has occurred." in res.data.decode(), res.data
 
         # not a project report. however signed in user is not part of signature.
         sign_payload = {"user_email": "aaa@a.com"}
         signature = signer.dumps(sign_payload)
         res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
-        assert "403 Forbidden" in res.data.decode(), res.data
+        assert "An internal error has occurred." in res.data.decode(), res.data
 
         # not a project report. signed in user not admin or subadmin. cannot download attachment
         sign_payload = {"user_email": reguser.email_addr}
         signature = signer.dumps(sign_payload)
         res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
-        assert "403 Forbidden" in res.data.decode(), res.data
+        assert "An internal error has occurred." in res.data.decode(), res.data
 
         # admin user allowed to download the attachment
         # however s3 bucket not configured resulting empty response

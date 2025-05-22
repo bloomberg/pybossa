@@ -186,11 +186,16 @@ def add_task_signature(tasks):
 def verify_operations(op_type):
     from pybossa.jobs import send_mail
     from pybossa.jobs import export_tasks
+    from html import escape
 
     if op_type == "export_tasks":
         project_shortname = request.args.get("project_shortname")
         export_type = request.args.get("export_type") # task, taskrun, consensus
         filetype = request.args.get("filetype") # csv, json
+
+        project_shortname = escape(project_shortname) if project_shortname else project_shortname
+        export_type = escape(export_type) if export_type else export_type
+        filetype = escape(filetype) if filetype else filetype
 
         # Validate export_type
         valid_export_types = ["task", "taskrun", "consensus"]
