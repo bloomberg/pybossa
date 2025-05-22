@@ -28,10 +28,6 @@ from pybossa.cache import categories as cached_cat
 from pybossa.util import rank, handle_content_type
 from jinja2.exceptions import TemplateNotFound
 from .projects import index as project_index
-from pybossa.cloud_store_api.s3 import s3_get_email_attachment
-from flask_login import login_required
-from pybossa.core import signer
-from pybossa.util import admin_or_project_owner
 
 
 blueprint = Blueprint('home', __name__)
