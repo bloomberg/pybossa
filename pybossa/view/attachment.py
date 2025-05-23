@@ -62,19 +62,19 @@ def download_attachment(signature, path):
             raise Forbidden('Access denied')
 
         resp = s3_get_email_attachment(path)
-        response = Response(resp["content"], mimetype=resp["type"])
+        response = Response(resp["content"], mimetype=resp["type"], status=200)
         if resp["content"]:
             response.headers['Content-Disposition'] = f'attachment; filename={resp["name"]}'
     except BadSignature as ex:
         current_app.logger.exception("BadSignature. %s, signature %s, path %s",str(ex), signature, path)
-        response = Response(f"An internal error has occurred.", mimetype="text/plain")
+        response = Response(f"An internal error has occurred.", mimetype="text/plain", status=400)
     except BadRequest as ex:
         current_app.logger.exception("%s, signature %s, path %s",str(ex), signature, path)
-        response = Response(f"An internal error has occurred.", mimetype="text/plain")
+        response = Response(f"An internal error has occurred.", mimetype="text/plain", status=400)
     except Forbidden as ex:
         current_app.logger.exception("%s, signature %s, path %s",str(ex), signature, path)
-        response = Response(f"An internal error has occurred.", mimetype="text/plain")
+        response = Response(f"An internal error has occurred.", mimetype="text/plain", status=403)
     except Exception as ex:
         current_app.logger.exception("%s, signature %s, path %s", str(ex), signature, path)
-        response = Response(f"Failed loading requested url.", mimetype="text/plain")
+        response = Response(f"Failed loading requested url.", mimetype="text/plain", status=400)
     return response

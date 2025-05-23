@@ -95,6 +95,9 @@ from pybossa.view.projects import get_locked_tasks, clone_project
 from pybossa.redis_lock import EXPIRE_LOCK_DELAY
 from pybossa.api.bulktasks import BulkTasksAPI
 from pybossa.util import admin_required
+from pybossa.jobs import send_mail
+from pybossa.jobs import export_tasks
+from html import escape
 
 
 task_fields = [
@@ -184,10 +187,6 @@ def add_task_signature(tasks):
 @admin_required
 @blueprint.route('/verify/<string:op_type>', methods=['POST'])
 def verify_operations(op_type):
-    from pybossa.jobs import send_mail
-    from pybossa.jobs import export_tasks
-    from html import escape
-
     if op_type == "export_tasks":
         data = request.json or {}
         project_shortname = data.get("project_shortname")
