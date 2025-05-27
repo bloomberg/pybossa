@@ -609,6 +609,7 @@ def disable_users_job():
             .format(len(users_disabled), ', '.join(users_disabled)))
     return True
 
+
 def send_mail(message_dict, mail_all=False):
     """Send email."""
 
@@ -627,6 +628,7 @@ def send_mail(message_dict, mail_all=False):
             else:
                 current_app.logger.info("Send email calling flask.mail")
                 mail.send(message)
+
 
 def count_records(table, task_ids):
     from pybossa.core import db

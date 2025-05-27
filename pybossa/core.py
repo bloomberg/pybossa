@@ -40,6 +40,7 @@ from pybossa.messages import *
 import pybossa.app_settings as app_settings
 import json
 from pybossa.wizard import Wizard
+from pybossa.util import copy_directory
 
 
 def create_app(run_as_server=True):
@@ -822,6 +823,13 @@ def setup_newsletter(app):
 def setup_assets(app):
     """Setup assets."""
     from flask_assets import Environment, Bundle
+
+    # when configured, copy themes template to a writable target directory
+    source = os.environ.get("TEMPLATE_SOURCE")
+    target = os.environ.get("TEMPLATE_TARGET")
+    if source and target:
+        copy_directory(source, target)
+
     assets = Environment(app)
     all_assets = [{
             'name': 'js_base',

@@ -15,11 +15,20 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA. If not, see <http://www.gnu.org/licenses/>.
+from werkzeug.middleware.proxy_fix import ProxyFix
 from pybossa.core import create_app
 
 if __name__ == "__main__":  # pragma: no cover
     app = create_app()
-    # logging.basicConfig(level=logging.NOTSET)
+
+    # tell flask that app is behind the proxy
+    app_behind_proxy = app.config.get("APP_BEHIND_PROXY", False)
+    app.logger.info("APP_BEHIND_PROXY %r", app_behind_proxy)
+    if app_behind_proxy:
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
+        )
+
     app.run(host=app.config['HOST'], port=app.config['PORT'],
             debug=app.config.get('DEBUG', True))
 else:

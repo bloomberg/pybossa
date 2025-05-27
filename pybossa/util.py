@@ -58,6 +58,7 @@ from pybossa.cloud_store_api.s3 import get_file_from_s3, delete_file_from_s3
 from pybossa.cloud_store_api.s3 import s3_upload_file_storage
 
 from bs4 import BeautifulSoup
+import shutil
 
 misaka = Misaka()
 TP_COMPONENT_TAGS = ["text-input", "dropdown-input", "radio-group-input",
@@ -1502,3 +1503,22 @@ def get_last_name(fullname):
             last_name = full_name_parts[-1]
 
     return last_name
+
+
+def copy_directory(source, target):
+    print(f"Copying directory from {source} to {target}")
+    if not os.path.isdir(source):
+        return
+
+    if not os.path.exists(target):
+        print(f"Create target directory {target}")
+        os.makedirs(target)
+
+    for item in os.listdir(source):
+        source_item = os.path.join(source, item)
+        target_item = os.path.join(target, item)
+        if os.path.isdir(source_item):
+            copy_directory(source_item, target_item)
+        else:
+            shutil.copy2(source_item, target_item)
+    print(f"Copying directory complete. source {source}, target {target}")
