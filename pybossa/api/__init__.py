@@ -187,6 +187,7 @@ def add_task_signature(tasks):
 @admin_required
 @blueprint.route('/verify/<string:op_type>', methods=['POST'])
 def verify_operations(op_type):
+    """Verify background job operations"""
     if op_type == "export_tasks":
         data = request.json or {}
         project_shortname = data.get("project_shortname")

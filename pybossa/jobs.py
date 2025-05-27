@@ -994,7 +994,7 @@ def export_tasks(current_user_email_addr, short_name,
                 if email_service.enabled:
                     url = upload_email_attachment(content, filename, current_user_email_addr, project.id)
                     msg = f'\nYour exported data can be downloaded from {url}\n'
-                    current_app.logger.info("Email service export_task attachment link %s", url)
+                    current_app.logger.info("Task export project id %s. Email service export_task attachment link %s", project.id, url)
                 else:
                     msg = '<p>Your exported data is attached.</p>'
                     mail_dict['attachments'] = [Attachment(filename, "application/zip", content)]

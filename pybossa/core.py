@@ -1058,6 +1058,7 @@ def setup_global_configs(app):
         private_required_fields.append("data_access_level")
 
 def setup_email_service(app):
+    """Setup email service and endpoint to access its email attachment"""
     from pybossa.view.attachment import blueprint as attachment_bp
 
     app.register_blueprint(attachment_bp, url_prefix='/attachment')
