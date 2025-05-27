@@ -12,6 +12,7 @@ from pybossa.cloud_store_api.connection import create_connection
 from pybossa.encryption import AESWithGCM
 import json
 from time import perf_counter
+from datetime import datetime
 
 allowed_mime_types = ['application/pdf',
                       'text/csv',
@@ -248,3 +249,56 @@ def upload_json_data(json_data, upload_path, file_name, encryption,
     return s3_upload_from_string(bucket, content, file_name, file_type_check=False,
         directory=upload_path, conn_name=conn_name,
         with_encryption=encryption, upload_root_dir=upload_root_dir)
+
+
+def upload_email_attachment(content, filename, user_email, project_id=None):
+    """Upload file to storage location and generate url to download file later"""
+
+    # generate signature for authorised access to the attachment
+    from pybossa.core import signer
+    payload = {"project_id": project_id} if project_id else {}
+    payload["user_email"] = user_email
+    signature = signer.dumps(payload)
+
+    # upload contents to s3 storage
+    bucket_name = app.config.get("S3_REQUEST_BUCKET_V2")
+    conn_name = "S3_TASK_REQUEST_V2"
+    if not bucket_name:
+        raise RuntimeError("S3_REQUEST_BUCKET_V2 is not configured")
+
+    conn_kwargs = app.config.get(conn_name, {})
+    conn = create_connection(**conn_kwargs)
+    bucket = conn.get_bucket(bucket_name, validate=False)
+
+    # Generate a unique file path using UTC timestamp and secure filename
+    timestamp = datetime.utcnow().isoformat()
+    secure_file_name = secure_filename(filename)
+    file_path = f"{signature}/{timestamp}-{secure_file_name}"
+
+    # Upload content to S3
+    key = bucket.new_key(file_path)
+    key.set_contents_from_string(content)
+    server_url = app.config.get('SERVER_URL')
+    url = f"{server_url}/attachment/{file_path}"
+    return url
+
+
+def s3_get_email_attachment(path):
+    """Download email attachment from storage location"""
+
+    response = {
+        "name": "",
+        "type": "application/octet-stream",
+        "content": b""
+    }
+
+    bucket = app.config.get("S3_REQUEST_BUCKET_V2")
+    if not bucket:
+        return response
+
+    conn_name = "S3_TASK_REQUEST_V2"
+    content, key = get_content_and_key_from_s3(bucket, path, conn=conn_name)
+    response["name"] = key.name
+    response["type"] = key.content_type
+    response["content"] = content
+    return response

@@ -53,19 +53,6 @@ class TestActivityFeed(Test):
         assert update_feed[0]['action_updated'] == 'Project', err_msg
 
     @with_context
-    def test_blogpost_creation(self):
-        """Test ACTIVITY FEED works for blog post creation."""
-        blogpost = BlogpostFactory.create()
-        update_feed = get_update_feed()
-        err_msg = "It should be the blog post"
-        assert update_feed[0]['id'] == blogpost.project_id, err_msg
-        assert update_feed[0]['name'] == blogpost.project.name, err_msg
-        assert update_feed[0]['short_name'] == blogpost.project.short_name, err_msg
-        # assert update_feed[0].get('info') is not None, err_msg
-        err_msg = "The update action should be Project"
-        assert update_feed[0]['action_updated'] == 'Blog', err_msg
-
-    @with_context
     def test_task_creation(self):
         """Test ACTIVITY FEED works for task creation."""
         task = TaskFactory.create()

@@ -35,7 +35,6 @@ from pybossa.model.user import User
 from pybossa.model.result import Result
 from pybossa.core import result_repo, db, task_repo
 from pybossa.jobs import webhook, notify_blog_users, check_and_send_task_notifications
-from pybossa.jobs import push_notification
 from pybossa.cache import projects as cached_projects
 from pybossa.cache import users as cached_users
 from pybossa import sched
@@ -46,48 +45,6 @@ from pybossa.sched import Schedulers
 webhook_queue = Queue('high', connection=sentinel.master)
 mail_queue = Queue('email', connection=sentinel.master)
 webpush_queue = Queue('webpush', connection=sentinel.master)
-
-
-@event.listens_for(Blogpost, 'after_insert')
-def add_blog_event(mapper, conn, target):
-    """Update PYBOSSA feed with new blog post."""
-    sql_query = ('select name, short_name, info from project \
-                 where id=%s') % target.project_id
-    results = conn.execute(sql_query)
-    obj = dict(action_updated='Blog')
-    tmp = dict()
-    for r in results:
-        tmp['id'] = target.project_id
-        tmp['name'] = r.name
-        tmp['short_name'] = r.short_name
-        tmp['info'] = r.info
-    tmp = Project().to_public_json(tmp)
-    obj.update(tmp)
-    update_feed(obj)
-    # Notify volunteers
-    if current_app.config.get('DISABLE_EMAIL_NOTIFICATIONS') is None:
-        scheme = current_app.config.get('PREFERRED_URL_SCHEME', 'http')
-        mail_queue.enqueue(notify_blog_users,
-                           blog_id=target.id,
-                           project_id=target.project_id)
-        contents = {"en": "New update!"}
-        headings = {"en": target.title}
-        launch_url = url_for('project.show_blogpost',
-                             short_name=tmp['short_name'],
-                             id=target.id,
-                             _scheme=scheme,
-                             _external=True)
-        # print launch_url
-        web_buttons = [{"id": "read-more-button",
-                        "text": "Read more",
-                        "icon": "http://i.imgur.com/MIxJp1L.png",
-                        "url": launch_url }]
-        webpush_queue.enqueue(push_notification,
-                              project_id=target.project_id,
-                              contents=contents,
-                              headings=headings,
-                              web_buttons=web_buttons,
-                              launch_url=launch_url)
 
 
 @event.listens_for(Project, 'after_insert')

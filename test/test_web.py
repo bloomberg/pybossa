@@ -11984,3 +11984,115 @@ class TestErrorHandlers(web.Helper):
             assert res.status_code == 423
             assert 'Public GIGwork' in str(res.data)
             assert owner_name in res_str
+
+
+class TestEmailAttachment(web.Helper):
+    pkg_json_not_found = {
+        "help": "Return ...",
+        "success": False,
+        "error": {
+            "message": "Not found",
+            "__type": "Not Found Error"}}
+
+    patch_data_access_levels = dict(
+        valid_access_levels=[["L1", "L2", "L3", "L4"]],
+        valid_user_levels_for_project_level=dict(
+            L1=[], L2=["L1"], L3=["L1", "L2"], L4=["L1", "L2", "L3"]),
+        valid_project_levels_for_user_level=dict(
+            L1=["L2", "L3", "L4"], L2=["L3", "L4"], L3=["L4"], L4=[]),
+        valid_user_access_levels=[("L1", "L1"), ("L2", "L2"),("L3", "L3"), ("L4", "L4")]
+    )
+
+    upref_mdata_choices = dict(languages=[("en", "en"), ("sp", "sp")],
+                                    locations=[("us", "us"), ("uk", "uk")],
+                                    country_codes=[("us", "us"), ("uk", "uk")],
+                                    country_names=[("us", "us"), ("uk", "uk")],
+                                    timezones=[("", ""), ("ACT", "Australia Central Time")],
+                                    user_types=[("Researcher", "Researcher"), ("Analyst", "Analyst")])
+
+    def clear_temp_container(self, user_id):
+        """Helper function which deletes all files in temp folder of a given owner_id"""
+        temp_folder = os.path.join('/tmp', 'user_%d' % user_id)
+        if os.path.isdir(temp_folder):
+            shutil.rmtree(temp_folder)
+
+    @with_context
+    def test_email_service_attachment(self):
+        """Test attachment link has invalid signature"""
+
+        import string
+        import random
+        from pybossa.core import signer
+
+        # create different types of users: admin, owner, regular user
+        admin = UserFactory.create(admin=True)
+        admin.set_password("1234")
+        user_repo.save(admin)
+        owner = UserFactory.create(pro=False)
+        owner.set_password("abc")
+        reguser = UserFactory.create(pro=False, admin=False, subadmin=False)
+        reguser.set_password("abc")
+
+        self.register(name=admin.name)
+        self.signin(email=admin.email_addr, password="1234")
+
+        # invalid signature
+        with patch('pybossa.view.attachment.TASK_SIGNATURE_MAX_SIZE', 2):
+            res = self.app.get("/attachment/sign/path", follow_redirects=True)
+            assert res.data.decode() == "An internal error has occurred.", res.data
+
+        # signed payload
+        signature = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(120))
+        res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
+        assert res.data.decode() == "An internal error has occurred.", res.data
+
+        # 400 when invalid project is passed in signature
+        sign_payload = {
+            "project_id": 123,
+            "user_email": "a@a.com"
+        }
+        signature = signer.dumps(sign_payload)
+        res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
+        assert res.data.decode() == "An internal error has occurred.", res.data
+
+        # 403 for non project owner
+        project = ProjectFactory.create(owner=owner)
+        self.register(name=reguser.name)
+        self.signin(email=reguser.email_addr, password="abc")
+
+        sign_payload["project_id"] = project.id
+        signature = signer.dumps(sign_payload)
+        res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
+        assert "An internal error has occurred." in res.data.decode(), res.data
+
+        # not a project report. however signed in user is not part of signature.
+        sign_payload = {"user_email": "aaa@a.com"}
+        signature = signer.dumps(sign_payload)
+        res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
+        assert "An internal error has occurred." in res.data.decode(), res.data
+
+        # not a project report. signed in user not admin or subadmin. cannot download attachment
+        sign_payload = {"user_email": reguser.email_addr}
+        signature = signer.dumps(sign_payload)
+        res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
+        assert "An internal error has occurred." in res.data.decode(), res.data
+
+        # admin user allowed to download the attachment
+        # however s3 bucket not configured resulting empty response
+        self.register(name=admin.name)
+        self.signin(email=admin.email_addr, password="1234")
+        sign_payload = {"user_email": reguser.email_addr}
+        signature = signer.dumps(sign_payload)
+        res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
+        assert res.status_code == 200 and res.data.decode() == "", "bucket not configured should return empty response"
+
+        self.register(name=admin.name)
+        self.signin(email=admin.email_addr, password="1234")
+        sign_payload = {"user_email": reguser.email_addr}
+        signature = signer.dumps(sign_payload)
+
+        key = type('Key', (object,), {'name': 'filename.zip', 'content_type': 'application/zip'})()
+        with patch.dict(self.flask_app.config, {"S3_REQUEST_BUCKET_V2": "attachment-bucket"}), \
+             patch('pybossa.cloud_store_api.s3.get_content_and_key_from_s3', return_value=("content", key)):
+            res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
+            assert res.status_code == 200 and res.data.decode() == "content" and res.content_type == "application/zip"

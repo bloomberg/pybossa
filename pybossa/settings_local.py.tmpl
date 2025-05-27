@@ -553,3 +553,16 @@ SWAGGER_TEMPLATE = {
 SESSION_REPLICATION_ROLE_DISABLED = True
 
 TASK_RESERVED_COLS = ["col_abc", "col_xyz"]
+
+# config to call external service to send emails
+PROXY_SERVICE_CONFIG = {
+    'email_service': {
+        'uri': "http/path/to/email/service:port",
+        'name': "pybemailservice",
+        'major_version': 1,
+        'minor_version': 0
+        'requests': ["emailReq"],
+        'headers': {'service-identity': environ.get('SERVICE_IDENTITY_HEADER')},
+        'validators': []
+    },
+}

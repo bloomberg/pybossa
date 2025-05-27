@@ -415,6 +415,7 @@ def setup_external_services(app):
     setup_dropbox_importer(app)
     setup_twitter_importer(app)
     setup_youtube_importer(app)
+    setup_email_service(app)
 
 
 def setup_twitter_login(app):
@@ -1055,3 +1056,17 @@ def setup_global_configs(app):
     private_required_fields = list(app.config.get("TASK_REQUIRED_FIELDS", {}).keys())
     if "data_access_level" not in private_required_fields:
         private_required_fields.append("data_access_level")
+
+def setup_email_service(app):
+    """Setup email service and endpoint to access its email attachment"""
+    from pybossa.view.attachment import blueprint as attachment_bp
+
+    app.register_blueprint(attachment_bp, url_prefix='/attachment')
+
+    proxy_service_config = app.config.get("PROXY_SERVICE_CONFIG", {})
+    email_config = proxy_service_config.get("email_service", {})
+    uri = email_config.get("uri")
+    if email_config and uri:
+        email_service.init_app(app)
+
+    app.logger.info("email_service enabled %r", email_service.enabled)

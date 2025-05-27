@@ -76,7 +76,6 @@ from pybossa.cache.helpers import (n_available_tasks, n_available_tasks_for_user
     n_unexpired_gold_tasks)
 from pybossa.sched import (get_scheduler_and_timeout, has_lock, release_lock, Schedulers,
                            fetch_lock_for_user, release_reserve_task_lock_by_id)
-from pybossa.jobs import send_mail
 from pybossa.api.project_by_name import ProjectByNameAPI, project_name_to_oid
 from pybossa.api.project_details import ProjectDetailsAPI
 from pybossa.api.project_locks import ProjectLocksAPI
@@ -95,6 +94,11 @@ from pybossa.cache.users import get_user_pref_metadata
 from pybossa.view.projects import get_locked_tasks, clone_project
 from pybossa.redis_lock import EXPIRE_LOCK_DELAY
 from pybossa.api.bulktasks import BulkTasksAPI
+from pybossa.util import admin_required
+from pybossa.jobs import send_mail
+from pybossa.jobs import export_tasks
+from html import escape
+
 
 task_fields = [
     "id",
@@ -177,6 +181,46 @@ def add_task_signature(tasks):
     if current_app.config.get('ENABLE_ENCRYPTION'):
         for task in tasks:
             sign_task(task)
+
+
+@jsonpify
+@admin_required
+@blueprint.route('/verify/<string:op_type>', methods=['POST'])
+def verify_operations(op_type):
+    """Verify background job operations"""
+    if op_type == "export_tasks":
+        data = request.json or {}
+        project_shortname = data.get("project_shortname")
+        export_type = data.get("export_type") # task, taskrun, consensus
+        filetype = data.get("filetype") # csv, json
+
+        project_shortname = escape(project_shortname) if project_shortname else project_shortname
+        export_type = escape(export_type) if export_type else export_type
+        filetype = escape(filetype) if filetype else filetype
+
+        # Validate export_type
+        valid_export_types = ["task", "taskrun", "consensus"]
+        if export_type not in valid_export_types:
+            return Response("Invalid export_type parameter", 400, mimetype="application/json")
+
+        resp = export_tasks(current_user.email_addr, project_shortname, export_type, False, filetype)
+        return Response(resp, 200, mimetype="application/json")
+
+    if op_type == "email_service":
+        data = request.json or {}
+        email = data.get('email')
+        if not email:
+            return Response("Missing email parameter", 400, mimetype="application/json")
+
+        message = {
+            "recipients": [email],
+            "subject": "Welcome",
+            "body": "Greetings. Email sent via /api/verify/email_service"
+        }
+        send_mail(message, mail_all=True)
+        return Response("OK", 200, mimetype="application/json")
+    return Response("Bad Request", 400, mimetype="application/json")
+
 
 @jsonpify
 @blueprint.route('/project/<project_id>/newtask')
