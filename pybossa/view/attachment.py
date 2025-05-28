@@ -47,6 +47,7 @@ def download_attachment(signature, path):
         signed_payload = signer.loads(signature)
         project_id = signed_payload.get("project_id")
         user_email = signed_payload.get("user_email")
+        current_app.logger.info("download attachment url signed info. project id %d, user email %s", project_id, user_email)
 
         # admins and project owners are authorized to download the attachment
         if project_id:
@@ -54,6 +55,8 @@ def download_attachment(signature, path):
             if not project:
                 raise BadRequest(f"Invalid project id {project_id}")
 
+            current_app.logger.info("project info: id %d, owner ids %s. current user info: id %d, admin %r, authenticated %r",
+                                    project.id, str(project.owners_ids), current_user.id, current_user.admin, current_user.is_authenticated)
             if not admin_or_project_owner(current_user, project):
                 raise Forbidden('Access denied')
 

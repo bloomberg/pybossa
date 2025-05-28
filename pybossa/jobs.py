@@ -994,8 +994,11 @@ def export_tasks(current_user_email_addr, short_name,
                 msg = '<p>You can download your file <a href="{}">here</a>.</p>'.format(url)
             else:
                 if email_service.enabled:
+                    current_app.logger.info("Uploading email attachment to s3. user email %s, project id %d",
+                                            current_user_email_addr, project.id)
                     url = upload_email_attachment(content, filename, current_user_email_addr, project.id)
-                    msg = f'\nYour exported data can be downloaded from {url}\n'
+                    # msg = f'\nYour exported data can be downloaded from {url}\n'
+                    msg = '<p>You can download your file <a href="{}">here</a>.</p>'.format(url)
                     current_app.logger.info("Task export project id %s. Email service export_task attachment link %s", project.id, url)
                 else:
                     msg = '<p>Your exported data is attached.</p>'
