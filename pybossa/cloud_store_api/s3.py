@@ -12,7 +12,7 @@ from pybossa.cloud_store_api.connection import create_connection
 from pybossa.encryption import AESWithGCM
 import json
 from time import perf_counter
-from datetime import datetime
+import time
 
 allowed_mime_types = ['application/pdf',
                       'text/csv',
@@ -271,15 +271,17 @@ def upload_email_attachment(content, filename, user_email, project_id=None):
     bucket = conn.get_bucket(bucket_name, validate=False)
 
     # Generate a unique file path using UTC timestamp and secure filename
-    timestamp = datetime.utcnow().isoformat()
+    timestamp = int(time.time())
     secure_file_name = secure_filename(filename)
-    file_path = f"{signature}/{timestamp}-{secure_file_name}"
+    s3_path = f"attachments/{timestamp}-{secure_file_name}"
+    app.logger.info("upload email attachment s3 path %s", s3_path)
 
     # Upload content to S3
-    key = bucket.new_key(file_path)
+    key = bucket.new_key(s3_path)
     key.set_contents_from_string(content)
     server_url = app.config.get('SERVER_URL')
-    url = f"{server_url}/attachment/{file_path}"
+    url = f"{server_url}/attachment/{signature}/{timestamp}-{secure_file_name}"
+    app.logger.info("upload email attachment url %s", url)
     return url
 
 
@@ -297,8 +299,12 @@ def s3_get_email_attachment(path):
         return response
 
     conn_name = "S3_TASK_REQUEST_V2"
-    content, key = get_content_and_key_from_s3(bucket, path, conn=conn_name)
-    response["name"] = key.name
-    response["type"] = key.content_type
-    response["content"] = content
+    s3_path = f"attachments/{path}"
+    content, key = get_content_and_key_from_s3(s3_bucket=bucket, path=s3_path, conn_name=conn_name)
+    if content and key:
+        app.logger.info("email attachment path %s, s3 file path %s, key name %s, key content_type %s",
+                path, s3_path, key.name, key.content_type)
+        response["name"] = key.name
+        response["type"] = key.content_type
+        response["content"] = content
     return response

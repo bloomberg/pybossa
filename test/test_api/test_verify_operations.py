@@ -20,6 +20,7 @@ from test import with_request_context
 from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory
 from test.test_api import TestAPI
 from unittest.mock import patch
+from pybossa.core import signer
 
 class TestVerifyOpAPI(TestAPI):
     """
@@ -50,9 +51,9 @@ class TestVerifyOpAPI(TestAPI):
         
 
     @with_request_context
-    @patch('pybossa.cloud_store_api.s3.datetime')
+    @patch('pybossa.cloud_store_api.s3.time')
     @patch('pybossa.cloud_store_api.s3.create_connection')
-    def test_verify_operations_export_tasks(self, create_conn, datetime):
+    def test_verify_operations_export_tasks(self, create_conn, mock_time):
         """Test the /api/verify/export_tasks endpoint export tasks and 
         generates email with attachment."""
 
@@ -60,7 +61,8 @@ class TestVerifyOpAPI(TestAPI):
         buck = conn.get_bucket.return_value
         key = buck.new_key.return_value
         key.set_contents_from_string.return_value = None
-        datetime.utcnow.return_value.isoformat.return_value = "01-01-2025"
+        current_time = "01012025"
+        mock_time.time.return_value = current_time
         
         admin = UserFactory.create(admin=True)
         project = ProjectFactory.create(owner=admin, short_name="test_project")
@@ -71,6 +73,9 @@ class TestVerifyOpAPI(TestAPI):
             "export_type": "task",
             "filetype": "csv"
         }
+        payload = {"project_id": project.id}
+        payload["user_email"] = admin.email_addr
+        expected_signature = signer.dumps(payload)
 
         with patch('pybossa.jobs.email_service') as mock_emailsvc:
             mock_emailsvc.enabled = True
@@ -78,18 +83,19 @@ class TestVerifyOpAPI(TestAPI):
                 'EXPORT_MAX_EMAIL_SIZE': 0,
                 'S3_REQUEST_BUCKET_V2': 'export-bucket',
                 'SERVER_URL': "https://testserver.com"
-            }):        
+            }):
+                expected_contents = f'You can download your file <a href="https://testserver.com/attachment/{expected_signature}/{int(current_time)}-{project.id}_{project.short_name}_task_csv.zip'
                 resp = self.app.post("/api/verify/export_tasks", json=data, headers=headers)
                 assert resp.status_code == 200 and resp.data.decode() == f"Task CSV file was successfully exported for: {project.name}"
                 args, _ = mock_emailsvc.send.call_args
                 message = args[0]
-                assert "Your exported data can be downloaded from https://testserver.com/attachment" in message["body"], "Email message to contain link to the attachment"
+                assert expected_contents in message["body"], message["body"]
 
 
     @with_request_context
-    @patch('pybossa.cloud_store_api.s3.datetime')
+    @patch('pybossa.cloud_store_api.s3.time')
     @patch('pybossa.cloud_store_api.s3.create_connection')
-    def test_verify_operations_send_mail(self, create_conn, datetime):
+    def test_verify_operations_send_mail(self, create_conn, mock_time):
         """Test the /api/verify/email_service endpoint 
         generates email to be sent via email service."""
         
