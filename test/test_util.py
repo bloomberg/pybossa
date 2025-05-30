@@ -43,6 +43,7 @@ from pybossa.util import admin_or_project_owner
 
 from pybossa.sentinel import Sentinel
 import pybossa.settings_test as settings_test
+from pybossa.util import copy_directory
 
 
 def myjsonify(data):
@@ -1946,3 +1947,34 @@ class TestMapLocations(Test):
         # ownership_id not numeric
         ownership_id = "1234abcd1234"
         assert_raises(ValueError, util.validate_ownership_id, ownership_id)
+
+
+class TestCopyDirectory(Test):
+
+    def __init__(self):
+        self.source = "/path/to/source/file/"
+        self.target = "/path/to/targetdir/"
+
+    @with_context
+    @patch("os.makedirs")
+    def test_source_missing(self, mock_makedir):
+        with patch("os.path.isdir", return_value=False):
+            copy_directory(self.source, self.target)
+        mock_makedir.assert_not_called()
+
+    @with_context
+    @patch("os.makedirs")
+    @patch("pybossa.util.shutil.copy2")
+    def test_create_target_directory_success(self, mock_shutil, mock_mkdir):
+        """
+        Test that the target directory is successfully created and files are copied
+        from the source directory to the target directory when the source exists
+        and the target does not exist.
+        """
+        mock_mkdir.return_value = True
+        with patch("os.path.isdir", side_effect=[True, False]), \
+            patch("os.path.exists", return_value=False), \
+            patch("os.listdir", return_value=[""]):
+            copy_directory(self.source, self.target)
+            mock_shutil.assert_called_with(self.source, self.target)
+            mock_mkdir.assert_called_once()

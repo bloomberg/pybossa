@@ -1506,12 +1506,10 @@ def get_last_name(fullname):
 
 
 def copy_directory(source, target):
-    print(f"Copying directory from {source} to {target}")
     if not os.path.isdir(source):
         return
 
     if not os.path.exists(target):
-        print(f"Create target directory {target}")
         os.makedirs(target)
 
     for item in os.listdir(source):
@@ -1521,4 +1519,3 @@ def copy_directory(source, target):
             copy_directory(source_item, target_item)
         else:
             shutil.copy2(source_item, target_item)
-    print(f"Copying directory complete. source {source}, target {target}")
