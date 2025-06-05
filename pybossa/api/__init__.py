@@ -185,6 +185,7 @@ def add_task_signature(tasks):
 
 @jsonpify
 @admin_required
+@csrf.exempt
 @blueprint.route('/verify/<string:op_type>', methods=['POST'])
 def verify_operations(op_type):
     """Verify background job operations"""

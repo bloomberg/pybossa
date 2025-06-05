@@ -244,9 +244,9 @@ class TestExport(Test):
         assert 'https://s3.com/buck/key' not in message.html
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.datetime')
+    @patch('pybossa.cloud_store_api.s3.time')
     @patch('pybossa.cloud_store_api.s3.create_connection')
-    def test_export_tasks_emailsvc_attachment(self, create_conn, datetime):
+    def test_export_tasks_emailsvc_attachment(self, create_conn, mock_time):
         """Test JOB export_tasks to bucket generates attachment url for emailsvc service."""
 
         user = UserFactory.create(admin=True)
@@ -258,7 +258,8 @@ class TestExport(Test):
         buck = conn.get_bucket.return_value
         key = buck.new_key.return_value
         key.set_contents_from_string.return_value = None
-        datetime.utcnow.return_value.isoformat.return_value = "01-01-2025"
+        current_time = "01012025"
+        mock_time.time.return_value = current_time
 
         payload = {"project_id": project.id}
         payload["user_email"] = user.email_addr
@@ -271,7 +272,7 @@ class TestExport(Test):
                 'S3_REQUEST_BUCKET_V2': 'export-bucket',
                 'SERVER_URL': "https://testserver.com"
             }):
-                expected_url = f"{self.flask_app.config['SERVER_URL']}/attachment/{expected_signature}/01-01-2025-1_project1_consensus_csv.zip"
+                expected_url = f"{self.flask_app.config['SERVER_URL']}/attachment/{expected_signature}/{int(current_time)}-1_project1_consensus_csv.zip"
                 export_tasks(user.email_addr, project.short_name, 'consensus', False, 'csv')
                 args, _ = mock_emailsvc.send.call_args
                 message = args[0]

@@ -17,6 +17,8 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 from redis import sentinel, StrictRedis
+import os
+from dns import resolver
 
 class Sentinel(object):
 
@@ -41,6 +43,16 @@ class Sentinel(object):
                 port=app.config['REDIS_PORT'], **conn_kwargs)
             self.slave = StrictRedis(host=app.config['REDIS_SLAVE_DNS'],
                 port=app.config['REDIS_PORT'], **conn_kwargs)
+        elif os.environ.get("REDIS_SENTINELS_DNS"):
+            redis_dns = os.environ.get("REDIS_SENTINELS_DNS")
+            ips_ports = resolver.resolve(redis_dns, "SRV")
+            sentinel_nodes = [(ipp.target.to_text(), ipp.port) for ipp in ips_ports]
+            app.config["REDIS_SENTINEL"] = sentinel_nodes
+            self.connection = sentinel.Sentinel(sentinel_nodes,
+                                                **conn_kwargs)
+            redis_master = app.config.get('REDIS_MASTER') or 'mymaster'
+            self.master = self.connection.master_for(redis_master)
+            self.slave = self.connection.slave_for(redis_master)
         else:
             self.connection = sentinel.Sentinel(app.config['REDIS_SENTINEL'],
                                                 **conn_kwargs)
