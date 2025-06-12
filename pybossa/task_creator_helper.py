@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Module with PyBossa create task helper."""
+import os
 from flask import current_app
 import hashlib
 import copy
@@ -145,6 +146,18 @@ def get_secret_from_vault(project_encryption):
         raise RuntimeError(get_path(data, config['error']))
 
 
+def get_secret_from_env(project_encryption):
+    config = current_app.config['SECRET_CONFIG_ENV']
+    if not isinstance(config, dict) or "secret_id_prefix" not in config:
+        raise RuntimeError("Env secret configuration is not valid")
+
+    secret_id = config.get("secret_id_prefix")
+    proj_secret_id = project_encryption.get(secret_id)
+    env_secret_id = f"{secret_id}_{proj_secret_id}"
+    current_app.logger.info("get_secret_from_env env_secret_id %s", env_secret_id)
+    return os.environ.get(env_secret_id, None)
+
+
 def get_project_encryption(project):
     encryption_jpath = current_app.config.get('ENCRYPTION_CONFIG_PATH')
     if not encryption_jpath:
@@ -157,8 +170,14 @@ def get_project_encryption(project):
 
 def get_encryption_key(project):
     project_encryption = get_project_encryption(project)
-    if project_encryption:
+    if not project_encryption:
+        return
+
+    secret_from_env = current_app.config.get("SECRET_CONFIG_ENV", False)
+    if not secret_from_env:
         return get_secret_from_vault(project_encryption)
+    else:
+        return get_secret_from_env(project_encryption)
 
 
 def read_encrypted_file(store, project, bucket, key_name):
