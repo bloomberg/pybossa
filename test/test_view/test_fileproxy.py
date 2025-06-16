@@ -17,6 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import os
 from test import with_context
 import json
 from test.helper import web
@@ -703,5 +704,56 @@ class TestEncryptedPayload(web.Helper):
         with patch('pybossa.view.fileproxy.has_lock') as has_lock:
             has_lock.return_value = False
             with patch.dict(self.flask_app.config, self.app_config):
+                res = self.app.get(url, follow_redirects=True)
+                assert res.status_code == 200, res.status_code
+
+    @with_context
+    def test_proj_encr_key_from_env(self):
+        """Test project encryption key can be retrieved from env."""
+        admin, owner, user = UserFactory.create_batch(3)
+
+        # project with encryption key in ext_config
+        # and key_id in env variable
+        project = ProjectFactory.create(owner=owner, info={
+            'ext_config': {
+                'encryption': {'key_id': 123}
+            }
+        })
+
+        encryption_key = 'testkey'
+        aes = AESWithGCM(encryption_key)
+        content = json.dumps(dict(a=1,b="2"))
+        encrypted_content = aes.encrypt(content)
+        task = TaskFactory.create(project=project, info={
+            'private_json__encrypted_payload': encrypted_content
+        })
+
+        signature = signer.dumps({'task_id': task.id})
+        url = '/fileproxy/encrypted/taskpayload/%s/%s?api_key=%s&task-signature=%s' \
+            % (project.id, task.id, user.api_key, signature)
+
+        app_config = {
+            'SECRET_CONFIG_ENV': {"secret_id_prefix": "key_id"},
+            'ENCRYPTION_CONFIG_PATH': ['ext_config', 'encryption']
+        }
+
+        with patch('pybossa.view.fileproxy.has_lock') as has_lock:
+            os.environ['key_id_123'] = encryption_key
+            has_lock.return_value = True
+            with patch.dict(self.flask_app.config, app_config):
+                res = self.app.get(url, follow_redirects=True)
+                assert res.status_code == 200, res.status_code
+                assert res.data == content.encode(), res.data
+
+        # project without encryption key in ext_config doesn't require encrypt/decrypt
+        content = dict(a=1, b="2")
+        project = ProjectFactory.create(owner=owner, info={})
+        task = TaskFactory.create(project=project, info=content)
+        signature = signer.dumps({'task_id': task.id})
+        url = '/fileproxy/encrypted/taskpayload/%s/%s?api_key=%s&task-signature=%s' \
+            % (project.id, task.id, user.api_key, signature)
+        with patch('pybossa.view.fileproxy.has_lock') as has_lock:
+            has_lock.return_value = True
+            with patch.dict(self.flask_app.config, app_config):
                 res = self.app.get(url, follow_redirects=True)
                 assert res.status_code == 200, res.status_code
