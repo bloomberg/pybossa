@@ -71,7 +71,7 @@ class TestEmailService(Test):
             esvc.send(message)
             sendmail.assert_called_with(expected_url, json=expected_svc_payload,
                 headers=self.service_config["email_service"]["headers"], verify=cert_path)
-            
+
     @with_context
     @patch('pybossa.emailsvc.requests.post')
     def test_emailsvc_send_email_exception(self, mock_post):
