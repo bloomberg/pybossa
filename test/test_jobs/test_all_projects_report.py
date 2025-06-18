@@ -23,6 +23,7 @@ from test import Fixtures, with_context
 from test.helper import web
 from test.helper.gig_helper import make_subadmin_by
 from nose.tools import assert_raises
+from test import Test
 
 
 @with_context
@@ -95,3 +96,36 @@ class TestAllProjectsReport(web.Helper):
         res = self.app.get('/project/export?format=csv',
                            follow_redirects=True)
         assert res.status_code == 403, res.status
+
+
+class TestReports(Test):
+
+    @with_context
+    @patch('pybossa.jobs.upload_email_attachment')
+    @patch('pybossa.jobs.send_mail')
+    def test_project_report_handles_exception(self, mock_sendmail, mock_email_upload):
+        """Test that the project report sends email with error info on exception."""
+
+        Fixtures.create_project({})
+        info = {
+            'timestamp': 'timestamp',
+            'user_id': 42,
+            'base_url': 'www.example.com/project/'
+        }
+
+        with patch('pybossa.jobs.email_service') as mock_emailsvc:
+            mock_emailsvc.enabled = True
+            mock_email_upload.side_effect = Exception("Upload failed")
+            with patch.dict(self.flask_app.config, {
+                    'EXPORT_MAX_EMAIL_SIZE': 0,
+                    'S3_REQUEST_BUCKET_V2': 'export-bucket',
+                    'SERVER_URL': "https://testserver.com"
+                }):
+                with assert_raises(Exception):
+                    mail_project_report(info, 'tyrion@casterlyrock.com')
+                    assert mock_emailsvc.send.called
+                    args, _ = mock_sendmail.call_args
+                    message = args[0]
+                    assert 'tyrion@casterlyrock.com' in message['recipients']
+                    assert 'Error in PYBOSSA project report' == message['subject'], message['subject']
+                    assert 'Hello,\n\nAn error occurred while exporting your report.\n\nThe PYBOSSA team.' == message['body'], message['body']

@@ -962,6 +962,7 @@ def export_tasks(current_user_email_addr, short_name,
             export_fn = None
 
         mail_dict = dict(recipients=[current_user_email_addr])
+        expires_in = current_app.config.get('EXPORT_EXPIRY', 60 * 60 * 12)  # default 12 hours
         # Construct message
         if export_fn is not None:
             mail_dict['subject'] = 'Data exported for your project: {0}'.format(project.name)
@@ -987,7 +988,6 @@ def export_tasks(current_user_email_addr, short_name,
                 timestamp = datetime.utcnow().isoformat()
                 key = bucket.new_key('{}-{}'.format(timestamp, filename))
                 key.set_contents_from_string(content)
-                expires_in = current_app.config.get('EXPORT_EXPIRY', 12 * 3600)
                 url = key.generate_url(expires_in)
                 current_app.logger.info("Task export project id %s: Exported file uploaded to s3 %s",
                                         project.id, url)
@@ -996,9 +996,9 @@ def export_tasks(current_user_email_addr, short_name,
                 if email_service.enabled:
                     current_app.logger.info("Uploading email attachment to s3. user email %s, project id %d",
                                             current_user_email_addr, project.id)
+                    expiration_date = (datetime.now() + timedelta(days=90)).strftime('%a, %d %b %Y %H:%M:%S GMT')
                     url = upload_email_attachment(content, filename, current_user_email_addr, project.id)
-                    # msg = f'\nYour exported data can be downloaded from {url}\n'
-                    msg = '<p>You can download your file <a href="{}">here</a>.</p>'.format(url)
+                    msg = f'<p>You can download your file <a href="{url}">here</a> until {expiration_date}.</p>'
                     current_app.logger.info("Task export project id %s. Email service export_task attachment link %s", project.id, url)
                 else:
                     msg = '<p>Your exported data is attached.</p>'
@@ -1040,7 +1040,11 @@ def export_tasks(current_user_email_addr, short_name,
                          subject=subject,
                          body=body)
         message = Message(**mail_dict)
-        mail.send(message)
+        if email_service.enabled:
+            current_app.logger.info("Sending error email for export tasks using email_service. %r", mail_dict)
+            email_service.send(mail_dict)
+        else:
+            mail.send(message)
         raise
 
 
@@ -1354,20 +1358,39 @@ def mail_project_report(info, email_addr):
         zipfile = None
         filename = project_csv_exporter.zip_name(info)
         subject = '{} project report'.format(current_app.config['BRAND'])
-        msg = 'Your exported data is attached.'
-
         body = 'Hello,\n\n{}\n\nThe {} team.'
-        body = body.format(msg, current_app.config.get('BRAND'))
-        mail_dict = dict(recipients=recipients,
-                         subject=subject,
-                         body=body)
 
-        container = 'user_{}'.format(info['user_id'])
         zipfile = project_csv_exporter.generate_zip_files(info)
-        with open(zipfile, mode='rb') as fp:  # open zipfile in binary mode
-            attachment = Attachment(filename, "application/zip",
-                                    fp.read())
-        mail_dict['attachments'] = [attachment]
+        if email_service.enabled:
+            current_app.logger.info("Uploading email attachment to s3 for project report. user email %s", email_addr)
+            expiration_date = (datetime.now() + timedelta(days=90)).strftime('%a, %d %b %Y %H:%M:%S GMT')
+            content = None
+            with open(zipfile, mode='rb') as fp:  # open zipfile in binary mode
+                content = fp.read()
+            if not content:
+                raise ValueError("No content in zipfile: {}".format(zipfile))
+
+            url = upload_email_attachment(content, filename, email_addr)
+            msg = f'<p>You can download your file <a href="{url}">here</a> until {expiration_date}.</p>'
+            body = body.format(msg, current_app.config.get('BRAND'))
+            mail_dict = dict(recipients=recipients,
+                        subject=subject,
+                        body=body)
+            current_app.logger.info("Project report for user %s generated email with report link %s", email_addr, url)
+        else:
+            msg = 'Your exported data is attached.'
+            body = body.format(msg, current_app.config.get('BRAND'))
+            mail_dict = dict(recipients=recipients,
+                            subject=subject,
+                            body=body)
+
+            attachment = None
+            with open(zipfile, mode='rb') as fp:  # open zipfile in binary mode
+                attachment = Attachment(filename, "application/zip",
+                                        fp.read())
+            if not attachment:
+                raise ValueError("No content in zipfile: {}".format(zipfile))
+            mail_dict['attachments'] = [attachment]
     except Exception:
         current_app.logger.exception('Error in mail_project_report')
         subject = 'Error in {} project report'.format(current_app.config['BRAND'])
@@ -1378,13 +1401,14 @@ def mail_project_report(info, email_addr):
         mail_dict = dict(recipients=recipients,
                          subject=subject,
                          body=body)
-        send_mail(mail_dict)
         raise
     finally:
         if zipfile:
             os.unlink(zipfile)
-
-    send_mail(mail_dict)
+        if email_service.enabled:
+            email_service.send(mail_dict)
+        else:
+            send_mail(mail_dict)
 
 
 def delete_account(user_id, admin_addr, **kwargs):
@@ -1635,17 +1659,29 @@ def export_all_users(fmt, email_addr):
 
     try:
         data = {"json": respond_json, "csv": respond_csv}[fmt]()
-        attachment = Attachment(
-            'user_export.{}'.format(fmt),
-            'application/{}'.format(fmt),
-            data
-        )
-        mail_dict = {
-            'recipients': recipients,
-            'subject': 'User Export',
-            'body': 'Your exported data is attached.',
-            'attachments': [attachment]
-        }
+        if email_service.enabled:
+            current_app.logger.info("Uploading email attachment to s3 for export users report. user email %s", email_addr)
+            expiration_date = (datetime.now() + timedelta(days=90)).strftime('%a, %d %b %Y %H:%M:%S GMT')
+            filename = 'user_export.{}'.format(fmt)
+            url = upload_email_attachment(data, filename, email_addr)
+            body = f'<p>You can download your file <a href="{url}">here</a> until {expiration_date}.</p>'
+            mail_dict = dict(recipients=recipients,
+                        subject="User Export",
+                        body=body)
+            current_app.logger.info("Export users for user %s generated email with report link %s", email_addr, url)
+        else:
+            mimetype = {"csv": "text/csv", "zip": "application/zip", "json": "application/json"}
+            attachment = Attachment(
+                'user_export.{}'.format(fmt),
+                mimetype.get(fmt, "application/octet-stream"),
+                data
+            )
+            mail_dict = {
+                'recipients': recipients,
+                'subject': 'User Export',
+                'body': 'Your exported data is attached.',
+                'attachments': [attachment]
+            }
     except Exception as e:
         mail_dict = {
             'recipients': [email_addr],
@@ -1654,7 +1690,10 @@ def export_all_users(fmt, email_addr):
         }
         raise
     finally:
-        send_mail(mail_dict)
+        if email_service.enabled:
+            email_service.send(mail_dict)
+        else:
+            send_mail(mail_dict)
 
 
 # TODO: uncomment, reuse this under future PR

@@ -151,3 +151,44 @@ class TestExportUsers(web.Helper):
             number_of_users += 1
 
         assert number_of_users == 4, number_of_users # user report returning all users also returns user1@test.com
+
+
+    @with_context
+    @patch('pybossa.jobs.send_mail')
+    @patch('pybossa.jobs.upload_email_attachment')
+    @patch('pybossa.api.pwd_manager.ProjectPasswdManager.password_needed')
+    def test_export_all_users_email_service_url(self, password_needed, mock_upload_attachment, mock_sendmail):
+        password_needed.return_value = False
+        restricted = UserFactory.create(restrict=True, id=5000016)
+        self.register(fullname="Manolita")
+        project = self.create_project_and_tasks()
+        self.signin()
+        self.contribute(project)
+        self.signout()
+
+        self.register(fullname="Juan Jose", name="juan",
+                      email="juan@juan.com", password="juan")
+        self.signin(email="juan@juan.com", password="juan")
+        self.contribute(project)
+        self.signout()
+
+        self.register(fullname="Juan Jose2", name="juan2",
+                      email="juan2@juan.com", password="juan2")
+        self.signin(email="juan2@juan.com", password="juan2")
+        self.contribute(project)
+        self.signout()
+        self.signin()
+
+        with patch('pybossa.jobs.email_service') as mock_emailsvc:
+            mock_emailsvc.enabled = True
+            export_all_users('csv', 'hello@c.com')
+
+            assert mock_upload_attachment.called
+            args, _ = mock_upload_attachment.call_args
+            assert args[1] == 'user_export.csv'
+            assert args[2] == 'hello@c.com'
+            assert mock_emailsvc.send.called
+            send_args, _ = mock_emailsvc.send.call_args
+            assert "hello@c.com" in send_args[0]["recipients"]
+            assert "User Export" in send_args[0]["subject"]
+            assert "You can download your file" in send_args[0]["body"]
