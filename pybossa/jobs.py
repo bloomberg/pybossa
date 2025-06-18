@@ -1670,9 +1670,10 @@ def export_all_users(fmt, email_addr):
                         body=body)
             current_app.logger.info("Export users for user %s generated email with report link %s", email_addr, url)
         else:
+            mimetype = {"csv": "text/csv", "zip": "application/zip", "json": "application/json"}
             attachment = Attachment(
                 'user_export.{}'.format(fmt),
-                'application/{}'.format(fmt),
+                mimetype.get(fmt, "application/octet-stream"),
                 data
             )
             mail_dict = {
