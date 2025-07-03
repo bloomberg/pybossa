@@ -48,6 +48,8 @@ class Sentinel(object):
             ips_ports = resolver.resolve(redis_dns, "SRV")
             sentinel_nodes = [(ipp.target.to_text(), ipp.port) for ipp in ips_ports]
             app.config["REDIS_SENTINEL"] = sentinel_nodes
+            app.config["REDIS_SENTINELS"] = ','.join(':'.join(str(x) for x in s) for s in sentinel_nodes)
+            app.logger.info("Configuring redis sentinels. app.config.REDIS_SENTINELS: %s", app.config["REDIS_SENTINELS"])
             self.connection = sentinel.Sentinel(sentinel_nodes,
                                                 **conn_kwargs)
             redis_master = app.config.get('REDIS_MASTER') or 'mymaster'
