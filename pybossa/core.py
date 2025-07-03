@@ -41,6 +41,7 @@ import pybossa.app_settings as app_settings
 import json
 from pybossa.wizard import Wizard
 from pybossa.util import copy_directory
+from dns import resolver
 
 
 def create_app(run_as_server=True):
@@ -115,14 +116,24 @@ RQ_DASHBOARD_LEGACY_CONFIG_OPTIONS = {
     "DELETE_JOBS": "RQ_DASHBOARD_DELETE_JOBS",
 }
 
-def upgrade_rq_config(config):
+def upgrade_rq_config(app):
     """
     rq_dashboard requires specific parameter name in config: https://pypi.org/project/rq-dashboard/
     old configuration options will be deprecated soon so updates old options with new ones.
     """
+    if os.environ.get("REDIS_SENTINELS_DNS"):
+        redis_dns = os.environ.get("REDIS_SENTINELS_DNS")
+        ips_ports = resolver.resolve(redis_dns, "SRV")
+        sentinel_nodes = [(ipp.target.to_text(), ipp.port) for ipp in ips_ports]
+        app.config["REDIS_SENTINEL"] = sentinel_nodes
+        app.config["REDIS_SENTINELS"] = ','.join(':'.join(str(x) for x in s) for s in sentinel_nodes)
+        app.logger.info("upgrade_rq_config app.config.REDIS_SENTINELS %s", app.config["REDIS_SENTINELS"])
+    else:
+        app.logger.info("upgrade_rq_config REDIS_SENTINELS_DNS env NOT set")
+
     for old_name, new_name in RQ_DASHBOARD_LEGACY_CONFIG_OPTIONS.items():
-        if old_name in config:
-            config[new_name] = config[old_name]
+        if old_name in app.config:
+            app.config[new_name] = app.config[old_name]
 
 
 def configure_app(app):
@@ -130,7 +141,9 @@ def configure_app(app):
     app.config.from_object(default_settings)
     if app_settings.config_path:
         app.config.from_pyfile(app_settings.config_path)
-    upgrade_rq_config(app.config)
+    upgrade_rq_config(app)
+    app.logger.info("Post upgrade_rq_config redis config. REDIS_SENTINELS %s, RQ_DASHBOARD_REDIS_SENTINELS %s",
+                    app.config.get("REDIS_SENTINELS"), app.config.get("RQ_DASHBOARD_REDIS_SENTINELS"))
 
     # Override DB in case of testing
     if app.config.get('SQLALCHEMY_DATABASE_TEST_URI'):

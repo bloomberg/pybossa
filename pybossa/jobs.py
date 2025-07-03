@@ -623,10 +623,10 @@ def send_mail(message_dict, mail_all=False):
                 break
         if not spam:
             if email_service.enabled:
-                current_app.logger.info("Send email calling email_service")
+                current_app.logger.info("Send email calling email_service %s", message_dict)
                 email_service.send(message_dict)
             else:
-                current_app.logger.info("Send email calling flask.mail")
+                current_app.logger.info("Send email calling flask.mail %s", message_dict)
                 mail.send(message)
 
 
