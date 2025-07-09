@@ -623,6 +623,17 @@ def send_mail(message_dict, mail_all=False):
                 break
         if not spam:
             if email_service.enabled:
+                # Normalize email aliases in recipients
+                recipients = []
+                for r in message_dict.get("recipients", []):
+                    if "+" in r:
+                        local, domain = r.split("@", 1)
+                        local = local.split("+", 1)[0]
+                        r = f"{local}@{domain}"
+                    recipients.append(r)
+                # Remove duplicates
+                recipients = list(dict.fromkeys(recipients))
+                message_dict["recipients"] = recipients
                 current_app.logger.info("Send email calling email_service %s", message_dict)
                 email_service.send(message_dict)
             else:
