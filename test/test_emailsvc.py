@@ -20,6 +20,7 @@
 from test import Test, with_context
 from unittest.mock import patch
 from pybossa.emailsvc import EmailService
+from pybossa.jobs import send_mail
 
 
 class TestEmailService(Test):
@@ -84,3 +85,28 @@ class TestEmailService(Test):
             message = "hi"
             esvc.send(message)
             mock_post.assert_not_called()
+
+    @with_context
+    @patch('pybossa.jobs.email_service')
+    @patch('pybossa.jobs.mail')
+    @patch('pybossa.jobs.Message')
+    def test_send_mail_normalize_email_alias(self, Message, mail, email_service):
+        """Test send_mail via email_service normalizes email aliases."""
+
+        email_service.enabled = True
+        mail_dict = {
+            "subject": "Hello",
+            "recipients": [
+                "abc+2@xyz.com",
+                "abc123+2@xyz.com",
+                "abc123@xyz.com",
+                "abc+7@xyz.com",
+                "sss@ttt.com"
+            ],
+            "body": "Welcome to PYBOSSA!"
+        }
+        expected_recipients = ['abc@xyz.com', 'abc123@xyz.com', 'sss@ttt.com']
+        send_mail(mail_dict, mail_all=True)
+        assert email_service.send.called
+        assert email_service.send.call_args[0][0]['recipients'] == expected_recipients, \
+            email_service.send.call_args[0][0]['recipients']

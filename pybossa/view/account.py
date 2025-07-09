@@ -244,6 +244,7 @@ def _email_two_factor_auth(user, invalid_token=False):
     msg['html'] = render_template(
                         '/account/email/otp.html',
                         user=user, otpcode=otp_code)
+    current_app.logger.info('sending email with otp for user %s', user.email_addr)
     mail_queue.enqueue(send_mail, msg)
     if not invalid_token:
         flash(gettext('an email has been sent to you with one time password'),
@@ -271,6 +272,7 @@ def otpvalidation(token):
         if otp_code is not None:
             if otp_code == user_otp:
                 msg = gettext('OTP verified. You are logged in to the system')
+                current_app.logger.info('otp verified for user %s', email)
                 flash(msg, 'success')
                 otp.expire_token(token)
                 return _sign_in_user(user)
