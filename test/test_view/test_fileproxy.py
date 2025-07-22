@@ -199,8 +199,8 @@ class TestFileproxy(web.Helper):
     @with_context
     @patch('pybossa.cloud_store_api.s3.create_connection')
     @patch('pybossa.view.fileproxy.has_lock')
-    @patch('pybossa.task_creator_helper.get_secret_from_vault')
-    def test_file_user_key_from_vault(self, get_secret, has_lock, create_connection):
+    @patch('pybossa.task_creator_helper.get_secret_from_env')
+    def test_file_user_key_from_env(self, get_secret, has_lock, create_connection):
         has_lock.return_value = True
         admin, owner, user = UserFactory.create_batch(3)
         project = ProjectFactory.create(info={
@@ -225,7 +225,8 @@ class TestFileproxy(web.Helper):
         with patch.dict(self.flask_app.config, {
             'FILE_ENCRYPTION_KEY': 'another key',
             'S3_REQUEST_BUCKET': 'test',
-            'ENCRYPTION_CONFIG_PATH': ['encryption']
+            'ENCRYPTION_CONFIG_PATH': ['encryption'],
+            'SECRET_CONFIG_ENV': {"secret_id_prefix": "key_id"},
         }):
             res = self.app.get(req_url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
@@ -482,14 +483,7 @@ class TestFileproxy(web.Helper):
 class TestEncryptedPayload(web.Helper):
 
     app_config = {
-        'VAULT_CONFIG': {
-            'url': 'https://valut.com/{key_id}',
-            'request': {
-                'headers': {'Authorization': 'apikey'}
-            },
-            'response': ['key'],
-            'error': ['error']
-        },
+        'SECRET_CONFIG_ENV': {"secret_id_prefix": "key_id"},
         'ENCRYPTION_CONFIG_PATH': ['ext_config', 'encryption']
     }
 
@@ -561,6 +555,7 @@ class TestEncryptedPayload(web.Helper):
             % (project.id, task.id, owner.api_key, signature)
 
         with patch.dict(self.flask_app.config, self.app_config):
+            os.environ['key_id_123'] = encryption_key
             res = self.app.get(url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
             assert res.data == content.encode(), res.data
@@ -592,17 +587,14 @@ class TestEncryptedPayload(web.Helper):
             % (project.id, task.id, admin.api_key, signature)
 
         with patch.dict(self.flask_app.config, self.app_config):
+            os.environ['key_id_123'] = encryption_key
             res = self.app.get(url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
             assert res.data == content.encode(), res.data
 
     @with_context
-    @patch('pybossa.view.fileproxy.requests.get')
-    def test_empty_response(self, http_get):
+    def test_empty_response(self):
         """Returns empty response with task payload not containing encrypted data."""
-        res = MagicMock()
-        res.json.return_value = {'key': 'testkey'}
-        http_get.return_value = res
 
         project = ProjectFactory.create(info={
             'ext_config': {
@@ -618,16 +610,15 @@ class TestEncryptedPayload(web.Helper):
             % (project.id, task.id, owner.api_key, signature)
 
         with patch.dict(self.flask_app.config, self.app_config):
+            os.environ['key_id_123'] = encryption_key
             res = self.app.get(url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
             assert res.data == b'', res.data
 
     @with_context
-    @patch('pybossa.view.fileproxy.requests.get')
-    def test_proxy_key_err(self, http_get):
-        res = MagicMock()
-        res.json.return_value = {'error': 'an error occurred'}
-        http_get.return_value = res
+    @patch('pybossa.task_creator_helper.get_secret_from_env')
+    def test_proxy_key_err(self, get_secret):
+        """Test error when retrieving encryption key."""
 
         admin, owner = UserFactory.create_batch(2)
         project = ProjectFactory.create(owner=owner, info={
@@ -646,6 +637,9 @@ class TestEncryptedPayload(web.Helper):
         signature = signer.dumps({'task_id': task.id})
         url = '/fileproxy/encrypted/taskpayload/%s/%s?api_key=%s&task-signature=%s' \
             % (project.id, task.id, admin.api_key, signature)
+
+        # Patch get_secret to raise an Exception to simulate key retrieval error
+        get_secret.side_effect = Exception("Key retrieval failed")
 
         with patch.dict(self.flask_app.config, self.app_config):
             res = self.app.get(url, follow_redirects=True)
@@ -689,6 +683,7 @@ class TestEncryptedPayload(web.Helper):
         with patch('pybossa.view.fileproxy.has_lock') as has_lock:
             has_lock.return_value = True
             with patch.dict(self.flask_app.config, self.app_config):
+                os.environ['key_id_123'] = encryption_key
                 res = self.app.get(url, follow_redirects=True)
                 assert res.status_code == 200, res.status_code
                 assert res.data == content.encode(), res.data

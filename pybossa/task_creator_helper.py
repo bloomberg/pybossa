@@ -144,7 +144,10 @@ def get_secret_from_env(project_encryption):
     proj_secret_id = project_encryption.get(secret_id)
     env_secret_id = f"{secret_id}_{proj_secret_id}"
     current_app.logger.info("get_secret_from_env env_secret_id %s", env_secret_id)
-    return os.environ.get(env_secret_id, None)
+    try:
+        return os.environ[env_secret_id]
+    except Exception:
+        raise RuntimeError(f"Unable to fetch project encryption key {env_secret_id}")
 
 
 def get_project_encryption(project):
