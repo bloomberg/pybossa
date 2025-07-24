@@ -26,7 +26,6 @@ from test.factories import ProjectFactory, TaskFactory, UserFactory
 from pybossa.core import signer
 from pybossa.encryption import AESWithGCM
 from boto.exception import S3ResponseError
-# from pybossa.view.fileproxy import is_valid_hdfs_url
 
 
 class TestFileproxy(web.Helper):
@@ -249,7 +248,7 @@ class TestFileproxy(web.Helper):
         key.get_contents_as_string.side_effect = S3ResponseError(403, 'Forbidden')
 
         res = self.app.get(req_url, follow_redirects=True)
-        assert res.status_code == 500, res.status_code
+        assert res.status_code == 500, f"Expected 500 Internal Server Error, got {res.status_code}"
 
     @with_context
     @patch('pybossa.cloud_store_api.s3.create_connection')
@@ -618,7 +617,11 @@ class TestEncryptedPayload(web.Helper):
     @with_context
     @patch('pybossa.task_creator_helper.get_secret_from_env')
     def test_proxy_key_err(self, get_secret):
-        """Test error when retrieving encryption key."""
+        """
+        Test error cases for encrypted payload proxy:
+        1. Simulate an error when retrieving the encryption key (should return 500).
+        2. Simulate a bad project id (should return 400).
+        """
 
         admin, owner = UserFactory.create_batch(2)
         project = ProjectFactory.create(owner=owner, info={
@@ -752,3 +755,35 @@ class TestEncryptedPayload(web.Helper):
             with patch.dict(self.flask_app.config, app_config):
                 res = self.app.get(url, follow_redirects=True)
                 assert res.status_code == 200, res.status_code
+
+    @with_context
+    def test_missing_config_SECRET_CONFIG_ENV_raises_exception(self):
+        """Test that missing SECRET_CONFIG_ENV raises an exception."""
+        admin, owner, user = UserFactory.create_batch(3)
+
+        project = ProjectFactory.create(owner=owner, info={
+            'ext_config': {
+                'encryption': {'key_id': 123}
+            }
+        })
+
+        encryption_key = 'testkey'
+        aes = AESWithGCM(encryption_key)
+        content = json.dumps(dict(a=1,b="2"))
+        encrypted_content = aes.encrypt(content)
+        task = TaskFactory.create(project=project, info={
+            'private_json__encrypted_payload': encrypted_content
+        })
+
+        signature = signer.dumps({'task_id': task.id})
+        url = '/fileproxy/encrypted/taskpayload/%s/%s?api_key=%s&task-signature=%s' \
+            % (project.id, task.id, owner.api_key, signature)
+
+        app_config = {
+            'ENCRYPTION_CONFIG_PATH': ['ext_config', 'encryption']
+        }
+
+        with patch.dict(self.flask_app.config, app_config):
+            resp = self.app.get(url, follow_redirects=True)
+            assert resp.status == '500 INTERNAL SERVER ERROR', resp.status_code
+            assert 'SECRET_CONFIG_ENV' not in self.flask_app.config

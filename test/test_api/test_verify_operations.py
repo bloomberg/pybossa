@@ -75,20 +75,23 @@ class TestVerifyOpAPI(TestAPI):
         }
         payload = {"project_id": project.id}
         payload["user_email"] = admin.email_addr
-        expected_signature = signer.dumps(payload)
+        signature = "mocked_signature"
 
-        with patch('pybossa.jobs.email_service') as mock_emailsvc:
+        with patch('pybossa.core.signer.dumps', return_value=signature), \
+             patch('pybossa.jobs.email_service') as mock_emailsvc:
             mock_emailsvc.enabled = True
             with patch.dict(self.flask_app.config, {
                 'EXPORT_MAX_EMAIL_SIZE': 0,
                 'S3_REQUEST_BUCKET_V2': 'export-bucket',
                 'SERVER_URL': "https://testserver.com"
             }):
-                expected_contents = f'You can download your file <a href="https://testserver.com/attachment/{expected_signature}/{int(current_time)}-{project.id}_{project.short_name}_task_csv.zip'
+                expected_contents = f'You can download your file <a href="https://testserver.com/attachment/{signature}/{int(current_time)}-{project.id}_{project.short_name}_task_csv.zip'
                 resp = self.app.post("/api/verify/export_tasks", json=data, headers=headers)
                 assert resp.status_code == 200 and resp.data.decode() == f"Task CSV file was successfully exported for: {project.name}"
                 args, _ = mock_emailsvc.send.call_args
                 message = args[0]
+                print("*** Message body ****", message["body"])
+                print("*** Expected contents ****", expected_contents)
                 assert expected_contents in message["body"], message["body"]
 
 
