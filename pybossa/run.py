@@ -17,7 +17,9 @@
 # along with PYBOSSA. If not, see <http://www.gnu.org/licenses/>.
 from werkzeug.middleware.proxy_fix import ProxyFix
 from pybossa.core import create_app
+import werkzeug.serving
 
+werkzeug.serving._log_add_style = False
 if __name__ == "__main__":  # pragma: no cover
     app = create_app()
 

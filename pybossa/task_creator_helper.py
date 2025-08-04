@@ -147,7 +147,7 @@ def get_secret_from_env(project_encryption):
     try:
         return os.environ[env_secret_id]
     except Exception:
-        raise RuntimeError(f"Unable to fetch project encryption key {env_secret_id}")
+        raise RuntimeError(f"Unable to fetch project encryption key from {env_secret_id}")
 
 
 def get_project_encryption(project):
