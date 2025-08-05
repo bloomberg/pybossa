@@ -5,8 +5,6 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      SETUPTOOLS_SCM_PRETEND_VERSION: "0.0.0"
     strategy:
       matrix:
         python-version: [3.9]
@@ -49,6 +47,16 @@ jobs:
           redis-server&
           cd pybossa && ln -s themes/default/translations && cd ..
           cp settings_test.py.tmpl pybossa/settings_test.py
+
+      - name: Ensure dynamic version in pyproject.toml
+        run: |
+          # Only add it if it isn’t there already
+          if ! grep -q '^dynamic =' pyproject.toml; then
+            # Insert right after the [project] header
+            sed -i '/^\[project\]/a dynamic = ["version"]' pyproject.toml
+          fi
+          echo "Patched pyproject.toml:"
+          sed -n '1,20p' pyproject.toml
 
       - name: Install dependencies
         run: |
