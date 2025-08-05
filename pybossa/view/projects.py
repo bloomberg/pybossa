@@ -485,10 +485,19 @@ def clone_project(project, form):
     proj_dict['info']['task_presenter'] = re.sub(regex, r"\1{}\3".format(form['short_name']), task_presenter)
 
     proj_dict['short_name'] = form['short_name']
+
+    # Remove "encryption" from ext_config if it exists
+    if 'ext_config' in proj_dict['info'] and isinstance(proj_dict['info']['ext_config'], dict):
+        encryption = proj_dict['info']['ext_config'].pop('encryption', None)
+        if encryption:
+            current_app.logger.info("Removed encryption %s from ext_config when cloning project %d", encryption, project.id)
+
+
     proj_dict['info']['data_classification'] = {
         'input_data': form['input_data_class'],
         'output_data': form['output_data_class']
     }
+
     new_project = Project(**proj_dict)
     new_project.set_password(form['password'])
     project_repo.save(new_project)
