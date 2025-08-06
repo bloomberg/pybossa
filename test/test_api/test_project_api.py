@@ -22,6 +22,8 @@ from unittest.mock import patch, call, MagicMock
 from dateutil import parser
 
 from nose.tools import assert_equal
+from nose.tools import assert_raises
+from werkzeug.exceptions import BadRequest
 
 from pybossa.model.project import Project
 from pybossa.repositories import ProjectRepository
@@ -35,6 +37,8 @@ from test.factories import (ProjectFactory, TaskFactory, TaskRunFactory,
 from test.helper.gig_helper import make_subadmin, make_admin
 from test.test_api import TestAPI
 from test.test_authorization import mock_current_user
+from pybossa.api.project import ProjectAPI
+from pybossa.model.project import Project
 
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)
@@ -2761,3 +2765,116 @@ class TestProjectAPI(TestAPI):
             res = self.app.post(f'/api/project/{short_name}/clone', headers=headers, data=json.dumps(data), content_type='application/json')
             data = json.loads(res.data)
             assert res.status_code == 200, data
+
+    @with_context
+    def test_clone_project_encryption_key_dropped(self):
+        """Test API clone project by id success state"""
+        from pybossa.view.projects import data_access_levels
+
+        [admin, subadminowner] = UserFactory.create_batch(2)
+        make_admin(admin)
+        make_subadmin(subadminowner)
+
+        short_name = "testproject"
+        task_presenter = 'test; url="project/oldname/" pybossa.run("oldname"); test;'
+        project = ProjectFactory.create(
+            id=40, short_name=short_name,
+            info={
+                'task_presenter': task_presenter,
+                'passwd_hash': 'testpass',
+                'ext_config': {
+                    'encryption': {
+                        'bpv_key_id': 'test_key_id'
+                    }
+                }
+            },
+            owner=subadminowner
+        )
+        headers = [('Authorization', subadminowner.api_key)]
+        data = {
+            'short_name': 'newname',
+            'name': 'newname',
+            'password': 'Test123',
+            'input_data_class': 'L4 - public',
+            'output_data_class': 'L4 - public',
+        }
+        with patch.dict(data_access_levels, self.patch_data_access_levels):
+            res = self.app.post(f'/api/project/40/clone', headers=headers, data=json.dumps(data), content_type='application/json')
+            data = json.loads(res.data)
+            assert res.status_code == 200, data
+            assert project.info.get("ext_config", {}).get("encryption") and not data["info"].get("ext_config", {}).get("encryption"), "Encryption key should be dropped from cloned project"
+
+
+    @with_context
+    def test_post_data_encryption_raises_badrequest(self):
+        data = {
+            'info': {
+                'ext_config': {
+                    'encryption': {'some_key': 'some_value'}
+                }
+            },
+            'description': 'desc',
+            'long_description': 'long desc'
+        }
+        api = ProjectAPI()
+        with assert_raises(BadRequest) as e:
+            api._preprocess_post_data(data)
+        assert 'encryption is deprecated' in str(e.exception)
+
+    @with_context
+    def test_put_data_encryption_key_update_raises_badrequest(self):
+        """Test that updating encryption key via PUT request raises BadRequest exception"""
+
+        # Create mock project objects with different encryption keys
+        old_project = Project()
+        old_project.info = {
+            'ext_config': {
+                'encryption': {
+                    'bpv_key_id': 'old_key_123'
+                }
+            }
+        }
+
+        new_project = Project()
+        new_project.info = {
+            'ext_config': {
+                'encryption': {
+                    'bpv_key_id': 'new_key_456'
+                }
+            }
+        }
+
+        api = ProjectAPI()
+        with assert_raises(BadRequest) as e:
+            api._update_attribute(new_project, old_project)
+        assert 'Updating encryption key is deprecated' in str(e.exception)
+
+    @with_context
+    def test_put_data_encryption_key_same_value_no_exception(self):
+        """Test that updating with same encryption key does not raise exception"""
+
+        # Create mock project objects with same encryption keys
+        old_project = Project()
+        old_project.info = {
+            'ext_config': {
+                'encryption': {
+                    'bpv_key_id': 'same_key_123'
+                }
+            },
+            'other_data': 'test'
+        }
+
+        new_project = Project()
+        new_project.info = {
+            'ext_config': {
+                'encryption': {
+                    'bpv_key_id': 'same_key_123'
+                }
+            }
+        }
+
+        api = ProjectAPI()
+        # This should not raise an exception
+        api._update_attribute(new_project, old_project)
+        # Verify that old data is preserved
+        assert new_project.info['other_data'] == 'test'
