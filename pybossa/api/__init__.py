@@ -1079,7 +1079,6 @@ def get_project_progress(project_id=None, short_name=None):
 @login_required
 @swag_from('docs/project/project_clone.yaml')
 def project_clone(project_id=None, short_name=None):
-
     if current_user.is_anonymous:
         return abort(401)
     if short_name:
