@@ -9442,6 +9442,7 @@ class TestWeb(web.Helper):
         url = 'project/category/historical_contributions?api_key={}'.format(user.api_key)
         with patch.dict(self.flask_app.config, {'HISTORICAL_CONTRIBUTIONS_AS_CATEGORY': True}):
             res = self.app.get(url, follow_redirects=True)
+            print("*** Historical Contributions Projects *** %s", str(res.data))
             assert '<h3>Historical Contributions Projects</h3>' in str(res.data)
             assert not mock_rank.called
 

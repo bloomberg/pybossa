@@ -108,6 +108,10 @@ class ProjectAPI(APIBase):
             data["info"] = data.get("info", {})
             # set to least restrictive, will overwrite when saved
             data["info"]["data_access"] = ["L4"]
+        # creating projects with encryption is deprecated
+        enc_config = data.get('info', {}).get('ext_config', {}).get('encryption', {})
+        if enc_config:
+            raise BadRequest("Creating projects with encryption is deprecated")
 
     def _create_instance_from_request(self, data):
         # password required if not syncing
@@ -141,6 +145,12 @@ class ProjectAPI(APIBase):
             obj.owners_ids = owners
 
     def _update_attribute(self, new, old):
+        # updating encryption key is deprecated
+        new_key = new.info.get("ext_config", {}).get("encryption", {}).get("bpv_key_id")
+        old_key = old.info.get("ext_config", {}).get("encryption", {}).get("bpv_key_id")
+        if new_key and new_key != old_key:
+            raise BadRequest("Updating encryption key is deprecated")
+
         for key, value in old.info.items():
             new.info.setdefault(key, value)
 

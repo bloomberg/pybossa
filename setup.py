@@ -161,7 +161,7 @@ requirements = [
     "wrapt==1.12.1",
     "WTForms==2.3.3",
     "WTForms-Components==0.10.5",
-    "xmlsec==1.3.12",
+    "xmlsec==1.3.13",
     "yacryptopan==1.0.1",
     "zipp==3.5.1"
 ]

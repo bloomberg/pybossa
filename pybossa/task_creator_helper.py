@@ -135,17 +135,6 @@ def get_path(dict_, path):
     return get_path(dict_[path[0]], path[1:])
 
 
-def get_secret_from_vault(project_encryption):
-    config = current_app.config['VAULT_CONFIG']
-    res = requests.get(config['url'].format(**project_encryption), **config['request'])
-    res.raise_for_status()
-    data = res.json()
-    try:
-        return get_path(data, config['response'])
-    except Exception:
-        raise RuntimeError(get_path(data, config['error']))
-
-
 def get_secret_from_env(project_encryption):
     config = current_app.config['SECRET_CONFIG_ENV']
     if not isinstance(config, dict) or "secret_id_prefix" not in config:
@@ -155,7 +144,10 @@ def get_secret_from_env(project_encryption):
     proj_secret_id = project_encryption.get(secret_id)
     env_secret_id = f"{secret_id}_{proj_secret_id}"
     current_app.logger.info("get_secret_from_env env_secret_id %s", env_secret_id)
-    return os.environ.get(env_secret_id, None)
+    try:
+        return os.environ[env_secret_id]
+    except Exception:
+        raise RuntimeError(f"Unable to fetch project encryption key from {env_secret_id}")
 
 
 def get_project_encryption(project):
@@ -175,9 +167,9 @@ def get_encryption_key(project):
 
     secret_from_env = current_app.config.get("SECRET_CONFIG_ENV", False)
     if not secret_from_env:
-        return get_secret_from_vault(project_encryption)
-    else:
-        return get_secret_from_env(project_encryption)
+        current_app.logger.exception('Missing env config SECRET_CONFIG_ENV. Cannot process encryption for Project id %d', project.id)
+        raise InternalServerError(f"Unable to fetch encryption key for project id {project.id}")
+    return get_secret_from_env(project_encryption)
 
 
 def read_encrypted_file(store, project, bucket, key_name):
