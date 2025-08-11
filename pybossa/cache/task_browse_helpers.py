@@ -391,7 +391,8 @@ def user_meet_task_requirement(task_id, user_filter, user_profile):
             return False
         user_data = user_profile.get(field) or 0
         try:
-            user_data = float(user_data)
+            if isinstance(user_data, (int, float)):
+                user_data = float(user_data)
             require = filters[0]
             op = filters[1]
             if op not in comparator_func:
