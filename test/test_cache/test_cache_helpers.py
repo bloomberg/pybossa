@@ -20,7 +20,7 @@ from test import Test, with_context, with_request_context
 from test.factories import (ProjectFactory, TaskFactory, TaskRunFactory, UserFactory)
 from pybossa.cache import helpers
 from pybossa.cache.project_stats import update_stats
-from pybossa.cache.task_browse_helpers import parse_tasks_browse_order_by_args
+from pybossa.cache.task_browse_helpers import parse_tasks_browse_order_by_args, user_meet_task_requirement
 
 class TestHelpersCache(Test):
 
@@ -502,3 +502,290 @@ class TestHelpersCache(Test):
         assert order_by_result == "id asc, priority_0 desc"
         assert 'task_id' in order_by_dict
         assert 'priority' in order_by_dict
+
+    @with_context
+    def test_user_meet_task_requirement_no_filters(self):
+        """Test user_meet_task_requirement returns True when no filters are provided"""
+        task_id = 1
+        user_filter = {}
+        user_profile = {'age': 25, 'experience': 5}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_user_profile_missing_field(self):
+        """Test user_meet_task_requirement returns False when user profile missing required field"""
+        task_id = 1
+        user_filter = {'age': [18, '>=']}
+        user_profile = {'experience': 5}  # missing 'age' field
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is False
+
+    @with_context
+    def test_user_meet_task_requirement_user_profile_field_none(self):
+        """Test user_meet_task_requirement returns False when user profile field is None"""
+        task_id = 1
+        user_filter = {'age': [18, '>=']}
+        user_profile = {'age': None, 'experience': 5}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is False
+
+    @with_context
+    def test_user_meet_task_requirement_greater_than_pass(self):
+        """Test user_meet_task_requirement returns True when user meets greater than requirement"""
+        task_id = 1
+        user_filter = {'age': [18, '>']}
+        user_profile = {'age': 25}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_greater_than_fail(self):
+        """Test user_meet_task_requirement returns False when user does not meet greater than requirement"""
+        task_id = 1
+        user_filter = {'age': [25, '>']}
+        user_profile = {'age': 20}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is False
+
+    @with_context
+    def test_user_meet_task_requirement_greater_than_equal_pass(self):
+        """Test user_meet_task_requirement returns True when user meets greater than or equal requirement"""
+        task_id = 1
+        user_filter = {'age': [18, '>=']}
+        user_profile = {'age': 18}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_greater_than_equal_fail(self):
+        """Test user_meet_task_requirement returns False when user does not meet greater than or equal requirement"""
+        task_id = 1
+        user_filter = {'age': [25, '>=']}
+        user_profile = {'age': 20}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is False
+
+    @with_context
+    def test_user_meet_task_requirement_less_than_pass(self):
+        """Test user_meet_task_requirement returns True when user meets less than requirement"""
+        task_id = 1
+        user_filter = {'age': [30, '<']}
+        user_profile = {'age': 25}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_less_than_fail(self):
+        """Test user_meet_task_requirement returns False when user does not meet less than requirement"""
+        task_id = 1
+        user_filter = {'age': [20, '<']}
+        user_profile = {'age': 25}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is False
+
+    @with_context
+    def test_user_meet_task_requirement_less_than_equal_pass(self):
+        """Test user_meet_task_requirement returns True when user meets less than or equal requirement"""
+        task_id = 1
+        user_filter = {'age': [25, '<=']}
+        user_profile = {'age': 25}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_less_than_equal_fail(self):
+        """Test user_meet_task_requirement returns False when user does not meet less than or equal requirement"""
+        task_id = 1
+        user_filter = {'age': [20, '<=']}
+        user_profile = {'age': 25}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is False
+
+    @with_context
+    def test_user_meet_task_requirement_equal_pass(self):
+        """Test user_meet_task_requirement returns True when user meets equal requirement"""
+        task_id = 1
+        user_filter = {'age': [25, '==']}
+        user_profile = {'age': 25}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_equal_fail(self):
+        """Test user_meet_task_requirement returns False when user does not meet equal requirement"""
+        task_id = 1
+        user_filter = {'age': [25, '==']}
+        user_profile = {'age': 20}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is False
+
+    @with_context
+    def test_user_meet_task_requirement_not_equal_pass(self):
+        """Test user_meet_task_requirement returns True when user meets not equal requirement"""
+        task_id = 1
+        user_filter = {'age': [25, '!=']}
+        user_profile = {'age': 20}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_not_equal_fail(self):
+        """Test user_meet_task_requirement returns False when user does not meet not equal requirement"""
+        task_id = 1
+        user_filter = {'age': [25, '!=']}
+        user_profile = {'age': 25}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is False
+
+    @with_context
+    def test_user_meet_task_requirement_multiple_filters_pass(self):
+        """Test user_meet_task_requirement returns True when user meets all multiple requirements"""
+        task_id = 1
+        user_filter = {
+            'age': [18, '>='],
+            'experience': [2, '>'],
+            'rating': [4.0, '>=']
+        }
+        user_profile = {'age': 25, 'experience': 5, 'rating': 4.5}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_multiple_filters_fail_one(self):
+        """Test user_meet_task_requirement returns False when user fails one of multiple requirements"""
+        task_id = 1
+        user_filter = {
+            'age': [18, '>='],
+            'experience': [2, '>'],
+            'rating': [4.0, '>=']
+        }
+        user_profile = {'age': 25, 'experience': 1, 'rating': 4.5}  # experience too low
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is False
+
+    @with_context
+    def test_user_meet_task_requirement_string_to_float_conversion(self):
+        """Test user_meet_task_requirement handles string to float conversion"""
+        task_id = 1
+        user_filter = {'age': [18, '>=']}
+        user_profile = {'age': '25'}  # string that can be converted to float
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_non_numeric_string(self):
+        """Test user_meet_task_requirement handles non-numeric strings gracefully"""
+        task_id = 1
+        user_filter = {'skill': ['python', '==']}
+        user_profile = {'skill': 'python'}  # string that cannot be converted to float
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_invalid_operator(self):
+        """Test user_meet_task_requirement returns False for invalid operator"""
+        task_id = 1
+        user_filter = {'age': [25, 'invalid_op']}
+        user_profile = {'age': 25}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is False
+
+    @with_context
+    def test_user_meet_task_requirement_alternative_operators(self):
+        """Test user_meet_task_requirement works with alternative operator names"""
+        task_id = 1
+        user_filter = {
+            'age': [18, 'greater_than_equal'],
+            'experience': [5, 'less_than'],
+            'rating': [3, 'equal']
+        }
+        user_profile = {'age': 25, 'experience': 3, 'rating': 3}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_negative_values(self):
+        """Test user_meet_task_requirement handles negative values correctly"""
+        task_id = 1
+        user_filter = {'balance': [-100, '>']}
+        user_profile = {'balance': -50}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_float_values(self):
+        """Test user_meet_task_requirement handles float values correctly"""
+        task_id = 1
+        user_filter = {'rating': [3.5, '>=']}
+        user_profile = {'rating': 4.2}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_string_value_match(self):
+        """Test user_meet_task_requirement returns True when string values match exactly"""
+        task_id = 1
+        user_filter = {'department': ['engineering', '==']}
+        user_profile = {'department': 'engineering'}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is True
+
+    @with_context
+    def test_user_meet_task_requirement_string_value_mismatch(self):
+        """Test user_meet_task_requirement returns False when string values do not match"""
+        task_id = 1
+        user_filter = {'department': ['engineering', '==']}
+        user_profile = {'department': 'marketing'}
+
+        result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+        assert result is False
