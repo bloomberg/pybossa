@@ -391,17 +391,19 @@ def user_meet_task_requirement(task_id, user_filter, user_profile):
             return False
         user_data = user_profile.get(field) or 0
         try:
-            if isinstance(user_data, (int, float)):
+            try:
                 user_data = float(user_data)
+            except ValueError:
+                pass
             require = filters[0]
             op = filters[1]
             if op not in comparator_func:
-                raise Exception("invalid operator %s", op)
+                raise Exception(f"invalid operator {op}")
             if not comparator_func[op](user_data, require):
                 return False
         except Exception as e:
-            current_app.logger.info("""An error occured when validate constraints for task {} on field {},
-                                reason {}""".format(task_id, field, str(e)))
+            current_app.logger.error("Validating worker filter failed for task %d on field %s, error %s",
+                                     task_id, field, str(e))
             return False
     return True
 
