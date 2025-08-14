@@ -21,6 +21,7 @@ from test.factories import (ProjectFactory, TaskFactory, TaskRunFactory, UserFac
 from pybossa.cache import helpers
 from pybossa.cache.project_stats import update_stats
 from pybossa.cache.task_browse_helpers import parse_tasks_browse_order_by_args, user_meet_task_requirement
+from unittest.mock import patch
 
 class TestHelpersCache(Test):
 
@@ -789,3 +790,28 @@ class TestHelpersCache(Test):
         result = user_meet_task_requirement(task_id, user_filter, user_profile)
 
         assert result is False
+
+    @with_context
+    def test_user_meet_task_requirement_comparison_exception(self):
+        """Test user_meet_task_requirement returns False when comparison operation raises an exception"""
+        task_id = 1
+        user_profile = {'age': 30}
+        bad_user_filter = {'age': [25]}
+        result = user_meet_task_requirement(task_id, bad_user_filter, user_profile)
+        assert result is False
+
+        user_filter = {'age': [25, '>=']}
+        # Mock the comparator_func to raise an exception during comparison
+        with patch('pybossa.cache.task_browse_helpers.comparator_func') as mock_comparator:
+            # Make sure the operator exists in the mock (so 'in' check passes)
+            mock_comparator.__contains__.return_value = True
+            # Create a mock operator function that raises an exception when called
+            mock_operator = mock_comparator.__getitem__.return_value
+            mock_operator.side_effect = Exception("Comparison failed")
+
+            result = user_meet_task_requirement(task_id, user_filter, user_profile)
+
+            assert result is False
+            # Verify that the mocked comparator function was accessed
+            mock_comparator.__contains__.assert_called_with('>=')
+            mock_comparator.__getitem__.assert_called_with('>=')
