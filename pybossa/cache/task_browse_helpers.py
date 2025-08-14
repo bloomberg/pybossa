@@ -390,20 +390,31 @@ def user_meet_task_requirement(task_id, user_filter, user_profile):
             # if user profile does not have attribute, user does not qualify for the task
             return False
         user_data = user_profile.get(field) or 0
+
+        # Convert user_data to float for numeric comparisons
+        # if the field is not numeric, it will be compared as a string.
         try:
-            try:
-                user_data = float(user_data)
-            except ValueError:
-                pass
-            require = filters[0]
-            op = filters[1]
-            if op not in comparator_func:
-                raise Exception(f"invalid operator {op}")
+            user_data = float(user_data)
+        except ValueError:
+            # non numeric data to be compared as string
+            pass
+
+        # Validate operator and perform comparison
+        if len(filters) < 2:
+            current_app.logger.error("Validating worker filter failed for task %d on field %s, error: insufficient filter parameters", task_id, field)
+            return False
+
+        require = filters[0]
+        op = filters[1]
+        if op not in comparator_func:
+            current_app.logger.error("Validating worker filter failed for task %d on field %s, error: invalid operator %s", task_id, field, op)
+            return False
+
+        try:
             if not comparator_func[op](user_data, require):
                 return False
         except Exception as e:
-            current_app.logger.error("Validating worker filter failed for task %d on field %s, error %s",
-                                     task_id, field, str(e))
+            current_app.logger.exception(f"Validating worker filter failed for task {task_id} on field {field}, comparison failed")
             return False
     return True
 
