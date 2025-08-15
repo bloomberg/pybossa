@@ -263,9 +263,9 @@ class TestExport(Test):
 
         payload = {"project_id": project.id}
         payload["user_email"] = user.email_addr
-        expected_signature = signer.dumps(payload)
-
-        with patch('pybossa.jobs.email_service') as mock_emailsvc:
+        expected_signature = "mocked-test-signature"
+        with patch('pybossa.core.signer.dumps', return_value=expected_signature), \
+            patch('pybossa.jobs.email_service') as mock_emailsvc:
             mock_emailsvc.enabled = True
             with patch.dict(self.flask_app.config, {
                 'EXPORT_MAX_EMAIL_SIZE': 0,
