@@ -22,31 +22,31 @@ This package adds GET, POST, PUT and DELETE methods for:
     * tasks
 
 """
-from flask import abort, current_app
+import copy
+import hashlib
+import json
+import re
+
+from flask import abort, current_app, url_for
 from flask_login import current_user
 from werkzeug.exceptions import BadRequest, Conflict, NotFound
-from pybossa.model.task import Task
-from pybossa.model.project import Project
-from pybossa.core import result_repo
-from pybossa.util import sign_task
-from .api_base import APIBase
+
 from pybossa.api.pwd_manager import get_pwd_manager
-from pybossa.util import get_user_id_or_ip, validate_required_fields
-from pybossa.core import task_repo, project_repo
-from pybossa.cache.projects import get_project_data
-from pybossa.data_access import when_data_access
-import hashlib
-from flask import url_for
-from pybossa.cloud_store_api.s3 import upload_json_data
 from pybossa.auth.task import TaskAuth
 from pybossa.cache import delete_memoized
-from pybossa.cache.task_browse_helpers import get_searchable_columns
-import json
-import copy
-from pybossa.task_creator_helper import get_task_expiration
-from pybossa.model import make_timestamp
-from pybossa.task_creator_helper import generate_checksum
 from pybossa.cache.projects import get_project_data
+from pybossa.cache.task_browse_helpers import get_searchable_columns
+from pybossa.cloud_store_api.s3 import upload_json_data
+from pybossa.core import project_repo, result_repo, signer, task_repo
+from pybossa.data_access import when_data_access
+from pybossa.model import make_timestamp
+from pybossa.model.project import Project
+from pybossa.model.task import Task
+from pybossa.task_creator_helper import generate_checksum, get_task_expiration
+from pybossa.util import get_user_id_or_ip, sign_task, validate_required_fields
+from pybossa.view.fileproxy import read_encrypted_file_with_signature
+
+from .api_base import APIBase
 
 
 class TaskAPI(APIBase):
@@ -156,6 +156,68 @@ class TaskAPI(APIBase):
 
     def _select_attributes(self, data):
         return TaskAuth.apply_access_control(data, user=current_user, project_data=get_project_data(data['project_id']))
+
+    def _parse_private_json_upload_url(self, path):
+        """
+        Parse a private JSON upload URL to extract store, bucket, project_id, and path components.
+
+        Args:
+            path (str): Path like '/fileproxy/encrypted/<store>/<bucket>/<project_id>/<path>'
+
+        Returns:
+            dict: Dictionary with keys 'store', 'bucket', 'project_id', 'path'
+
+        Raises:
+            ValueError: If path doesn't match expected format
+        """
+        pattern = r'^/?fileproxy/encrypted/([^/]+)/([^/]+)/(\d+)/(.+)$'
+        match = re.match(pattern, path)
+
+        if not match:
+            raise ValueError(f"Path '{path}' doesn't match expected format: /fileproxy/encrypted/<store>/<bucket>/<project_id>/<path>")
+
+        store, bucket, project_id_str, file_path = match.groups()
+
+        return {
+            'store': store,
+            'bucket': bucket,
+            'project_id': int(project_id_str),
+            'path': file_path
+        }
+
+
+    def _enrich_get_response(self, task_id: str, tasks: list[Task]):
+        if not current_app.config.get('ENABLE_ENCRYPTION'):
+            current_app.logger.info("Encryption not enabled, skipping task enrichment")
+            return
+
+        for task in tasks:
+            if "private_json__upload_url" not in task.info:
+                continue
+
+            url_parts = self._parse_private_json_upload_url(task.info["private_json__upload_url"])
+
+            store = url_parts.get('store')
+            bucket = url_parts.get('bucket')
+            project_id = url_parts.get('project_id')
+            path = url_parts.get('path')
+            key_name = '/{}/{}'.format(project_id, path)
+            signature = signer.dumps({'task_id': task_id})
+
+            decrypted_data, _key = read_encrypted_file_with_signature(store, project_id, bucket, key_name, signature)
+
+            try:
+                if decrypted_data and isinstance(decrypted_data, str):
+                    decrypted_data = json.loads(decrypted_data)
+            except Exception as e:
+                current_app.logger.error(f"Error parsing decrypted data as JSON for task id {task_id}: {str(e)}")
+                decrypted_data = None
+
+            if decrypted_data and isinstance(decrypted_data, dict):
+                task.info.update(decrypted_data)
+
+            del task.info["private_json__upload_url"]
+
 
     def put(self, oid):
         # reset cache / memoized

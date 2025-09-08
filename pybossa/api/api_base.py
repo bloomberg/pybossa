@@ -27,28 +27,30 @@ This package adds GET, POST, PUT and DELETE methods for any class:
 
 """
 import json
-from flask import request, abort, Response, current_app
-from flask_login import current_user
-from flask.views import MethodView
+
 from flasgger import swag_from
-from werkzeug.exceptions import NotFound, Unauthorized, Forbidden, BadRequest
-from werkzeug.exceptions import MethodNotAllowed
-from pybossa.util import jsonpify, fuzzyboolean, get_avatar_url
-from pybossa.util import get_user_id_or_ip
-from pybossa.core import ratelimits, uploader
+from flask import Response, abort, current_app, request
+from flask.views import MethodView
+from flask_login import current_user
+from werkzeug.exceptions import (BadRequest, Forbidden, MethodNotAllowed,
+                                 NotFound, Unauthorized)
+
 from pybossa.auth import ensure_authorized_to
-from pybossa.hateoas import Hateoas
-from pybossa.ratelimit import ratelimit
-from pybossa.error import ErrorStatus
-from pybossa.core import project_repo, user_repo, task_repo, result_repo, auditlog_repo
-from pybossa.core import announcement_repo, blog_repo, helping_repo, performance_stats_repo
-from pybossa.core import project_stats_repo
-from pybossa.model import DomainObject, announcement
-from pybossa.model.task import Task
+from pybossa.cache.announcements import reset as reset_announcements
+from pybossa.cache.categories import reset as reset_categories
 from pybossa.cache.projects import clean_project
 from pybossa.cache.users import delete_user_summary_id
-from pybossa.cache.categories import reset as reset_categories
-from pybossa.cache.announcements import reset as reset_announcements
+from pybossa.core import (announcement_repo, auditlog_repo, blog_repo,
+                          helping_repo, performance_stats_repo, project_repo,
+                          project_stats_repo, ratelimits, result_repo,
+                          task_repo, uploader, user_repo)
+from pybossa.error import ErrorStatus
+from pybossa.hateoas import Hateoas
+from pybossa.model import DomainObject, announcement
+from pybossa.model.task import Task
+from pybossa.ratelimit import ratelimit
+from pybossa.util import (fuzzyboolean, get_avatar_url, get_user_id_or_ip,
+                          jsonpify)
 
 repos = {'Task': {'repo': task_repo, 'filter': 'filter_tasks_by',
                   'get': 'get_task', 'save': 'save', 'update': 'update',
@@ -141,6 +143,7 @@ class APIBase(MethodView):
         try:
             ensure_authorized_to('read', self.__class__)
             query = self._db_query(oid)
+            self._enrich_get_response(oid, query)
             json_response = self._create_json_response(query, oid)
             return Response(json_response, mimetype='application/json')
         except Exception as e:
@@ -635,6 +638,12 @@ class APIBase(MethodView):
 
     def _sign_item(self, item):
         """Apply custom signature"""
+        pass
+
+    def _enrich_get_response(self, oid, item):
+        """Method to be overriden in inheriting classes for enriching the
+        response for a GET request
+        """
         pass
 
     def _copy_original(self, item):

@@ -16,25 +16,25 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from urllib.parse import urlparse, parse_qs
-from functools import wraps
-from flask import Blueprint, current_app, Response, request
-from flask_login import current_user, login_required
-
-import six
-import requests
 import json
-from werkzeug.exceptions import Forbidden, BadRequest, InternalServerError, NotFound
+from functools import wraps
+from urllib.parse import parse_qs, urlparse
+
+import requests
+import six
+from boto.exception import S3ResponseError
+from flask import Blueprint, Response, current_app, request
+from flask_login import current_user, login_required
+from werkzeug.exceptions import (BadRequest, Forbidden, InternalServerError,
+                                 NotFound)
 
 from pybossa.cache.projects import get_project_data
-from boto.exception import S3ResponseError
 from pybossa.contributions_guard import ContributionsGuard
-from pybossa.core import task_repo, signer
+from pybossa.core import signer, task_repo
 from pybossa.encryption import AESWithGCM
 # from pybossa.pybhdfs.client import HDFSKerberos
 from pybossa.sched import has_lock
 from pybossa.task_creator_helper import get_encryption_key, read_encrypted_file
-
 
 blueprint = Blueprint('fileproxy', __name__)
 
@@ -71,6 +71,17 @@ def check_allowed(user_id, task_id, project, is_valid_url):
 
     raise Forbidden('FORBIDDEN')
 
+def get_read_encrypted_file_with_signature_response(store, project_id, bucket, key_name, signature):
+    decrypted, key = read_encrypted_file_with_signature(store, project_id, bucket, key_name, signature)
+
+    response = Response(decrypted, content_type=key.content_type)
+    if hasattr(key, "content_encoding") and key.content_encoding:
+        response.headers.add('Content-Encoding', key.content_encoding)
+    if hasattr(key, "content_disposition") and key.content_disposition:
+        response.headers.add('Content-Disposition', key.content_disposition)
+    return response
+
+
 def read_encrypted_file_with_signature(store, project_id, bucket, key_name, signature):
     if not signature:
         current_app.logger.exception('Project id {} no signature {}'.format(project_id, key_name))
@@ -89,14 +100,8 @@ def read_encrypted_file_with_signature(store, project_id, bucket, key_name, sign
     task_id = payload['task_id']
 
     check_allowed(current_user.id, task_id, project, lambda v: v == request.path)
-    decrypted, key = read_encrypted_file(store, project, bucket, key_name)
 
-    response = Response(decrypted, content_type=key.content_type)
-    if hasattr(key, "content_encoding") and key.content_encoding:
-        response.headers.add('Content-Encoding', key.content_encoding)
-    if hasattr(key, "content_disposition") and key.content_disposition:
-        response.headers.add('Content-Disposition', key.content_disposition)
-    return response
+    return read_encrypted_file(store, project, bucket, key_name)
 
 
 @blueprint.route('/encrypted/<string:store>/<string:bucket>/workflow_request/<string:workflow_uid>/<int:project_id>/<path:path>')
@@ -107,7 +112,7 @@ def encrypted_workflow_file(store, bucket, workflow_uid, project_id, path):
     key_name = '/workflow_request/{}/{}/{}'.format(workflow_uid, project_id, path)
     signature = request.args.get('task-signature')
     current_app.logger.info('Project id {} decrypt workflow file. {}'.format(project_id, path))
-    return read_encrypted_file_with_signature(store, project_id, bucket, key_name, signature)
+    return get_read_encrypted_file_with_signature_response(store, project_id, bucket, key_name, signature)
 
 
 @blueprint.route('/encrypted/<string:store>/<string:bucket>/<int:project_id>/<path:path>')
@@ -119,7 +124,7 @@ def encrypted_file(store, bucket, project_id, path):
     signature = request.args.get('task-signature')
     current_app.logger.info('Project id {} decrypt file. {}'.format(project_id, path))
     current_app.logger.info("store %s, bucket %s, project_id %s, path %s", store, bucket, str(project_id), path)
-    return read_encrypted_file_with_signature(store, project_id, bucket, key_name, signature)
+    return get_read_encrypted_file_with_signature_response(store, project_id, bucket, key_name, signature)
 
 
 def encrypt_task_response_data(task_id, project_id, data):
