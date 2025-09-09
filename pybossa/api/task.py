@@ -192,7 +192,7 @@ class TaskAPI(APIBase):
             return
 
         for task in tasks:
-            if "private_json__upload_url" not in task.info:
+            if not task.info or "private_json__upload_url" not in task.info:
                 continue
 
             url_parts = self._parse_private_json_upload_url(task.info["private_json__upload_url"])
