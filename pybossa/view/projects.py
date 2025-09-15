@@ -4137,9 +4137,9 @@ def schema_config(short_name):
 
     task_info_schema = project.info.get(task_info_schema_key , {})
     task_answer_schema = project.info.get(task_answer_schema_key , {})
-    strict_validation = project.info.get(strict_validation_key , {})
+    strict_validation = project.info.get(strict_validation_key , False)
     response = {
-        'template': '/projects/answerfieldsconfig.html',
+        'template': '/projects/schemaconfig.html',
         'project': project_sanitized,
         task_info_schema_key : json.dumps(task_info_schema),
         task_answer_schema_key : json.dumps(task_answer_schema),
