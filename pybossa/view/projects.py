@@ -4054,7 +4054,7 @@ def delete_stats_for_changed_fields(project_id, new_config, old_config):
 @login_required
 @admin_or_subadmin_required
 def answerfieldsconfig(short_name):
-    """Returns Project Stats"""
+    """Get/ Edit answer fields config"""
     project, owner, ps = project_by_shortname(short_name)
     pro = pro_features()
     ensure_authorized_to('update', project)
@@ -4093,6 +4093,57 @@ def answerfieldsconfig(short_name):
         'project': project_sanitized,
         answer_fields_key : json.dumps(answer_fields),
         consensus_config_key : json.dumps(consensus_config),
+        'pro_features': pro,
+        'csrf': generate_csrf()
+    }
+    return handle_content_type(response)
+
+
+@blueprint.route('/<short_name>/schema-config', methods=['GET', 'POST'])
+@login_required
+@admin_or_subadmin_required
+def schema_config(short_name):
+    """Get/ edit project schemas"""
+    project, owner, ps = project_by_shortname(short_name)
+    pro = pro_features()
+    ensure_authorized_to('update', project)
+
+    task_info_schema_key = 'task_info_schema'
+    task_answer_schema_key = 'task_answer_schema'
+    strict_validation_key = 'strict_validation'
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.data) or {}
+
+            task_info_schema = body.get(task_info_schema_key) or {}
+            task_answer_schema = body.get(task_answer_schema_key) or {}
+            strict_validation = body.get(strict_validation_key) or False
+
+            project.info[task_info_schema_key] = task_info_schema
+            project.info[task_answer_schema_key] = task_answer_schema
+            project.info[strict_validation_key] = strict_validation
+            project_repo.save(project)
+            auditlogger.log_event(project, current_user, 'update', 'project.' + task_info_schema_key,
+              'N/A', project.info[task_info_schema_key])
+            auditlogger.log_event(project, current_user, 'update', 'project.' + task_answer_schema_key,
+              'N/A', project.info[task_answer_schema_key])
+            auditlogger.log_event(project, current_user, 'update', 'project.' + strict_validation_key,
+              'N/A', project.info[strict_validation_key])
+            flash(gettext('Configuration updated successfully'), 'success')
+        except Exception:
+            flash(gettext('An error occurred.'), 'error')
+    project_sanitized, owner_sanitized = sanitize_project_owner(
+        project, owner, current_user, ps)
+
+    task_info_schema = project.info.get(task_info_schema_key , {})
+    task_answer_schema = project.info.get(task_answer_schema_key , {})
+    strict_validation = project.info.get(strict_validation_key , {})
+    response = {
+        'template': '/projects/answerfieldsconfig.html',
+        'project': project_sanitized,
+        task_info_schema_key : json.dumps(task_info_schema),
+        task_answer_schema_key : json.dumps(task_answer_schema),
+        strict_validation_key: strict_validation,
         'pro_features': pro,
         'csrf': generate_csrf()
     }
