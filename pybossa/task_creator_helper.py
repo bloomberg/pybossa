@@ -24,7 +24,7 @@ from flask import url_for
 import json
 import requests
 from six import string_types
-from boto.exception import S3ResponseError
+from botocore.exceptions import ClientError
 from werkzeug.exceptions import InternalServerError, NotFound
 from pybossa.util import get_time_plus_delta_ts
 from pybossa.cloud_store_api.s3 import upload_json_data, get_content_from_s3
@@ -56,7 +56,8 @@ def get_task_expiration(expiration, create_time):
     from task creation date
     """
     max_expiration_days = current_app.config.get('TASK_EXPIRATION', 60)
-    max_expiration = get_time_plus_delta_ts(create_time, days=max_expiration_days)
+    max_expiration = get_time_plus_delta_ts(
+        create_time, days=max_expiration_days)
 
     if expiration and isinstance(expiration, string_types):
         max_expiration = max_expiration.isoformat()
@@ -69,7 +70,8 @@ def set_gold_answers(task, gold_answers):
     if not gold_answers:
         return
     if encrypted():
-        url = upload_files_priv(task, task.project_id, gold_answers, TASK_PRIVATE_GOLD_ANSWER_FILE_NAME)['externalUrl']
+        url = upload_files_priv(task, task.project_id, gold_answers,
+                                TASK_PRIVATE_GOLD_ANSWER_FILE_NAME)['externalUrl']
         gold_answers = dict([(TASK_GOLD_ANSWER_URL_KEY, url)])
 
     task.gold_answers = gold_answers
@@ -94,7 +96,8 @@ def upload_files_priv(task, project_id, data, file_name):
         path='{}/{}'.format(task_hash, file_name)
     )
     file_url = url_for('fileproxy.encrypted_file', **values)
-    conn_name = "S3_TASK_REQUEST_V2" if store == current_app.config.get("S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
+    conn_name = "S3_TASK_REQUEST_V2" if store == current_app.config.get(
+        "S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
     internal_url = upload_json_data(
         bucket=bucket,
         json_data=data,
@@ -114,18 +117,23 @@ def get_gold_answers(task):
 
     url = gold_answers.get(TASK_GOLD_ANSWER_URL_KEY)
     if not url:
-        raise Exception('Cannot retrieve Private Gigwork gold answers for task id {}. URL is missing.'.format(task.id))
+        raise Exception(
+            'Cannot retrieve Private Gigwork gold answers for task id {}. URL is missing.'.format(task.id))
 
     # The task instance here is not the same as the one that was used to generate the hash
     # in the upload url. So we can't regenerate that hash here, and instead we have to parse it
     # from the url.
 
     parts = url.split('/')
-    store = parts[3] if len(parts) > 3 and parts[1] == "fileproxy" and parts[2] == "encrypted" else None
-    conn_name = "S3_TASK_REQUEST_V2" if store == current_app.config.get("S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
+    store = parts[3] if len(
+        parts) > 3 and parts[1] == "fileproxy" and parts[2] == "encrypted" else None
+    conn_name = "S3_TASK_REQUEST_V2" if store == current_app.config.get(
+        "S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
     key_name = '/{}/{}/{}'.format(*parts[-3:])
-    current_app.logger.info("gold_answers url %s, store %s, conn_name %s, key %s", url, store, conn_name, key_name)
-    decrypted = get_content_from_s3(s3_bucket=parts[-4], path=key_name, conn_name=conn_name, decrypt=True)
+    current_app.logger.info(
+        "gold_answers url %s, store %s, conn_name %s, key %s", url, store, conn_name, key_name)
+    decrypted = get_content_from_s3(
+        s3_bucket=parts[-4], path=key_name, conn_name=conn_name, decrypt=True)
     return json.loads(decrypted)
 
 
@@ -143,11 +151,13 @@ def get_secret_from_env(project_encryption):
     secret_id = config.get("secret_id_prefix")
     proj_secret_id = project_encryption.get(secret_id)
     env_secret_id = f"{secret_id}_{proj_secret_id}"
-    current_app.logger.info("get_secret_from_env env_secret_id %s", env_secret_id)
+    current_app.logger.info(
+        "get_secret_from_env env_secret_id %s", env_secret_id)
     try:
         return os.environ[env_secret_id]
     except Exception:
-        raise RuntimeError(f"Unable to fetch project encryption key from {env_secret_id}")
+        raise RuntimeError(
+            f"Unable to fetch project encryption key from {env_secret_id}")
 
 
 def get_project_encryption(project):
@@ -167,14 +177,17 @@ def get_encryption_key(project):
 
     secret_from_env = current_app.config.get("SECRET_CONFIG_ENV", False)
     if not secret_from_env:
-        current_app.logger.exception('Missing env config SECRET_CONFIG_ENV. Cannot process encryption for Project id %d', project.id)
-        raise InternalServerError(f"Unable to fetch encryption key for project id {project.id}")
+        current_app.logger.exception(
+            'Missing env config SECRET_CONFIG_ENV. Cannot process encryption for Project id %d', project.id)
+        raise InternalServerError(
+            f"Unable to fetch encryption key for project id {project.id}")
     return get_secret_from_env(project_encryption)
 
 
 def read_encrypted_file(store, project, bucket, key_name):
-    conn_name = "S3_TASK_REQUEST_V2" if store == current_app.config.get("S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
-    ## download file
+    conn_name = "S3_TASK_REQUEST_V2" if store == current_app.config.get(
+        "S3_CONN_TYPE_V2") else "S3_TASK_REQUEST"
+    # download file
     if bucket not in [current_app.config.get("S3_REQUEST_BUCKET"), current_app.config.get("S3_REQUEST_BUCKET_V2")]:
         secret = get_encryption_key(project)
     else:
@@ -183,9 +196,11 @@ def read_encrypted_file(store, project, bucket, key_name):
     try:
         decrypted, key = get_content_and_key_from_s3(
             bucket, key_name, conn_name, decrypt=secret, secret=secret)
-    except S3ResponseError as e:
-        current_app.logger.exception('Project id {} get task file {} {}'.format(project.id, key_name, e))
-        if e.error_code == 'NoSuchKey':
+    except ClientError as e:
+        current_app.logger.exception(
+            'Project id {} get task file {} {}'.format(project.id, key_name, e))
+        error_code = e.response.get('Error', {}).get('Code', '')
+        if error_code == 'NoSuchKey':
             raise NotFound('File Does Not Exist')
         else:
             raise InternalServerError('An Error Occurred')
@@ -201,7 +216,8 @@ def generate_checksum(project_id, task):
 
     project = get_project_data(project_id)
     if not project:
-        current_app.logger.info("Duplicate task checksum not generated. Incorrect project id %s", str(project_id))
+        current_app.logger.info(
+            "Duplicate task checksum not generated. Incorrect project id %s", str(project_id))
         return
 
     # with task payload not proper dict, dup checksum cannot be computed and will be set to null
@@ -214,7 +230,8 @@ def generate_checksum(project_id, task):
     # certain scenarios as this could miss duplicate task check correctly on
     # remaining fields when all fields are included for duplicate check
     task_reserved_cols = current_app.config.get("TASK_RESERVED_COLS", [])
-    task_info = {k:v for k, v in task["info"].items() if k not in task_reserved_cols}
+    task_info = {k: v for k, v in task["info"].items(
+    ) if k not in task_reserved_cols}
 
     # include all task_info fields with no field configured under duplicate_fields
     dup_task_config = project.info.get("duplicate_task_check", {})
@@ -236,14 +253,16 @@ def generate_checksum(project_id, task):
                 continue
 
             if field.endswith("__upload_url"):
-                current_app.logger.info("generate_checksum file payload name %s, path %s", field, value)
+                current_app.logger.info(
+                    "generate_checksum file payload name %s, path %s", field, value)
                 tokens = value.split("/")
                 count_slash = value.count("/")
                 if count_slash >= 6 and tokens[1] == "fileproxy" and tokens[2] == "encrypted":
                     store = tokens[3]
                     bucket = tokens[4]
                     project_id_from_url = int(tokens[5])
-                    current_app.logger.info("generate_checksum file tokens %s", str(tokens))
+                    current_app.logger.info(
+                        "generate_checksum file tokens %s", str(tokens))
                     if int(project_id) != project_id_from_url:
                         current_app.logger.info("error computing duplicate checksum. incorrect project id in url path. project id expected %s vs actual %s, url %s",
                                                 str(project_id), str(project_id_from_url), str(value))
@@ -251,44 +270,57 @@ def generate_checksum(project_id, task):
 
                     path = "/".join((tokens[5:]))
                     try:
-                        current_app.logger.info("generate_checksum parsed file info. store %s, bucket %s, path %s", store, bucket, path)
-                        content, _ = read_encrypted_file(store, project, bucket, path)
+                        current_app.logger.info(
+                            "generate_checksum parsed file info. store %s, bucket %s, path %s", store, bucket, path)
+                        content, _ = read_encrypted_file(
+                            store, project, bucket, path)
                         content = json.loads(content)
                         task_contents.update(content)
                     except Exception as e:
                         current_app.logger.info("error generating duplicate checksum with url contents for project %s, %s, %s %s",
                                                 str(project_id), field, str(value), str(e))
-                        raise Exception(f"Error generating duplicate checksum with url contents. url {field}, {value}")
+                        raise Exception(
+                            f"Error generating duplicate checksum with url contents. url {field}, {value}")
                 else:
-                    current_app.logger.info("error parsing task data url to compute duplicate checksum %s, %s", field, str(value))
+                    current_app.logger.info(
+                        "error parsing task data url to compute duplicate checksum %s, %s", field, str(value))
             elif field == "private_json__encrypted_payload":
                 try:
                     secret = get_encryption_key(project)
                     cipher = AESWithGCM(secret) if secret else None
-                    encrypted_content = task_info.get("private_json__encrypted_payload")
-                    content = cipher.decrypt(encrypted_content) if cipher else encrypted_content
+                    encrypted_content = task_info.get(
+                        "private_json__encrypted_payload")
+                    content = cipher.decrypt(
+                        encrypted_content) if cipher else encrypted_content
                     content = json.loads(content)
                     task_contents.update(content)
                 except Exception as e:
                     current_app.logger.info("error generating duplicate checksum with encrypted payload for project %s, %s, %s %s",
                                             str(project_id), field, str(value), str(e))
-                    raise Exception(f"Error generating duplicate checksum with encrypted payload. {field}, {value}")
+                    raise Exception(
+                        f"Error generating duplicate checksum with encrypted payload. {field}, {value}")
             else:
                 task_contents[field] = value
     else:
         # with duplicate check not configured, consider all task fields
         task_contents = task_info
 
-    checksum_fields = task_contents.keys() if not dup_fields_configured else dup_fields_configured
+    checksum_fields = task_contents.keys(
+    ) if not dup_fields_configured else dup_fields_configured
     try:
-        checksum_payload = {field:task_contents[field] for field in checksum_fields}
+        checksum_payload = {
+            field: task_contents[field] for field in checksum_fields}
         checksum = hashlib.sha256()
-        checksum.update(json.dumps(checksum_payload, sort_keys=True).encode("utf-8"))
+        checksum.update(json.dumps(checksum_payload,
+                        sort_keys=True).encode("utf-8"))
         checksum_value = checksum.hexdigest()
         return checksum_value
     except KeyError as e:
         private_fields = task.get('private_fields', None)
         task_payload = copy.deepcopy(task_info)
-        task_payload["private_fields_keys"] = list(private_fields.keys()) if private_fields else []
-        current_app.logger.info("error generating duplicate checksum for project id %s, error %s, task payload %s", str(project_id), str(e), json.dumps(task_payload))
-        raise Exception(f"Error generating duplicate checksum due to missing checksum configured fields {checksum_fields}")
+        task_payload["private_fields_keys"] = list(
+            private_fields.keys()) if private_fields else []
+        current_app.logger.info("error generating duplicate checksum for project id %s, error %s, task payload %s", str(
+            project_id), str(e), json.dumps(task_payload))
+        raise Exception(
+            f"Error generating duplicate checksum due to missing checksum configured fields {checksum_fields}")

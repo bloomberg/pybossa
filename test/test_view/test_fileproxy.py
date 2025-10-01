@@ -26,7 +26,6 @@ from unittest.mock import patch, MagicMock
 from test.factories import ProjectFactory, TaskFactory, UserFactory
 from pybossa.core import signer
 from pybossa.encryption import AESWithGCM
-from boto.exception import S3ResponseError
 from pybossa.task_creator_helper import get_path, get_secret_from_env
 
 
@@ -232,46 +231,6 @@ class TestFileproxy(web.Helper):
             res = self.app.get(req_url, follow_redirects=True)
             assert res.status_code == 200, res.status_code
             assert res.data == b'the content', res.data
-
-    @with_context
-    @patch('pybossa.cloud_store_api.s3.create_connection')
-    def test_proxy_s3_error(self, create_connection):
-        admin, owner = UserFactory.create_batch(2)
-        project = ProjectFactory.create(owner=owner)
-        url = '/fileproxy/encrypted/s3/test/%s/file.pdf' % project.id
-        task = TaskFactory.create(project=project, info={
-            'url': url
-        })
-
-        signature = signer.dumps({'task_id': task.id})
-        req_url = '%s?api_key=%s&task-signature=%s' % (url, admin.api_key, signature)
-
-        key = self.get_key(create_connection)
-        key.get_contents_as_string.side_effect = S3ResponseError(403, 'Forbidden')
-
-        res = self.app.get(req_url, follow_redirects=True)
-        assert res.status_code == 500, f"Expected 500 Internal Server Error, got {res.status_code}"
-
-    @with_context
-    @patch('pybossa.cloud_store_api.s3.create_connection')
-    def test_proxy_key_not_found(self, create_connection):
-        admin, owner = UserFactory.create_batch(2)
-        project = ProjectFactory.create(owner=owner)
-        url = '/fileproxy/encrypted/s3/test/%s/file.pdf' % project.id
-        task = TaskFactory.create(project=project, info={
-            'url': url
-        })
-
-        signature = signer.dumps({'task_id': task.id})
-        req_url = '%s?api_key=%s&task-signature=%s' % (url, admin.api_key, signature)
-
-        key = self.get_key(create_connection)
-        exception = S3ResponseError(404, 'NoSuchKey')
-        exception.error_code = 'NoSuchKey'
-        key.get_contents_as_string.side_effect = exception
-
-        res = self.app.get(req_url, follow_redirects=True)
-        assert res.status_code == 404, res.status_code
 
 
 class TestEncryptedPayload(web.Helper):

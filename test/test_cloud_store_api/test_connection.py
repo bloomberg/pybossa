@@ -20,7 +20,7 @@ import jwt
 import io
 from unittest.mock import patch
 from test import Test, with_context
-from pybossa.cloud_store_api.connection import create_connection, CustomAuthHandler, CustomProvider
+from pybossa.cloud_store_api.connection import create_connection
 from nose.tools import assert_raises
 from boto.auth_handler import NotReadyToAuthenticate
 from unittest.mock import patch
@@ -52,14 +52,9 @@ class TestS3Connection(Test):
                                  auth_headers=self.auth_headers)
         assert 'context' in conn.http_connection_kwargs
 
-        conn = create_connection(host='s3.store.com', auth_headers=self.auth_headers)
+        conn = create_connection(
+            host='s3.store.com', auth_headers=self.auth_headers)
         assert 'context' not in conn.http_connection_kwargs
-
-    @with_context
-    def test_auth_handler_error(self):
-        provider = CustomProvider('aws')
-        assert_raises(NotReadyToAuthenticate, CustomAuthHandler,
-                      's3.store.com', None, provider)
 
     @with_context
     def test_custom_headers(self):
@@ -100,7 +95,8 @@ class TestS3Connection(Test):
 
         bucket = conn.get_bucket('test_bucket', validate=False)
         key = bucket.get_key('test_key', validate=False)
-        assert key.generate_url(0).split('?')[0] == 'https://s3.test.com:443/test_bucket/test_key'
+        assert key.generate_url(0).split(
+            '?')[0] == 'https://s3.test.com:443/test_bucket/test_key'
 
     @with_context
     @patch('pybossa.cloud_store_api.connection.S3Connection.make_request')
@@ -127,7 +123,8 @@ class TestS3Connection(Test):
 
         bucket = conn.get_bucket('test_bucket', validate=False)
         key = bucket.get_key('test_key', validate=False)
-        assert key.generate_url(0).split('?')[0] == 'https://s3.test.com:443/test/test_bucket/test_key'
+        assert key.generate_url(0).split(
+            '?')[0] == 'https://s3.test.com:443/test/test_bucket/test_key'
 
 
 class TestCustomConnectionV2(Test):
@@ -135,7 +132,7 @@ class TestCustomConnectionV2(Test):
     default_config = {
         "S3_CONN_TYPE": "storev1",
         "S3_CONN_TYPE_V2": "storev2"
-        }
+    }
     access_key, secret_key = "test-access-key", "test-secret-key"
 
     @with_context
@@ -152,9 +149,9 @@ class TestCustomConnectionV2(Test):
     def test_boto3_session_not_called(self):
         with assert_raises(BadRequest):
             create_connection(aws_access_key_id=self.access_key,
-                                    aws_secret_access_key=self.secret_key,
-                                    endpoint="s3.store.com",
-                                    store="storev2")
+                              aws_secret_access_key=self.secret_key,
+                              endpoint="s3.store.com",
+                              store="storev2")
 
     @with_context
     @patch("pybossa.cloud_store_api.connection.CustomConnection")
@@ -179,22 +176,24 @@ class TestCustomConnectionV2(Test):
             bucket = conn.get_bucket(bucket_name=bucket_name)
             key = bucket.get_key(path)
             assert mock_client.return_value.get_object.called
-            mock_client.return_value.get_object.assert_called_with(Bucket=bucket_name, Key=path)
+            mock_client.return_value.get_object.assert_called_with(
+                Bucket=bucket_name, Key=path)
 
     @with_context
     @patch("pybossa.cloud_store_api.connection.Session.client")
     def test_get_delete_key_success(self, mock_client):
         with patch.dict(self.flask_app.config, self.default_config):
             conn = create_connection(aws_access_key_id=self.access_key,
-                                    aws_secret_access_key=self.secret_key,
-                                    store="storev2")
+                                     aws_secret_access_key=self.secret_key,
+                                     store="storev2")
             bucket_name = "testv2"
             path = "path/to/key"
             bucket = conn.get_bucket(bucket_name=bucket_name)
             key = bucket.get_key(path)
             key.delete()
             assert mock_client.return_value.delete_object.called
-            mock_client.return_value.delete_object.assert_called_with(Bucket=bucket_name, Key=path)
+            mock_client.return_value.delete_object.assert_called_with(
+                Bucket=bucket_name, Key=path)
 
     @with_context
     @patch("pybossa.cloud_store_api.connection.Session.client")
@@ -246,14 +245,13 @@ class TestCustomConnectionV2(Test):
             bucket.copy_key(key, new_key)
             assert mock_client.return_value.copy.called
 
-
     @with_context
     @patch("pybossa.cloud_store_api.connection.Session.client")
     def test_key_generate_url_and_head(self, mock_client):
         with patch.dict(self.flask_app.config, self.default_config):
             conn = create_connection(aws_access_key_id=self.access_key,
-                                    aws_secret_access_key=self.secret_key,
-                                    store="storev2")
+                                     aws_secret_access_key=self.secret_key,
+                                     store="storev2")
             bucket_name = "testv2"
             path = "path/to/key"
             bucket = conn.get_bucket(bucket_name=bucket_name)

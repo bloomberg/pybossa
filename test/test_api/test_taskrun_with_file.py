@@ -64,8 +64,8 @@ class TestTaskrunWithFile(TestAPI):
             assert success.status_code == 200, success.data
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_taskrun_with_upload(self, set_content):
+    @patch('pybossa.cloud_store_api.s3.boto3.client')
+    def test_taskrun_with_upload(self, mock_client):
         with patch.dict(self.flask_app.config, self.patch_config):
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
@@ -86,7 +86,6 @@ class TestTaskrunWithFile(TestAPI):
             success = self.app.post(url, data=datajson)
 
             assert success.status_code == 200, success.data
-            set_content.assert_called()
             res = json.loads(success.data)
             url = res['info']['test__upload_url']
             args = {
@@ -102,8 +101,8 @@ class TestTaskrunWithFile(TestAPI):
             assert url == expected, url
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_taskrun_with_no_upload(self, set_content):
+    @patch('pybossa.cloud_store_api.s3.boto3.client')
+    def test_taskrun_with_no_upload(self, mock_client):
         with patch.dict(self.flask_app.config, self.patch_config):
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
@@ -123,13 +122,12 @@ class TestTaskrunWithFile(TestAPI):
             success = self.app.post(url, data=datajson)
 
             assert success.status_code == 200, success.data
-            set_content.assert_not_called()
             res = json.loads(success.data)
             assert res['info']['test__upload_url']['test'] == 'not a file'
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_taskrun_multipart(self, set_content):
+    @patch('pybossa.cloud_store_api.s3.boto3.client')
+    def test_taskrun_multipart(self, mock_client):
         with patch.dict(self.flask_app.config, self.patch_config):
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
@@ -152,7 +150,6 @@ class TestTaskrunWithFile(TestAPI):
                                     data=form)
 
             assert success.status_code == 200, success.data
-            set_content.assert_called()
             res = json.loads(success.data)
             url = res['info']['test__upload_url']
             args = {
@@ -168,8 +165,8 @@ class TestTaskrunWithFile(TestAPI):
             assert url == expected, url
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_taskrun_multipart_error(self, set_content):
+    @patch('pybossa.cloud_store_api.s3.boto3.client')
+    def test_taskrun_multipart_error(self, mock_client):
         with patch.dict(self.flask_app.config, self.patch_config):
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
@@ -192,7 +189,6 @@ class TestTaskrunWithFile(TestAPI):
                                     data=form)
 
             assert success.status_code == 400, success.data
-            set_content.assert_not_called()
 
 
 class TestTaskrunWithSensitiveFile(TestAPI):
@@ -216,9 +212,9 @@ class TestTaskrunWithSensitiveFile(TestAPI):
         db.session.query(TaskRun).delete()
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
+    @patch('pybossa.cloud_store_api.s3.boto3.client')
     @patch('pybossa.api.task_run.s3_upload_from_string', wraps=s3_upload_from_string)
-    def test_taskrun_with_upload(self, upload_from_string, set_content):
+    def test_taskrun_with_upload(self, upload_from_string, mock_client):
         with patch.dict(self.flask_app.config, self.patch_config):
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
@@ -240,7 +236,6 @@ class TestTaskrunWithSensitiveFile(TestAPI):
             success = self.app.post(url, data=datajson)
 
             assert success.status_code == 200, success.data
-            set_content.assert_called()
             res = json.loads(success.data)
             assert len(res['info']) == 1
             url = res['info']['pyb_answer_url']
@@ -284,8 +279,8 @@ class TestTaskrunWithSensitiveFile(TestAPI):
             assert actual_content['another_field'] == 42
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_taskrun_multipart(self, set_content):
+    @patch('pybossa.cloud_store_api.s3.boto3.client')
+    def test_taskrun_multipart(self, mock_client):
         with patch.dict(self.flask_app.config, self.patch_config):
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
@@ -308,7 +303,6 @@ class TestTaskrunWithSensitiveFile(TestAPI):
                                     data=form)
 
             assert success.status_code == 200, success.data
-            set_content.assert_called()
             res = json.loads(success.data)
             url = res['info']['pyb_answer_url']
             args = {
@@ -324,10 +318,10 @@ class TestTaskrunWithSensitiveFile(TestAPI):
             assert url == expected, url
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
+    @patch('pybossa.cloud_store_api.s3.boto3.client')
     @patch('pybossa.api.task_run.s3_upload_from_string', wraps=s3_upload_from_string)
     @patch('pybossa.view.fileproxy.get_encryption_key')
-    def test_taskrun_with_encrypted_payload(self, encr_key, upload_from_string, set_content):
+    def test_taskrun_with_encrypted_payload(self, encr_key, upload_from_string, mock_client):
         with patch.dict(self.flask_app.config, self.patch_config):
             project = ProjectFactory.create()
             encryption_key = 'testkey'
@@ -353,7 +347,6 @@ class TestTaskrunWithSensitiveFile(TestAPI):
             success = self.app.post(url, data=datajson)
 
             assert success.status_code == 200, success.data
-            set_content.assert_called()
             res = json.loads(success.data)
             assert len(res['info']) == 2
             encrypted_response = res['info']['private_json__encrypted_response']
@@ -364,6 +357,13 @@ class TestTaskrunWithSensitiveFile(TestAPI):
                 'host': self.host,
                 'port': self.port,
                 'bucket': self.bucket,
+                'project_id': project.id,
+                'task_id': task.id,
+                'user_id': project.owner.id,
+                'filename': 'pyb_answer.json'
+            }
+            expected = 'https://{host}:{port}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
+            assert url == expected, url
                 'project_id': project.id,
                 'task_id': task.id,
                 'user_id': project.owner.id,

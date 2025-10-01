@@ -37,6 +37,7 @@ from itsdangerous import BadSignature
 from pybossa.util import get_user_signup_method, unicode_csv_reader
 from bs4 import BeautifulSoup
 from requests.exceptions import ConnectionError
+import boto3
 from pybossa.model.project import Project
 from pybossa.model.category import Category
 from pybossa.model.task import Task

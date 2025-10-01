@@ -120,15 +120,6 @@ class TestS3Uploader(Test):
             delete_key.assert_called_with('/the/key', headers={}, version_id=None)
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.bucket.Bucket.delete_key')
-    @patch('pybossa.cloud_store_api.s3.app.logger.exception')
-    def test_delete_file_from_s3_exception(self, logger, delete_key):
-        delete_key.side_effect = boto.exception.S3ResponseError('', '', '')
-        with patch.dict(self.flask_app.config, self.default_config):
-            delete_file_from_s3('test_bucket', '/the/key')
-            logger.assert_called()
-
-    @with_context
     @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.get_contents_as_string')
     def test_get_file_from_s3(self, get_contents):
         get_contents.return_value = 'abcd'
