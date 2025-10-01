@@ -37,7 +37,6 @@ from itsdangerous import BadSignature
 from pybossa.util import get_user_signup_method, unicode_csv_reader
 from bs4 import BeautifulSoup
 from requests.exceptions import ConnectionError
-import boto3
 from pybossa.model.project import Project
 from pybossa.model.category import Category
 from pybossa.model.task import Task
@@ -8486,7 +8485,6 @@ class TestWeb(web.Helper):
         assert not t.expiration
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
     def test_task_gold_with_files_in_form(self, set_content):
         """Test WEB when making a task gold with files"""
 

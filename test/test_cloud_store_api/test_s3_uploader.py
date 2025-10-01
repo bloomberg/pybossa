@@ -63,14 +63,12 @@ class TestS3Uploader(Test):
         assert_raises(RuntimeError, validate_directory, 'hello$world')
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
     def test_upload_from_string(self, set_contents):
         with patch.dict(self.flask_app.config, self.default_config):
             url = s3_upload_from_string('bucket', 'hello world', 'test.txt')
             assert url == 'https://s3.storage.com:443/bucket/test.txt', url
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
     def test_upload_from_string_util(self, set_contents):
         with patch.dict(self.flask_app.config, self.util_config):
             """Test -util keyword dropped from meta url returned from s3 upload."""
@@ -85,7 +83,6 @@ class TestS3Uploader(Test):
                       'bucket', 'hellow world', 'test.txt')
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
     def test_upload_from_string_return_key(self, set_contents):
         with patch.dict(self.flask_app.config, self.default_config):
             key = s3_upload_from_string('bucket', 'hello world', 'test.txt',
@@ -93,7 +90,6 @@ class TestS3Uploader(Test):
             assert key == 'test.txt', key
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
     def test_upload_from_storage(self, set_contents):
         with patch.dict(self.flask_app.config, self.default_config):
             stream = BytesIO(b'Hello world!')
@@ -104,8 +100,6 @@ class TestS3Uploader(Test):
             assert url == 'https://s3.storage.com:443/bucket/test.txt', url
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.generate_url')
     def test_upload_remove_query_params(self, generate_url, set_content):
         with patch.dict(self.flask_app.config, self.default_config):
             generate_url.return_value = 'https://s3.storage.com/bucket/key?query_1=aaaa&query_2=bbbb'
@@ -113,14 +107,12 @@ class TestS3Uploader(Test):
             assert url == 'https://s3.storage.com/bucket/key'
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.bucket.Bucket.delete_key')
     def test_delete_file_from_s3(self, delete_key):
         with patch.dict(self.flask_app.config, self.default_config):
             delete_file_from_s3('test_bucket', '/the/key')
             delete_key.assert_called_with('/the/key', headers={}, version_id=None)
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.get_contents_as_string')
     def test_get_file_from_s3(self, get_contents):
         get_contents.return_value = 'abcd'
         with patch.dict(self.flask_app.config, self.default_config):
@@ -128,7 +120,6 @@ class TestS3Uploader(Test):
             get_contents.assert_called()
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.get_contents_as_string')
     def test_decrypts_file_from_s3(self, get_contents):
         config = self.default_config.copy()
         config['FILE_ENCRYPTION_KEY'] = 'abcd'
