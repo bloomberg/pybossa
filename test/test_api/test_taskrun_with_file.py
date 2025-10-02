@@ -364,10 +364,3 @@ class TestTaskrunWithSensitiveFile(TestAPI):
             }
             expected = 'https://{host}:{port}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
             assert url == expected, url
-                'project_id': project.id,
-                'task_id': task.id,
-                'user_id': project.owner.id,
-                'filename': 'pyb_answer.json'
-            }
-            expected = 'https://{host}:{port}/{bucket}/{project_id}/{task_id}/{user_id}/{filename}'.format(**args)
-            assert url == expected, url
