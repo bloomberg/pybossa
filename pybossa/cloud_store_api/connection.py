@@ -62,6 +62,12 @@ def create_connection(**kwargs):
 
     if 'object_service' in kwargs:
         current_app.logger.info("Calling ProxiedS3Client")
+        # Map auth_headers to extra_headers for ProxiedS3Client compatibility
+        if 'auth_headers' in kwargs:
+            auth_headers = kwargs.pop('auth_headers')
+            # Convert auth_headers list of tuples to dict for extra_headers
+            if auth_headers:
+                kwargs['extra_headers'] = dict(auth_headers)
         conn = ProxiedS3Client(**kwargs)
     else:
         current_app.logger.info("Calling S3ClientWrapper")
