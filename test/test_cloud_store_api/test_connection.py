@@ -22,7 +22,6 @@ from unittest.mock import patch
 from test import Test, with_context
 from pybossa.cloud_store_api.connection import create_connection
 from nose.tools import assert_raises
-from boto.auth_handler import NotReadyToAuthenticate
 from unittest.mock import patch
 from nose.tools import assert_raises
 from werkzeug.exceptions import BadRequest

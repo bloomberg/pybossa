@@ -20,7 +20,6 @@ from io import StringIO, BytesIO
 from unittest.mock import patch, MagicMock
 from test import Test, with_context
 from pybossa.cloud_store_api.s3 import *
-from pybossa.cloud_store_api.connection import ProxiedKey
 from pybossa.encryption import AESWithGCM
 from nose.tools import assert_raises
 from werkzeug.exceptions import BadRequest
@@ -130,31 +129,3 @@ class TestS3Uploader(Test):
             fp = get_file_from_s3('test_bucket', '/the/key', decrypt=True)
             content = fp.read()
             assert content == b'hello world'
-
-    @with_context
-    def test_no_checksum_key(self):
-        response = MagicMock()
-        response.status = 200
-        key = ProxiedKey()
-        assert key.should_retry(response)
-
-    @with_context
-    @patch('pybossa.cloud_store_api.connection.Key.should_retry')
-    def test_checksum(self, should_retry):
-        response = MagicMock()
-        response.status = 200
-        key = ProxiedKey()
-        key.should_retry(response)
-        should_retry.assert_not_called()
-
-
-    @with_context
-    @patch('pybossa.cloud_store_api.connection.Key.should_retry')
-    def test_checksum_not_ok(self, should_retry):
-        response = MagicMock()
-        response.status = 300
-        key = ProxiedKey()
-        key.should_retry(response)
-        should_retry.assert_called()
-        key.should_retry(response)
-        should_retry.assert_called()
