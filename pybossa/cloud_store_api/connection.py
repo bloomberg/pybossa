@@ -50,6 +50,16 @@ def create_connection(**kwargs):
             cert=kwargs.get("cert", False),
             proxy_url=kwargs.get("proxy_url")
         )
+    # Map legacy boto2 parameters to boto3 parameters
+    if 'host' in kwargs and 'endpoint_url' not in kwargs:
+        host = kwargs.pop('host')
+        port = kwargs.pop('port', None)
+        if port:
+            kwargs['endpoint_url'] = f"https://{host}:{port}"
+        else:
+            # Default to port 443 for HTTPS to maintain compatibility with old behavior
+            kwargs['endpoint_url'] = f"https://{host}:443"
+
     if 'object_service' in kwargs:
         current_app.logger.info("Calling ProxiedS3Client")
         conn = ProxiedS3Client(**kwargs)

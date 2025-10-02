@@ -2,9 +2,10 @@ from urllib.parse import urlsplit, urlunsplit
 from botocore.exceptions import ClientError
 from botocore.config import Config
 import boto3
+from pybossa.cloud_store_api.base_conn import BaseConnection
 
 
-class S3ClientWrapper:
+class S3ClientWrapper(BaseConnection):
     """
     A thin wrapper around boto3's S3 client that emulates the old boto2 behavior:
       - path-style addressing (OrdinaryCallingFormat)
@@ -28,7 +29,11 @@ class S3ClientWrapper:
         # string to prefix to every request path (e.g., "/proxy")
         host_suffix="",
     ):
-        self.auth_headers = auth_headers or {}
+        # Convert auth_headers to dict if it's a list of tuples
+        if isinstance(auth_headers, list):
+            self.auth_headers = dict(auth_headers)
+        else:
+            self.auth_headers = auth_headers or {}
         self.host_suffix = host_suffix or ""
 
         session = (

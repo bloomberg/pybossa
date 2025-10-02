@@ -153,7 +153,7 @@ class TestCustomConnectionV2(Test):
                               store="storev2")
 
     @with_context
-    @patch("pybossa.cloud_store_api.connection.CustomConnection")
+    @patch("pybossa.cloud_store_api.s3_client_wrapper.S3ClientWrapper")
     @patch("pybossa.cloud_store_api.connection.Session")
     def test_custom_conn_called(self, mock_boto3_session, mock_conn):
         with patch.dict(self.flask_app.config, self.default_config):

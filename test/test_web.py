@@ -8485,11 +8485,21 @@ class TestWeb(web.Helper):
         assert not t.expiration
 
     @with_context
-    def test_task_gold_with_files_in_form(self, set_content):
+    @patch('pybossa.cloud_store_api.s3.create_connection')
+    def test_task_gold_with_files_in_form(self, mock_create_connection):
         """Test WEB when making a task gold with files"""
 
+        # Mock S3 connection
+        mock_conn = MagicMock()
+        mock_bucket = MagicMock()
+        mock_key = MagicMock()
+        mock_conn.get_bucket.return_value = mock_bucket
+        mock_bucket.new_key.return_value = mock_key
+        mock_key.name = 'hello.txt'
+        mock_key.generate_url.return_value = 'https://s3.storage.com:443/test_bucket/1/1/1/hello.txt'
+        mock_create_connection.return_value = mock_conn
+
         host = 's3.storage.com'
-        bucket = 'test_bucket'
         patch_config = {
             'S3_TASKRUN': {
                 'host': host,
@@ -8520,7 +8530,6 @@ class TestWeb(web.Helper):
                                         data=form)
 
             assert success.status_code == 200, success.data
-            set_content.s()
             res = json.loads(success.data)
 
             t = task_repo.get_task(task.id)
