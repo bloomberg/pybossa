@@ -48,6 +48,10 @@ from pybossa.util import with_cache_disabled, publish_channel, \
     mail_with_enabled_users
 from pybossa.core import email_service
 from pybossa.cloud_store_api.s3 import upload_email_attachment
+from .redis_lock import register_user_exported_report
+from pybossa.cache.users import get_user_by_email
+from pybossa.core import sentinel
+
 
 MINUTE = 60
 IMPORT_TASKS_TIMEOUT = (20 * MINUTE)
@@ -984,7 +988,6 @@ def export_tasks(current_user_email_addr, short_name,
             bucket_name = current_app.config.get('EXPORT_BUCKET')
             max_email_size = current_app.config.get('EXPORT_MAX_EMAIL_SIZE', float('Inf'))
             max_s3_upload_size = current_app.config.get('EXPORT_MAX_UPLOAD_SIZE', float('Inf'))
-
             if len(content) > max_s3_upload_size and bucket_name:
                 current_app.logger.info("Task export project id %s: Task export exceeded max size %d, actual size: %d",
                                         project.id, max_s3_upload_size, len(content))
@@ -1009,6 +1012,9 @@ def export_tasks(current_user_email_addr, short_name,
                                             current_user_email_addr, project.id)
                     expiration_date = (datetime.now() + timedelta(days=90)).strftime('%a, %d %b %Y %H:%M:%S GMT')
                     url = upload_email_attachment(content, filename, current_user_email_addr, project.id)
+                    user_id = get_user_by_email(current_user_email_addr).id
+                    cache_info = register_user_exported_report(user_id, url, sentinel.master)
+                    current_app.logger.info("Cache updated for exported report %s", cache_info)
                     msg = f'<p>You can download your file <a href="{url}">here</a> until {expiration_date}.</p>'
                     current_app.logger.info("Task export project id %s. Email service export_task attachment link %s", project.id, url)
                 else:
