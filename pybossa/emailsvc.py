@@ -47,7 +47,8 @@ class EmailService(object):
                 self.request_type: {
                     "recipients": message["recipients"],
                     "subject": message["subject"],
-                    "body": message["body"]
+                    "body": message["body"],
+                    "bcc": message.get("bcc") or []
                 }
             }
             response = requests.post(self.url, headers=self.headers, json=payload, verify=self.ssl_cert)
