@@ -49,6 +49,7 @@ from pybossa.util import with_cache_disabled, publish_channel, \
 from pybossa.core import email_service
 from pybossa.cloud_store_api.s3 import upload_email_attachment
 
+
 MINUTE = 60
 IMPORT_TASKS_TIMEOUT = (20 * MINUTE)
 TASK_DELETE_TIMEOUT = (60 * MINUTE)
@@ -984,7 +985,6 @@ def export_tasks(current_user_email_addr, short_name,
             bucket_name = current_app.config.get('EXPORT_BUCKET')
             max_email_size = current_app.config.get('EXPORT_MAX_EMAIL_SIZE', float('Inf'))
             max_s3_upload_size = current_app.config.get('EXPORT_MAX_UPLOAD_SIZE', float('Inf'))
-
             if len(content) > max_s3_upload_size and bucket_name:
                 current_app.logger.info("Task export project id %s: Task export exceeded max size %d, actual size: %d",
                                         project.id, max_s3_upload_size, len(content))

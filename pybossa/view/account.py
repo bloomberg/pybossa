@@ -1178,6 +1178,9 @@ def get_bookmarks(user_name, short_name, order_by, desc):
     proj_bookmarks = taskbrowse_bookmarks.get(short_name, {})
     return bookmarks_dict_to_array(proj_bookmarks, order_by, desc)
 
+def get_user_reports(user_name):
+    user_reports = cached_users.get_user_reports(user_name)
+    return user_reports
 
 def add_bookmark(user_name, short_name, bookmark_name, bookmark_url, order_by, desc):
 

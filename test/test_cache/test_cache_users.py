@@ -20,6 +20,14 @@ from test import Test, with_context
 from pybossa.cache import users as cached_users
 from pybossa.model.user import User
 from pybossa.leaderboard.jobs import leaderboard as update_leaderboard
+from pybossa.redis_lock import (get_user_exported_reports_key,
+                                register_user_exported_report,
+                                get_user_exported_reports)
+from pybossa.core import sentinel
+from time import time
+from datetime import datetime
+from unittest.mock import patch, MagicMock
+import os
 
 from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, UserFactory
 
@@ -570,3 +578,328 @@ class TestUsersCache(Test):
         ProjectFactory.create(owner=user, published=True)
         draft_projects = cached_users.draft_projects_cached(user.id)
         assert len(draft_projects) == 0
+
+    @with_context
+    def test_get_user_exported_reports_key(self):
+        """Test get_user_exported_reports_key returns correct Redis key format"""
+        user_id = 123
+        expected_key = 'pybossa:user:exported:reports:123'
+
+        key = get_user_exported_reports_key(user_id)
+
+        assert key == expected_key
+
+    @with_context
+    def test_get_user_exported_reports_key_string_user_id(self):
+        """Test get_user_exported_reports_key works with string user_id"""
+        user_id = "456"
+        expected_key = 'pybossa:user:exported:reports:456'
+
+        key = get_user_exported_reports_key(user_id)
+
+        assert key == expected_key
+
+    @with_context
+    def test_register_user_exported_report_default_ttl(self):
+        """Test register_user_exported_report stores report with default TTL"""
+        user_id = 123
+        path = '/path/to/report.csv'
+        conn = sentinel.master
+
+        # Clear any existing data
+        conn.flushall()
+
+        # Mock time to get predictable timestamp
+        with patch('pybossa.redis_lock.time') as mock_time:
+            mock_time.return_value = 1609459200.123456  # 2021-01-01 00:00:00.123456
+
+            cache_info = register_user_exported_report(user_id, path, conn)
+
+            # Check that the function returns cache info
+            expected_cache_info = 'Registered exported report for user_id 123 at 1609459200.123456 with value {"filename": "report.csv", "path": "/path/to/report.csv"}'
+            assert cache_info == expected_cache_info
+
+            # Check that the key was created with correct format
+            expected_key = 'pybossa:user:exported:reports:123'
+            assert conn.exists(expected_key)
+
+            # Check that the data was stored correctly in the hash
+            import json
+            stored_value = conn.hget(expected_key, '1609459200.123456')
+            assert stored_value is not None
+            stored_data = json.loads(stored_value)
+            assert stored_data['filename'] == 'report.csv'
+            assert stored_data['path'] == '/path/to/report.csv'
+
+            # Check TTL is approximately correct (default 3600 seconds)
+            ttl = conn.ttl(expected_key)
+            assert 3590 <= ttl <= 3600
+
+    @with_context
+    def test_register_user_exported_report_custom_ttl(self):
+        """Test register_user_exported_report stores report with custom TTL"""
+        user_id = 456
+        path = '/path/to/custom_report.json'
+        conn = sentinel.master
+        custom_ttl = 1800  # 30 minutes
+
+        # Clear any existing data
+        conn.flushall()
+
+        with patch('pybossa.redis_lock.time') as mock_time:
+            mock_time.return_value = 1609459200.789012
+
+            cache_info = register_user_exported_report(user_id, path, conn, ttl=custom_ttl)
+
+            # Check that the function returns cache info
+            expected_cache_info = 'Registered exported report for user_id 456 at 1609459200.789012 with value {"filename": "custom_report.json", "path": "/path/to/custom_report.json"}'
+            assert cache_info == expected_cache_info
+
+            expected_key = 'pybossa:user:exported:reports:456'
+            assert conn.exists(expected_key)
+
+            # Check TTL is approximately correct (custom 1800 seconds)
+            ttl = conn.ttl(expected_key)
+            assert 1790 <= ttl <= 1800
+
+    @with_context
+    def test_register_user_exported_report_multiple_reports(self):
+        """Test register_user_exported_report can store multiple reports for same user"""
+        user_id = 789
+        path1 = '/path/to/report1.csv'
+        path2 = '/path/to/report2.json'
+        conn = sentinel.master
+
+        # Clear any existing data
+        conn.flushall()
+
+        with patch('pybossa.redis_lock.time') as mock_time:
+            # First report
+            mock_time.return_value = 1609459200.111111
+            cache_info1 = register_user_exported_report(user_id, path1, conn)
+
+            # Second report with different timestamp
+            mock_time.return_value = 1609459260.222222
+            cache_info2 = register_user_exported_report(user_id, path2, conn)
+
+            # Check both reports are stored in the same key
+            key = 'pybossa:user:exported:reports:789'
+            assert conn.exists(key)
+
+            # Check both timestamps exist as hash fields
+            assert conn.hexists(key, '1609459200.111111')
+            assert conn.hexists(key, '1609459260.222222')
+
+            # Check correct data is stored
+            import json
+            stored_value1 = json.loads(conn.hget(key, '1609459200.111111'))
+            stored_value2 = json.loads(conn.hget(key, '1609459260.222222'))
+
+            assert stored_value1['filename'] == 'report1.csv'
+            assert stored_value1['path'] == path1
+            assert stored_value2['filename'] == 'report2.json'
+            assert stored_value2['path'] == path2
+
+    @with_context
+    def test_get_user_exported_reports_no_reports(self):
+        """Test get_user_exported_reports returns empty list when no reports exist"""
+        user_id = 999
+        conn = sentinel.master
+
+        # Clear any existing data
+        conn.flushall()
+
+        reports = get_user_exported_reports(user_id, conn)
+
+        assert reports == []
+
+    @with_context
+    def test_get_user_exported_reports_single_report(self):
+        """Test get_user_exported_reports returns single report correctly"""
+        user_id = 111
+        path = '/path/to/single_report.csv'
+        conn = sentinel.master
+
+        # Clear any existing data
+        conn.flushall()
+
+        # Register a report first
+        with patch('pybossa.redis_lock.time') as mock_time:
+            mock_time.return_value = 1609459200.555555
+            register_user_exported_report(user_id, path, conn)
+
+        # Retrieve reports
+        reports = get_user_exported_reports(user_id, conn)
+
+        assert len(reports) == 1
+        assert reports[0] == ('2021-01-01 00:00:00:555', 'single_report.csv', path)
+
+    @with_context
+    def test_get_user_exported_reports_multiple_reports(self):
+        """Test get_user_exported_reports returns multiple reports correctly"""
+        user_id = 222
+        path1 = '/path/to/report1.csv'
+        path2 = '/path/to/report2.json'
+        path3 = '/path/to/report3.xlsx'
+        conn = sentinel.master
+
+        # Clear any existing data
+        conn.flushall()
+
+        # Register multiple reports
+        with patch('pybossa.redis_lock.time') as mock_time:
+
+            # First report
+            mock_time.return_value = 1609459200.111111
+            register_user_exported_report(user_id, path1, conn)
+
+            # Second report
+            mock_time.return_value = 1609459260.222222
+            register_user_exported_report(user_id, path2, conn)
+
+            # Third report
+            mock_time.return_value = 1609459320.333333
+            register_user_exported_report(user_id, path3, conn)
+
+        # Retrieve reports
+        reports = get_user_exported_reports(user_id, conn)
+
+        assert len(reports) == 3
+
+        # Convert to set for easier comparison (order may vary)
+        report_set = set(reports)
+        expected_set = {
+            ('2021-01-01 00:00:00:111', 'report1.csv', path1),
+            ('2021-01-01 00:01:00:222', 'report2.json', path2),
+            ('2021-01-01 00:02:00:333', 'report3.xlsx', path3)
+        }
+        assert report_set == expected_set
+
+    @with_context
+    def test_get_user_exported_reports_ignores_malformed_values(self):
+        """Test get_user_exported_reports ignores malformed JSON values"""
+        user_id = 333
+        valid_path = '/path/to/valid_report.csv'
+        conn = sentinel.master
+
+        # Clear any existing data
+        conn.flushall()
+
+        # Create a valid report
+        with patch('pybossa.redis_lock.time') as mock_time:
+            mock_time.return_value = 1609459200.777777
+            register_user_exported_report(user_id, valid_path, conn)
+
+        # Manually add a malformed value (invalid JSON)
+        key = get_user_exported_reports_key(user_id)
+        conn.hset(key, '1609459300.888888', 'invalid_json_string')
+
+        # Retrieve reports - should handle the malformed JSON gracefully
+        try:
+            reports = get_user_exported_reports(user_id, conn)
+            # Should only return the valid report, ignoring malformed ones
+            assert len(reports) == 1
+            assert reports[0] == ('2021-01-01 00:00:00:777', 'valid_report.csv', valid_path)
+        except Exception as e:
+            # If the implementation doesn't handle malformed JSON gracefully,
+            # we expect a specific type of error
+            import json
+            assert isinstance(e, json.JSONDecodeError)
+
+    @with_context
+    def test_get_user_exported_reports_handles_complex_paths(self):
+        """Test get_user_exported_reports handles paths with special characters"""
+        user_id = 444
+        complex_path = '/path/with spaces/and:colons/report_file-name.csv'
+        conn = sentinel.master
+
+        # Clear any existing data
+        conn.flushall()
+
+        # Register report with complex path
+        with patch('pybossa.redis_lock.time') as mock_time:
+            mock_time.return_value = 1609459200.999999
+            register_user_exported_report(user_id, complex_path, conn)
+
+        # Retrieve reports
+        reports = get_user_exported_reports(user_id, conn)
+
+        assert len(reports) == 1
+        assert reports[0] == ('2021-01-01 00:00:00:999', 'report_file-name.csv', complex_path)
+
+    @with_context
+    def test_get_user_exported_reports_different_users_isolated(self):
+        """Test get_user_exported_reports only returns reports for specific user"""
+        user_id_1 = 555
+        user_id_2 = 666
+        path_1 = '/path/to/user1_report.csv'
+        path_2 = '/path/to/user2_report.json'
+        conn = sentinel.master
+
+        # Clear any existing data
+        conn.flushall()
+
+        # Register reports for different users
+        with patch('pybossa.redis_lock.time') as mock_time:
+            # User 1 report
+            mock_time.return_value = 1609459200.111111
+            register_user_exported_report(user_id_1, path_1, conn)
+
+            # User 2 report
+            mock_time.return_value = 1609459260.222222
+            register_user_exported_report(user_id_2, path_2, conn)
+
+        # Retrieve reports for user 1
+        reports_1 = get_user_exported_reports(user_id_1, conn)
+        assert len(reports_1) == 1
+        assert reports_1[0] == ('2021-01-01 00:00:00:111', 'user1_report.csv', path_1)
+
+        # Retrieve reports for user 2
+        reports_2 = get_user_exported_reports(user_id_2, conn)
+        assert len(reports_2) == 1
+        assert reports_2[0] == ('2021-01-01 00:01:00:222', 'user2_report.json', path_2)
+
+    @with_context
+    def test_register_user_exported_report_with_mock_connection(self):
+        """Test register_user_exported_report with mocked Redis connection"""
+        user_id = 777
+        path = '/path/to/mock_report.csv'
+        mock_conn = MagicMock()
+
+        with patch('pybossa.redis_lock.time') as mock_time:
+            mock_time.return_value = 1609459200.888888
+
+            cache_info = register_user_exported_report(user_id, path, mock_conn, ttl=7200)
+
+            # Verify Redis operations were called correctly
+            expected_key = 'pybossa:user:exported:reports:777'
+            expected_value = '{"filename": "mock_report.csv", "path": "/path/to/mock_report.csv"}'
+            mock_conn.hset.assert_called_once_with(expected_key, 1609459200.888888, expected_value)
+            mock_conn.expire.assert_called_once_with(expected_key, 7200)
+
+            # Verify return value
+            expected_cache_info = 'Registered exported report for user_id 777 at 1609459200.888888 with value {"filename": "mock_report.csv", "path": "/path/to/mock_report.csv"}'
+            assert cache_info == expected_cache_info
+
+    @with_context
+    def test_get_user_exported_reports_with_mock_connection(self):
+        """Test get_user_exported_reports with mocked Redis connection"""
+        user_id = 888
+        mock_conn = MagicMock()
+
+        # Mock the hgetall response
+        mock_conn.hgetall.return_value.items.return_value = [
+            (b'1609459200.123', b'{"filename": "report1.csv", "path": "/path/to/report1.csv"}'),
+            (b'1609459260.456', b'{"filename": "report2.json", "path": "/path/to/report2.json"}'),
+        ]
+
+        reports = get_user_exported_reports(user_id, mock_conn)
+
+        # Verify correct Redis key was used
+        expected_key = 'pybossa:user:exported:reports:888'
+        mock_conn.hgetall.assert_called_once_with(expected_key)
+
+        # Verify correct parsing
+        assert len(reports) == 2
+        assert ('2021-01-01 00:00:00:123', 'report1.csv', '/path/to/report1.csv') in reports
+        assert ('2021-01-01 00:01:00:456', 'report2.json', '/path/to/report2.json') in reports

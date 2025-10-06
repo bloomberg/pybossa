@@ -33,6 +33,7 @@ from pybossa.util import get_user_pref_db_clause, get_user_filter_db_clause, map
 from pybossa.data_access import data_access_levels
 from pybossa.util import get_taskrun_date_range_sql_clause_params
 from flask import current_app
+from pybossa.cache import ONE_HOUR
 
 session = db.slave_session
 
@@ -408,6 +409,13 @@ def get_user_filters(user_id):
 def get_user_by_id(user_id):
     assert user_id is not None or user_id > 0
     user = User.query.get(user_id)
+    return user
+
+
+@memoize(timeout=ONE_DAY)
+def get_user_by_email(email):
+    assert email is not None
+    user = User.query.filter_by(email_addr=email).first()
     return user
 
 

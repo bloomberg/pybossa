@@ -17,12 +17,13 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from datetime import timedelta
+from datetime import timedelta, datetime
 from time import time
 
 from pybossa.contributions_guard import ContributionsGuard
 from pybossa.core import sentinel
 from werkzeug.exceptions import BadRequest
+import os
 
 TASK_USERS_KEY_PREFIX = 'pybossa:project:task_requested:timestamps:{0}'
 USER_TASKS_KEY_PREFIX = 'pybossa:user:task_acquired:timestamps:{0}'
@@ -30,7 +31,7 @@ TASK_ID_PROJECT_ID_KEY_PREFIX = 'pybossa:task_id:project_id:{0}'
 ACTIVE_USER_KEY = 'pybossa:active_users_in_project:{}'
 EXPIRE_LOCK_DELAY = 5
 EXPIRE_RESERVE_TASK_LOCK_DELAY = 30*60
-
+USER_EXPORTED_REPORTS_KEY = 'pybossa:user:exported:reports:{}'
 
 def get_active_user_key(project_id):
     return ACTIVE_USER_KEY.format(project_id)
@@ -126,6 +127,35 @@ def get_locked_tasks_project(project_id):
                         "seconds_remaining": seconds_remaining
                     })
     return tasks
+
+def get_user_exported_reports_key(user_id):
+    # redis key to store exported reports for user_id
+    return USER_EXPORTED_REPORTS_KEY.format(user_id)
+
+def register_user_exported_report(user_id, path, conn, ttl=60*60):
+    # register report path for user_id
+    # reports are stored as hset with key as user_id and field as timestamp:path
+    now = time()
+    key = get_user_exported_reports_key(user_id)
+    filename = os.path.basename(path)
+    value = json.dumps({"filename": filename, "path": path})
+    conn.hset(key, now, value)
+    conn.expire(key, ttl)
+    cache_info = f"Registered exported report for user_id {user_id} at {now} with value {value}"
+    return cache_info
+
+def get_user_exported_reports(user_id, conn):
+    # obtain all reports for user_id
+    # reports are stored as hset with key as user_id and field as timestamp:path
+    # return list of (timestamp, path) tuples
+    key = get_user_exported_reports_key(user_id)
+    reports_data = conn.hgetall(key).items()
+    result = []
+    for k, v in reports_data:
+        decoded_value = json.loads(v.decode())
+        formatted_time = datetime.fromtimestamp(float(k.decode())).strftime('%Y-%m-%d %H:%M:%S:%f')[:-3]
+        result.append((formatted_time, decoded_value['filename'], decoded_value['path']))
+    return result
 
 
 class LockManager(object):
