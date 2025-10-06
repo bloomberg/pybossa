@@ -35,14 +35,14 @@ class S3ClientWrapper(BaseConnection):
         else:
             self.auth_headers = auth_headers or {}
         self.host_suffix = host_suffix or ""
-        
+
         # Store credentials for auth header processing
         self.aws_access_key_id = aws_access_key_id
         self.aws_secret_access_key = aws_secret_access_key
-        
+
         # Initialize http_connection_kwargs for compatibility with legacy tests
         self.http_connection_kwargs = {}
-        
+
         # If s3_ssl_no_verify=True, add context to http_connection_kwargs
         # This maintains compatibility with legacy boto2-style interface expectations
         if s3_ssl_no_verify:
@@ -134,7 +134,7 @@ class S3ClientWrapper(BaseConnection):
 
     def put_object(self, bucket, key, body, **kwargs):
         return self.client.put_object(Bucket=bucket, Key=key, Body=body, **kwargs)
-    
+
     def build_base_http_request(self, method, path, auth_path, headers=None):
         """
         Build a base HTTP request object for testing purposes.
@@ -142,16 +142,23 @@ class S3ClientWrapper(BaseConnection):
         """
         return MockHTTPRequest(method, path, auth_path, headers or {})
 
+    def list_objects(self, bucket, prefix="", **kwargs):
+        return self.client.list_objects_v2(Bucket=bucket, Prefix=prefix, **kwargs)
+
+    # expose the raw client if you need more
+    def raw(self):
+        return self.client
+
 
 class MockHTTPRequest:
     """Mock HTTP request object to support legacy test interface."""
-    
+
     def __init__(self, method, path, auth_path, headers):
         self.method = method
         self.path = path
         self.auth_path = auth_path
         self.headers = headers.copy()
-    
+
     def authorize(self, connection):
         """
         Authorize the request by processing auth_headers.
@@ -167,11 +174,4 @@ class MockHTTPRequest:
                         self.headers[key] = value
                 else:
                     self.headers[key] = value
-
-    def list_objects(self, bucket, prefix="", **kwargs):
-        return self.client.list_objects_v2(Bucket=bucket, Prefix=prefix, **kwargs)
-
-    # expose the raw client if you need more
-    def raw(self):
-        return self.client
 
