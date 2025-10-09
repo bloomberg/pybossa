@@ -170,6 +170,19 @@ class TestFileproxy(web.Helper):
         assert res.status_code == 403, res.status_code
 
     @with_context
+    def test_proxy_no_project(self):
+        project = ProjectFactory.create()
+        owner = project.owner
+        task = TaskFactory.create(project=project)
+        signature = signer.dumps({'task_id': task.id})
+        invalid_project_id = 99999
+
+        url = '/fileproxy/encrypted/s3/test/%s/file.pdf?api_key=%s&task-signature=%s' \
+            % (invalid_project_id, owner.api_key, signature)
+        res = self.app.get(url, follow_redirects=True)
+        assert res.status_code == 400, res.status_code
+
+    @with_context
     @patch('pybossa.cloud_store_api.s3.create_connection')
     @patch('pybossa.view.fileproxy.has_lock')
     def test_file_user(self, has_lock, create_connection):
