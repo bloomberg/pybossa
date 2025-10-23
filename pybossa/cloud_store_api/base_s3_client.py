@@ -93,6 +93,27 @@ class BaseS3Client(BaseConnection):
         request.url = urlunsplit(
             (parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
 
+    def get_path(self, path):
+        """
+        Return the path with host_suffix prepended, for compatibility with legacy tests.
+        This emulates the behavior that was expected from the old boto2 implementation.
+        """
+        if not self.host_suffix:
+            return path
+        
+        # Normalize the path to ensure proper formatting
+        if not path.startswith('/'):
+            path = '/' + path
+        
+        # Combine host_suffix and path, avoiding double slashes
+        combined = (self.host_suffix.rstrip("/") + "/" + path.lstrip("/")).replace("//", "/")
+        
+        # Ensure trailing slash if the original path was just '/'
+        if path == '/' and not combined.endswith('/'):
+            combined += '/'
+            
+        return combined
+
     # Override BaseConnection's delete_key to provide tolerant delete behavior
     def delete_key(self, bucket, path, **kwargs):
         """

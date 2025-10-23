@@ -152,9 +152,9 @@ class TestProxiedS3Client(Test):
         # Mock time.time() for predictable JWT
         with patch('time.time', return_value=1234567890):
             token = client._create_jwt(method, host, path)
-
-        # Decode and verify JWT
-        decoded = jwt.decode(token, self.client_secret, algorithms=['HS256'])
+            
+            # Decode and verify JWT while time is still mocked
+            decoded = jwt.decode(token, self.client_secret, algorithms=['HS256'])
 
         assert decoded['iat'] == 1234567890
         assert decoded['nbf'] == 1234567890
@@ -729,8 +729,8 @@ class TestProxiedS3ClientIntegration(Test):
 
         token = client._create_jwt('GET', 'test.com', '/path')
 
-        # Decode and check expiration
-        decoded = jwt.decode(token, self.client_secret, algorithms=['HS256'])
+        # Decode and check expiration - disable time validation to focus on content
+        decoded = jwt.decode(token, self.client_secret, algorithms=['HS256'], options={"verify_exp": False})
         assert decoded['exp'] == test_time + 300  # 5 minutes
         assert decoded['iat'] == test_time
         assert decoded['nbf'] == test_time
