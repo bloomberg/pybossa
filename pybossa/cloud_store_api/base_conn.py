@@ -163,23 +163,6 @@ class BaseConnection(ABC):
     ):  # pylint: disable=W0613
         return BaseClientBucketAdapter(self, bucket_name)
 
-    def get_path(self, path='/', **kwargs):
-        """
-        Get the full path by prepending host_suffix if it exists.
-        This method provides compatibility with the legacy boto2-style interface.
-        """
-        host_suffix = getattr(self, 'host_suffix', '')
-        if host_suffix:
-            if not host_suffix.startswith('/'):
-                host_suffix = '/' + host_suffix
-            if not host_suffix.endswith('/') and path.startswith('/'):
-                return host_suffix + path
-            elif host_suffix.endswith('/') and path.startswith('/'):
-                return host_suffix + path[1:]
-            else:
-                return host_suffix + path
-        return path
-
     def new_key(self, bucket, path):
         try:
             self.client.put_object(Bucket=bucket, Key=path)

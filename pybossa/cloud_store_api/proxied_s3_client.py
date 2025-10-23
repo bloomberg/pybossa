@@ -6,9 +6,10 @@ import boto3
 import time
 import jwt
 import logging
+from pybossa.cloud_store_api.base_s3_client import BaseS3Client
 
 
-class ProxiedS3Client:
+class ProxiedS3Client(BaseS3Client):
     """
     Emulates the old ProxiedConnection/ProxiedBucket/ProxiedKey behavior using boto3.
 
@@ -27,52 +28,23 @@ class ProxiedS3Client:
         client_secret: str,
         object_service: str,
         region_claim: str = "ny",               # value used in the JWT "region" claim
-        host_suffix: str = "",                  # prepended to every request path
         extra_headers: Optional[Dict[str, str]] = None,      # any additional headers to inject
-        endpoint_url: Optional[str] = None,
-        region_name: Optional[str] = None,
-        profile_name: Optional[str] = None,
-        aws_access_key_id: Optional[str] = None,
-        aws_secret_access_key: Optional[str] = None,
-        aws_session_token: Optional[str] = None,
-        s3_ssl_no_verify: bool = False,
-        # optional logger with .info(...)
         logger: Optional[logging.Logger] = None,
+        **kwargs
     ):
         self.client_id = client_id
         self.client_secret = client_secret
         self.object_service = object_service
         self.region_claim = region_claim
-        self.host_suffix = host_suffix or ""
         self.extra_headers = extra_headers or {}
         self.logger = logger
 
-        session = (
-            boto3.session.Session(profile_name=profile_name)
-            if profile_name else boto3.session.Session()
-        )
+        # Initialize parent class with all parameters
+        super().__init__(**kwargs)
 
-        config = Config(
-            region_name=region_name,
-            # OrdinaryCallingFormat equivalent
-            s3={"addressing_style": "path"},
-        )
-
-        verify = False if s3_ssl_no_verify else None  # None -> default verify
-
-        self.client = session.client(
-            "s3",
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
-            aws_session_token=aws_session_token,
-            endpoint_url=endpoint_url,
-            config=config,
-            verify=verify,
-        )
-
-        # One hook to: (1) prefix path, (2) add headers, (3) attach JWT
-        self.client.meta.events.register(
-            "before-sign.s3", self._before_sign_hook)
+    def _should_register_hooks(self):
+        """Always register hooks for JWT and header injection."""
+        return True
 
     # ---------------------------
     # Event hook: adjust request
@@ -82,27 +54,20 @@ class ProxiedS3Client:
         request: botocore.awsrequest.AWSRequest
         operation_name: e.g. "GetObject", "PutObject", etc.
         """
-        parts = urlsplit(request.url)
+        # Apply host_suffix from base class first
+        super()._before_sign_hook(request, **kwargs)
 
-        # 1) Prefix request path with host_suffix (if set)
-        path = parts.path
-        if self.host_suffix:
-            path = (self.host_suffix.rstrip("/") + "/" +
-                    path.lstrip("/")).replace("//", "/")
-            request.url = urlunsplit(
-                (parts.scheme, parts.netloc, path, parts.query, parts.fragment))
-
-        # Recompute parts so host/path match the (possibly) updated URL
+        # Get updated URL parts after host_suffix application
         parts = urlsplit(request.url)
         method = request.method
         host = parts.netloc
         path_for_jwt = parts.path  # include the prefixed path exactly as sent
 
-        # 2) Build headers (x-objectservice-id + any extra)
+        # Build headers (x-objectservice-id + any extra)
         headers = dict(self.extra_headers)
         headers["x-objectservice-id"] = self.object_service.upper()
 
-        # 3) Add JWT header
+        # Add JWT header
         headers["jwt"] = self._create_jwt(method, host, path_for_jwt)
 
         # Inject/override headers
@@ -135,53 +100,26 @@ class ProxiedS3Client:
     # ---------------------------
     # Convenience helpers
     # ---------------------------
-    def delete_key(self, bucket: str, key: str) -> bool:
-        """
-        Delete object: accept HTTP 200 or 204 as success (mirrors CustomBucket).
-        """
-        try:
-            resp = self.client.delete_object(Bucket=bucket, Key=key)
-            status = resp.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)
-            if status not in (200, 204):
-                raise ClientError(
-                    {"Error": {"Code": str(status), "Message": "Unexpected status"},
-                     "ResponseMetadata": {"HTTPStatusCode": status}},
-                    operation_name="DeleteObject",
-                )
-            return True
-        except ClientError:
-            # Propagate non-success/delete errors
-            raise
-
-    def get_object(self, bucket: str, key: str, **kwargs):
-        return self.client.get_object(Bucket=bucket, Key=key, **kwargs)
-
-    def put_object(self, bucket: str, key: str, body, **kwargs):
-        return self.client.put_object(Bucket=bucket, Key=key, Body=body, **kwargs)
-
-    def list_objects(self, bucket: str, prefix: str = "", **kwargs):
-        return self.client.list_objects_v2(Bucket=bucket, Prefix=prefix, **kwargs)
-
-    def upload_file(self, filename: str, bucket: str, key: str, **kwargs):
-        # Uses s3transfer under the hood (built-in retries/backoff)
-        return self.client.upload_file(filename, bucket, key, ExtraArgs=kwargs or {})
-
-    def raw(self):
-        """Access the underlying boto3 client if you need operations not wrapped here."""
-        return self.client
-    
     def get_bucket(self, bucket_name, validate=False, **kwargs):
         """Return a bucket adapter for boto2-style interface compatibility."""
         return ProxiedBucketAdapter(self, bucket_name)
 
+    # Inherited methods from BaseS3Client:
+    # - delete_key(bucket, path, **kwargs)
+    # - get_object(bucket, key, **kwargs)
+    # - put_object(bucket, key, body, **kwargs)
+    # - list_objects(bucket, prefix="", **kwargs)
+    # - upload_file(filename, bucket, key, **kwargs)
+    # - raw()
+
 
 class ProxiedBucketAdapter:
     """Adapter to provide boto2-style bucket interface for ProxiedS3Client."""
-    
+
     def __init__(self, client, bucket_name):
         self.client = client
         self.name = bucket_name
-    
+
     def get_key(self, key_name, validate=False, **kwargs):
         """Return a key adapter for boto2-style interface compatibility."""
         return ProxiedKeyAdapter(self.client, self.name, key_name)
@@ -189,12 +127,12 @@ class ProxiedBucketAdapter:
 
 class ProxiedKeyAdapter:
     """Adapter to provide boto2-style key interface for ProxiedS3Client."""
-    
+
     def __init__(self, client, bucket_name, key_name):
         self.client = client
         self.bucket = bucket_name
         self.name = key_name
-    
+
     def generate_url(self, expire=0, query_auth=True):
         """Generate a URL for this key."""
         # For the test, we need to construct the URL manually since ProxiedS3Client
