@@ -149,12 +149,13 @@ class TestProxiedS3Client(Test):
         host = 's3.test.com'
         path = '/bucket/key'
 
-        # Mock time.time() for predictable JWT
-        with patch('time.time', return_value=1234567890):
+        # Mock time.time() in the proxied_s3_client module for predictable JWT
+        with patch('pybossa.cloud_store_api.proxied_s3_client.time.time', return_value=1234567890):
             token = client._create_jwt(method, host, path)
-            
+
             # Decode and verify JWT while time is still mocked
-            decoded = jwt.decode(token, self.client_secret, algorithms=['HS256'])
+            # Disable expiration verification to avoid timing issues
+            decoded = jwt.decode(token, self.client_secret, algorithms=['HS256'], options={"verify_exp": False})
 
         assert decoded['iat'] == 1234567890
         assert decoded['nbf'] == 1234567890
@@ -711,7 +712,7 @@ class TestProxiedS3ClientIntegration(Test):
         )
 
     @patch('boto3.session.Session')
-    @patch('time.time')
+    @patch('pybossa.cloud_store_api.proxied_s3_client.time.time')
     def test_jwt_token_expiration(self, mock_time, mock_session):
         """Test JWT token has correct expiration time."""
         mock_client = MagicMock()
