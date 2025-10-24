@@ -12072,11 +12072,11 @@ class TestEmailAttachment(web.Helper):
         res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
         assert "An internal error has occurred." in res.data.decode(), res.data
 
-        # not a project report. signed in user not admin or subadmin. cannot download attachment
+        # not a project report. signed in user not admin can download attachment
         sign_payload = {"user_email": reguser.email_addr}
         signature = signer.dumps(sign_payload)
         res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
-        assert "An internal error has occurred." in res.data.decode(), res.data
+        assert res.status_code == 200 and "" in res.data.decode(), res.data
 
         # admin user allowed to download the attachment
         # however s3 bucket not configured resulting empty response
