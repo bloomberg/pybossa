@@ -110,6 +110,7 @@ from pybossa.cache import delete_memoized
 from sqlalchemy.orm.attributes import flag_modified
 from pybossa.util import admin_or_project_owner, validate_ownership_id
 from pybossa.api.project import ProjectAPI
+from pybossa.redis_lock import get_user_exported_reports
 
 cors_headers = ['Content-Type', 'Authorization']
 
@@ -1849,7 +1850,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             get_users_fullname(page_tasks, lambda task: get_users_completed(task), 'completed_users')
 
         taskbrowse_bookmarks = get_bookmarks(current_user.name, short_name, None, None)
-
+        user_reports = get_user_exported_reports(current_user.id, sentinel.master)
         valid_user_preferences = app_settings.upref_mdata.get_valid_user_preferences() \
             if app_settings.upref_mdata else {}
         language_options = valid_user_preferences.get('languages')
@@ -1882,7 +1883,8 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                     allow_taskrun_edit=allow_taskrun_edit,
                     regular_user=regular_user,
                     admin_subadmin_coowner=admin_subadmin_coowner,
-                    taskbrowse_bookmarks=taskbrowse_bookmarks)
+                    taskbrowse_bookmarks=taskbrowse_bookmarks,
+                    user_reports=user_reports)
 
 
         return handle_content_type(data)

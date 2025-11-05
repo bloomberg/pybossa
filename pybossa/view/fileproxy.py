@@ -85,6 +85,10 @@ def read_encrypted_file_with_signature(store, project_id, bucket, key_name, sign
         raise Forbidden('Invalid signature')
 
     project = get_project_data(project_id)
+    if not project:
+        current_app.logger.exception('Invalid project id {}.'.format(project_id))
+        raise BadRequest('Invalid Project')
+
     timeout = project['info'].get('timeout', ContributionsGuard.STAMP_TTL)
 
     payload = signer.loads(signature, max_age=timeout)
@@ -192,8 +196,7 @@ def encrypted_task_payload(project_id, task_id):
 
     project = get_project_data(project_id)
     if not project:
-        current_app.logger.exception(
-            'Invalid project id {}.'.format(project_id, task_id))
+        current_app.logger.exception('Invalid project id {}.'.format(project_id))
         raise BadRequest('Invalid Project')
 
     timeout = project['info'].get('timeout', ContributionsGuard.STAMP_TTL)

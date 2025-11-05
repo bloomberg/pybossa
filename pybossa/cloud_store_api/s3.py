@@ -267,6 +267,10 @@ def upload_email_attachment(content, filename, user_email, project_id=None):
 
     # generate signature for authorised access to the attachment
     from pybossa.core import signer
+    from pybossa.core import sentinel
+    from pybossa.redis_lock import register_user_exported_report
+    from pybossa.cache.users import get_user_by_email
+
     payload = {"project_id": project_id} if project_id else {}
     payload["user_email"] = user_email
     signature = signer.dumps(payload)
@@ -293,6 +297,9 @@ def upload_email_attachment(content, filename, user_email, project_id=None):
     server_url = app.config.get('SERVER_URL')
     url = f"{server_url}/attachment/{signature}/{timestamp}-{secure_file_name}"
     app.logger.info("upload email attachment url %s", url)
+    user_id = get_user_by_email(user_email).id
+    cache_info = register_user_exported_report(user_id, url, sentinel.master)
+    app.logger.info("Cache updated for exported report %s", cache_info)
     return url
 
 

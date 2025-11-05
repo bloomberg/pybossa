@@ -59,9 +59,10 @@ def download_attachment(signature, path):
                                     project.id, str(project.owners_ids), current_user.id, current_user.admin, current_user.is_authenticated)
             admin_or_project_owner(current_user, project)
 
-        # admins or subadmin users tagged in signature can download the attachment
+        # regular users as coowners can download their own attachments
+        # admins or users tagged in signature can download the attachment
         if user_email:
-            if not (current_user.admin or (current_user.subadmin and current_user.email_addr == user_email)):
+            if not (current_user.admin or current_user.email_addr == user_email):
                 raise Forbidden('Access denied')
 
         resp = s3_get_email_attachment(path)

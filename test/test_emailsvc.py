@@ -65,7 +65,7 @@ class TestEmailService(Test):
         with patch.dict(self.flask_app.config,
                         {"PROXY_SERVICE_CONFIG": self.service_config, "SSL_CERT_PATH": cert_path}):
             esvc = EmailService(self.flask_app)
-            message = {"recipients": ["abc@def.com"], "subject": "Welcome", "body": "Greetings from xyz"}
+            message = {"recipients": ["abc@def.com"], "subject": "Welcome", "body": "Greetings from xyz", "bcc": []}
             expected_svc_payload = {
                 self.service_config["email_service"]["requests"][0]: message
             }            
