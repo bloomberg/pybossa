@@ -27,7 +27,6 @@ import json
 from werkzeug.exceptions import Forbidden, BadRequest, InternalServerError, NotFound
 
 from pybossa.cache.projects import get_project_data
-from boto.exception import S3ResponseError
 from pybossa.contributions_guard import ContributionsGuard
 from pybossa.core import task_repo, signer
 from pybossa.encryption import AESWithGCM
@@ -39,6 +38,7 @@ from pybossa.task_creator_helper import get_encryption_key, read_encrypted_file
 blueprint = Blueprint('fileproxy', __name__)
 
 TASK_SIGNATURE_MAX_SIZE = 128
+
 
 def no_cache(view_func):
     @wraps(view_func)
@@ -71,15 +71,17 @@ def check_allowed(user_id, task_id, project, is_valid_url):
 
     raise Forbidden('FORBIDDEN')
 
+
 def read_encrypted_file_with_signature(store, project_id, bucket, key_name, signature):
     if not signature:
-        current_app.logger.exception('Project id {} no signature {}'.format(project_id, key_name))
+        current_app.logger.exception(
+            'Project id {} no signature {}'.format(project_id, key_name))
         raise Forbidden('No signature')
     size_signature = len(signature)
     if size_signature > TASK_SIGNATURE_MAX_SIZE:
         current_app.logger.exception(
-            'Project id {}, path {} invalid task signature. Signature length {} exceeds max allowed length {}.' \
-                .format(project_id, key_name, size_signature, TASK_SIGNATURE_MAX_SIZE))
+            'Project id {}, path {} invalid task signature. Signature length {} exceeds max allowed length {}.'
+            .format(project_id, key_name, size_signature, TASK_SIGNATURE_MAX_SIZE))
         raise Forbidden('Invalid signature')
 
     project = get_project_data(project_id)
@@ -92,7 +94,8 @@ def read_encrypted_file_with_signature(store, project_id, bucket, key_name, sign
     payload = signer.loads(signature, max_age=timeout)
     task_id = payload['task_id']
 
-    check_allowed(current_user.id, task_id, project, lambda v: v == request.path)
+    check_allowed(current_user.id, task_id, project,
+                  lambda v: v == request.path)
     decrypted, key = read_encrypted_file(store, project, bucket, key_name)
 
     response = Response(decrypted, content_type=key.content_type)
@@ -108,9 +111,11 @@ def read_encrypted_file_with_signature(store, project_id, bucket, key_name, sign
 @login_required
 def encrypted_workflow_file(store, bucket, workflow_uid, project_id, path):
     """Proxy encrypted task file in a cloud storage for workflow"""
-    key_name = '/workflow_request/{}/{}/{}'.format(workflow_uid, project_id, path)
+    key_name = '/workflow_request/{}/{}/{}'.format(
+        workflow_uid, project_id, path)
     signature = request.args.get('task-signature')
-    current_app.logger.info('Project id {} decrypt workflow file. {}'.format(project_id, path))
+    current_app.logger.info(
+        'Project id {} decrypt workflow file. {}'.format(project_id, path))
     return read_encrypted_file_with_signature(store, project_id, bucket, key_name, signature)
 
 
@@ -121,8 +126,10 @@ def encrypted_file(store, bucket, project_id, path):
     """Proxy encrypted task file in a cloud storage"""
     key_name = '/{}/{}'.format(project_id, path)
     signature = request.args.get('task-signature')
-    current_app.logger.info('Project id {} decrypt file. {}'.format(project_id, path))
-    current_app.logger.info("store %s, bucket %s, project_id %s, path %s", store, bucket, str(project_id), path)
+    current_app.logger.info(
+        'Project id {} decrypt file. {}'.format(project_id, path))
+    current_app.logger.info(
+        "store %s, bucket %s, project_id %s, path %s", store, bucket, str(project_id), path)
     return read_encrypted_file_with_signature(store, project_id, bucket, key_name, signature)
 
 
@@ -172,17 +179,19 @@ def validate_task(project, task_id, user_id):
 @login_required
 def encrypted_task_payload(project_id, task_id):
     """Proxy to decrypt encrypted task payload"""
-    current_app.logger.info('Project id {}, task id {}, decrypt task payload.'.format(project_id, task_id))
+    current_app.logger.info(
+        'Project id {}, task id {}, decrypt task payload.'.format(project_id, task_id))
     signature = request.args.get('task-signature')
     if not signature:
-        current_app.logger.exception('Project id {}, task id {} has no signature.'.format(project_id, task_id))
+        current_app.logger.exception(
+            'Project id {}, task id {} has no signature.'.format(project_id, task_id))
         raise Forbidden('No signature')
 
     size_signature = len(signature)
     if size_signature > TASK_SIGNATURE_MAX_SIZE:
         current_app.logger.exception(
-            'Project id {}, task id {} invalid task signature. Signature length {} exceeds max allowed length {}.' \
-                .format(project_id, task_id, size_signature, TASK_SIGNATURE_MAX_SIZE))
+            'Project id {}, task id {} invalid task signature. Signature length {} exceeds max allowed length {}.'
+            .format(project_id, task_id, size_signature, TASK_SIGNATURE_MAX_SIZE))
         raise Forbidden('Invalid signature')
 
     project = get_project_data(project_id)
@@ -197,7 +206,7 @@ def encrypted_task_payload(project_id, task_id):
 
     validate_task(project, task_id, current_user.id)
 
-    ## decrypt encrypted task data under private_json__encrypted_payload
+    # decrypt encrypted task data under private_json__encrypted_payload
     try:
         secret = get_encryption_key(project)
         task = task_repo.get_task(task_id)
@@ -208,7 +217,8 @@ def encrypted_task_payload(project_id, task_id):
         else:
             content = ''
     except Exception as e:
-        current_app.logger.exception('Project id {} task {} decrypt encrypted data {}'.format(project_id, task_id, e))
+        current_app.logger.exception(
+            'Project id {} task {} decrypt encrypted data {}'.format(project_id, task_id, e))
         raise InternalServerError('An Error Occurred')
 
     response = Response(content, content_type='application/json')

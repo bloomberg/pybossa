@@ -195,7 +195,7 @@ class BaseConnection(ABC):
                     "%s: %s, key %s. http status %d",
                     self.__class__.__name__,
                     str(e),
-                    err_resp.get("Key", path),
+                    err_resp.get("Key", target_key),
                     http_status,
                 )
             raise

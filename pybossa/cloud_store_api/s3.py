@@ -3,7 +3,7 @@ import os
 import re
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlparse
-import boto
+from botocore.exceptions import ClientError
 from flask import current_app as app
 from werkzeug.utils import secure_filename
 import magic
@@ -45,7 +45,8 @@ DEFAULT_CONN = 'S3_DEFAULT'
 def check_type(filename):
     mime_type = magic.from_file(filename, mime=True)
     if mime_type not in allowed_mime_types:
-        raise BadRequest('File type not supported for {}: {}'.format(filename, mime_type))
+        raise BadRequest(
+            'File type not supported for {}: {}'.format(filename, mime_type))
 
 
 def validate_directory(directory_name):
@@ -78,8 +79,8 @@ def s3_upload_from_string(s3_bucket, string, filename, headers=None,
     tmp_file = tmp_file_from_string(string)
     headers = headers or {}
     return s3_upload_tmp_file(
-            s3_bucket, tmp_file, filename, headers, directory, file_type_check,
-            return_key_only, conn_name, with_encryption, upload_root_dir)
+        s3_bucket, tmp_file, filename, headers, directory, file_type_check,
+        return_key_only, conn_name, with_encryption, upload_root_dir)
 
 
 def s3_upload_file_storage(s3_bucket, source_file, headers=None, directory='',
@@ -102,8 +103,8 @@ def s3_upload_file_storage(s3_bucket, source_file, headers=None, directory='',
 
     upload_root_dir = app.config.get('S3_UPLOAD_DIRECTORY')
     return s3_upload_tmp_file(
-            s3_bucket, tmp_file, filename, headers, directory, file_type_check,
-            return_key_only, conn_name, with_encryption, upload_root_dir)
+        s3_bucket, tmp_file, filename, headers, directory, file_type_check,
+        return_key_only, conn_name, with_encryption, upload_root_dir)
 
 
 def s3_upload_tmp_file(s3_bucket, tmp_file, filename,
@@ -137,7 +138,8 @@ def s3_upload_tmp_file(s3_bucket, tmp_file, filename,
         meta_url = url
         if bcosv2_prod_util_url and url.startswith(bcosv2_prod_util_url):
             meta_url = url.replace("-util", "")
-            app.logger.info("bcosv2 url paths. uploaded path %s, metadata path %s", url, meta_url)
+            app.logger.info(
+                "bcosv2 url paths. uploaded path %s, metadata path %s", url, meta_url)
 
     finally:
         os.unlink(tmp_file.name)
@@ -168,12 +170,14 @@ def s3_upload_file(s3_bucket, source_file, target_file_name,
     conn = create_connection(**conn_kwargs)
     bucket = conn.get_bucket(s3_bucket, validate=False)
 
-    assert(len(upload_key) < 256)
+    assert (len(upload_key) < 256)
     key = bucket.new_key(upload_key)
 
     key.set_contents_from_file(
-        source_file, headers=headers,
-        policy='bucket-owner-full-control')
+        source_file, ExtraArgs={
+            'ACL': 'bucket-owner-full-control',
+            **headers
+        })
 
     if return_key_only:
         return key.name
@@ -202,13 +206,14 @@ def get_file_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN, decrypt=False):
 
 
 def get_content_and_key_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN,
-        decrypt=False, secret=None):
+                                decrypt=False, secret=None):
     begin_time = perf_counter()
     _, key = get_s3_bucket_key(s3_bucket, path, conn_name)
     content = key.get_contents_as_string()
     duration = perf_counter() - begin_time
     file_path = f"{s3_bucket}/{path}"
-    app.logger.info("get_content_and_key_from_s3. Load file contents %s duration %f seconds", file_path, duration)
+    app.logger.info(
+        "get_content_and_key_from_s3. Load file contents %s duration %f seconds", file_path, duration)
     begin_time = perf_counter()
     if decrypt:
         if not secret:
@@ -216,15 +221,18 @@ def get_content_and_key_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN,
         cipher = AESWithGCM(secret)
         content = cipher.decrypt(content)
         duration = perf_counter() - begin_time
-        app.logger.info("get_content_and_key_from_s3. file %s decryption duration %f seconds", file_path, duration)
+        app.logger.info(
+            "get_content_and_key_from_s3. file %s decryption duration %f seconds", file_path, duration)
     else:
-        app.logger.info("get_content_and_key_from_s3. file %s no decryption duration %f seconds", file_path, duration)
+        app.logger.info(
+            "get_content_and_key_from_s3. file %s no decryption duration %f seconds", file_path, duration)
     try:
         if type(content) == bytes:
             content = content.decode()
             app.logger.info("get_content_and_key_from_s3. contents decoded")
     except (UnicodeDecodeError, AttributeError) as e:
-        app.logger.info("get_content_and_key_from_s3. file %s exception %s", file_path, str(e))
+        app.logger.info(
+            "get_content_and_key_from_s3. file %s exception %s", file_path, str(e))
         pass
     return content, key
 
@@ -238,19 +246,20 @@ def delete_file_from_s3(s3_bucket, s3_url, conn_name=DEFAULT_CONN):
     try:
         bucket, key = get_s3_bucket_key(s3_bucket, s3_url, conn_name)
         bucket.delete_key(key.name, version_id=key.version_id, headers=headers)
-    except boto.exception.S3ResponseError:
+    except ClientError:
         app.logger.exception('S3: unable to delete file {0}'.format(s3_url))
 
 
 def upload_json_data(json_data, upload_path, file_name, encryption,
-    conn_name, upload_root_dir=None, bucket=None):
+                     conn_name, upload_root_dir=None, bucket=None):
     content = json.dumps(json_data, ensure_ascii=False)
     if not bucket:
-        bucket = app.config.get("S3_BUCKET_V2") if app.config.get("S3_CONN_TYPE_V2") else app.config.get("S3_BUCKET")
+        bucket = app.config.get("S3_BUCKET_V2") if app.config.get(
+            "S3_CONN_TYPE_V2") else app.config.get("S3_BUCKET")
 
     return s3_upload_from_string(bucket, content, file_name, file_type_check=False,
-        directory=upload_path, conn_name=conn_name,
-        with_encryption=encryption, upload_root_dir=upload_root_dir)
+                                 directory=upload_path, conn_name=conn_name,
+                                 with_encryption=encryption, upload_root_dir=upload_root_dir)
 
 
 def upload_email_attachment(content, filename, user_email, project_id=None):
@@ -309,10 +318,11 @@ def s3_get_email_attachment(path):
 
     conn_name = "S3_TASK_REQUEST_V2"
     s3_path = f"attachments/{path}"
-    content, key = get_content_and_key_from_s3(s3_bucket=bucket, path=s3_path, conn_name=conn_name)
+    content, key = get_content_and_key_from_s3(
+        s3_bucket=bucket, path=s3_path, conn_name=conn_name)
     if content and key:
         app.logger.info("email attachment path %s, s3 file path %s, key name %s, key content_type %s",
-                path, s3_path, key.name, key.content_type)
+                        path, s3_path, key.name, key.content_type)
         response["name"] = key.name
         response["type"] = key.content_type
         response["content"] = content

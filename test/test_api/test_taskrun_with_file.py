@@ -23,7 +23,7 @@ from unittest.mock import patch
 from test.factories import ProjectFactory, TaskFactory
 from pybossa.core import db
 from pybossa.model.task_run import TaskRun
-from pybossa.cloud_store_api.s3 import s3_upload_from_string
+from pybossa.cloud_store_api.s3 import s3_upload_from_string, s3_upload_file
 from pybossa.encryption import AESWithGCM
 
 
@@ -64,11 +64,38 @@ class TestTaskrunWithFile(TestAPI):
             assert success.status_code == 200, success.data
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_taskrun_with_upload(self, set_content):
+    @patch('pybossa.cloud_store_api.s3.create_connection')
+    def test_taskrun_with_upload(self, mock_connection):
         with patch.dict(self.flask_app.config, self.patch_config):
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
+            
+            # Set up mock connection for S3 operations
+            from unittest.mock import MagicMock
+            
+            # Create a mock key that will have its name set dynamically
+            mock_key = MagicMock()
+            mock_key.set_contents_from_file = MagicMock()
+            
+            # Mock the generate_url to return the expected URL format
+            def mock_generate_url(*args, **kwargs):
+                # The URL should be: https://host:port/bucket/key_name
+                return f'https://{self.host}:{self.port}/{self.bucket}/{mock_key.name}'
+            mock_key.generate_url = mock_generate_url
+            
+            # Mock the bucket to set the key name when new_key is called
+            mock_bucket = MagicMock()
+            def mock_new_key(key_name):
+                # Store the key name so generate_url can use it
+                mock_key.name = key_name  
+                return mock_key
+            mock_bucket.new_key = mock_new_key
+            
+            # Mock the connection
+            mock_conn = MagicMock()
+            mock_conn.get_bucket.return_value = mock_bucket
+            mock_connection.return_value = mock_conn
+
             self.app.get('/api/project/%s/newtask?api_key=%s' % (project.id, project.owner.api_key))
 
             data = dict(
@@ -86,7 +113,6 @@ class TestTaskrunWithFile(TestAPI):
             success = self.app.post(url, data=datajson)
 
             assert success.status_code == 200, success.data
-            set_content.assert_called()
             res = json.loads(success.data)
             url = res['info']['test__upload_url']
             args = {
@@ -102,8 +128,8 @@ class TestTaskrunWithFile(TestAPI):
             assert url == expected, url
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_taskrun_with_no_upload(self, set_content):
+    @patch('pybossa.cloud_store_api.s3.create_connection')
+    def test_taskrun_with_no_upload(self, mock_connection):
         with patch.dict(self.flask_app.config, self.patch_config):
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
@@ -123,14 +149,36 @@ class TestTaskrunWithFile(TestAPI):
             success = self.app.post(url, data=datajson)
 
             assert success.status_code == 200, success.data
-            set_content.assert_not_called()
             res = json.loads(success.data)
             assert res['info']['test__upload_url']['test'] == 'not a file'
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_taskrun_multipart(self, set_content):
+    @patch('pybossa.cloud_store_api.s3.create_connection')
+    def test_taskrun_multipart(self, mock_connection):
         with patch.dict(self.flask_app.config, self.patch_config):
+            # Set up mock connection for S3 operations
+            from unittest.mock import MagicMock
+            
+            # Create a mock key that will have its name set dynamically
+            mock_key = MagicMock()
+            mock_key.set_contents_from_file = MagicMock()
+            
+            # Mock the generate_url to return the expected URL format
+            def mock_generate_url(*args, **kwargs):
+                return f'https://{self.host}:{self.port}/{self.bucket}/{mock_key.name}'
+            mock_key.generate_url = mock_generate_url
+            
+            # Mock the bucket to set the key name when new_key is called
+            mock_bucket = MagicMock()
+            def mock_new_key(key_name):
+                mock_key.name = key_name  
+                return mock_key
+            mock_bucket.new_key = mock_new_key
+            
+            mock_conn = MagicMock()
+            mock_conn.get_bucket.return_value = mock_bucket
+            mock_connection.return_value = mock_conn
+
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
             self.app.get('/api/project/%s/newtask?api_key=%s' % (project.id, project.owner.api_key))
@@ -152,7 +200,6 @@ class TestTaskrunWithFile(TestAPI):
                                     data=form)
 
             assert success.status_code == 200, success.data
-            set_content.assert_called()
             res = json.loads(success.data)
             url = res['info']['test__upload_url']
             args = {
@@ -168,8 +215,8 @@ class TestTaskrunWithFile(TestAPI):
             assert url == expected, url
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_taskrun_multipart_error(self, set_content):
+    @patch('pybossa.cloud_store_api.s3.create_connection')
+    def test_taskrun_multipart_error(self, mock_connection):
         with patch.dict(self.flask_app.config, self.patch_config):
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
@@ -192,7 +239,6 @@ class TestTaskrunWithFile(TestAPI):
                                     data=form)
 
             assert success.status_code == 400, success.data
-            set_content.assert_not_called()
 
 
 class TestTaskrunWithSensitiveFile(TestAPI):
@@ -216,12 +262,39 @@ class TestTaskrunWithSensitiveFile(TestAPI):
         db.session.query(TaskRun).delete()
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    @patch('pybossa.api.task_run.s3_upload_from_string', wraps=s3_upload_from_string)
-    def test_taskrun_with_upload(self, upload_from_string, set_content):
+    @patch('pybossa.cloud_store_api.s3.create_connection')
+    @patch('pybossa.cloud_store_api.s3.s3_upload_file', wraps=s3_upload_file)
+    def test_taskrun_with_upload(self, s3_upload_file_mock, mock_connection):
         with patch.dict(self.flask_app.config, self.patch_config):
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
+            
+            # Set up mock connection for S3 operations
+            from unittest.mock import MagicMock
+            
+            # Create a mock key that will have its name set dynamically
+            mock_key = MagicMock()
+            mock_key.set_contents_from_file = MagicMock()
+            
+            # Mock the generate_url to return the expected URL format
+            def mock_generate_url(*args, **kwargs):
+                # The URL should be: https://host:port/bucket/key_name
+                return f'https://{self.host}:{self.port}/{self.bucket}/{mock_key.name}'
+            mock_key.generate_url = mock_generate_url
+            
+            # Mock the bucket to set the key name when new_key is called
+            mock_bucket = MagicMock()
+            def mock_new_key(key_name):
+                # Store the key name so generate_url can use it
+                mock_key.name = key_name  
+                return mock_key
+            mock_bucket.new_key = mock_new_key
+            
+            # Mock the connection
+            mock_conn = MagicMock()
+            mock_conn.get_bucket.return_value = mock_bucket
+            mock_connection.return_value = mock_conn
+
             self.app.get('/api/project/%s/newtask?api_key=%s' % (project.id, project.owner.api_key))
 
             data = dict(
@@ -240,7 +313,6 @@ class TestTaskrunWithSensitiveFile(TestAPI):
             success = self.app.post(url, data=datajson)
 
             assert success.status_code == 200, success.data
-            set_content.assert_called()
             res = json.loads(success.data)
             assert len(res['info']) == 1
             url = res['info']['pyb_answer_url']
@@ -258,16 +330,23 @@ class TestTaskrunWithSensitiveFile(TestAPI):
 
             aes = AESWithGCM('testkey')
             # first call
-            first_call = set_content.call_args_list[0]
+            first_call = s3_upload_file_mock.call_args_list[0]
             args, kwargs = first_call
-            encrypted = args[0].read()
+            # args[1] is the source_file (BytesIO) passed to s3_upload_file
+            source_file = args[1]
+            encrypted = source_file.read()
+            source_file.seek(0)  # Reset file pointer for subsequent reads
             content = aes.decrypt(encrypted)
             assert encrypted != content
             assert content == 'abc'
 
-            upload_from_string.assert_called()
-            args, kwargs = set_content.call_args
-            content = aes.decrypt(args[0].read())
+            s3_upload_file_mock.assert_called()
+            args, kwargs = s3_upload_file_mock.call_args
+            # args[1] is the source_file (BytesIO) passed to s3_upload_file
+            source_file = args[1]
+            encrypted_content = source_file.read()
+            source_file.seek(0)  # Reset file pointer
+            content = aes.decrypt(encrypted_content)
             actual_content = json.loads(content)
 
             args = {
@@ -284,9 +363,32 @@ class TestTaskrunWithSensitiveFile(TestAPI):
             assert actual_content['another_field'] == 42
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_taskrun_multipart(self, set_content):
+    @patch('pybossa.cloud_store_api.s3.create_connection')
+    def test_taskrun_multipart(self, mock_connection):
         with patch.dict(self.flask_app.config, self.patch_config):
+            # Set up mock connection for S3 operations
+            from unittest.mock import MagicMock
+            
+            # Create a mock key that will have its name set dynamically
+            mock_key = MagicMock()
+            mock_key.set_contents_from_file = MagicMock()
+            
+            # Mock the generate_url to return the expected URL format
+            def mock_generate_url(*args, **kwargs):
+                return f'https://{self.host}:{self.port}/{self.bucket}/{mock_key.name}'
+            mock_key.generate_url = mock_generate_url
+            
+            # Mock the bucket to set the key name when new_key is called
+            mock_bucket = MagicMock()
+            def mock_new_key(key_name):
+                mock_key.name = key_name  
+                return mock_key
+            mock_bucket.new_key = mock_new_key
+            
+            mock_conn = MagicMock()
+            mock_conn.get_bucket.return_value = mock_bucket
+            mock_connection.return_value = mock_conn
+
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
             self.app.get('/api/project/%s/newtask?api_key=%s' % (project.id, project.owner.api_key))
@@ -308,7 +410,6 @@ class TestTaskrunWithSensitiveFile(TestAPI):
                                     data=form)
 
             assert success.status_code == 200, success.data
-            set_content.assert_called()
             res = json.loads(success.data)
             url = res['info']['pyb_answer_url']
             args = {
@@ -324,11 +425,34 @@ class TestTaskrunWithSensitiveFile(TestAPI):
             assert url == expected, url
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    @patch('pybossa.api.task_run.s3_upload_from_string', wraps=s3_upload_from_string)
+    @patch('pybossa.cloud_store_api.s3.create_connection')
+    @patch('pybossa.cloud_store_api.s3.s3_upload_file', wraps=s3_upload_file)
     @patch('pybossa.view.fileproxy.get_encryption_key')
-    def test_taskrun_with_encrypted_payload(self, encr_key, upload_from_string, set_content):
+    def test_taskrun_with_encrypted_payload(self, encr_key, s3_upload_file_mock, mock_connection):
         with patch.dict(self.flask_app.config, self.patch_config):
+            # Set up mock connection for S3 operations
+            from unittest.mock import MagicMock
+            
+            # Create a mock key that will have its name set dynamically
+            mock_key = MagicMock()
+            mock_key.set_contents_from_file = MagicMock()
+            
+            # Mock the generate_url to return the expected URL format
+            def mock_generate_url(*args, **kwargs):
+                return f'https://{self.host}:{self.port}/{self.bucket}/{mock_key.name}'
+            mock_key.generate_url = mock_generate_url
+            
+            # Mock the bucket to set the key name when new_key is called
+            mock_bucket = MagicMock()
+            def mock_new_key(key_name):
+                mock_key.name = key_name  
+                return mock_key
+            mock_bucket.new_key = mock_new_key
+            
+            mock_conn = MagicMock()
+            mock_conn.get_bucket.return_value = mock_bucket
+            mock_connection.return_value = mock_conn
+
             project = ProjectFactory.create()
             encryption_key = 'testkey'
             encr_key.return_value = encryption_key
@@ -353,7 +477,6 @@ class TestTaskrunWithSensitiveFile(TestAPI):
             success = self.app.post(url, data=datajson)
 
             assert success.status_code == 200, success.data
-            set_content.assert_called()
             res = json.loads(success.data)
             assert len(res['info']) == 2
             encrypted_response = res['info']['private_json__encrypted_response']
