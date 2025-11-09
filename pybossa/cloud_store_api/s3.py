@@ -3,7 +3,7 @@ import os
 import re
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlparse
-import boto
+from botocore.exceptions import ClientError
 from flask import current_app as app
 from werkzeug.utils import secure_filename
 import magic
@@ -238,7 +238,7 @@ def delete_file_from_s3(s3_bucket, s3_url, conn_name=DEFAULT_CONN):
     try:
         bucket, key = get_s3_bucket_key(s3_bucket, s3_url, conn_name)
         bucket.delete_key(key.name, version_id=key.version_id, headers=headers)
-    except boto.exception.S3ResponseError:
+    except ClientError:
         app.logger.exception('S3: unable to delete file {0}'.format(s3_url))
 
 

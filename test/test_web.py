@@ -8485,9 +8485,12 @@ class TestWeb(web.Helper):
         assert not t.expiration
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_task_gold_with_files_in_form(self, set_content):
+    @patch('boto3.session.Session.client')
+    def test_task_gold_with_files_in_form(self, mock_session_client):
         """Test WEB when making a task gold with files"""
+        # Mock S3 client with proper URL return
+        mock_client = MagicMock()
+        mock_session_client.return_value = mock_client
 
         host = 's3.storage.com'
         bucket = 'test_bucket'
@@ -8503,6 +8506,10 @@ class TestWeb(web.Helper):
         with patch.dict(self.flask_app.config, patch_config):
             project = ProjectFactory.create()
             task = TaskFactory.create(project=project)
+            
+            # Configure mock to return the expected URL structure dynamically
+            expected_url = f'https://{host}:443/{bucket}/{project.id}/{task.id}/{project.owner.id}/hello.txt'
+            mock_client.generate_presigned_url.return_value = expected_url
 
             data = dict(
                 project_id=project.id,
@@ -8521,7 +8528,8 @@ class TestWeb(web.Helper):
                                         data=form)
 
             assert success.status_code == 200, success.data
-            set_content.s()
+            # Verify S3 upload was called
+            mock_client.put_object.assert_called()
             res = json.loads(success.data)
 
             t = task_repo.get_task(task.id)
