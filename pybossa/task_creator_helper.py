@@ -87,7 +87,7 @@ def upload_files_priv(task, project_id, data, file_name):
 
     hash_contents = {
         "project_id": project_id,
-        "task_info": task.info,
+        "task_info": task.info if hasattr(task, "info") else {},
         "data": data, # could be gold answers / private_fields
         "creation_timestamp": int(time.time() * 1000000)  # microseconds # ensure uniqueness for new tasks
     }
