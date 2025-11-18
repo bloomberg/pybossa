@@ -15,22 +15,20 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
+import hashlib
 import json
-from unittest.mock import patch, call
+from test import db, with_context
+from test.factories import (ExternalUidTaskRunFactory, ProjectFactory,
+                            TaskFactory, TaskRunFactory, UserFactory)
+from test.helper.gig_helper import make_admin, make_subadmin
+from test.test_api import TestAPI
+from unittest.mock import call, patch
 
 from nose.tools import assert_equal
 
 from pybossa.api.task import TaskAPI
-from pybossa.repositories import ProjectRepository
-from pybossa.repositories import ResultRepository
-from pybossa.repositories import TaskRepository
-from test import db, with_context
-from test.factories import ExternalUidTaskRunFactory
-from test.factories import ProjectFactory, TaskFactory, TaskRunFactory, \
-    UserFactory
-from test.helper.gig_helper import make_subadmin, make_admin
-from test.test_api import TestAPI
-import hashlib
+from pybossa.repositories import (ProjectRepository, ResultRepository,
+                                  TaskRepository)
 
 project_repo = ProjectRepository(db)
 task_repo = TaskRepository(db)
@@ -101,6 +99,53 @@ class TestTaskAPI(TestAPI):
         task_ids = [task['id'] for task in data]
         err_msg = 'This task should not be in the list as the user participated.'
         assert task_orig.id not in task_ids, err_msg
+
+
+    @with_context
+    @patch('pybossa.api.task.TaskAPI._verify_auth')
+    @patch('pybossa.api.task.read_encrypted_file_with_signature')
+    def test_task_query_list_project_ids_with_tasks_with_info(self, mock_read_encrypted, auth):
+        """Get a list of tasks using a list of project_ids."""
+
+        from flask import current_app
+
+        # Mock the encrypted file read function to return test data
+        mock_read_encrypted.return_value = {"decrypted_data": "test_content"}, "sample_key"
+
+        with patch.dict(current_app.config, {'ENABLE_ENCRYPTION': True}):
+            auth.return_value = True
+            projects = ProjectFactory.create_batch(3)
+            tasks = []
+            for project in projects:
+                tmp = TaskFactory.create_batch(2, project=project)
+                for t in tmp:
+                    t.info = {
+                        "private_json__upload_url": "/fileproxy/encrypted/store/bucket/%s/%s" % (project.id, t.id)
+                    }
+                    tasks.append(t)
+
+            user = UserFactory.create()
+            project_ids = [project.id for project in projects]
+            url = '/api/task?all=1&project_id=%s&limit=100&api_key=%s' % (project_ids, user.api_key)
+            res = self.app.get(url)
+            data = json.loads(res.data)
+
+            assert len(data) == 3 * 2, len(data)
+            for task in data:
+                assert task['project_id'] in project_ids
+            task_project_ids = list(set([task['project_id'] for task in data]))
+            assert sorted(project_ids) == sorted(task_project_ids)
+
+            # more filters
+            res = self.app.get(url + '&orderby=created&desc=true')
+            data = json.loads(res.data)
+            assert data[0]['id'] == tasks[-1].id
+
+            task_orig = tasks[0]
+            task_run = TaskRunFactory.create(task=task_orig, user=user)
+
+            project_ids = [project.id for project in projects]
+            url = '/api/task?project_id=%s&limit=100&participated=true&api_key=%s' % (project_ids, user.api_key)
 
     @with_context
     @patch('pybossa.api.task.TaskAPI._verify_auth')
