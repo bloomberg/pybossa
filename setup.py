@@ -7,7 +7,6 @@ requirements = [
     "Babel==2.9.1",
     "beautifulsoup4==4.10.0",
     "blinker==1.4",
-    "boto==2.49.0",
     "boto3==1.28.62",
     "botocore==1.31.62",
     "cachelib==0.3.0",

@@ -24,7 +24,7 @@ from flask import url_for
 import json
 import requests
 from six import string_types
-from boto.exception import S3ResponseError
+from botocore.exceptions import ClientError
 from werkzeug.exceptions import InternalServerError, NotFound
 from pybossa.util import get_time_plus_delta_ts
 from pybossa.cloud_store_api.s3 import upload_json_data, get_content_from_s3
@@ -183,9 +183,10 @@ def read_encrypted_file(store, project, bucket, key_name):
     try:
         decrypted, key = get_content_and_key_from_s3(
             bucket, key_name, conn_name, decrypt=secret, secret=secret)
-    except S3ResponseError as e:
+    except ClientError as e:
         current_app.logger.exception('Project id {} get task file {} {}'.format(project.id, key_name, e))
-        if e.error_code == 'NoSuchKey':
+        error_code = e.response.get('Error', {}).get('Code')
+        if error_code == 'NoSuchKey':
             raise NotFound('File Does Not Exist')
         else:
             raise InternalServerError('An Error Occurred')

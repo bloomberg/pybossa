@@ -3,7 +3,7 @@ import os
 import re
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlparse
-import boto
+from botocore.exceptions import ClientError
 from flask import current_app as app
 from werkzeug.utils import secure_filename
 import magic
@@ -11,9 +11,7 @@ from werkzeug.exceptions import BadRequest
 from pybossa.cloud_store_api.connection import create_connection
 from pybossa.encryption import AESWithGCM
 import json
-from time import perf_counter
 import time
-from datetime import datetime, timedelta
 
 
 allowed_mime_types = ['application/pdf',
@@ -203,22 +201,14 @@ def get_file_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN, decrypt=False):
 
 def get_content_and_key_from_s3(s3_bucket, path, conn_name=DEFAULT_CONN,
         decrypt=False, secret=None):
-    begin_time = perf_counter()
     _, key = get_s3_bucket_key(s3_bucket, path, conn_name)
     content = key.get_contents_as_string()
-    duration = perf_counter() - begin_time
     file_path = f"{s3_bucket}/{path}"
-    app.logger.info("get_content_and_key_from_s3. Load file contents %s duration %f seconds", file_path, duration)
-    begin_time = perf_counter()
     if decrypt:
         if not secret:
             secret = app.config.get('FILE_ENCRYPTION_KEY')
         cipher = AESWithGCM(secret)
         content = cipher.decrypt(content)
-        duration = perf_counter() - begin_time
-        app.logger.info("get_content_and_key_from_s3. file %s decryption duration %f seconds", file_path, duration)
-    else:
-        app.logger.info("get_content_and_key_from_s3. file %s no decryption duration %f seconds", file_path, duration)
     try:
         if type(content) == bytes:
             content = content.decode()
@@ -238,7 +228,7 @@ def delete_file_from_s3(s3_bucket, s3_url, conn_name=DEFAULT_CONN):
     try:
         bucket, key = get_s3_bucket_key(s3_bucket, s3_url, conn_name)
         bucket.delete_key(key.name, version_id=key.version_id, headers=headers)
-    except boto.exception.S3ResponseError:
+    except ClientError as e:
         app.logger.exception('S3: unable to delete file {0}'.format(s3_url))
 
 

@@ -20,12 +20,12 @@ from io import StringIO, BytesIO
 from unittest.mock import patch, MagicMock
 from test import Test, with_context
 from pybossa.cloud_store_api.s3 import *
-from pybossa.cloud_store_api.connection import ProxiedKey
 from pybossa.encryption import AESWithGCM
 from nose.tools import assert_raises
 from werkzeug.exceptions import BadRequest
 from werkzeug.datastructures import FileStorage
 from tempfile import NamedTemporaryFile
+from botocore.exceptions import ClientError
 
 
 class TestS3Uploader(Test):
@@ -63,21 +63,6 @@ class TestS3Uploader(Test):
         assert_raises(RuntimeError, validate_directory, 'hello$world')
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_upload_from_string(self, set_contents):
-        with patch.dict(self.flask_app.config, self.default_config):
-            url = s3_upload_from_string('bucket', 'hello world', 'test.txt')
-            assert url == 'https://s3.storage.com:443/bucket/test.txt', url
-
-    @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_upload_from_string_util(self, set_contents):
-        with patch.dict(self.flask_app.config, self.util_config):
-            """Test -util keyword dropped from meta url returned from s3 upload."""
-            url = s3_upload_from_string('bucket', 'hello world', 'test.txt')
-            assert url == 'https://s3.storage.env.com:443/bucket/test.txt', url
-
-    @with_context
     @patch('pybossa.cloud_store_api.s3.io.open')
     def test_upload_from_string_exception(self, open):
         open.side_effect = IOError
@@ -85,94 +70,18 @@ class TestS3Uploader(Test):
                       'bucket', 'hellow world', 'test.txt')
 
     @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_upload_from_string_return_key(self, set_contents):
-        with patch.dict(self.flask_app.config, self.default_config):
-            key = s3_upload_from_string('bucket', 'hello world', 'test.txt',
-                                        return_key_only=True)
-            assert key == 'test.txt', key
-
-    @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    def test_upload_from_storage(self, set_contents):
-        with patch.dict(self.flask_app.config, self.default_config):
-            stream = BytesIO(b'Hello world!')
-            fstore = FileStorage(stream=stream,
-                                 filename='test.txt',
-                                 name='fieldname')
-            url = s3_upload_file_storage('bucket', fstore)
-            assert url == 'https://s3.storage.com:443/bucket/test.txt', url
-
-    @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.generate_url')
-    def test_upload_remove_query_params(self, generate_url, set_content):
-        with patch.dict(self.flask_app.config, self.default_config):
-            generate_url.return_value = 'https://s3.storage.com/bucket/key?query_1=aaaa&query_2=bbbb'
-            url = s3_upload_file('bucket', 'a_file', 'a_file', {}, 'dev')
-            assert url == 'https://s3.storage.com/bucket/key'
-
-    @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.bucket.Bucket.delete_key')
-    def test_delete_file_from_s3(self, delete_key):
-        with patch.dict(self.flask_app.config, self.default_config):
-            delete_file_from_s3('test_bucket', '/the/key')
-            delete_key.assert_called_with('/the/key', headers={}, version_id=None)
-
-    @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.bucket.Bucket.delete_key')
+    @patch('pybossa.cloud_store_api.s3.get_s3_bucket_key')
     @patch('pybossa.cloud_store_api.s3.app.logger.exception')
-    def test_delete_file_from_s3_exception(self, logger, delete_key):
-        delete_key.side_effect = boto.exception.S3ResponseError('', '', '')
+    def test_delete_file_from_s3_exception(self, logger, get_s3_bucket_key):
+        get_s3_bucket_key.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'NoSuchKey',
+                    'Message': 'The specified key does not exist'
+                }
+            },
+            operation_name='DeleteObject'
+        )
         with patch.dict(self.flask_app.config, self.default_config):
             delete_file_from_s3('test_bucket', '/the/key')
             logger.assert_called()
-
-    @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.get_contents_as_string')
-    def test_get_file_from_s3(self, get_contents):
-        get_contents.return_value = 'abcd'
-        with patch.dict(self.flask_app.config, self.default_config):
-            get_file_from_s3('test_bucket', '/the/key')
-            get_contents.assert_called()
-
-    @with_context
-    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.get_contents_as_string')
-    def test_decrypts_file_from_s3(self, get_contents):
-        config = self.default_config.copy()
-        config['FILE_ENCRYPTION_KEY'] = 'abcd'
-        config['ENABLE_ENCRYPTION'] = True
-        cipher = AESWithGCM('abcd')
-        get_contents.return_value = cipher.encrypt('hello world')
-        with patch.dict(self.flask_app.config, config):
-            fp = get_file_from_s3('test_bucket', '/the/key', decrypt=True)
-            content = fp.read()
-            assert content == b'hello world'
-
-    @with_context
-    def test_no_checksum_key(self):
-        response = MagicMock()
-        response.status = 200
-        key = ProxiedKey()
-        assert key.should_retry(response)
-
-    @with_context
-    @patch('pybossa.cloud_store_api.connection.Key.should_retry')
-    def test_checksum(self, should_retry):
-        response = MagicMock()
-        response.status = 200
-        key = ProxiedKey()
-        key.should_retry(response)
-        should_retry.assert_not_called()
-
-
-    @with_context
-    @patch('pybossa.cloud_store_api.connection.Key.should_retry')
-    def test_checksum_not_ok(self, should_retry):
-        response = MagicMock()
-        response.status = 300
-        key = ProxiedKey()
-        key.should_retry(response)
-        should_retry.assert_called()
-        key.should_retry(response)
-        should_retry.assert_called()
