@@ -22,7 +22,7 @@ import hashlib
 import copy
 from flask import url_for
 import json
-import requests
+import time
 from six import string_types
 from boto.exception import S3ResponseError
 from werkzeug.exceptions import InternalServerError, NotFound
@@ -68,6 +68,9 @@ def get_task_expiration(expiration, create_time):
 def set_gold_answers(task, gold_answers):
     if not gold_answers:
         return
+
+    current_app.logger.info("Setting gold answers for project id %d, task.info: %s, gold_answers: %s",
+                            task.project_id, str(task.info), str(gold_answers))
     if encrypted():
         url = upload_files_priv(task, task.project_id, gold_answers, TASK_PRIVATE_GOLD_ANSWER_FILE_NAME)['externalUrl']
         gold_answers = dict([(TASK_GOLD_ANSWER_URL_KEY, url)])
@@ -82,8 +85,15 @@ def set_gold_answers(task, gold_answers):
 def upload_files_priv(task, project_id, data, file_name):
     bucket = bucket_name()
 
-    # hashlib.md5() accepts bytes only
-    task_hash = hashlib.md5(str(task).encode()).hexdigest()
+    hash_contents = {
+        "project_id": project_id,
+        "task_info": task.info if hasattr(task, "info") else {},
+        "data": data, # could be gold answers / private_fields
+        "creation_timestamp": int(time.time() * 1000000)  # microseconds # ensure uniqueness for new tasks
+    }
+    # Create deterministic hash
+    content_str = json.dumps(hash_contents, sort_keys=True, ensure_ascii=False)
+    task_hash = hashlib.md5(content_str.encode('utf-8')).hexdigest()
 
     path = "{}/{}".format(project_id, task_hash)
     store = s3_conn_type()
