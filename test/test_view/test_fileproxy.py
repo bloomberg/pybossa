@@ -26,7 +26,7 @@ from unittest.mock import patch, MagicMock
 from test.factories import ProjectFactory, TaskFactory, UserFactory
 from pybossa.core import signer
 from pybossa.encryption import AESWithGCM
-from boto.exception import S3ResponseError
+from botocore.exceptions import ClientError
 from pybossa.task_creator_helper import get_path, get_secret_from_env
 
 
@@ -260,7 +260,19 @@ class TestFileproxy(web.Helper):
         req_url = '%s?api_key=%s&task-signature=%s' % (url, admin.api_key, signature)
 
         key = self.get_key(create_connection)
-        key.get_contents_as_string.side_effect = S3ResponseError(403, 'Forbidden')
+        exception = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'Forbidden',
+                    'Message': 'Access denied'
+                },
+                'ResponseMetadata': {
+                    'HTTPStatusCode': 403
+                }
+            },
+            operation_name='GetObject'
+        )
+        key.get_contents_as_string.side_effect = exception
 
         res = self.app.get(req_url, follow_redirects=True)
         assert res.status_code == 500, f"Expected 500 Internal Server Error, got {res.status_code}"
@@ -279,7 +291,18 @@ class TestFileproxy(web.Helper):
         req_url = '%s?api_key=%s&task-signature=%s' % (url, admin.api_key, signature)
 
         key = self.get_key(create_connection)
-        exception = S3ResponseError(404, 'NoSuchKey')
+        exception = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'NoSuchKey',
+                    'Message': 'The specified key does not exist'
+                },
+                'ResponseMetadata': {
+                    'HTTPStatusCode': 404
+                }
+            },
+            operation_name='GetObject'
+        )
         exception.error_code = 'NoSuchKey'
         key.get_contents_as_string.side_effect = exception
 
