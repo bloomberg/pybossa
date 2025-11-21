@@ -117,10 +117,16 @@ def signin():
     """
     form = LoginForm(request.body)
     isLdap = current_app.config.get('LDAP_HOST', False)
+    auth = {'twitter': False, 'facebook': False, 'google': False}
     if (request.method == 'POST' and form.validate()
             and isLdap is False):
         password = form.password.data
         email_addr = form.email.data.lower()
+
+        if '\x00' in email_addr:
+            flash('Invalid email address format', 'error')
+            return render_template('account/signin.html', form=form, auth=auth)
+
         user = user_repo.search_by_email(email_addr=email_addr)
         if user and user.check_password(password):
             # Check if the user can bypass two-factor authentication.
@@ -179,7 +185,6 @@ def signin():
 
     if request.method == 'POST' and not form.validate():
         flash(gettext('Please correct the errors'), 'error')
-    auth = {'twitter': False, 'facebook': False, 'google': False}
     if current_user.is_anonymous:
         # If Twitter is enabled in config, show the Twitter Sign in button
         if (isLdap is False):
