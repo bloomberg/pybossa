@@ -35,6 +35,52 @@ class TestAuthentication(Test):
         assert '<a href="/account/signout"' in str(res.data), str(res.data)
         assert 'checkpoint::logged-in::tester' in str(res.data), str(res.data)
 
+    @with_context
+    def test_signin_with_invalid_email_addr(self):
+        """Test that signin rejects email addresses containing NUL characters."""
+
+        # Test email with NUL character at the beginning
+        form_data = {
+            'email': '\x00test@example.com',
+            'password': 'validpassword'
+        }
+
+        response = self.app.post('/account/signin',
+                            data=form_data,
+                            follow_redirects=True)
+
+        # Should show error message and stay on signin page
+        assert response.status_code == 200
+        assert b'Invalid email address format' in response.data
+
+        # Test email with NUL character in the middle
+        form_data['email'] = 'test\x00@example.com'
+        response = self.app.post('/account/signin',
+                            data=form_data,
+                            follow_redirects=True)
+
+        assert response.status_code == 200
+        assert b'Invalid email address format' in response.data
+
+        # Test email with NUL character at the end
+        form_data['email'] = 'test@example.com\x00'
+        response = self.app.post('/account/signin',
+                            data=form_data,
+                            follow_redirects=True)
+
+        assert response.status_code == 200
+        assert b'Invalid email address format' in response.data
+
+        # Test empty email
+        form_data = {
+            'email': '',
+            'password': 'validpassword'
+        }
+        response = self.app.post('/account/signin',
+                            data=form_data,
+                            follow_redirects=True)
+        assert response.status_code == 200
+        assert b'Please correct the errors' in response.data
 
 def handle_error(error):
     return error
