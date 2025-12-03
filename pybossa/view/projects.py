@@ -566,7 +566,7 @@ def is_admin_or_owner(project):
 def upload_task_guidelines_image(short_name):
     error = False
     return_code = 200
-    project = project_by_shortname(short_name)
+    project, owner, ps = project_by_shortname(short_name)
 
     imgurls = []
     if is_editor_disabled():
