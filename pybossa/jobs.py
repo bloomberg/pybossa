@@ -994,6 +994,13 @@ def export_tasks(current_user_email_addr, short_name,
             elif len(content) > max_email_size and bucket_name:
                 current_app.logger.info("uploading exporting tasks to s3 for project, %s", project.id)
                 conn_kwargs = current_app.config.get('S3_EXPORT_CONN', {})
+
+                # Log connection configuration for S3 export
+                current_app.logger.info("S3 Export Connection Configuration:")
+                current_app.logger.info("  bucket_name: %s", bucket_name)
+                current_app.logger.info("  conn_kwargs from S3_EXPORT_CONN: %s",
+                    {k: '***' if 'secret' in k.lower() else v for k, v in conn_kwargs.items()})
+
                 conn = create_connection(**conn_kwargs)
                 bucket = conn.get_bucket(bucket_name, validate=False)
                 timestamp = datetime.utcnow().isoformat()

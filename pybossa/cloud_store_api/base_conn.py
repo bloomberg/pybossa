@@ -17,12 +17,18 @@ class BaseConnection(ABC):
         self.client = None
 
     def get_key(self, bucket, path, **kwargs):
+        logger.info("BaseConnection.get_key called")
+        logger.info("  bucket: %s", bucket)
+        logger.info("  path: %s", path)
+        logger.info("  kwargs: %s", kwargs)
+
         try:
             fobj = self.client.get_object(
                 Bucket=bucket,
                 Key=path,
                 **kwargs,
             )
+            logger.info("  get_object successful")
             return fobj
         except ClientError as e:
             if "Error" in e.response:
@@ -86,6 +92,12 @@ class BaseConnection(ABC):
             raise
 
     def set_contents(self, bucket, path, content, **kwargs):
+        logger.info("BaseConnection.set_contents called")
+        logger.info("  bucket: %s", bucket)
+        logger.info("  path: %s", path)
+        logger.info("  content_length: %d bytes", len(content) if content else 0)
+        logger.info("  content_type: %s", type(content).__name__)
+
         if type(content) == str:
             content = content.encode()
         try:
@@ -94,6 +106,7 @@ class BaseConnection(ABC):
             self.client.upload_fileobj(
                 source, bucket, path, Config=config, ExtraArgs=kwargs
             )
+            logger.info("  upload_fileobj successful")
         except ClientError as e:
             if "Error" in e.response:
                 err_resp = e.response["Error"]
@@ -132,12 +145,17 @@ class BaseConnection(ABC):
                 )
             raise
     def delete_key(self, bucket, path, **kwargs):
+        logger.info("BaseConnection.delete_key called")
+        logger.info("  bucket: %s", bucket)
+        logger.info("  path: %s", path)
+
         try:
             self.client.delete_object(
                 Bucket=bucket,
                 Key=path,
                 **kwargs,
             )
+            logger.info("  delete_object successful")
         except ClientError as e:
             if "Error" in e.response:
                 err_resp = e.response["Error"]
@@ -182,9 +200,15 @@ class BaseConnection(ABC):
             raise
 
     def copy_key(self, bucket, source_key, target_key, **kwargs):
+        logger.info("BaseConnection.copy_key called")
+        logger.info("  bucket: %s", bucket)
+        logger.info("  source_key: %s", source_key)
+        logger.info("  target_key: %s", target_key)
+
         try:
             copy_source = {"Bucket": bucket, "Key": source_key}
             self.client.copy(CopySource=copy_source, Bucket=bucket, Key=target_key, ExtraArgs=kwargs)
+            logger.info("  copy successful")
         except ClientError as e:
             if "Error" in e.response:
                 err_resp = e.response["Error"]
@@ -192,10 +216,11 @@ class BaseConnection(ABC):
                     "HTTPStatusCode"
                 )
                 logger.warning(
-                    "%s: %s, key %s. http status %d",
+                    "%s: %s, source_key %s, target_key %s. http status %d",
                     self.__class__.__name__,
                     str(e),
-                    err_resp.get("Key", path),
+                    source_key,
+                    target_key,
                     http_status,
                 )
             raise

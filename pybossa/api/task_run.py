@@ -202,6 +202,11 @@ class TaskRunAPI(APIBase):
 def _upload_files_from_json(task_run_info, upload_path, with_encryption):
     if not isinstance(task_run_info, dict):
         return
+
+    app.logger.info("_upload_files_from_json called")
+    app.logger.info("  upload_path: %s", upload_path)
+    app.logger.info("  with_encryption: %s", with_encryption)
+
     for key, value in task_run_info.items():
         if key.endswith('__upload_url'):
             filename = value.get('filename')
@@ -211,6 +216,12 @@ def _upload_files_from_json(task_run_info, upload_path, with_encryption):
                 continue
             bucket = app.config.get("S3_BUCKET_V2") if app.config.get("S3_CONN_TYPE_V2") else app.config.get("S3_BUCKET")
             conn_name = "S3_TASKRUN_V2" if app.config.get("S3_CONN_TYPE_V2") else "S3_TASKRUN"
+
+            app.logger.info("  Uploading file from JSON: %s", filename)
+            app.logger.info("    bucket: %s", bucket)
+            app.logger.info("    conn_name: %s", conn_name)
+            app.logger.info("    content_length: %d bytes", len(content) if content else 0)
+
             out_url = s3_upload_from_string(bucket,
                                             content,
                                             filename,
@@ -218,15 +229,25 @@ def _upload_files_from_json(task_run_info, upload_path, with_encryption):
                                             with_encryption=with_encryption,
                                             upload_root_dir=upload_root_dir)
             task_run_info[key] = out_url
+            app.logger.info("    uploaded to: %s", out_url)
 
 
 def _upload_files_from_request(task_run_info, files, upload_path, with_encryption):
+    app.logger.info("_upload_files_from_request called")
+    app.logger.info("  upload_path: %s", upload_path)
+    app.logger.info("  with_encryption: %s", with_encryption)
+    app.logger.info("  files count: %d", len(files))
+
     for key in files:
         if not key.endswith('__upload_url'):
             raise BadRequest("File upload field should end in __upload_url")
         file_obj = request.files[key]
         bucket = app.config.get("S3_BUCKET_V2") if app.config.get("S3_CONN_TYPE_V2") else app.config.get("S3_BUCKET")
         conn_name = "S3_TASKRUN_V2" if app.config.get("S3_CONN_TYPE_V2") else "S3_TASKRUN"
+
+        app.logger.info("  Uploading file from request: %s", file_obj.filename)
+        app.logger.info("    bucket: %s", bucket)
+        app.logger.info("    conn_name: %s", conn_name)
         s3_url = s3_upload_file_storage(bucket,
                                         file_obj,
                                         directory=upload_path, conn_name=conn_name,

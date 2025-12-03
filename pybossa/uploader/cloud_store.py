@@ -2,12 +2,16 @@ from pybossa.uploader import Uploader
 from flask import current_app as app
 from flask import url_for
 import traceback
+import logging
 from pybossa.cloud_store_api.connection import create_connection
+
+logger = logging.getLogger(__name__)
 
 
 class CloudStoreUploader(Uploader):
 
     def __init__(self):
+        logger.info("CloudStoreUploader.__init__ called")
         self._bucket = None
 
     @property
@@ -15,8 +19,15 @@ class CloudStoreUploader(Uploader):
         if not self._bucket:
             bucket = app.config['UPLOAD_BUCKET']
             conn_kwargs = app.config.get('S3_UPLOAD', {})
+
+            logger.info("CloudStoreUploader.bucket property accessed")
+            logger.info("  UPLOAD_BUCKET: %s", bucket)
+            logger.info("  S3_UPLOAD conn_kwargs: %s", {k: '***' if 'secret' in k.lower() else v for k, v in conn_kwargs.items()})
+
             conn = create_connection(**conn_kwargs)
             self._bucket = conn.get_bucket(bucket, validate=False)
+
+            logger.info("  Bucket connection established")
         return self._bucket
 
     @staticmethod
