@@ -9,6 +9,8 @@ Status](https://img.shields.io/coveralls/Scifabric/pybossa.svg)](https://coveral
 
 # What is PYBOSSA?
 
+
+
 PYBOSSA is a technology built by [Scifabric](https://scifabric.com), for crowdsourcing or citizen science platforms.
 
 PYBOSSA is an extremely flexible and versatile technology with a multitude of applications that
