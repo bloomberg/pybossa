@@ -308,7 +308,7 @@ def upload_email_attachment(content, filename, user_email, project_id=None):
     app.logger.info("  conn_name: %s", conn_name)
 
     if not bucket_name:
-        logger.error("S3_REQUEST_BUCKET_V2 is not configured")
+        app.logger.error("S3_REQUEST_BUCKET_V2 is not configured")
         raise RuntimeError("S3_REQUEST_BUCKET_V2 is not configured")
 
     conn_kwargs = app.config.get(conn_name, {})
@@ -355,7 +355,7 @@ def s3_get_email_attachment(path):
 
     bucket = app.config.get("S3_REQUEST_BUCKET_V2")
     if not bucket:
-        logger.warning("S3_REQUEST_BUCKET_V2 not configured, returning empty response")
+        app.logger.warning("S3_REQUEST_BUCKET_V2 not configured, returning empty response")
         return response
 
     app.logger.info("  bucket: %s", bucket)
@@ -377,6 +377,6 @@ def s3_get_email_attachment(path):
         response["type"] = key.content_type
         response["content"] = content
     else:
-        logger.warning("  File not found or content/key is None")
+        app.logger.warning("  File not found or content/key is None")
 
     return response
