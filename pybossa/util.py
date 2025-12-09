@@ -1003,7 +1003,16 @@ def s3_get_file_contents(s3_bucket, s3_path,
     :return: File contents as a string with the
         specified encoding
     """
-    conn = create_connection(**current_app.config.get(conn, {}))
+    current_app.logger.info("get_s3_file_contents called")
+    current_app.logger.info("  s3_bucket: %s", s3_bucket)
+    current_app.logger.info("  s3_path: %s", s3_path)
+    current_app.logger.info("  conn config name: %s", conn)
+
+    conn_config = current_app.config.get(conn, {})
+    current_app.logger.info("  conn_config: %s",
+        {k: '***' if 'secret' in k.lower() else v for k, v in conn_config.items()})
+
+    conn = create_connection(**conn_config)
     bucket = conn.get_bucket(s3_bucket, validate=False)
     key = bucket.get_key(s3_path)
     return key.get_contents_as_string(
