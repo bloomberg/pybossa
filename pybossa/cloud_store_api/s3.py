@@ -16,8 +16,6 @@ from time import perf_counter
 import time
 from datetime import datetime, timedelta
 
-logger = logging.getLogger(__name__)
-
 
 allowed_mime_types = ['application/pdf',
                       'text/csv',
@@ -165,20 +163,20 @@ def s3_upload_file(s3_bucket, source_file, target_file_name,
     :param directory: path in S3 where the object needs to be stored
     :param return_key_only: return key name instead of full url
     """
-    logger.info("s3_upload_file called")
-    logger.info("  s3_bucket: %s", s3_bucket)
-    logger.info("  target_file_name: %s", target_file_name)
-    logger.info("  directory: %s", directory)
-    logger.info("  conn_name: %s", conn_name)
-    logger.info("  return_key_only: %s", return_key_only)
+    app.logger.info("s3_upload_file called")
+    app.logger.info("  s3_bucket: %s", s3_bucket)
+    app.logger.info("  target_file_name: %s", target_file_name)
+    app.logger.info("  directory: %s", directory)
+    app.logger.info("  conn_name: %s", conn_name)
+    app.logger.info("  return_key_only: %s", return_key_only)
 
     filename = secure_filename(target_file_name)
     upload_key = form_upload_directory(directory, filename, upload_root_dir)
 
-    logger.info("  upload_key: %s", upload_key)
+    app.logger.info("  upload_key: %s", upload_key)
 
     conn_kwargs = app.config.get(conn_name, {})
-    logger.info("  conn_kwargs from config[%s]: %s", conn_name, {k: '***' if 'secret' in k.lower() else v for k, v in conn_kwargs.items()})
+    app.logger.info("  conn_kwargs from config[%s]: %s", conn_name, {k: '***' if 'secret' in k.lower() else v for k, v in conn_kwargs.items()})
 
     conn = create_connection(**conn_kwargs)
     bucket = conn.get_bucket(s3_bucket, validate=False)
@@ -186,36 +184,36 @@ def s3_upload_file(s3_bucket, source_file, target_file_name,
     assert(len(upload_key) < 256)
     key = bucket.new_key(upload_key)
 
-    logger.info("  Uploading file to S3...")
+    app.logger.info("  Uploading file to S3...")
     key.set_contents_from_file(
         source_file, headers=headers,
         policy='bucket-owner-full-control')
-    logger.info("  File uploaded successfully")
+    app.logger.info("  File uploaded successfully")
 
     if return_key_only:
-        logger.info("  Returning key name: %s", key.name)
+        app.logger.info("  Returning key name: %s", key.name)
         return key.name
     url = key.generate_url(0, query_auth=False)
     final_url = url.split('?')[0]
-    logger.info("  Generated URL: %s", final_url)
+    app.logger.info("  Generated URL: %s", final_url)
     return final_url
 
 
 def get_s3_bucket_key(s3_bucket, s3_url, conn_name=DEFAULT_CONN):
-    logger.info("get_s3_bucket_key called")
-    logger.info("  s3_bucket: %s", s3_bucket)
-    logger.info("  s3_url: %s", s3_url)
-    logger.info("  conn_name: %s", conn_name)
+    app.logger.info("get_s3_bucket_key called")
+    app.logger.info("  s3_bucket: %s", s3_bucket)
+    app.logger.info("  s3_url: %s", s3_url)
+    app.logger.info("  conn_name: %s", conn_name)
 
     conn_kwargs = app.config.get(conn_name, {})
-    logger.info("  conn_kwargs from config[%s]: %s", conn_name, {k: '***' if 'secret' in k.lower() else v for k, v in conn_kwargs.items()})
+    app.logger.info("  conn_kwargs from config[%s]: %s", conn_name, {k: '***' if 'secret' in k.lower() else v for k, v in conn_kwargs.items()})
 
     conn = create_connection(**conn_kwargs)
     bucket = conn.get_bucket(s3_bucket, validate=False)
     obj = urlparse(s3_url)
     path = obj.path
 
-    logger.info("  Parsed path from URL: %s", path)
+    app.logger.info("  Parsed path from URL: %s", path)
 
     key = bucket.get_key(path, validate=False)
     return bucket, key
@@ -286,11 +284,11 @@ def upload_json_data(json_data, upload_path, file_name, encryption,
 def upload_email_attachment(content, filename, user_email, project_id=None):
     """Upload file to storage location and generate url to download file later"""
 
-    logger.info("upload_email_attachment called")
-    logger.info("  filename: %s", filename)
-    logger.info("  user_email: %s", user_email)
-    logger.info("  project_id: %s", project_id)
-    logger.info("  content_length: %d bytes", len(content) if content else 0)
+    app.logger.info("upload_email_attachment called")
+    app.logger.info("  filename: %s", filename)
+    app.logger.info("  user_email: %s", user_email)
+    app.logger.info("  project_id: %s", project_id)
+    app.logger.info("  content_length: %d bytes", len(content) if content else 0)
 
     # generate signature for authorised access to the attachment
     from pybossa.core import signer
@@ -306,15 +304,15 @@ def upload_email_attachment(content, filename, user_email, project_id=None):
     bucket_name = app.config.get("S3_REQUEST_BUCKET_V2")
     conn_name = "S3_TASK_REQUEST_V2"
 
-    logger.info("  bucket_name: %s", bucket_name)
-    logger.info("  conn_name: %s", conn_name)
+    app.logger.info("  bucket_name: %s", bucket_name)
+    app.logger.info("  conn_name: %s", conn_name)
 
     if not bucket_name:
         logger.error("S3_REQUEST_BUCKET_V2 is not configured")
         raise RuntimeError("S3_REQUEST_BUCKET_V2 is not configured")
 
     conn_kwargs = app.config.get(conn_name, {})
-    logger.info("  conn_kwargs from config[%s]: %s", conn_name, {k: '***' if 'secret' in k.lower() else v for k, v in conn_kwargs.items()})
+    app.logger.info("  conn_kwargs from config[%s]: %s", conn_name, {k: '***' if 'secret' in k.lower() else v for k, v in conn_kwargs.items()})
 
     conn = create_connection(**conn_kwargs)
     bucket = conn.get_bucket(bucket_name, validate=False)
@@ -324,7 +322,7 @@ def upload_email_attachment(content, filename, user_email, project_id=None):
     secure_file_name = secure_filename(filename)
     s3_path = f"attachments/{timestamp}-{secure_file_name}"
 
-    logger.info("  s3_path: %s", s3_path)
+    app.logger.info("  s3_path: %s", s3_path)
 
     # Upload content to S3
     key = bucket.new_key(s3_path)
@@ -333,12 +331,12 @@ def upload_email_attachment(content, filename, user_email, project_id=None):
     server_url = app.config.get('SERVER_URL')
     url = f"{server_url}/attachment/{signature}/{timestamp}-{secure_file_name}"
 
-    logger.info("  Generated attachment URL: %s", url)
+    app.logger.info("  Generated attachment URL: %s", url)
 
     user_id = get_user_by_email(user_email).id
     cache_info = register_user_exported_report(user_id, url, sentinel.master)
 
-    logger.info("  Cache updated for user_id=%s: %s", user_id, cache_info)
+    app.logger.info("  Cache updated for user_id=%s: %s", user_id, cache_info)
 
     return url
 
@@ -346,8 +344,8 @@ def upload_email_attachment(content, filename, user_email, project_id=None):
 def s3_get_email_attachment(path):
     """Download email attachment from storage location"""
 
-    logger.info("s3_get_email_attachment called")
-    logger.info("  path: %s", path)
+    app.logger.info("s3_get_email_attachment called")
+    app.logger.info("  path: %s", path)
 
     response = {
         "name": "",
@@ -360,20 +358,20 @@ def s3_get_email_attachment(path):
         logger.warning("S3_REQUEST_BUCKET_V2 not configured, returning empty response")
         return response
 
-    logger.info("  bucket: %s", bucket)
+    app.logger.info("  bucket: %s", bucket)
 
     conn_name = "S3_TASK_REQUEST_V2"
     s3_path = f"attachments/{path}"
 
-    logger.info("  conn_name: %s", conn_name)
-    logger.info("  s3_path: %s", s3_path)
+    app.logger.info("  conn_name: %s", conn_name)
+    app.logger.info("  s3_path: %s", s3_path)
 
     content, key = get_content_and_key_from_s3(s3_bucket=bucket, path=s3_path, conn_name=conn_name)
     if content and key:
-        logger.info("  File retrieved successfully")
-        logger.info("    key.name: %s", key.name)
-        logger.info("    key.content_type: %s", key.content_type)
-        logger.info("    content_length: %d bytes", len(content) if content else 0)
+        app.logger.info("  File retrieved successfully")
+        app.logger.info("    key.name: %s", key.name)
+        app.logger.info("    key.content_type: %s", key.content_type)
+        app.logger.info("    content_length: %d bytes", len(content) if content else 0)
 
         response["name"] = key.name
         response["type"] = key.content_type

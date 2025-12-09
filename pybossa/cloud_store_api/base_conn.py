@@ -6,8 +6,7 @@ from abc import ABC, abstractmethod
 from boto3.s3.transfer import TransferConfig
 from botocore.exceptions import ClientError
 
-logger = logging.getLogger(__name__)
-
+from flask import current_app as app
 
 class BaseConnection(ABC):
     @abstractmethod
@@ -17,10 +16,10 @@ class BaseConnection(ABC):
         self.client = None
 
     def get_key(self, bucket, path, **kwargs):
-        logger.info("BaseConnection.get_key called")
-        logger.info("  bucket: %s", bucket)
-        logger.info("  path: %s", path)
-        logger.info("  kwargs: %s", kwargs)
+        app.logger.info("BaseConnection.get_key called")
+        app.logger.info("  bucket: %s", bucket)
+        app.logger.info("  path: %s", path)
+        app.logger.info("  kwargs: %s", kwargs)
 
         try:
             fobj = self.client.get_object(
@@ -28,7 +27,7 @@ class BaseConnection(ABC):
                 Key=path,
                 **kwargs,
             )
-            logger.info("  get_object successful")
+            app.logger.info("  get_object successful")
             return fobj
         except ClientError as e:
             if "Error" in e.response:
@@ -36,7 +35,7 @@ class BaseConnection(ABC):
                 http_status = e.response.get("ResponseMetadata", {}).get(
                     "HTTPStatusCode"
                 )
-                logger.warning(
+                app.app.logger.warning(
                     "%s: %s, key %s. http status %d",
                     self.__class__.__name__,
                     str(e),
@@ -82,7 +81,7 @@ class BaseConnection(ABC):
                 http_status = e.response.get("ResponseMetadata", {}).get(
                     "HTTPStatusCode"
                 )
-                logger.warning(
+                app.logger.warning(
                     "%s: %s, key %s. http status %d",
                     self.__class__.__name__,
                     str(e),
@@ -92,11 +91,11 @@ class BaseConnection(ABC):
             raise
 
     def set_contents(self, bucket, path, content, **kwargs):
-        logger.info("BaseConnection.set_contents called")
-        logger.info("  bucket: %s", bucket)
-        logger.info("  path: %s", path)
-        logger.info("  content_length: %d bytes", len(content) if content else 0)
-        logger.info("  content_type: %s", type(content).__name__)
+        app.logger.info("BaseConnection.set_contents called")
+        app.logger.info("  bucket: %s", bucket)
+        app.logger.info("  path: %s", path)
+        app.logger.info("  content_length: %d bytes", len(content) if content else 0)
+        app.logger.info("  content_type: %s", type(content).__name__)
 
         if type(content) == str:
             content = content.encode()
@@ -106,14 +105,14 @@ class BaseConnection(ABC):
             self.client.upload_fileobj(
                 source, bucket, path, Config=config, ExtraArgs=kwargs
             )
-            logger.info("  upload_fileobj successful")
+            app.logger.info("  upload_fileobj successful")
         except ClientError as e:
             if "Error" in e.response:
                 err_resp = e.response["Error"]
                 http_status = e.response.get("ResponseMetadata", {}).get(
                     "HTTPStatusCode"
                 )
-                logger.warning(
+                app.logger.warning(
                     "%s: %s, key %s. http status %d",
                     self.__class__.__name__,
                     str(e),
@@ -136,7 +135,7 @@ class BaseConnection(ABC):
                 http_status = e.response.get("ResponseMetadata", {}).get(
                     "HTTPStatusCode"
                 )
-                logger.warning(
+                app.logger.warning(
                     "%s: %s, key %s. http status %d",
                     self.__class__.__name__,
                     str(e),
@@ -145,9 +144,9 @@ class BaseConnection(ABC):
                 )
             raise
     def delete_key(self, bucket, path, **kwargs):
-        logger.info("BaseConnection.delete_key called")
-        logger.info("  bucket: %s", bucket)
-        logger.info("  path: %s", path)
+        app.logger.info("BaseConnection.delete_key called")
+        app.logger.info("  bucket: %s", bucket)
+        app.logger.info("  path: %s", path)
 
         try:
             self.client.delete_object(
@@ -155,14 +154,14 @@ class BaseConnection(ABC):
                 Key=path,
                 **kwargs,
             )
-            logger.info("  delete_object successful")
+            app.logger.info("  delete_object successful")
         except ClientError as e:
             if "Error" in e.response:
                 err_resp = e.response["Error"]
                 http_status = e.response.get("ResponseMetadata", {}).get(
                     "HTTPStatusCode"
                 )
-                logger.warning(
+                app.logger.warning(
                     "%s: %s, key %s. http status %d",
                     self.__class__.__name__,
                     str(e),
@@ -190,7 +189,7 @@ class BaseConnection(ABC):
                 http_status = e.response.get("ResponseMetadata", {}).get(
                     "HTTPStatusCode"
                 )
-                logger.warning(
+                app.logger.warning(
                     "%s: %s, key %s. http status %d",
                     self.__class__.__name__,
                     str(e),
@@ -200,22 +199,22 @@ class BaseConnection(ABC):
             raise
 
     def copy_key(self, bucket, source_key, target_key, **kwargs):
-        logger.info("BaseConnection.copy_key called")
-        logger.info("  bucket: %s", bucket)
-        logger.info("  source_key: %s", source_key)
-        logger.info("  target_key: %s", target_key)
+        app.logger.info("BaseConnection.copy_key called")
+        app.logger.info("  bucket: %s", bucket)
+        app.logger.info("  source_key: %s", source_key)
+        app.logger.info("  target_key: %s", target_key)
 
         try:
             copy_source = {"Bucket": bucket, "Key": source_key}
             self.client.copy(CopySource=copy_source, Bucket=bucket, Key=target_key, ExtraArgs=kwargs)
-            logger.info("  copy successful")
+            app.logger.info("  copy successful")
         except ClientError as e:
             if "Error" in e.response:
                 err_resp = e.response["Error"]
                 http_status = e.response.get("ResponseMetadata", {}).get(
                     "HTTPStatusCode"
                 )
-                logger.warning(
+                app.logger.warning(
                     "%s: %s, source_key %s, target_key %s. http status %d",
                     self.__class__.__name__,
                     str(e),
