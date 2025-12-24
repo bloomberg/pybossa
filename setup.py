@@ -129,7 +129,7 @@ requirements = [
     "raven==6.10.0",
     "rax-default-network-flags-python-novaclient-ext==0.4.0",
     "rax-scheduled-images-python-novaclient-ext==0.3.1",
-    "readability-lxml==0.8.1",
+    # "readability-lxml==0.8.1",  # Disabled - not compatible with Python 3.9
     "redis==3.5.3",
     "rednose==1.3.0",
     "requests==2.31.0",

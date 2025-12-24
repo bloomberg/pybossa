@@ -22,7 +22,7 @@ from flask import render_template
 from pybossa.util import handle_content_type
 from pybossa.cache import projects as cached_projects
 from pybossa.cache import categories as cached_cat
-from readability.readability import Document
+# from readability.readability import Document  # Disabled - not compatible with Python 3.9
 from flask_login import login_required
 
 blueprint = Blueprint('help', __name__)
@@ -60,7 +60,8 @@ def license():
 @blueprint.route('/terms-of-use')
 def tos():
     """Render help/terms-of-use page."""
-    cleaned_up_content = Document(render_template('help/tos.html')).summary()
+    # cleaned_up_content = Document(render_template('help/tos.html')).summary()
+    cleaned_up_content = render_template('help/tos.html')  # Simplified without readability
     response = dict(template='help/tos.html',
                     content=cleaned_up_content,
                     title='Help: Terms of Use')
@@ -70,7 +71,8 @@ def tos():
 @blueprint.route('/cookies-policy')
 def cookies_policy():
     """Render help/cookies-policy page."""
-    cleaned_up_content = Document(render_template('help/cookies_policy.html')).summary()
+    # cleaned_up_content = Document(render_template('help/cookies_policy.html')).summary()
+    cleaned_up_content = render_template('help/cookies_policy.html')  # Simplified without readability
     response = dict(template='help/cookies_policy.html',
                     content=cleaned_up_content,
                     title='Help: Cookies Policy')
@@ -82,7 +84,8 @@ def cookies_policy():
 def privacy():
     """Render help/privacy policy page."""
     # use readability to remove styling and headers
-    cleaned_up_content = Document(render_template('help/privacy.html')).summary()
+    # cleaned_up_content = Document(render_template('help/privacy.html')).summary()
+    cleaned_up_content = render_template('help/privacy.html')  # Simplified without readability
     response = dict(template='help/privacy.html',
                     content=cleaned_up_content,
                     title='Privacy Policy')
