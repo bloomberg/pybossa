@@ -1159,12 +1159,30 @@ def add_metadata(name):
                                country_name_to_country_code=app_settings.upref_mdata.country_name_to_country_code,
                                country_code_to_country_name=app_settings.upref_mdata.country_code_to_country_name)
 
+    # Capture old profile for logging before update
+    old_metadata = user.info.get('metadata', {})
+    old_profile = old_metadata.get('profile', '')
+    old_profile_parsed = json.loads(old_profile) if old_profile and isinstance(old_profile, str) else old_profile if old_profile else {}
+
     user_pref, metadata = get_user_pref_and_metadata(name, form)
     user.info['metadata'] = metadata
     ensure_user_data_access_assignment_from_form(user.info, form)
     user.user_pref = user_pref
+
+    # Get new profile for logging
+    new_profile = metadata.get('profile', '')
+    new_profile_parsed = json.loads(new_profile) if new_profile and isinstance(new_profile, str) else new_profile if new_profile else {}
+
+    # Log profile update with old and new values
+    current_app.logger.info(
+        "User profile updated via account view. User %s (id=%s, email=%s) "
+        "Old profile: %s, New profile: %s",
+        user.name, user.id, user.email_addr, old_profile_parsed, new_profile_parsed
+    )
+
     user_repo.update(user)
     cached_users.delete_user_pref_metadata(user)
+
     flash("Input saved successfully", "info")
     return redirect(url_for('account.profile', name=name))
 

@@ -770,3 +770,203 @@ class TestNTaskAvailable(sched.Helper):
         resp = json.loads(res.data)
         assert resp['id'] == tasks[0].id, \
             'task presented should not be gold task'
+
+    @with_context
+    def test_task_routing_fte_only_filter(self):
+        '''
+        Test that users with fte_only=1 in profile can get tasks with fte_only=[1, "=="] filter,
+        while users with fte_only!=1 cannot get such tasks
+        '''
+        # Create user with fte_only=0.1 - should NOT get the task
+        user_info_non_fte = dict(metadata={
+            "profile": json.dumps({
+                "bbg_index": 0.1,
+                "mkt_cap": 0.1,
+                "private": 0.5,
+                "nace": 0.1,
+                "bics": 1.0,
+                "bclass": 0.1,
+                "tier": 0.7,
+                "attention": 0.8,
+                "fte_only": 0.1
+            })
+        })
+        non_fte_user = UserFactory.create(id=500, name="john", fullname="john doe", info=user_info_non_fte)
+        user_repo.save(non_fte_user)
+
+        # Create user with fte_only=1 - SHOULD get the task
+        user_info_fte = dict(metadata={
+            "profile": json.dumps({
+                "bbg_index": 0.1,
+                "mkt_cap": 0.1,
+                "private": 0.5,
+                "nace": 0.1,
+                "bics": 1.0,
+                "bclass": 0.1,
+                "tier": 0.7,
+                "attention": 0.8,
+                "fte_only": 1.0
+            })
+        })
+        fte_user = UserFactory.create(id=501, name="jane", fullname="jane doe", info=user_info_fte)
+        user_repo.save(fte_user)
+
+        # Clear user cache to ensure profile is loaded correctly
+        from pybossa.cache import users as cached_users
+        cached_users.delete_user_pref_metadata(non_fte_user)
+        cached_users.delete_user_pref_metadata(fte_user)
+
+        # Create project with task_queue scheduler
+        project = ProjectFactory.create(owner=non_fte_user)
+        project.info['sched'] = Schedulers.task_queue
+        project_repo.save(project)
+
+        # Create tasks - explicitly create task 2 without worker_filter
+        # Task 0: Requires fte_only=1 with all other filters
+        task0 = TaskFactory.create(project=project, n_answers=10)
+        task0.worker_filter = {
+            "bics": [1, "=="],
+            "nace": [0, ">="],
+            "tier": [0, ">="],
+            "bclass": [0, ">="],
+            "mkt_cap": [0, ">="],
+            "private": [0.5, ">="],
+            "fte_only": [1, "=="],
+            "bbg_index": [0, ">="]
+        }
+        task_repo.save(task0)
+
+        # Task 1: Another task requiring fte_only=1
+        task1 = TaskFactory.create(project=project, n_answers=10)
+        task1.worker_filter = {
+            "fte_only": [1, "=="],
+            "bics": [1, "=="]
+        }
+        task_repo.save(task1)
+
+        # Task 2: No worker_filter - should be available to both users
+        task2 = TaskFactory.create(project=project, n_answers=10)
+        # Don't set worker_filter at all - leave it as default (None)
+
+        # Test 1: User with fte_only=0.1 should NOT get tasks with fte_only=1 requirement
+        available_tasks_non_fte = n_available_tasks_for_user(project, non_fte_user.id)
+        assert available_tasks_non_fte == 1, \
+            f'User with fte_only=0.1 should only get 1 task (no filter), but got {available_tasks_non_fte}'
+
+        # Test 2: User with fte_only=1.0 should get all tasks
+        available_tasks_fte = n_available_tasks_for_user(project, fte_user.id)
+        assert available_tasks_fte == 3, \
+            f'User with fte_only=1.0 should get all 3 tasks, but got {available_tasks_fte}'
+
+        # Test 3: Verify task assignment via API for non-fte user
+        task_assigned_non_fte = get_user_pref_task(project.id, non_fte_user.id)
+        if task_assigned_non_fte:
+            assigned_task = task_assigned_non_fte[0]
+            # The assigned task should have no worker_filter or empty worker_filter
+            assert not assigned_task.worker_filter or assigned_task.worker_filter == {}, \
+                f'User with fte_only=0.1 should only get task without worker_filter, got task {assigned_task.id} with filter {assigned_task.worker_filter}'
+
+        # Test 4: Verify task assignment via API for fte user can get filtered tasks
+        task_assigned_fte = get_user_pref_task(project.id, fte_user.id)
+        assert task_assigned_fte, 'User with fte_only=1.0 should get a task'
+        # The assigned task should be one of the three available tasks
+        assert task_assigned_fte[0].id in [task0.id, task1.id, task2.id], \
+            'User with fte_only=1.0 should get one of the available tasks'
+
+    @with_context
+    def test_task_routing_fte_only_strict_equality(self):
+        '''
+        Test that fte_only equality filter strictly requires exact match
+        '''
+        # Create user with fte_only=0.9 (close to 1 but not equal)
+        user_info = dict(metadata={
+            "profile": json.dumps({
+                "bbg_index": 0.5,
+                "mkt_cap": 0.5,
+                "private": 0.5,
+                "nace": 0.5,
+                "bics": 1.0,
+                "bclass": 0.5,
+                "tier": 0.5,
+                "fte_only": 0.9
+            })
+        })
+        user = UserFactory.create(id=502, info=user_info)
+        user_repo.save(user)
+
+        project = ProjectFactory.create(owner=user)
+        project.info['sched'] = Schedulers.task_queue
+        project_repo.save(project)
+
+        # Create task requiring exact fte_only=1
+        task = TaskFactory.create(project=project, n_answers=10)
+        task.worker_filter = {
+            "fte_only": [1, "=="],
+            "bics": [1, "=="]
+        }
+        task_repo.save(task)
+
+        # User with fte_only=0.9 should NOT get task requiring fte_only=1
+        available_tasks = n_available_tasks_for_user(project, user.id)
+        assert available_tasks == 0, \
+            'User with fte_only=0.9 should NOT get task requiring fte_only==1'
+
+    @with_context
+    def test_task_routing_missing_profile_field(self):
+        '''
+        Test that users without fte_only field in profile cannot get tasks requiring fte_only
+        '''
+        # Create user without fte_only in profile
+        user_info = dict(metadata={
+            "profile": json.dumps({
+                "bbg_index": 0.5,
+                "bics": 1.0,
+                "tier": 0.5
+            })
+        })
+        user = UserFactory.create(id=503, info=user_info)
+        user_repo.save(user)
+
+        project = ProjectFactory.create(owner=user)
+        project.info['sched'] = Schedulers.task_queue
+        project_repo.save(project)
+
+        # Create task requiring fte_only
+        task = TaskFactory.create(project=project, n_answers=10)
+        task.worker_filter = {
+            "fte_only": [1, "=="]
+        }
+        task_repo.save(task)
+
+        # User without fte_only field should NOT get the task
+        available_tasks = n_available_tasks_for_user(project, user.id)
+        assert available_tasks == 0, \
+            'User without fte_only field in profile should NOT get task requiring fte_only'
+
+    @with_context
+    def test_get_user_pref_task_with_task_id(self):
+        '''
+        Test that passing a specific task_id to the scheduler returns that task
+        This covers the task_id parameter code path in locked_scheduler
+        '''
+        owner = UserFactory.create(id=504)
+        owner.user_pref = {'languages': ['en']}
+        user_repo.save(owner)
+
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+
+        # Create multiple tasks
+        tasks = TaskFactory.create_batch(3, project=project, n_answers=10)
+        for task in tasks:
+            task.user_pref = {'languages': ['en']}
+            task_repo.save(task)
+
+        # Request a specific task by task_id
+        target_task_id = tasks[1].id
+        result = get_user_pref_task(project.id, owner.id, task_id=target_task_id)
+
+        assert result is not None, 'Should return a task when task_id is provided'
+        assert len(result) == 1, 'Should return exactly one task'
+        assert result[0].id == target_task_id, f'Should return the requested task {target_task_id}, but got {result[0].id}'
