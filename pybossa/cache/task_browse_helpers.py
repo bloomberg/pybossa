@@ -385,6 +385,11 @@ def _get_field_filters(filters):
 
 
 def user_meet_task_requirement(task_id, user_filter, user_profile):
+    current_app.logger.info(
+        "Checking user meet worker filter requirement for task %s, worker_filter: %s, user_profile: %s",
+        task_id, user_filter, user_profile
+    )
+
     for field, filters in user_filter.items():
         if not user_profile.get(field):
             # if user profile does not have attribute, user does not qualify for the task
@@ -416,6 +421,7 @@ def user_meet_task_requirement(task_id, user_filter, user_profile):
         except Exception as e:
             current_app.logger.exception(f"Validating worker filter failed for task {task_id} on field {field}, comparison failed")
             return False
+    current_app.logger.info("User met worker filter requirement for Task %s, worker_filter: %s, user_profile: %s", task_id, user_filter, user_profile)
     return True
 
 

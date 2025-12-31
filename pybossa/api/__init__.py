@@ -557,6 +557,10 @@ def update_user_preferences(user_name):
 
     user_preferences = None
     if user:
+        # Capture old profile for logging before update
+        profile = user.info.get('metadata', {}).get('profile', '')
+        profile_old = json.loads(profile) if profile else {}
+
         # Add a metadata section if not found.
         if 'metadata' not in user.info:
             user.info['metadata'] = {}
@@ -569,10 +573,15 @@ def update_user_preferences(user_name):
 
         # Save user preferences.
         user_repo.update(user)
+        # Log profile update with old and new values
+        current_app.logger.info(
+            "User profile updated via api/preferences. User %s (id=%s, email=%s) "
+            "Old profile: %s, New profile: %s",
+            user.name, user.id, user.email_addr, profile_old, payload
+        )
 
         # Clear user in cache.
         cached_users.delete_user_pref_metadata(user)
-
         # Return updated metadata and user preferences.
         user_preferences = user.info.get('metadata', {})
 
