@@ -7,7 +7,6 @@ from pybossa.cloud_store_api.connection import create_connection
 class CloudStoreUploader(Uploader):
 
     def __init__(self):
-        app.logger.info("CloudStoreUploader.__init__ called")
         self._bucket = None
 
     @property
