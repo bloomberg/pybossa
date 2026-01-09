@@ -158,8 +158,13 @@ def locked_scheduler(query_factory):
             return None
         project = project_repo.get(project_id)
         timeout = project.info.get('timeout', TIMEOUT)
-        task_queue_scheduler = project.info.get("sched", "default") in [Schedulers.task_queue]
+        scheduler_type = project.info.get("sched", "default")
+        task_queue_scheduler = scheduler_type in [Schedulers.task_queue]
         reserve_task_config = project.info.get("reserve_tasks", {}).get("category", [])
+
+        # Enable filter_user_prefs for user_pref and task_queue schedulers if not explicitly set
+        if not filter_user_prefs and scheduler_type in [Schedulers.user_pref, Schedulers.task_queue]:
+            filter_user_prefs = True
 
         # "first" or "last" value of saved_task_position will result tasks retrieving from DB
         task_id, lock_seconds = (None, 0) if saved_task_position else get_task_id_and_duration_for_project_user(project_id, user_id)
@@ -231,10 +236,6 @@ def locked_scheduler(query_factory):
 
         # validate user qualification and calculate task preference score
         user_profile = json.loads(user_profile) if user_profile else {}
-        current_app.logger.info(
-            "locked_scheduler. Project %s, User %s - filter_user_prefs=%s, saved_task_position=%s, task_id_map=%s, user_profile=%s",
-            project_id, user_id, filter_user_prefs, saved_task_position, bool(task_id_map), user_profile
-        )
         task_rank_info = []
         for task_id, taskcount, n_answers, calibration, w_filter, w_pref, timeout in rows:
             score = 0
@@ -246,9 +247,8 @@ def locked_scheduler(query_factory):
                 elif ttl > 0 and saved_task_position == SavedTaskPositionEnum.FIRST:
                     score = sys.maxsize - ttl  # Earliest saved task first
                 current_app.logger.info(
-                    "locked_scheduler. Task %s added via SAVED_TASK path (bypasses worker_filter). "
-                    "User %s, project %s, w_filter=%s",
-                    task_id, user_id, project_id, w_filter
+                    "locked_scheduler. User can obtain task via saved tasks (bypasses worker_filter) for project %s, task %s, user %s, ttl %s, score %s",
+                    project_id, task_id, user_id, ttl, score
                 )
                 task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
             elif filter_user_prefs:  # Only include when filter requirement is met
@@ -257,16 +257,9 @@ def locked_scheduler(query_factory):
                 meet_requirement = cached_task_browse_helpers.user_meet_task_requirement(task_id, w_filter, user_profile)
                 if meet_requirement:
                     score = cached_task_browse_helpers.get_task_preference_score(w_pref, user_profile)
-                    current_app.logger.info(
-                        "locked_scheduler. Task %s PASSED filter_user_prefs check. User %s, project %s, score=%s",
-                        task_id, user_id, project_id, score
-                    )
+                    current_app.logger.info("locked_scheduler. User met worker filter requirement for project %s, task %s, user_id %s, worker_filter: %s, user_profile: %s, score=%s",
+                                            project_id, task_id, user_id, w_filter, user_profile, score)
                     task_rank_info.append((task_id, taskcount, n_answers, calibration, score, None, timeout))
-                else:
-                    current_app.logger.info(
-                        "locked_scheduler. Task %s EXCLUDED by filter_user_prefs. User %s, project %s, w_filter=%s",
-                        task_id, user_id, project_id, w_filter
-                    )
             else:  # Default/locker schedulers
                 current_app.logger.info(
                     "locked_scheduler. Task %s added via DEFAULT path (no worker_filter check). "
@@ -283,6 +276,7 @@ def locked_scheduler(query_factory):
             if acquire_locks(task_id, user_id, remaining, timeout):
                 # reserve tasks
                 acquire_reserve_task_lock(project_id, task_id, user_id, timeout)
+                current_app.logger.info("locked_scheduler. User acquired lock for project %s, task %s, user %s", project_id, task_id, user_id)
                 return _lock_task_for_user(task_id, project_id, user_id, timeout, calibration)
         return []
 
@@ -472,39 +466,19 @@ def get_locked_task(project_id, user_id=None, limit=1, rand_within_priority=Fals
 
 
 @locked_scheduler
-def _get_user_pref_task_impl(project_id, user_id=None, limit=1, rand_within_priority=False,
-                              task_type='gold_last', filter_user_prefs=True, task_category_filters="",
-                              saved_task_position=None, user_ip=None, external_uid=None, offset=0,
-                              orderby='priority_0', desc=True, task_id=None):
-    """Internal implementation of get_user_pref_task decorated with @locked_scheduler."""
-    return locked_task_sql(project_id, user_id=user_id, limit=limit,
-                           rand_within_priority=rand_within_priority, task_type=task_type,
-                           filter_user_prefs=True, task_category_filters=task_category_filters)
-
-
-def get_user_pref_task(project_id, user_id=None, user_ip=None, external_uid=None,
-                       limit=1, offset=0, orderby='priority_0', desc=True,
-                       rand_within_priority=False, task_type='gold_last',
-                       task_category_filters="", saved_task_position=None, task_id=None, **kwargs):
-    """Select a new task based on user preference set under user profile.
+def get_user_pref_task(project_id, user_id=None, limit=1, rand_within_priority=False,
+                       task_type='gold_last', filter_user_prefs=True, task_category_filters="", saved_task_position=None):
+    """ Select a new task based on user preference set under user profile.
 
     For each incomplete task, check if the number of users working on the task
     is smaller than the number of answers still needed. In that case, acquire
     a lock on the task that matches user preference(if any) with users profile
     and return the task to the user. If offset is nonzero, skip that amount of
     available tasks before returning to the user.
-
-    This wrapper ensures filter_user_prefs=True is always used, regardless of
-    whether the function is called via new_task() or directly.
     """
-    return _get_user_pref_task_impl(
-        project_id, user_id=user_id, user_ip=user_ip, external_uid=external_uid,
-        limit=limit, offset=offset, orderby=orderby, desc=desc,
-        rand_within_priority=rand_within_priority, task_type=task_type,
-        filter_user_prefs=True,  # Always True for user preference scheduler
-        task_category_filters=task_category_filters,
-        saved_task_position=saved_task_position, task_id=task_id
-    )
+    return locked_task_sql(project_id, user_id=user_id, limit=limit,
+                           rand_within_priority=rand_within_priority, task_type=task_type,
+                           filter_user_prefs=True, task_category_filters=task_category_filters)
 
 
 def fetch_lock_for_user(project_id, task_id, user_id):
