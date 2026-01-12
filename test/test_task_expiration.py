@@ -30,7 +30,7 @@ task_repo = TaskRepository(db)
 
 
 class TestTaskExpirationConfig(TestAPI):
-    """Test task expiration configuration with TASK_EXPIRATION and TASK_MAX_EXPIRATION."""
+    """Test task expiration configuration with TASK_DEFAULT_EXPIRATION and TASK_MAX_EXPIRATION."""
 
     @with_context
     def test_task_default_expiration_60_days(self):
