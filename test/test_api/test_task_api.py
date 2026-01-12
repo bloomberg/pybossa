@@ -817,7 +817,7 @@ class TestTaskAPI(TestAPI):
         datajson = json.dumps({'expiration': expiration})
 
         url = '/api/task/%s?api_key=%s' % (task.id, admin.api_key)
-        with patch.dict(self.flask_app.config, {'TASK_DEFAULT_EXPIRATION': 60}):
+        with patch.dict(self.flask_app.config, {'TASK_DEFAULT_EXPIRATION': 60, 'TASK_MAX_EXPIRATION': 60}):
             res = self.app.put(url, data=datajson)
         out = json.loads(res.data)
         assert_equal(res.status, '200 OK', res.data)
