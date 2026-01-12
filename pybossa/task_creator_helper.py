@@ -50,18 +50,25 @@ def s3_conn_type():
 
 def get_task_expiration(expiration, create_time):
     """
-    Given current task expiration, compute new expiration based on
-    1. task creation date and 2. max allowed task expiration
-    do that task expiration cannot be set beyond max task expiration
-    from task creation date
+    Given current task expiration, compute new expiration based on:
+    1. task creation date
+    2. default task expiration (if no expiration is provided)
+    3. max allowed task expiration (cannot be exceeded)
+
+    Returns the minimum of requested expiration and max allowed expiration.
+    If no expiration is provided, uses the default expiration.
     """
-    max_expiration_days = current_app.config.get('TASK_EXPIRATION', 60)
+    default_expiration_days = current_app.config.get('TASK_EXPIRATION', 60)
+    max_expiration_days = current_app.config.get('TASK_MAX_EXPIRATION', 365)
+
+    default_expiration = get_time_plus_delta_ts(create_time, days=default_expiration_days)
     max_expiration = get_time_plus_delta_ts(create_time, days=max_expiration_days)
 
     if expiration and isinstance(expiration, string_types):
+        default_expiration = default_expiration.isoformat()
         max_expiration = max_expiration.isoformat()
 
-    expiration = expiration or max_expiration
+    expiration = expiration or default_expiration
     return min(expiration, max_expiration)
 
 

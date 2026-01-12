@@ -51,7 +51,17 @@ from datetime import datetime
 
 class Repository(object):
 
-    def __init__(self, db, language='english', rdancy_upd_exp=60):
+    def __init__(self, db, language='english', rdancy_upd_exp=365):
+        """
+        Initialize Repository.
+
+        Args:
+            db: Database connection
+            language: Language for full text search (default: 'english')
+            rdancy_upd_exp: Redundancy update expiration window in days (default: 365).
+                           This defines how old a task can be and still have its redundancy
+                           updated. Should match TASK_MAX_EXPIRATION config.
+        """
         self.db = db
         self.language = language
         self.rdancy_upd_exp = rdancy_upd_exp

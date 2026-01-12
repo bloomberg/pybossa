@@ -293,7 +293,7 @@ def setup_repositories(app):
     global helping_repo
     global performance_stats_repo
     language = app.config.get('FULLTEXTSEARCH_LANGUAGE')
-    rdancy_upd_exp = app.config.get('TASK_EXPIRATION', 60)
+    rdancy_upd_exp = app.config.get('TASK_MAX_EXPIRATION', 365)
     user_repo = UserRepository(db)
     project_repo = ProjectRepository(db)
     project_stats_repo = ProjectStatsRepository(db)

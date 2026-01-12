@@ -385,7 +385,11 @@ TTL_ZIP_SEC_FILES = 3
 # Request signature secret key
 # SIGNATURE_SECRET = 'my-sig-secret'
 
+# Default task expiration in days (when no expiration is specified)
 TASK_EXPIRATION=60
+
+# Maximum task expiration in days (cannot be exceeded even if requested)
+TASK_MAX_EXPIRATION=365
 
 # Access control configurations
 ENABLE_ACCESS_CONTROL = True

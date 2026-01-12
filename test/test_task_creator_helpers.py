@@ -24,18 +24,18 @@ class TestGetTaskExpirationDatetime(object):
         assert exp == current_exp
 
     @with_context
-    def test_current_expiration_is_after(self):
+    def test_current_expiration_is_after_max(self):
         now = datetime.utcnow()
-        current_exp = now + timedelta(days=90)
+        current_exp = now + timedelta(days=400)
         exp = get_task_expiration(current_exp, now)
-        assert are_almost_equal(exp, now + timedelta(days=60))
+        assert are_almost_equal(exp, now + timedelta(days=365))
 
     @with_context
-    def test_create_date_is_set(self):
+    def test_expiration_within_max(self):
         now = datetime.utcnow()
         current_exp = now + timedelta(days=90)
         exp = get_task_expiration(current_exp, now)
-        assert are_almost_equal(exp, now + timedelta(days=60))
+        assert are_almost_equal(exp, current_exp)
 
     @with_context
     def test_current_expiration_is_none(self):
@@ -54,12 +54,12 @@ class TestGetTaskExpirationString(object):
         assert to_datetime(exp) == current_exp
 
     @with_context
-    def test_current_expiration_is_after(self):
+    def test_current_expiration_is_after_max(self):
         now = datetime.utcnow()
-        current_exp = now + timedelta(days=90)
+        current_exp = now + timedelta(days=400)
         exp = get_task_expiration(current_exp.isoformat(), now)
         assert are_almost_equal(
-            to_datetime(exp), now + timedelta(days=60))
+            to_datetime(exp), now + timedelta(days=365))
 
     @with_context
     def test_create_date_is_set(self):

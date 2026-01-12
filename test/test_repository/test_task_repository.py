@@ -928,3 +928,101 @@ class TestTaskRepositorySaveDeleteUpdate(Test):
 
         for task in tasks:
             assert task.state == 'completed', task.state
+
+    @with_context
+    def test_update_tasks_redundancy_with_365_day_window(self):
+        """Test update_tasks_redundancy uses 365 day window for task age checks"""
+        from datetime import datetime, timedelta
+
+        project = ProjectFactory.create()
+
+        # Create task 300 days ago (within 365 day window)
+        task_old = TaskFactory.create(project=project, n_answers=1)
+        old_date = datetime.utcnow() - timedelta(days=300)
+        task_old.created = old_date.strftime('%Y-%m-%dT%H:%M:%S.%f')
+        db.session.commit()
+
+        # Create recent task
+        task_recent = TaskFactory.create(project=project, n_answers=1)
+
+        # Update redundancy should work for both tasks
+        self.task_repo.update_tasks_redundancy(project, 2)
+
+        tasks = self.task_repo.filter_tasks_by(project_id=project.id)
+        for task in tasks:
+            assert task.n_answers == 2, f"Task {task.id} should have n_answers=2, got {task.n_answers}"
+
+    @with_context
+    def test_update_tasks_redundancy_beyond_365_days_with_files(self):
+        """Test that completed tasks with files beyond 365 days are not updated"""
+        from datetime import datetime, timedelta
+
+        project = ProjectFactory.create()
+
+        # Create task 400 days ago with file URL, completed
+        task_old = TaskFactory.create(
+            project=project,
+            n_answers=1,
+            state='completed',
+            info={'file__upload_url': 'https://example.com/file.pdf'}
+        )
+        old_date = datetime.utcnow() - timedelta(days=400)
+        task_old.created = old_date.strftime('%Y-%m-%dT%H:%M:%S.%f')
+        db.session.commit()
+
+        # Create recent task
+        task_recent = TaskFactory.create(project=project, n_answers=1)
+
+        # Update redundancy
+        self.task_repo.update_tasks_redundancy(project, 2)
+
+        # Recent task should be updated
+        updated_recent = self.task_repo.get_task(task_recent.id)
+        assert updated_recent.n_answers == 2, "Recent task should be updated"
+
+        # Old task with file should NOT be updated
+        updated_old = self.task_repo.get_task(task_old.id)
+        assert updated_old.n_answers == 1, "Old task with file should not be updated"
+
+    @with_context
+    def test_task_expiration_set_on_save(self):
+        """Test that task expiration is set when saving a task"""
+        from datetime import datetime, timedelta
+
+        project = ProjectFactory.create()
+        task = TaskFactory.build(project=project, n_answers=1)
+
+        # Task should not have expiration before save
+        assert task.expiration is None
+
+        # Save task
+        self.task_repo.save(task)
+
+        # Task should now have expiration set to ~60 days from now
+        assert task.expiration is not None
+        now = datetime.utcnow()
+        days_diff = (task.expiration - now).days
+        assert 59 <= days_diff <= 61, f"Expected ~60 days, got {days_diff}"
+
+    @with_context
+    def test_task_expiration_max_365_days(self):
+        """Test that task expiration cannot exceed 365 days"""
+        from datetime import datetime, timedelta
+
+        project = ProjectFactory.create()
+
+        # Try to create task with 400 day expiration
+        far_future = datetime.utcnow() + timedelta(days=400)
+        task = TaskFactory.build(
+            project=project,
+            n_answers=1,
+            expiration=far_future
+        )
+
+        # Save task
+        self.task_repo.save(task)
+
+        # Expiration should be capped at 365 days
+        now = datetime.utcnow()
+        days_diff = (task.expiration - now).days
+        assert 364 <= days_diff <= 366, f"Expected ~365 days (capped), got {days_diff}"
