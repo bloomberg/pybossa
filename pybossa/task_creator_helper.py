@@ -58,18 +58,11 @@ def get_task_expiration(expiration, create_time):
     Returns the minimum of requested expiration and max allowed expiration.
     If no expiration is provided, uses the default expiration.
     """
-    default_expiration_days = current_app.config.get('TASK_EXPIRATION', 60)
+    default_expiration_days = current_app.config.get('TASK_DEFAULT_EXPIRATION', 60)
     max_expiration_days = current_app.config.get('TASK_MAX_EXPIRATION', 365)
 
-    default_expiration = get_time_plus_delta_ts(create_time, days=default_expiration_days)
-    max_expiration = get_time_plus_delta_ts(create_time, days=max_expiration_days)
-
-    if expiration and isinstance(expiration, string_types):
-        default_expiration = default_expiration.isoformat()
-        max_expiration = max_expiration.isoformat()
-
-    expiration = expiration or default_expiration
-    return min(expiration, max_expiration)
+    exp_days = min(expiration if expiration is not None else default_expiration_days, max_expiration_days)
+    return get_time_plus_delta_ts(create_time, days=exp_days).isoformat()
 
 
 def set_gold_answers(task, gold_answers):
