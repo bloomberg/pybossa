@@ -219,8 +219,10 @@ class BaseClientBucketAdapter:
         return BaseClientKeyAdapter(self.connection, self.name, key_name)
 
     def copy_key(self, source_key, target_key, **kwargs):
-        source_bucket = self.name
-        self.connection.copy_key(self.name, source_key, target_key, **kwargs)
+        # Handle both string key names and Key objects
+        source_key_name = source_key.name if hasattr(source_key, 'name') else source_key
+        target_key_name = target_key.name if hasattr(target_key, 'name') else target_key
+        self.connection.copy_key(self.name, source_key_name, target_key_name, **kwargs)
 
 
 class BaseClientKeyAdapter:
