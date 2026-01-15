@@ -289,7 +289,7 @@ class TestReserveTaskCategory(sched.Helper):
         # release reserve task lock
         expiry = 1
         release_reserve_task_lock_by_id(project.id, task.id, user.id, timeout, expiry=expiry)
-        time.sleep(expiry)
+        time.sleep(expiry + 0.1)
         assert expected_reserve_task_key.encode() not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
 
         # test releasing multiple locks
@@ -306,7 +306,7 @@ class TestReserveTaskCategory(sched.Helper):
 
         release_reserve_task_lock_by_id(project.id, tasks[0].id, user.id, timeout,
                                         expiry=expiry, release_all_task=True)
-        time.sleep(expiry)
+        time.sleep(expiry + 0.1)
         for task in tasks:
             category_key = ":".join([f"{field}:{task.info[field]}" for field in category_fields])
             expected_reserve_task_key = f"reserve_task:project:{project.id}:category:{category_key}:user:{user.id}:task:{task.id}"

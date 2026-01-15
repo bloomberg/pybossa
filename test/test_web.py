@@ -9748,7 +9748,7 @@ class TestWeb(web.Helper):
 
     @with_context
     def test_task_redundancy_update_tasks_created_within_max_date_range(self):
-        """Test task redundancy update applies to tasks created within days as per configured under TASK_EXPIRATION"""
+        """Test task redundancy update applies to tasks created within days as per configured under TASK_DEFAULT_EXPIRATION"""
 
         self.register()
         self.signin()
