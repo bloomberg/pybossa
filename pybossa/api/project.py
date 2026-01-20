@@ -160,6 +160,13 @@ class ProjectAPI(APIBase):
             raise ValueError(msg)
         ensure_user_assignment_to_project(project)
         validate_ownership_id(project.info.get('ownership_id'))
+        self._validate_task_filter_fields(project)
+
+    def _validate_task_filter_fields(self, project):
+        """Validate task_filter_fields is a list when provided."""
+        task_filter_fields = project.info.get('task_filter_fields')
+        if task_filter_fields is not None and not isinstance(task_filter_fields, list):
+            raise BadRequest("task_filter_fields must be a list")
 
     def _log_changes(self, old_project, new_project):
         auditlogger.add_log_entry(old_project, new_project, current_user)

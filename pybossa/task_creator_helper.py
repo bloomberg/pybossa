@@ -211,7 +211,6 @@ def read_encrypted_file(store, project, bucket, key_name):
 
 def generate_checksum(project_id, task):
     from pybossa.cache.projects import get_project_data
-    from pybossa.core import private_required_fields
 
     if not (task and isinstance(task, dict) and "info" in task):
         return
@@ -239,59 +238,9 @@ def generate_checksum(project_id, task):
 
     task_contents = {}
     if current_app.config.get("PRIVATE_INSTANCE") and dup_task_config:
-        # csv import under private instance, may contain private data under _priv cols
-        # prior to this call, sucn _priv columns are combined together into task.private_fields
-        # collect fieldname and value from private_fields that are not part of task.info
-        private_fields = task.get('private_fields', None)
-        if private_fields:
-            for field, value in private_fields.items():
-                task_contents[field] = value
-
-        for field, value in task_info.items():
-            # private required fields are excluded from building duplicate checksum
-            if field in private_required_fields:
-                continue
-
-            if field.endswith("__upload_url"):
-                current_app.logger.info("generate_checksum file payload name %s, path %s", field, value)
-                tokens = value.split("/")
-                count_slash = value.count("/")
-                if count_slash >= 6 and tokens[1] == "fileproxy" and tokens[2] == "encrypted":
-                    store = tokens[3]
-                    bucket = tokens[4]
-                    project_id_from_url = int(tokens[5])
-                    current_app.logger.info("generate_checksum file tokens %s", str(tokens))
-                    if int(project_id) != project_id_from_url:
-                        current_app.logger.info("error computing duplicate checksum. incorrect project id in url path. project id expected %s vs actual %s, url %s",
-                                                str(project_id), str(project_id_from_url), str(value))
-                        continue
-
-                    path = "/".join((tokens[5:]))
-                    try:
-                        current_app.logger.info("generate_checksum parsed file info. store %s, bucket %s, path %s", store, bucket, path)
-                        content, _ = read_encrypted_file(store, project, bucket, path)
-                        content = json.loads(content)
-                        task_contents.update(content)
-                    except Exception as e:
-                        current_app.logger.info("error generating duplicate checksum with url contents for project %s, %s, %s %s",
-                                                str(project_id), field, str(value), str(e))
-                        raise Exception(f"Error generating duplicate checksum with url contents. url {field}, {value}")
-                else:
-                    current_app.logger.info("error parsing task data url to compute duplicate checksum %s, %s", field, str(value))
-            elif field == "private_json__encrypted_payload":
-                try:
-                    secret = get_encryption_key(project)
-                    cipher = AESWithGCM(secret) if secret else None
-                    encrypted_content = task_info.get("private_json__encrypted_payload")
-                    content = cipher.decrypt(encrypted_content) if cipher else encrypted_content
-                    content = json.loads(content)
-                    task_contents.update(content)
-                except Exception as e:
-                    current_app.logger.info("error generating duplicate checksum with encrypted payload for project %s, %s, %s %s",
-                                            str(project_id), field, str(value), str(e))
-                    raise Exception(f"Error generating duplicate checksum with encrypted payload. {field}, {value}")
-            else:
-                task_contents[field] = value
+        task_contents = extract_task_contents_from_files(
+            project_id, project, task, task_info
+        )
     else:
         # with duplicate check not configured, consider all task fields
         task_contents = task_info
@@ -309,3 +258,82 @@ def generate_checksum(project_id, task):
         task_payload["private_fields_keys"] = list(private_fields.keys()) if private_fields else []
         current_app.logger.info("error generating duplicate checksum for project id %s, error %s, task payload %s", str(project_id), str(e), json.dumps(task_payload))
         raise Exception(f"Error generating duplicate checksum due to missing checksum configured fields {checksum_fields}")
+
+
+def extract_task_contents_from_files(project_id, project, task, task_info):
+    """
+    Extract task contents from files for tasks containing encrypted file references.
+
+    This function processes task info fields and extracts actual content from:
+    - Private fields stored separately
+    - Encrypted files referenced via __upload_url fields
+    - Encrypted payloads in private_json__encrypted_payload
+
+    Args:
+        project_id: The project ID
+        project: The project data dictionary
+        task: The task dictionary containing 'info' and optionally 'private_fields'
+        task_info: The filtered task info dictionary (reserved columns removed)
+
+    Returns:
+        dict: Task contents with file contents extracted and decrypted
+    """
+    from pybossa.core import private_required_fields
+
+    task_contents = {}
+
+    # csv import under private instance, may contain private data under _priv cols
+    # prior to this call, such _priv columns are combined together into task.private_fields
+    # collect fieldname and value from private_fields that are not part of task.info
+    private_fields = task.get('private_fields', None)
+    if private_fields:
+        for field, value in private_fields.items():
+            task_contents[field] = value
+
+    for field, value in task_info.items():
+        # private required fields are excluded from building duplicate checksum
+        if field in private_required_fields:
+            continue
+
+        if field.endswith("__upload_url"):
+            current_app.logger.info("extract_task_contents_from_files file payload name %s, path %s", field, value)
+            tokens = value.split("/")
+            count_slash = value.count("/")
+            if count_slash >= 6 and tokens[1] == "fileproxy" and tokens[2] == "encrypted":
+                store = tokens[3]
+                bucket = tokens[4]
+                project_id_from_url = int(tokens[5])
+                current_app.logger.info("extract_task_contents_from_files file tokens %s", str(tokens))
+                if int(project_id) != project_id_from_url:
+                    current_app.logger.info("error extracting task contents. incorrect project id in url path. project id expected %s vs actual %s, url %s",
+                                            str(project_id), str(project_id_from_url), str(value))
+                    continue
+
+                path = "/".join((tokens[5:]))
+                try:
+                    current_app.logger.info("extract_task_contents_from_files parsed file info. store %s, bucket %s, path %s", store, bucket, path)
+                    content, _ = read_encrypted_file(store, project, bucket, path)
+                    content = json.loads(content)
+                    task_contents.update(content)
+                except Exception as e:
+                    current_app.logger.info("error extracting task contents with url contents for project %s, %s, %s %s",
+                                            str(project_id), field, str(value), str(e))
+                    raise Exception(f"Error extracting task contents with url contents. url {field}, {value}")
+            else:
+                current_app.logger.info("error parsing task data url to extract task contents %s, %s", field, str(value))
+        elif field == "private_json__encrypted_payload":
+            try:
+                secret = get_encryption_key(project)
+                cipher = AESWithGCM(secret) if secret else None
+                encrypted_content = task_info.get("private_json__encrypted_payload")
+                content = cipher.decrypt(encrypted_content) if cipher else encrypted_content
+                content = json.loads(content)
+                task_contents.update(content)
+            except Exception as e:
+                current_app.logger.info("error extracting task contents with encrypted payload for project %s, %s, %s %s",
+                                        str(project_id), field, str(value), str(e))
+                raise Exception(f"Error extracting task contents with encrypted payload. {field}, {value}")
+        else:
+            task_contents[field] = value
+
+    return task_contents
