@@ -163,7 +163,7 @@ requirements = [
     "WTForms-Components==0.10.5",
     "xmlsec==1.3.13",
     "yacryptopan==1.0.1",
-    "zipp==3.5.1"
+    "zipp==3.19.1"
 ]
 
 setup(
