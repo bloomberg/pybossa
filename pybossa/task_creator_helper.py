@@ -209,7 +209,19 @@ def read_encrypted_file(store, project, bucket, key_name):
     return decrypted, key
 
 
-def generate_checksum(project_id, task):
+def generate_checksum(project_id, task, task_contents=None):
+    """
+    Generate a checksum for duplicate task detection.
+
+    Args:
+        project_id: The project ID
+        task: The task dictionary containing 'info'
+        task_contents: Optional pre-extracted task contents from files.
+                       If provided, skips extraction to avoid redundant file reads.
+
+    Returns:
+        str: The checksum value, or None if checksum cannot be generated
+    """
     from pybossa.cache.projects import get_project_data
 
     if not (task and isinstance(task, dict) and "info" in task):
@@ -236,14 +248,15 @@ def generate_checksum(project_id, task):
     dup_task_config = project.info.get("duplicate_task_check", {})
     dup_fields_configured = dup_task_config.get("duplicate_fields", [])
 
-    task_contents = {}
-    if current_app.config.get("PRIVATE_INSTANCE") and dup_task_config:
-        task_contents = extract_task_contents_from_files(
-            project_id, project, task, task_info
-        )
-    else:
-        # with duplicate check not configured, consider all task fields
-        task_contents = task_info
+    # Use provided task_contents or extract from files if needed
+    if task_contents is None:
+        if current_app.config.get("PRIVATE_INSTANCE") and dup_task_config:
+            task_contents = extract_task_contents_from_files(
+                project_id, project, task, task_info
+            )
+        else:
+            # with duplicate check not configured, consider all task fields
+            task_contents = task_info
 
     checksum_fields = task_contents.keys() if not dup_fields_configured else dup_fields_configured
     try:
@@ -258,6 +271,111 @@ def generate_checksum(project_id, task):
         task_payload["private_fields_keys"] = list(private_fields.keys()) if private_fields else []
         current_app.logger.info("error generating duplicate checksum for project id %s, error %s, task payload %s", str(project_id), str(e), json.dumps(task_payload))
         raise Exception(f"Error generating duplicate checksum due to missing checksum configured fields {checksum_fields}")
+
+
+def set_task_filter_fields(project_id, task, task_contents=None):
+    """
+    Set task filter field values from file contents into task.info for configured task_filter_fields.
+
+    On PRIVATE_INSTANCE, when task_filter_fields are configured for a project, this function
+    extracts field values from encrypted files and stores them in task.info for filtering purposes.
+    Fields already present in task.info are not overwritten.
+
+    Args:
+        project_id: The project ID
+        task: The task dictionary containing 'info'. Will be modified in place.
+        task_contents: Optional pre-extracted task contents from files.
+                       If provided, skips extraction to avoid redundant file reads.
+
+    Returns:
+        dict: The extracted task_contents (useful for chaining with generate_checksum),
+              or None if extraction was not needed
+    """
+    from pybossa.cache.projects import get_project_data
+
+    if not current_app.config.get("PRIVATE_INSTANCE"):
+        return None
+
+    if not (task and isinstance(task, dict) and "info" in task):
+        return None
+
+    project = get_project_data(project_id)
+    if not project:
+        current_app.logger.info("set_task_filter_fields skipped. Incorrect project id %s", str(project_id))
+        return None
+
+    task_filter_fields = project.info.get("task_filter_fields", [])
+    if not task_filter_fields:
+        return None
+
+    if not isinstance(task["info"], dict):
+        current_app.logger.info("set_task_filter_fields skipped for project %s. Task.info type is %s, expected dict",
+                                str(project_id), str(type(task["info"])))
+        return None
+
+    # Extract task contents from files if not already provided
+    if task_contents is None:
+        task_reserved_cols = current_app.config.get("TASK_RESERVED_COLS", [])
+        task_info = {k:v for k, v in task["info"].items() if k not in task_reserved_cols}
+        task_contents = extract_task_contents_from_files(
+            project_id, project, task, task_info
+        )
+
+    # Set filter field values in task.info only if not already present
+    for field in task_filter_fields:
+        if field in task_contents and field not in task["info"]:
+            task["info"][field] = task_contents[field]
+            current_app.logger.info("set_task_filter_fields: project %s, set filter field %s",
+                                    str(project_id), field)
+
+    return task_contents
+
+
+def get_task_contents_for_processing(project_id, task):
+    """
+    Extract task contents from files for use in both generate_checksum and set_task_filter_fields.
+
+    This is an optimization function that extracts file contents once when both
+    duplicate checking and task filter fields are configured.
+
+    Args:
+        project_id: The project ID
+        task: The task dictionary containing 'info'
+
+    Returns:
+        tuple: (task_contents, project) where task_contents is the extracted dict
+               and project is the project data. Returns (None, None) if extraction not needed.
+    """
+    from pybossa.cache.projects import get_project_data
+
+    if not current_app.config.get("PRIVATE_INSTANCE"):
+        return None, None
+
+    if not (task and isinstance(task, dict) and "info" in task):
+        return None, None
+
+    project = get_project_data(project_id)
+    if not project:
+        return None, None
+
+    if not isinstance(task["info"], dict):
+        return None, None
+
+    # Check if extraction is needed for either duplicate check or task filter fields
+    dup_task_config = project.info.get("duplicate_task_check", {})
+    task_filter_fields = project.info.get("task_filter_fields", [])
+
+    if not (dup_task_config or task_filter_fields):
+        return None, project
+
+    task_reserved_cols = current_app.config.get("TASK_RESERVED_COLS", [])
+    task_info = {k:v for k, v in task["info"].items() if k not in task_reserved_cols}
+
+    task_contents = extract_task_contents_from_files(
+        project_id, project, task, task_info
+    )
+
+    return task_contents, project
 
 
 def extract_task_contents_from_files(project_id, project, task, task_info):
