@@ -334,3 +334,69 @@ class TestReserveTaskCategory(sched.Helper):
         )[0]
         reserve_key = get_reserve_task_key(task.id)
         assert reserve_key == expected_key, "reserve key expected to be {}".format(expected_key)
+
+    @with_context
+    @patch('pybossa.sched.release_reserve_task_lock_by_keys')
+    @patch('pybossa.sched.get_reserve_task_category_info')
+    def test_locked_scheduler_retries_excluding_user_categories(self, mock_get_category_info, mock_release_lock):
+        """Test that locked_scheduler retries with exclude_user=True when no tasks found with user's reserved categories"""
+        from pybossa.sched import get_user_pref_task
+
+        category_fields = ["field_1", "field_2"]
+        user = UserFactory.create()
+        project = ProjectFactory.create(
+            owner=user,
+            info=dict(
+                sched="task_queue_scheduler",
+                reserve_tasks=dict(
+                    category=category_fields
+                )
+            )
+        )
+
+        # Create a task that will be returned on second query
+        task = TaskFactory.create(
+            project=project, n_answers=2,
+            info=dict(field_1="abc", field_2=123)
+        )
+
+        # First call returns category keys (simulating user has reserved categories)
+        # Second call (with exclude_user=True) returns different filter
+        initial_category_keys = [
+            f"reserve_task:project:{project.id}:category:field_1:abc:field_2:123:user:{user.id}:task:999"
+        ]
+        mock_get_category_info.side_effect = [
+            (" AND (task.info->>'field_1' = 'nonexistent') ", initial_category_keys),  # First call - filter that matches nothing
+            ("", [])  # Second call with exclude_user=True - no filter
+        ]
+
+        # Call the scheduler - it should retry when first query returns no results
+        tasks = get_user_pref_task(
+            project.id,
+            user_id=user.id,
+            user_ip=None,
+            external_uid=None,
+            limit=1,
+            offset=0
+        )
+
+        # Verify release_reserve_task_lock_by_keys was called with initial category keys
+        mock_release_lock.assert_called_once()
+
+        # Verify get_reserve_task_category_info was called twice
+        # First without exclude_user, second with exclude_user=True
+        assert mock_get_category_info.call_count == 2
+        first_call_args = mock_get_category_info.call_args_list[0]
+        second_call_args = mock_get_category_info.call_args_list[1]
+
+        # First call should not have exclude_user=True (default is False)
+        # Check positional args or kwargs
+        first_exclude_user = first_call_args.kwargs.get('exclude_user', False) if first_call_args.kwargs else False
+        assert first_exclude_user == False, f"First call exclude_user should be False, got {first_exclude_user}"
+
+        # Second call should have exclude_user=True
+        second_exclude_user = second_call_args.kwargs.get('exclude_user', False) if second_call_args.kwargs else False
+        if not second_exclude_user and len(second_call_args.args) > 4:
+            second_exclude_user = second_call_args.args[4]
+        assert second_exclude_user == True, f"Second call exclude_user should be True, got {second_exclude_user}"
+
