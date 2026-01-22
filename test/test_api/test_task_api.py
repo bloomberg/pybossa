@@ -1689,3 +1689,59 @@ class TestTaskAPI(TestAPI):
         task = json.loads(res.data)
         assert "non_existent_field" not in task["info"]
         assert task["info"]["other_field"] == "value"
+
+    @with_context
+    @patch("pybossa.api.task.get_task_contents_for_processing")
+    def test_create_task_get_task_contents_exception(self, mock_get_contents):
+        """Test task creation fails when get_task_contents_for_processing raises exception"""
+        mock_get_contents.side_effect = Exception("Failed to extract task contents")
+
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={})
+
+        task_data = dict(
+            project_id=project.id,
+            info={"field_a": "value_a"}
+        )
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+
+        assert res.status_code == 400, res
+        error = json.loads(res.data)
+        assert "Failed to extract task contents" in error["exception_msg"]
+
+    @with_context
+    @patch("pybossa.api.task.set_task_filter_fields")
+    @patch("pybossa.api.task.get_task_contents_for_processing")
+    def test_create_task_set_filter_fields_exception(self, mock_get_contents, mock_set_filter):
+        """Test task creation fails when set_task_filter_fields raises exception"""
+        mock_get_contents.return_value = ({}, False)
+        mock_set_filter.side_effect = Exception("Failed to set filter fields")
+
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "task_filter_fields": ["routing_flag"]
+            })
+
+        task_data = dict(
+            project_id=project.id,
+            info={"field_a": "value_a"}
+        )
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+
+        assert res.status_code == 400, res
+        error = json.loads(res.data)
+        assert "Failed to set filter fields" in error["exception_msg"]

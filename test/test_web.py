@@ -10875,10 +10875,6 @@ class TestWeb(web.Helper):
     @with_context
     def test_get_task_contents_for_processing_not_private_instance(self):
         """Test get_task_contents_for_processing returns None when not PRIVATE_INSTANCE"""
-        from flask import current_app
-
-        current_app.config["PRIVATE_INSTANCE"] = False
-
         subadmin = UserFactory.create(subadmin=True)
         self.signin_user(subadmin)
         project = ProjectFactory.create(
@@ -10888,10 +10884,11 @@ class TestWeb(web.Helper):
 
         task_payload = {"id": 1, "info": {"x": 1}}
 
-        task_contents, returned_project = get_task_contents_for_processing(
-            project_id=project.id,
-            task=task_payload
-        )
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': False}):
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=project.id,
+                task=task_payload
+            )
 
         assert task_contents is None
         assert returned_project is None
@@ -10899,10 +10896,6 @@ class TestWeb(web.Helper):
     @with_context
     def test_get_task_contents_for_processing_no_configs(self):
         """Test get_task_contents_for_processing returns None when no dup_check or filter_fields configured"""
-        from flask import current_app
-
-        current_app.config["PRIVATE_INSTANCE"] = True
-
         subadmin = UserFactory.create(subadmin=True)
         self.signin_user(subadmin)
         project = ProjectFactory.create(
@@ -10912,13 +10905,77 @@ class TestWeb(web.Helper):
 
         task_payload = {"id": 1, "info": {"x": 1}}
 
-        task_contents, returned_project = get_task_contents_for_processing(
-            project_id=project.id,
-            task=task_payload
-        )
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=project.id,
+                task=task_payload
+            )
 
         assert task_contents is None
         assert returned_project is not None  # project is returned even when extraction not needed
+
+    @with_context
+    def test_get_task_contents_for_processing_invalid_task(self):
+        """Test get_task_contents_for_processing returns None when task is invalid"""
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            # Test with None task
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=1,
+                task=None
+            )
+            assert task_contents is None
+            assert returned_project is None
+
+            # Test with non-dict task
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=1,
+                task="not a dict"
+            )
+            assert task_contents is None
+            assert returned_project is None
+
+            # Test with dict missing "info" key
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=1,
+                task={"id": 1}
+            )
+            assert task_contents is None
+            assert returned_project is None
+
+    @with_context
+    def test_get_task_contents_for_processing_project_not_found(self):
+        """Test get_task_contents_for_processing returns None when project not found"""
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            task_payload = {"id": 1, "info": {"x": 1}}
+
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=999999,  # Non-existent project
+                task=task_payload
+            )
+
+            assert task_contents is None
+            assert returned_project is None
+
+    @with_context
+    def test_get_task_contents_for_processing_task_info_not_dict(self):
+        """Test get_task_contents_for_processing returns None when task.info is not a dict"""
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={"task_filter_fields": ["field_a"]})
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            task_payload = {"id": 1, "info": "not a dict"}
+
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=project.id,
+                task=task_payload
+            )
+
+            assert task_contents is None
+            assert returned_project is None
 
 
 class TestWebUserMetadataUpdate(web.Helper):
