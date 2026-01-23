@@ -227,7 +227,7 @@ class Importer(object):
                 # Extract task contents once for both checksum and filter fields (optimization)
                 task_contents, _ = get_task_contents_for_processing(project_id=project.id, task=task_data)
                 dup_checksum = generate_checksum(project_id=project.id, task=task_data, task_contents=task_contents)
-                set_task_filter_fields(project_id=project.id, task=task_data, task_contents=task_contents)
+                set_task_filter_fields(project=project, task=task_data, task_contents=task_contents)
 
                 self.upload_private_data(task_data, project.id)
                 task = Task(project_id=project.id, n_answers=n_answers, dup_checksum=dup_checksum)

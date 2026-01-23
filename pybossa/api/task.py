@@ -108,7 +108,7 @@ class TaskAPI(APIBase):
 
         # Set task filter fields from file contents (uses same task_contents)
         try:
-            set_task_filter_fields(project_id=project_id, task=data, task_contents=task_contents)
+            set_task_filter_fields(project=project, task=data, task_contents=task_contents)
         except Exception as e:
             current_app.logger.info("Project %d. Error setting task filter fields %s", project_id, str(e))
             raise BadRequest(str(e))

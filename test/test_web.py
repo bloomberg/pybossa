@@ -10635,7 +10635,7 @@ class TestWeb(web.Helper):
             })
 
         task_payload = {"id": 1, "info": {"x": 1, "y": 2}}
-        result = set_task_filter_fields(project_id=project.id, task=task_payload)
+        result = set_task_filter_fields(project=project, task=task_payload)
         assert result is None
 
     @with_context
@@ -10652,7 +10652,7 @@ class TestWeb(web.Helper):
             info={})  # no task_filter_fields
 
         task_payload = {"id": 1, "info": {"x": 1, "y": 2}}
-        result = set_task_filter_fields(project_id=project.id, task=task_payload)
+        result = set_task_filter_fields(project=project, task=task_payload)
         assert result is None
 
     @with_context
@@ -10669,7 +10669,7 @@ class TestWeb(web.Helper):
             info={"task_filter_fields": []})
 
         task_payload = {"id": 1, "info": {"x": 1, "y": 2}}
-        result = set_task_filter_fields(project_id=project.id, task=task_payload)
+        result = set_task_filter_fields(project=project, task=task_payload)
         assert result is None
 
     @with_context
@@ -10686,15 +10686,15 @@ class TestWeb(web.Helper):
             info={"task_filter_fields": ["field_a"]})
 
         # None task
-        result = set_task_filter_fields(project_id=project.id, task=None)
+        result = set_task_filter_fields(project=project, task=None)
         assert result is None
 
         # Task without info
-        result = set_task_filter_fields(project_id=project.id, task={"id": 1})
+        result = set_task_filter_fields(project=project, task={"id": 1})
         assert result is None
 
         # Task with non-dict info
-        result = set_task_filter_fields(project_id=project.id, task={"id": 1, "info": "not a dict"})
+        result = set_task_filter_fields(project=project, task={"id": 1, "info": "not a dict"})
         assert result is None
 
     @with_context
@@ -10704,7 +10704,7 @@ class TestWeb(web.Helper):
 
         current_app.config["PRIVATE_INSTANCE"] = True
         task_payload = {"id": 1, "info": {"x": 1, "y": 2}}
-        result = set_task_filter_fields(project_id=99999, task=task_payload)
+        result = set_task_filter_fields(project=None, task=task_payload)
         assert result is None
 
     @with_context
@@ -10722,7 +10722,7 @@ class TestWeb(web.Helper):
 
         # Task already has filter fields in info - should not be overwritten
         task_payload = {"id": 1, "info": {"field_a": "value_a", "field_b": "value_b", "other": "data"}}
-        result = set_task_filter_fields(project_id=project.id, task=task_payload)
+        result = set_task_filter_fields(project=project, task=task_payload)
 
         # Filter fields already in task.info should remain unchanged
         assert task_payload["info"]["field_a"] == "value_a"
@@ -10756,7 +10756,7 @@ class TestWeb(web.Helper):
             }
         }
 
-        result = set_task_filter_fields(project_id=project.id, task=task_payload)
+        result = set_task_filter_fields(project=project, task=task_payload)
 
         # Filter fields should be added to task.info from file contents
         assert task_payload["info"]["field_a"] == "from_file_a"
@@ -10793,7 +10793,7 @@ class TestWeb(web.Helper):
             }
         }
 
-        result = set_task_filter_fields(project_id=project.id, task=task_payload)
+        result = set_task_filter_fields(project=project, task=task_payload)
 
         # field_a should retain its original value (not overwritten)
         assert task_payload["info"]["field_a"] == "existing_value"
@@ -10822,7 +10822,7 @@ class TestWeb(web.Helper):
         pre_extracted_contents = {"field_a": "pre_extracted_a", "field_b": "pre_extracted_b", "field_c": "pre_extracted_c"}
 
         result = set_task_filter_fields(
-            project_id=project.id,
+            project=project,
             task=task_payload,
             task_contents=pre_extracted_contents
         )

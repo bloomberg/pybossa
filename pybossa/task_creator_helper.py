@@ -273,7 +273,7 @@ def generate_checksum(project_id, task, task_contents=None):
         raise Exception(f"Error generating duplicate checksum due to missing checksum configured fields {checksum_fields}")
 
 
-def set_task_filter_fields(project_id, task, task_contents=None):
+def set_task_filter_fields(project, task, task_contents=None):
     """
     Set task filter field values from file contents into task.info for configured task_filter_fields.
 
@@ -282,7 +282,7 @@ def set_task_filter_fields(project_id, task, task_contents=None):
     Fields already present in task.info are not overwritten.
 
     Args:
-        project_id: The project ID
+        project: The project object or project data dictionary
         task: The task dictionary containing 'info'. Will be modified in place.
         task_contents: Optional pre-extracted task contents from files.
                        If provided, skips extraction to avoid redundant file reads.
@@ -291,21 +291,20 @@ def set_task_filter_fields(project_id, task, task_contents=None):
         dict: The extracted task_contents (useful for chaining with generate_checksum),
               or None if extraction was not needed
     """
-    from pybossa.cache.projects import get_project_data
-
     if not current_app.config.get("PRIVATE_INSTANCE"):
         return None
 
     if not (task and isinstance(task, dict) and "info" in task):
         return None
 
-    project = get_project_data(project_id)
     if not project:
-        current_app.logger.info("set_task_filter_fields skipped. Incorrect project id %s", str(project_id))
+        current_app.logger.info("set_task_filter_fields skipped. No project provided")
         return None
 
-    task_filter_fields = project.info.get("task_filter_fields", [])
+    project_id = project.id if hasattr(project, 'id') else project.get('id')
+    task_filter_fields = project.info.get("task_filter_fields", []) if hasattr(project, 'info') else project.get('info', {}).get("task_filter_fields", [])
     if not task_filter_fields:
+        return None
         return None
 
     if not isinstance(task["info"], dict):
