@@ -460,6 +460,7 @@ class APIBase(MethodView):
                                          new_upload=data)
             self.refresh_cache(cls_name, oid)
             response_dict = inst.dictize()
+            self._customize_response_dict(response_dict)
             message = f"Updated {cls_name}"
             self._log_operation(message, info=response_dict)
             return Response(json.dumps(response_dict), 200,

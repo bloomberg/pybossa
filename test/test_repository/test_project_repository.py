@@ -389,6 +389,105 @@ class TestProjectRepositoryForProjects(Test):
             self.project_repo.save(project)
         assert err.exception.description == "Invalid subproduct"
 
+    @with_context
+    def test_save_with_deprecated_product_succeeds(self):
+        """Test save with deprecated products does not generate warnings in repository layer"""
+        test_config = {
+            'DEPRECATED_PRODUCTS_SUBPRODUCTS': {
+                'Old Product': ['Valid Subproduct']
+            },
+            'PRODUCTS_SUBPRODUCTS': {
+                'Old Product': ['Valid Subproduct']
+            }
+        }
+
+        with patch.dict(self.flask_app.config, test_config):
+            project = ProjectFactory.build()
+            project.info.update(self.project_info)
+            project.info['product'] = 'Old Product'
+            project.info['subproduct'] = 'Valid Subproduct'
+            project.set_password('hello')
+
+            self.project_repo.save(project)
+
+            # Repository should not generate warnings
+            assert 'warnings' not in project.info
+
+            # Project should be saved successfully
+            saved_project = self.project_repo.get(project.id)
+            assert saved_project is not None
+            assert saved_project.info['product'] == 'Old Product'
+
+
+    @with_context
+    def test_deprecated_products_dont_interfere_with_validation(self):
+        """Test that deprecated (but valid) products don't interfere with core validation"""
+        test_config = {
+            'DEPRECATED_PRODUCTS_SUBPRODUCTS': {
+                'Old Product': ['Valid Subproduct']
+            },
+            'PRODUCTS_SUBPRODUCTS': {
+                'Old Product': ['Valid Subproduct']
+            }
+        }
+
+        with patch.dict(self.flask_app.config, test_config):
+            project = ProjectFactory.build()
+            project.info.update(self.project_info)
+            project.info['product'] = 'Old Product'
+            project.info['subproduct'] = 'Valid Subproduct'
+            project.set_password('hello')
+
+            # Should save successfully even with deprecated product
+            self.project_repo.save(project)
+
+            saved_project = self.project_repo.get(project.id)
+            assert saved_project is not None
+            assert saved_project.info['product'] == 'Old Product'
+
+            # But invalid products should still fail validation
+            invalid_project = ProjectFactory.build()
+            invalid_project.info.update(self.project_info)
+            invalid_project.info['product'] = 'Invalid Product'
+            invalid_project.set_password('hello')
+
+            with assert_raises(BadRequest) as err:
+                self.project_repo.save(invalid_project)
+            assert err.exception.description == "Invalid product"
+
+    @with_context
+    def test_update_with_deprecated_products_succeeds(self):
+        """Test update with deprecated (but valid) products succeeds without generating warnings"""
+        test_config = {
+            'DEPRECATED_PRODUCTS_SUBPRODUCTS': {
+                'Old Product': ['Valid Subproduct']
+            },
+            'PRODUCTS_SUBPRODUCTS': {
+                'Old Product': ['Valid Subproduct'],
+                'Valid Product': ['Valid Subproduct']
+            }
+        }
+
+        with patch.dict(self.flask_app.config, test_config):
+            project = ProjectFactory.build()
+            project.info.update(self.project_info)
+            project.info['product'] = 'Valid Product'
+            project.info['subproduct'] = 'Valid Subproduct'
+            project.set_password('hello')
+
+            self.project_repo.save(project)
+
+            # Update to use deprecated product
+            project.info['product'] = 'Old Product'
+            project.name = 'Updated Project'
+
+            self.project_repo.update(project)
+
+            updated_project = self.project_repo.get(project.id)
+            assert updated_project.name == 'Updated Project'
+            assert updated_project.info['product'] == 'Old Product'
+            assert 'warnings' not in updated_project.info
+
 
     @with_context
     def test_save_only_saves_projects(self):

@@ -160,6 +160,13 @@ class ProjectAPI(APIBase):
             raise ValueError(msg)
         ensure_user_assignment_to_project(project)
         validate_ownership_id(project.info.get('ownership_id'))
+        self._validate_task_filter_fields(project)
+
+    def _validate_task_filter_fields(self, project):
+        """Validate task_filter_fields is a list when provided."""
+        task_filter_fields = project.info.get('task_filter_fields')
+        if task_filter_fields is not None and not isinstance(task_filter_fields, list):
+            raise BadRequest("task_filter_fields must be a list")
 
     def _log_changes(self, old_project, new_project):
         auditlogger.add_log_entry(old_project, new_project, current_user)
@@ -220,3 +227,54 @@ class ProjectAPI(APIBase):
 
     def _after_save(self, original_data, instance):
         delete_memoized(get_project_data, instance.id)
+
+    def _customize_response_dict(self, response_dict):
+        """Customize the response dictionary to include dynamically generated warnings."""
+        # Generate warnings dynamically based on current configuration
+        project_info = response_dict.get('info', {})
+        product = project_info.get('product')
+        subproduct = project_info.get('subproduct')
+
+        if product and subproduct:
+            warnings = self._generate_product_subproduct_warnings(product, subproduct)
+            if warnings:
+                response_dict['warnings'] = warnings
+
+        return response_dict
+
+
+    def _is_product_or_subproduct_deprecated(self, product, subproduct=None):
+        """Check if a product or product/subproduct combination is deprecated."""
+        products_subproducts = current_app.config.get('PRODUCTS_SUBPRODUCTS', {})
+        deprecated_products_subproducts = current_app.config.get('DEPRECATED_PRODUCTS_SUBPRODUCTS', {})
+
+        # Validate product exists in valid products list
+        if not product or product not in products_subproducts:
+            raise ValueError(gettext("Invalid product"))
+
+        # Validate subproduct exists for this product
+        if subproduct and subproduct not in products_subproducts[product]:
+            raise ValueError(gettext("Invalid subproduct"))
+
+        # Check if product or product/subproduct combination is deprecated
+        if product not in deprecated_products_subproducts:
+            return False  # Valid and not deprecated
+
+        if subproduct and subproduct in deprecated_products_subproducts[product]:
+            return True  # Valid and Deprecated combination
+
+        return False # Valid and not deprecated
+
+
+    def _generate_product_subproduct_warnings(self, product, subproduct):
+        """Generate warnings for product and subproduct selections."""
+        warnings = []
+
+        if product and self._is_product_or_subproduct_deprecated(product, subproduct):
+            warnings.append(
+                'Combination of selected Product and Subproduct has been deprecated '
+                'and will be removed in future. Refer to GIGwork documentation for '
+                'taxonomy updates.'
+            )
+
+        return warnings
