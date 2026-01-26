@@ -114,6 +114,9 @@ from pybossa.redis_lock import get_user_exported_reports
 
 cors_headers = ['Content-Type', 'Authorization']
 
+# Warning message for deprecated products/subproducts
+DEPRECATED_PRODUCT_SUBPRODUCT_WARNING = 'Combination of selected Product and Subproduct has been deprecated and will be removed in future. Refer to GIGwork documentation for taxonomy updates.'
+
 blueprint = Blueprint('project', __name__)
 blueprint_projectid = Blueprint('projectid', __name__)
 
@@ -389,6 +392,9 @@ def new():
     data_classes = [(data_class, data_class, {} if enabled else dict(disabled='disabled'))
         for data_class, enabled in current_app.config.get('DATA_CLASSIFICATION', [('', False)])
     ]
+
+    deprecatedprodssubprods = current_app.config.get('DEPRECATED_PRODUCTS_SUBPRODUCTS', {})
+
     form = dynamic_project_form(ProjectForm, request.body, data_access_levels, prodsubprods, data_classes)
 
     def respond(errors):
@@ -396,7 +402,9 @@ def new():
                         project=None,
                         title=gettext("Create a Project"),
                         form=form, errors=errors,
-                        prodsubprods=prodsubprods)
+                        prodsubprods=prodsubprods,
+                        deprecatedprodssubprods=deprecatedprodssubprods,
+                        deprecationWarningMsg=DEPRECATED_PRODUCT_SUBPRODUCT_WARNING)
         return handle_content_type(response)
 
 
@@ -980,7 +988,9 @@ def update(short_name):
                     pro_features=pro,
                     sync_enabled=sync_enabled,
                     private_instance=bool(data_access_levels),
-                    prodsubprods=prodsubprods)
+                    prodsubprods=prodsubprods,
+                    deprecatedprodssubprods=current_app.config.get('DEPRECATED_PRODUCTS_SUBPRODUCTS', {}),
+                    deprecationWarningMsg=DEPRECATED_PRODUCT_SUBPRODUCT_WARNING)
     return handle_content_type(response)
 
 
