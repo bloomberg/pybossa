@@ -245,16 +245,7 @@ class ProjectAPI(APIBase):
 
     def _is_product_or_subproduct_deprecated(self, product, subproduct=None):
         """Check if a product or product/subproduct combination is deprecated."""
-        products_subproducts = current_app.config.get('PRODUCTS_SUBPRODUCTS', {})
         deprecated_products_subproducts = current_app.config.get('DEPRECATED_PRODUCTS_SUBPRODUCTS', {})
-
-        # Validate product exists in valid products list
-        if not product or product not in products_subproducts:
-            raise ValueError(gettext("Invalid product"))
-
-        # Validate subproduct exists for this product
-        if subproduct and subproduct not in products_subproducts[product]:
-            raise ValueError(gettext("Invalid subproduct"))
 
         # Check if product or product/subproduct combination is deprecated
         if product not in deprecated_products_subproducts:

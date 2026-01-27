@@ -726,3 +726,197 @@ class TestProjectWarningsAPI(TestAPI):
             assert project.info['extra_field'] == 'extra_value'
             assert 'warnings' not in project.info
 
+    @with_context
+    def test_post_invalid_product_raises_bad_request_no_warnings(self):
+        """Test POST with invalid product raises Bad Request error."""
+        test_config = {
+            'DEPRECATED_PRODUCTS_SUBPRODUCTS': {
+                'Old Product': ['Valid Subproduct']
+            },
+            'PRODUCTS_SUBPRODUCTS': {
+                'Valid Product': ['Valid Subproduct'],
+                'Old Product': ['Valid Subproduct']
+            }
+        }
+
+        with patch.dict(self.flask_app.config, test_config):
+            CategoryFactory.create()
+            user = UserFactory.create()
+
+            project_data = {
+                'name': 'Test Invalid Product',
+                'short_name': 'test_invalid_product',
+                'description': 'Test project with invalid product',
+                'long_description': 'Test project with invalid product',
+                'password': 'hello',
+                'info': {
+                    'product': 'Invalid Product',  # Not in PRODUCTS_SUBPRODUCTS
+                    'subproduct': 'Valid Subproduct',
+                    'data_classification': {
+                        'input_data': 'L4 - public',
+                        'output_data': 'L4 - public'
+                    },
+                    'kpi': 0.5
+                }
+            }
+
+            url = '/api/project?api_key=%s' % user.api_key
+            res = self.app.post(url, data=json.dumps(project_data))
+
+            # Should fail with 400 error due to ValueError during response generation
+            assert res.status_code == 400, res.data
+            response_data = json.loads(res.data)
+            assert 'exception_msg' in response_data
+            assert 'Invalid product' in response_data['exception_msg']
+            # check that invalid product is caught before warning generation check
+            assert 'warnings' not in response_data
+
+    @with_context
+    def test_post_invalid_subproduct_raises_bad_request_no_warnings(self):
+        """Test POST with invalid subproduct raises Bad Request error."""
+        test_config = {
+            'DEPRECATED_PRODUCTS_SUBPRODUCTS': {
+                'Old Product': ['Valid Subproduct']
+            },
+            'PRODUCTS_SUBPRODUCTS': {
+                'Valid Product': ['Valid Subproduct', 'Another Valid Subproduct'],
+                'Old Product': ['Valid Subproduct']
+            }
+        }
+
+        with patch.dict(self.flask_app.config, test_config):
+            CategoryFactory.create()
+            user = UserFactory.create()
+
+            project_data = {
+                'name': 'Test Invalid Subproduct',
+                'short_name': 'test_invalid_subproduct',
+                'description': 'Test project with invalid subproduct',
+                'long_description': 'Test project with invalid subproduct',
+                'password': 'hello',
+                'info': {
+                    'product': 'Valid Product',
+                    'subproduct': 'Invalid Subproduct',  # Not in PRODUCTS_SUBPRODUCTS for this product
+                    'data_classification': {
+                        'input_data': 'L4 - public',
+                        'output_data': 'L4 - public'
+                    },
+                    'kpi': 0.5
+                }
+            }
+
+            url = '/api/project?api_key=%s' % user.api_key
+            res = self.app.post(url, data=json.dumps(project_data))
+
+            # Should fail with 400 error due to ValueError during response generation
+            assert res.status_code == 400, res.data
+            response_data = json.loads(res.data)
+            assert 'exception_msg' in response_data
+            assert 'Invalid subproduct' in response_data['exception_msg']
+            # check that invalid product is caught before warning generation check
+            assert 'warnings' not in response_data
+
+    @with_context
+    def test_put_invalid_product_raises_bad_request_no_warnings(self):
+        """Test PUT with invalid product raises Bad Request error."""
+        test_config = {
+            'DEPRECATED_PRODUCTS_SUBPRODUCTS': {
+                'Old Product': ['Valid Subproduct']
+            },
+            'PRODUCTS_SUBPRODUCTS': {
+                'Valid Product': ['Valid Subproduct'],
+                'Old Product': ['Valid Subproduct']
+            }
+        }
+
+        with patch.dict(self.flask_app.config, test_config):
+            user = UserFactory.create()
+            project = ProjectFactory.create(
+                owner=user,
+                short_name='test_put_invalid_product',
+                info={
+                    'product': 'Valid Product',
+                    'subproduct': 'Valid Subproduct',
+                    'data_classification': {
+                        'input_data': 'L4 - public',
+                        'output_data': 'L4 - public'
+                    },
+                    'kpi': 0.5
+                }
+            )
+
+            # Update to use invalid product
+            update_data = {
+                'info': {
+                    'product': 'Invalid Product',  # Not in PRODUCTS_SUBPRODUCTS
+                    'subproduct': 'Valid Subproduct',
+                    'data_classification': {
+                        'input_data': 'L4 - public',
+                        'output_data': 'L4 - public'
+                    },
+                    'kpi': 0.5
+                }
+            }
+
+            url = '/api/project/%s?api_key=%s' % (project.id, user.api_key)
+            res = self.app.put(url, data=json.dumps(update_data))
+
+            # Should fail with 400 error due to ValueError during response generation
+            assert res.status_code == 400, res.data
+            response_data = json.loads(res.data)
+            assert 'exception_msg' in response_data
+            assert 'Invalid product' in response_data['exception_msg']
+            assert 'warnings' not in response_data
+
+    @with_context
+    def test_put_invalid_subproduct_raises_bad_request_no_warnings(self):
+        """Test PUT with invalid subproduct raises Bad Request error."""
+        test_config = {
+            'DEPRECATED_PRODUCTS_SUBPRODUCTS': {
+                'Old Product': ['Valid Subproduct']
+            },
+            'PRODUCTS_SUBPRODUCTS': {
+                'Valid Product': ['Valid Subproduct', 'Another Valid Subproduct'],
+                'Old Product': ['Valid Subproduct']
+            }
+        }
+
+        with patch.dict(self.flask_app.config, test_config):
+            user = UserFactory.create()
+            project = ProjectFactory.create(
+                owner=user,
+                short_name='test_put_invalid_subproduct',
+                info={
+                    'product': 'Valid Product',
+                    'subproduct': 'Valid Subproduct',
+                    'data_classification': {
+                        'input_data': 'L4 - public',
+                        'output_data': 'L4 - public'
+                    },
+                    'kpi': 0.5
+                }
+            )
+
+            # Update to use invalid subproduct
+            update_data = {
+                'info': {
+                    'product': 'Valid Product',
+                    'subproduct': 'Invalid Subproduct',  # Not in PRODUCTS_SUBPRODUCTS for this product
+                    'data_classification': {
+                        'input_data': 'L4 - public',
+                        'output_data': 'L4 - public'
+                    },
+                    'kpi': 0.5
+                }
+            }
+
+            url = '/api/project/%s?api_key=%s' % (project.id, user.api_key)
+            res = self.app.put(url, data=json.dumps(update_data))
+
+            # Should fail with 400 error due to ValueError during response generation
+            assert res.status_code == 400, res.data
+            response_data = json.loads(res.data)
+            assert 'exception_msg' in response_data
+            assert 'Invalid subproduct' in response_data['exception_msg']
+            assert 'warnings' not in response_data
+
