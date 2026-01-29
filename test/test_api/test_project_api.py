@@ -2878,3 +2878,88 @@ class TestProjectAPI(TestAPI):
         api._update_attribute(new_project, old_project)
         # Verify that old data is preserved
         assert new_project.info['other_data'] == 'test'
+
+    @with_context
+    def test_project_post_task_filter_fields_not_list(self):
+        """Test that task_filter_fields must be a list"""
+        user = UserFactory.create()
+        make_subadmin(user)
+        CategoryFactory.create()
+
+        data = dict(
+            name='My Project',
+            short_name='myproject',
+            description='description',
+            long_description='long_description',
+            password='hello',
+            info={
+                'task_presenter': 'presenter',
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
+                'task_filter_fields': "not_a_list"  # Invalid - should be a list
+            }
+        )
+
+        res = self.app.post('/api/project?api_key=' + user.api_key,
+                            data=json.dumps(data))
+
+        assert res.status_code == 400, res.status_code
+        error = json.loads(res.data)
+        assert "task_filter_fields must be a list" in error["exception_msg"]
+
+    @with_context
+    def test_project_put_task_filter_fields_not_list(self):
+        """Test that updating task_filter_fields with non-list value fails"""
+        user = UserFactory.create()
+        make_subadmin(user)
+        project = ProjectFactory.create(
+            owner=user,
+            info={
+                'task_presenter': 'presenter',
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public")
+            }
+        )
+
+        data = dict(
+            info={
+                'task_presenter': 'presenter',
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
+                'task_filter_fields': {'not': 'a_list'}  # Invalid - should be a list
+            }
+        )
+
+        res = self.app.put('/api/project/%s?api_key=%s' % (project.id, user.api_key),
+                           data=json.dumps(data))
+
+        assert res.status_code == 400, res.status_code
+        error = json.loads(res.data)
+        assert "task_filter_fields must be a list" in error["exception_msg"]
+
+    @with_context
+    def test_project_post_task_filter_fields_valid_list(self):
+        """Test that task_filter_fields accepts a valid list"""
+        user = UserFactory.create()
+        make_subadmin(user)
+        CategoryFactory.create()
+
+        data = dict(
+            name='My Project',
+            short_name='myproject',
+            description='description',
+            long_description='long_description',
+            password='hello',
+            info={
+                'task_presenter': 'presenter',
+                'data_classification': dict(input_data="L4 - public", output_data="L4 - public"),
+                'task_filter_fields': ['field_a', 'field_b'],  # Valid list
+                'kpi': 0.5,
+                'product': 'abc',
+                'subproduct': 'def'
+            }
+        )
+
+        res = self.app.post('/api/project?api_key=' + user.api_key,
+                            data=json.dumps(data))
+
+        assert res.status_code == 200, res.data
+        project = json.loads(res.data)
+        assert project['info']['task_filter_fields'] == ['field_a', 'field_b']

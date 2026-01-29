@@ -1463,3 +1463,285 @@ class TestTaskAPI(TestAPI):
         # task creation to pass as similar task that is present has already expired
         res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
         assert res.status_code == 200, res
+
+    @with_context
+    def test_create_task_no_task_filter_fields(self):
+        """Test task creation when task_filter_fields is not configured"""
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        # Project without task_filter_fields
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={})
+
+        task_data = dict(
+            project_id=project.id,
+            info={"field_a": "value_a", "field_b": "value_b"}
+        )
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status_code == 200, res
+
+        task = json.loads(res.data)
+        # Task info should remain unchanged
+        assert task["info"]["field_a"] == "value_a"
+        assert task["info"]["field_b"] == "value_b"
+
+    @with_context
+    def test_create_task_with_task_filter_fields_public_data(self):
+        """Test task creation with task_filter_fields configured - fields already in task.info"""
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        # Project with task_filter_fields configured
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "task_filter_fields": ["routing_flag", "asset_class"]
+            })
+
+        task_data = dict(
+            project_id=project.id,
+            info={
+                "routing_flag": "finance",
+                "asset_class": "equity",
+                "other_data": "some_value"
+            }
+        )
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status_code == 200, res
+
+        task = json.loads(res.data)
+        # Task info should retain filter fields
+        assert task["info"]["routing_flag"] == "finance"
+        assert task["info"]["asset_class"] == "equity"
+        assert task["info"]["other_data"] == "some_value"
+
+    @with_context
+    @patch("pybossa.task_creator_helper.get_encryption_key")
+    @patch("pybossa.task_creator_helper.read_encrypted_file")
+    def test_create_task_with_task_filter_fields_from_files(self, mock_read_enc_file, mock_get_enc_key):
+        """Test task creation with task_filter_fields - fields extracted from encrypted files"""
+        # File contains filter field values
+        file_data = {
+            "routing_flag": "commodity",
+            "asset_class": "futures",
+            "private_field": "secret_value"
+        }
+        mock_get_enc_key.return_value = "xyz"
+        mock_read_enc_file.return_value = (json.dumps(file_data), "path/contents.txt")
+
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        # Project with task_filter_fields configured
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "task_filter_fields": ["routing_flag", "asset_class"]
+            })
+
+        task_data = dict(
+            project_id=project.id,
+            info={
+                "public_field": "public_value",
+                "priv_data__upload_url": f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"
+            }
+        )
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status_code == 200, res
+
+        task = json.loads(res.data)
+        # Filter fields should be added to task.info from file
+        assert task["info"]["routing_flag"] == "commodity"
+        assert task["info"]["asset_class"] == "futures"
+        assert task["info"]["public_field"] == "public_value"
+        # private_field is not in task_filter_fields, should NOT be added
+        assert "private_field" not in task["info"]
+
+    @with_context
+    @patch("pybossa.task_creator_helper.get_encryption_key")
+    @patch("pybossa.task_creator_helper.read_encrypted_file")
+    def test_create_task_filter_fields_not_overwritten(self, mock_read_enc_file, mock_get_enc_key):
+        """Test task creation - existing filter fields in task.info are not overwritten"""
+        # File contains different values for filter fields
+        file_data = {
+            "routing_flag": "from_file",
+            "asset_class": "from_file"
+        }
+        mock_get_enc_key.return_value = "xyz"
+        mock_read_enc_file.return_value = (json.dumps(file_data), "path/contents.txt")
+
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "task_filter_fields": ["routing_flag", "asset_class"]
+            })
+
+        # Task already has routing_flag in info
+        task_data = dict(
+            project_id=project.id,
+            info={
+                "routing_flag": "existing_value",  # Should NOT be overwritten
+                "priv_data__upload_url": f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"
+            }
+        )
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        assert res.status_code == 200, res
+
+        task = json.loads(res.data)
+        # routing_flag should retain original value
+        assert task["info"]["routing_flag"] == "existing_value"
+        # asset_class should be added from file
+        assert task["info"]["asset_class"] == "from_file"
+
+    @with_context
+    @patch("pybossa.task_creator_helper.get_encryption_key")
+    @patch("pybossa.task_creator_helper.read_encrypted_file")
+    def test_create_task_with_both_dup_check_and_filter_fields(self, mock_read_enc_file, mock_get_enc_key):
+        """Test task creation with both duplicate_task_check and task_filter_fields configured"""
+        file_data = {
+            "field_a": "file_value_a",
+            "field_b": "file_value_b",
+            "routing_flag": "commodity"
+        }
+        mock_get_enc_key.return_value = "xyz"
+        mock_read_enc_file.return_value = (json.dumps(file_data), "path/contents.txt")
+
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        # Project with both configurations
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "duplicate_task_check": {
+                    "duplicate_fields": ["field_a", "field_b"]
+                },
+                "task_filter_fields": ["routing_flag"]
+            })
+
+        task_data = dict(
+            project_id=project.id,
+            info={
+                "priv_data__upload_url": f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"
+            }
+        )
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+            assert res.status_code == 200, res
+
+            task = json.loads(res.data)
+            # Filter field should be added
+            assert task["info"]["routing_flag"] == "commodity"
+            # Checksum should be generated
+            assert task["dup_checksum"] is not None
+
+            # Verify extract was called only once by trying to create duplicate
+            # (which should fail if checksum was correctly computed)
+            res2 = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+            assert res2.status == "409 CONFLICT"
+
+    @with_context
+    def test_create_task_filter_fields_not_in_file(self):
+        """Test task creation when configured filter fields are not present in file"""
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        # Project with task_filter_fields configured
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "task_filter_fields": ["non_existent_field"]
+            })
+
+        # Task doesn't have the filter field
+        task_data = dict(
+            project_id=project.id,
+            info={
+                "other_field": "value"
+            }
+        )
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+        # Task creation should succeed, but filter field won't be added
+        assert res.status_code == 200, res
+
+        task = json.loads(res.data)
+        assert "non_existent_field" not in task["info"]
+        assert task["info"]["other_field"] == "value"
+
+    @with_context
+    @patch("pybossa.api.task.get_task_contents_for_processing")
+    def test_create_task_get_task_contents_exception(self, mock_get_contents):
+        """Test task creation fails when get_task_contents_for_processing raises exception"""
+        mock_get_contents.side_effect = Exception("Failed to extract task contents")
+
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={})
+
+        task_data = dict(
+            project_id=project.id,
+            info={"field_a": "value_a"}
+        )
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+
+        assert res.status_code == 400, res
+        error = json.loads(res.data)
+        assert "Failed to extract task contents" in error["exception_msg"]
+
+    @with_context
+    @patch("pybossa.api.task.set_task_filter_fields")
+    @patch("pybossa.api.task.get_task_contents_for_processing")
+    def test_create_task_set_filter_fields_exception(self, mock_get_contents, mock_set_filter):
+        """Test task creation fails when set_task_filter_fields raises exception"""
+        mock_get_contents.return_value = ({}, False)
+        mock_set_filter.side_effect = Exception("Failed to set filter fields")
+
+        subadmin = UserFactory.create(subadmin=True)
+        subadmin_headers = dict(Authorization=subadmin.api_key)
+
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "task_filter_fields": ["routing_flag"]
+            })
+
+        task_data = dict(
+            project_id=project.id,
+            info={"field_a": "value_a"}
+        )
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            res = self.app.post('/api/task', data=json.dumps(task_data), headers=subadmin_headers)
+
+        assert res.status_code == 400, res
+        error = json.loads(res.data)
+        assert "Failed to set filter fields" in error["exception_msg"]

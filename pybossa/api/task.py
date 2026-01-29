@@ -45,7 +45,7 @@ import json
 import copy
 from pybossa.task_creator_helper import get_task_expiration
 from pybossa.model import make_timestamp
-from pybossa.task_creator_helper import generate_checksum
+from pybossa.task_creator_helper import generate_checksum, get_task_contents_for_processing, set_task_filter_fields
 from pybossa.cache.projects import get_project_data
 
 
@@ -92,11 +92,27 @@ class TaskAPI(APIBase):
             hdfs_task = any([val.startswith("/fileproxy/hdfs/") for val in info.values() if isinstance(val, str)])
             if hdfs_task:
                 raise BadRequest("Invalid task payload. HDFS is not supported")
+
+        # Extract task contents once for both checksum and filter fields (optimization)
         try:
-            dup_checksum = generate_checksum(project_id=project_id, task=data)
+            task_contents, _ = get_task_contents_for_processing(project_id=project_id, task=data)
+        except Exception as e:
+            current_app.logger.info("Project %d. Error extracting task contents %s", project_id, str(e))
+            raise BadRequest(str(e))
+
+        try:
+            dup_checksum = generate_checksum(project_id=project_id, task=data, task_contents=task_contents)
         except Exception as e:
             current_app.logger.info("Project %d. Error generating duplicate task checksum %s", project_id, str(e))
             raise BadRequest(str(e))
+
+        # Set task filter fields from file contents (uses same task_contents)
+        try:
+            set_task_filter_fields(project=project, task=data, task_contents=task_contents)
+        except Exception as e:
+            current_app.logger.info("Project %d. Error setting task filter fields %s", project_id, str(e))
+            raise BadRequest(str(e))
+
         data["dup_checksum"] = dup_checksum
         completed_tasks = project.info.get("duplicate_task_check", {}).get("completed_tasks", False)
         duplicate_task = task_repo.find_duplicate(

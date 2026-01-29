@@ -64,6 +64,7 @@ from pybossa.cloud_store_api.s3 import upload_json_data
 from pybossa.task_creator_helper import get_gold_answers
 from pybossa.core import setup_error_handlers
 from pybossa.task_creator_helper import generate_checksum
+from pybossa.task_creator_helper import set_task_filter_fields, get_task_contents_for_processing
 
 
 class TestWeb(web.Helper):
@@ -10618,6 +10619,364 @@ class TestWeb(web.Helper):
         with assert_raises(Exception):
             generate_checksum(project_id=project.id, task=task_payload)
 
+    @with_context
+    def test_set_task_filter_fields_not_private_instance(self):
+        """Test set_task_filter_fields returns None when not PRIVATE_INSTANCE"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = False
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={
+                "task_filter_fields": ["field_a", "field_b"]
+            })
+
+        task_payload = {"id": 1, "info": {"x": 1, "y": 2}}
+        result = set_task_filter_fields(project=project, task=task_payload)
+        assert result is None
+
+    @with_context
+    def test_set_task_filter_fields_no_filter_fields_configured(self):
+        """Test set_task_filter_fields returns None when task_filter_fields not configured"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={})  # no task_filter_fields
+
+        task_payload = {"id": 1, "info": {"x": 1, "y": 2}}
+        result = set_task_filter_fields(project=project, task=task_payload)
+        assert result is None
+
+    @with_context
+    def test_set_task_filter_fields_empty_filter_fields(self):
+        """Test set_task_filter_fields returns None when task_filter_fields is empty list"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={"task_filter_fields": []})
+
+        task_payload = {"id": 1, "info": {"x": 1, "y": 2}}
+        result = set_task_filter_fields(project=project, task=task_payload)
+        assert result is None
+
+    @with_context
+    def test_set_task_filter_fields_invalid_task(self):
+        """Test set_task_filter_fields handles invalid task payload"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={"task_filter_fields": ["field_a"]})
+
+        # None task
+        result = set_task_filter_fields(project=project, task=None)
+        assert result is None
+
+        # Task without info
+        result = set_task_filter_fields(project=project, task={"id": 1})
+        assert result is None
+
+        # Task with non-dict info
+        result = set_task_filter_fields(project=project, task={"id": 1, "info": "not a dict"})
+        assert result is None
+
+    @with_context
+    def test_set_task_filter_fields_missing_project(self):
+        """Test set_task_filter_fields handles missing project"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        task_payload = {"id": 1, "info": {"x": 1, "y": 2}}
+        result = set_task_filter_fields(project=None, task=task_payload)
+        assert result is None
+
+    @with_context
+    def test_set_task_filter_fields_from_task_info(self):
+        """Test set_task_filter_fields extracts fields from task.info when already present"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={"task_filter_fields": ["field_a", "field_b"]})
+
+        # Task already has filter fields in info - should not be overwritten
+        task_payload = {"id": 1, "info": {"field_a": "value_a", "field_b": "value_b", "other": "data"}}
+        result = set_task_filter_fields(project=project, task=task_payload)
+
+        # Filter fields already in task.info should remain unchanged
+        assert task_payload["info"]["field_a"] == "value_a"
+        assert task_payload["info"]["field_b"] == "value_b"
+
+    @with_context
+    @patch("pybossa.task_creator_helper.get_encryption_key")
+    @patch("pybossa.task_creator_helper.read_encrypted_file")
+    def test_set_task_filter_fields_from_files(self, mock_read_enc_file, mock_get_enc_key):
+        """Test set_task_filter_fields extracts filter fields from encrypted files"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        file_data = {"field_a": "from_file_a", "field_b": "from_file_b", "other_field": "other_value"}
+
+        mock_get_enc_key.return_value = "xyz"
+        mock_read_enc_file.return_value = (json.dumps(file_data), "path/contents.txt")
+
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={"task_filter_fields": ["field_a", "field_b"]})
+
+        # Task has upload_url pointing to encrypted file
+        task_payload = {
+            "id": 1,
+            "info": {
+                "priv_data__upload_url": f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"
+            }
+        }
+
+        result = set_task_filter_fields(project=project, task=task_payload)
+
+        # Filter fields should be added to task.info from file contents
+        assert task_payload["info"]["field_a"] == "from_file_a"
+        assert task_payload["info"]["field_b"] == "from_file_b"
+        # other_field is not in task_filter_fields, so it should NOT be added
+        assert "other_field" not in task_payload["info"]
+
+    @with_context
+    @patch("pybossa.task_creator_helper.get_encryption_key")
+    @patch("pybossa.task_creator_helper.read_encrypted_file")
+    def test_set_task_filter_fields_does_not_overwrite_existing(self, mock_read_enc_file, mock_get_enc_key):
+        """Test set_task_filter_fields does not overwrite fields already in task.info"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        file_data = {"field_a": "from_file_a", "field_b": "from_file_b"}
+
+        mock_get_enc_key.return_value = "xyz"
+        mock_read_enc_file.return_value = (json.dumps(file_data), "path/contents.txt")
+
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={"task_filter_fields": ["field_a", "field_b"]})
+
+        # Task already has field_a in info
+        task_payload = {
+            "id": 1,
+            "info": {
+                "field_a": "existing_value",  # This should NOT be overwritten
+                "priv_data__upload_url": f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"
+            }
+        }
+
+        result = set_task_filter_fields(project=project, task=task_payload)
+
+        # field_a should retain its original value (not overwritten)
+        assert task_payload["info"]["field_a"] == "existing_value"
+        # field_b should be added from file contents
+        assert task_payload["info"]["field_b"] == "from_file_b"
+
+    @with_context
+    @patch("pybossa.task_creator_helper.get_encryption_key")
+    @patch("pybossa.task_creator_helper.read_encrypted_file")
+    def test_set_task_filter_fields_with_provided_task_contents(self, mock_read_enc_file, mock_get_enc_key):
+        """Test set_task_filter_fields uses provided task_contents without re-extracting"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={"task_filter_fields": ["field_a", "field_b"]})
+
+        task_payload = {"id": 1, "info": {}}
+
+        # Pre-extracted task contents
+        pre_extracted_contents = {"field_a": "pre_extracted_a", "field_b": "pre_extracted_b", "field_c": "pre_extracted_c"}
+
+        result = set_task_filter_fields(
+            project=project,
+            task=task_payload,
+            task_contents=pre_extracted_contents
+        )
+
+        # Should use pre-extracted contents, not call read_encrypted_file
+        mock_read_enc_file.assert_not_called()
+
+        # Filter fields should be added from pre-extracted contents
+        assert task_payload["info"]["field_a"] == "pre_extracted_a"
+        assert task_payload["info"]["field_b"] == "pre_extracted_b"
+        # field_c not in task_filter_fields
+        assert "field_c" not in task_payload["info"]
+
+    @with_context
+    @patch("pybossa.task_creator_helper.get_encryption_key")
+    @patch("pybossa.task_creator_helper.read_encrypted_file")
+    def test_get_task_contents_for_processing_with_filter_fields(self, mock_read_enc_file, mock_get_enc_key):
+        """Test get_task_contents_for_processing extracts contents when task_filter_fields configured"""
+        from flask import current_app
+
+        current_app.config["PRIVATE_INSTANCE"] = True
+        file_data = {"field_a": "value_a", "field_b": "value_b"}
+
+        mock_get_enc_key.return_value = "xyz"
+        mock_read_enc_file.return_value = (json.dumps(file_data), "path/contents.txt")
+
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={"task_filter_fields": ["field_a", "field_b"]})
+
+        task_payload = {
+            "id": 1,
+            "info": {
+                "priv_data__upload_url": f"/fileproxy/encrypted/bcosv2-dev/testbucket/{project.id}/path/contents.txt"
+            }
+        }
+
+        task_contents, returned_project = get_task_contents_for_processing(
+            project_id=project.id,
+            task=task_payload
+        )
+
+        assert task_contents is not None
+        assert "field_a" in task_contents
+        assert "field_b" in task_contents
+
+    @with_context
+    def test_get_task_contents_for_processing_not_private_instance(self):
+        """Test get_task_contents_for_processing returns None when not PRIVATE_INSTANCE"""
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={"task_filter_fields": ["field_a"]})
+
+        task_payload = {"id": 1, "info": {"x": 1}}
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': False}):
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=project.id,
+                task=task_payload
+            )
+
+        assert task_contents is None
+        assert returned_project is None
+
+    @with_context
+    def test_get_task_contents_for_processing_no_configs(self):
+        """Test get_task_contents_for_processing returns None when no dup_check or filter_fields configured"""
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={})  # No duplicate_task_check or task_filter_fields
+
+        task_payload = {"id": 1, "info": {"x": 1}}
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=project.id,
+                task=task_payload
+            )
+
+        assert task_contents is None
+        assert returned_project is not None  # project is returned even when extraction not needed
+
+    @with_context
+    def test_get_task_contents_for_processing_invalid_task(self):
+        """Test get_task_contents_for_processing returns None when task is invalid"""
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            # Test with None task
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=1,
+                task=None
+            )
+            assert task_contents is None
+            assert returned_project is None
+
+            # Test with non-dict task
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=1,
+                task="not a dict"
+            )
+            assert task_contents is None
+            assert returned_project is None
+
+            # Test with dict missing "info" key
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=1,
+                task={"id": 1}
+            )
+            assert task_contents is None
+            assert returned_project is None
+
+    @with_context
+    def test_get_task_contents_for_processing_project_not_found(self):
+        """Test get_task_contents_for_processing returns None when project not found"""
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            task_payload = {"id": 1, "info": {"x": 1}}
+
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=999999,  # Non-existent project
+                task=task_payload
+            )
+
+            assert task_contents is None
+            assert returned_project is None
+
+    @with_context
+    def test_get_task_contents_for_processing_task_info_not_dict(self):
+        """Test get_task_contents_for_processing returns None when task.info is not a dict"""
+        subadmin = UserFactory.create(subadmin=True)
+        self.signin_user(subadmin)
+        project = ProjectFactory.create(
+            owner=subadmin,
+            short_name="testproject",
+            info={"task_filter_fields": ["field_a"]})
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
+            task_payload = {"id": 1, "info": "not a dict"}
+
+            task_contents, returned_project = get_task_contents_for_processing(
+                project_id=project.id,
+                task=task_payload
+            )
+
+            assert task_contents is None
+            assert returned_project is None
+
 
 class TestWebUserMetadataUpdate(web.Helper):
 
@@ -11212,7 +11571,9 @@ class TestWebUserMetadataUpdate(web.Helper):
 
         url = f"/api/project/{project.short_name}/task/123/partial_answer"
         data = {"my_answer": {"k1: ": "test", "k2": [1, 2, "abc"]}}
-        resp = self.app_post_json(url, data=data, follow_redirects=False)
+        # Set MAX_SAVED_ANSWERS to 2 so the mock with 2 entries exceeds the limit
+        with patch.dict(self.flask_app.config, {'MAX_SAVED_ANSWERS': 2}):
+            resp = self.app_post_json(url, data=data, follow_redirects=False)
         assert resp.status_code == 400, resp
 
     @with_context
