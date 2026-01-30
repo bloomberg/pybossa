@@ -34,7 +34,8 @@ from werkzeug.exceptions import Forbidden, Unauthorized, InternalServerError, Lo
 from werkzeug.exceptions import NotFound, BadRequest
 
 __all__ = ['SUCCESS', 'ERROR', 'WARNING', 'FORBIDDEN', 'NOTFOUND', 'BADREQUEST',
-           'INFO', 'FAILED', 'NOTFOUND', 'INTERNALSERVERERROR', 'UNAUTHORIZED', 'LOCKED']
+           'INFO', 'FAILED', 'NOTFOUND', 'INTERNALSERVERERROR', 'UNAUTHORIZED', 'LOCKED',
+           'DEPRECATED_PRODUCT_SUBPRODUCT_WARNING']
 
 SUCCESS = "success"
 
@@ -57,6 +58,10 @@ BADREQUEST = BadRequest.description
 INTERNALSERVERERROR = InternalServerError.description
 
 UNAUTHORIZED = Unauthorized.description
+
+DEPRECATED_PRODUCT_SUBPRODUCT_WARNING = ('This combination of selected Product and Subproduct has been deprecated '
+                                         'and will be removed in future. Refer to GIGwork documentation for '
+                                         'taxonomy updates.')
 
 assert SUCCESS
 assert ERROR

@@ -33,6 +33,7 @@ from pybossa.cache.categories import get_all as get_categories
 from pybossa.util import is_reserved_name, description_from_long_description, validate_ownership_id
 from pybossa.core import auditlog_repo, result_repo, http_signer
 from pybossa.auditlogger import AuditLogger
+from pybossa.messages import DEPRECATED_PRODUCT_SUBPRODUCT_WARNING
 from pybossa.data_access import ensure_user_assignment_to_project, set_default_amp_store
 from sqlalchemy.orm.base import _entity_descriptor
 from pybossa.cache import delete_memoized
@@ -262,10 +263,6 @@ class ProjectAPI(APIBase):
         warnings = []
 
         if product and self._is_product_or_subproduct_deprecated(product, subproduct):
-            warnings.append(
-                'Combination of selected Product and Subproduct has been deprecated '
-                'and will be removed in future. Refer to GIGwork documentation for '
-                'taxonomy updates.'
-            )
+            warnings.append(DEPRECATED_PRODUCT_SUBPRODUCT_WARNING)
 
         return warnings

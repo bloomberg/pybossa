@@ -83,6 +83,7 @@ from pybossa.forms.projects_view_forms import *
 from pybossa.forms.admin_view_forms import SearchForm
 from pybossa.importers import BulkImportException
 from pybossa.pro_features import ProFeatureHandler
+from pybossa.messages import DEPRECATED_PRODUCT_SUBPRODUCT_WARNING
 
 from pybossa.core import (project_repo, user_repo, task_repo, blog_repo,
                           result_repo, webhook_repo, auditlog_repo,
@@ -113,9 +114,6 @@ from pybossa.api.project import ProjectAPI
 from pybossa.redis_lock import get_user_exported_reports
 
 cors_headers = ['Content-Type', 'Authorization']
-
-# Warning message for deprecated products/subproducts
-DEPRECATED_PRODUCT_SUBPRODUCT_WARNING = 'Combination of selected Product and Subproduct has been deprecated and will be removed in future. Refer to GIGwork documentation for taxonomy updates.'
 
 blueprint = Blueprint('project', __name__)
 blueprint_projectid = Blueprint('projectid', __name__)

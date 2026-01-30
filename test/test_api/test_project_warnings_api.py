@@ -66,14 +66,11 @@ from test import with_context
 from test.factories import UserFactory, CategoryFactory, ProjectFactory
 from test.test_api import TestAPI
 from pybossa.core import project_repo
+from pybossa.messages import DEPRECATED_PRODUCT_SUBPRODUCT_WARNING
 
 
 class TestProjectWarningsAPI(TestAPI):
     """Test Project API warnings functionality."""
-
-    DEPRECATED_PRODUCT_SUBPRODUCT_WARNING_MESSAGE = ('Combination of selected Product and Subproduct has been deprecated '
-                'and will be removed in future. Refer to GIGwork documentation for '
-                'taxonomy updates.')
 
     @with_context
     def test_post_valid_product_with_deprecated_subproduct_shows_warning(self):
@@ -119,7 +116,7 @@ class TestProjectWarningsAPI(TestAPI):
             # Verify warning is present when using valid product with deprecated subproduct
             assert 'warnings' in response_data
             assert len(response_data['warnings']) == 1
-            assert self.DEPRECATED_PRODUCT_SUBPRODUCT_WARNING_MESSAGE == response_data['warnings'][0]
+            assert DEPRECATED_PRODUCT_SUBPRODUCT_WARNING == response_data['warnings'][0]
 
             # Verify project was saved to database
             project = project_repo.get(response_data['id'])
@@ -227,7 +224,7 @@ class TestProjectWarningsAPI(TestAPI):
             # Verify warning is present when using deprecated product
             assert 'warnings' in response_data
             assert len(response_data['warnings']) == 1
-            assert self.DEPRECATED_PRODUCT_SUBPRODUCT_WARNING_MESSAGE == response_data['warnings'][0]
+            assert DEPRECATED_PRODUCT_SUBPRODUCT_WARNING == response_data['warnings'][0]
 
             # Verify project was saved to database
             project = project_repo.get(response_data['id'])
@@ -353,7 +350,7 @@ class TestProjectWarningsAPI(TestAPI):
             # Verify warning is present when using valid product with deprecated subproduct
             assert 'warnings' in response_data
             assert len(response_data['warnings']) == 1
-            assert self.DEPRECATED_PRODUCT_SUBPRODUCT_WARNING_MESSAGE == response_data['warnings'][0]
+            assert DEPRECATED_PRODUCT_SUBPRODUCT_WARNING == response_data['warnings'][0]
 
             # Verify project was updated in database
             updated_project = project_repo.get(project.id)
@@ -416,7 +413,7 @@ class TestProjectWarningsAPI(TestAPI):
             # Verify warning is present when using deprecated product
             assert 'warnings' in response_data
             assert len(response_data['warnings']) == 1
-            assert self.DEPRECATED_PRODUCT_SUBPRODUCT_WARNING_MESSAGE == response_data['warnings'][0]
+            assert DEPRECATED_PRODUCT_SUBPRODUCT_WARNING == response_data['warnings'][0]
 
             # Verify project was updated in database
             updated_project = project_repo.get(project.id)
@@ -496,7 +493,7 @@ class TestProjectWarningsAPI(TestAPI):
 
             # Verify PUT response has different warnings
             assert 'warnings' in put_response
-            assert self.DEPRECATED_PRODUCT_SUBPRODUCT_WARNING_MESSAGE in put_response['warnings']
+            assert DEPRECATED_PRODUCT_SUBPRODUCT_WARNING in put_response['warnings']
 
             # Check database after PUT
             project = project_repo.get(project_id)
@@ -579,7 +576,7 @@ class TestProjectWarningsAPI(TestAPI):
             # Should generate warnings dynamically
             assert 'warnings' in result
             assert len(result['warnings']) == 1
-            assert self.DEPRECATED_PRODUCT_SUBPRODUCT_WARNING_MESSAGE == result['warnings'][0]
+            assert DEPRECATED_PRODUCT_SUBPRODUCT_WARNING == result['warnings'][0]
 
             # Other fields should remain unchanged
             assert result['id'] == 1
@@ -708,7 +705,7 @@ class TestProjectWarningsAPI(TestAPI):
             # Verify warnings are properly formatted
             assert isinstance(response_data['warnings'], list)
             assert len(response_data['warnings']) == 1
-            assert self.DEPRECATED_PRODUCT_SUBPRODUCT_WARNING_MESSAGE == response_data['warnings'][0]
+            assert DEPRECATED_PRODUCT_SUBPRODUCT_WARNING == response_data['warnings'][0]
 
             # Verify info field integrity
             assert response_data['info']['product'] == 'Old Product'
@@ -763,7 +760,7 @@ class TestProjectWarningsAPI(TestAPI):
             url = '/api/project?api_key=%s' % user.api_key
             res = self.app.post(url, data=json.dumps(project_data))
 
-            # Should fail with 400 error due to ValueError during response generation
+            # Should fail with 400 error when product/subproduct value is validated at repository layer
             assert res.status_code == 400, res.data
             response_data = json.loads(res.data)
             assert 'exception_msg' in response_data
@@ -808,7 +805,7 @@ class TestProjectWarningsAPI(TestAPI):
             url = '/api/project?api_key=%s' % user.api_key
             res = self.app.post(url, data=json.dumps(project_data))
 
-            # Should fail with 400 error due to ValueError during response generation
+            # Should fail with 400 error when product/subproduct value is validated at repository layer
             assert res.status_code == 400, res.data
             response_data = json.loads(res.data)
             assert 'exception_msg' in response_data
@@ -861,11 +858,12 @@ class TestProjectWarningsAPI(TestAPI):
             url = '/api/project/%s?api_key=%s' % (project.id, user.api_key)
             res = self.app.put(url, data=json.dumps(update_data))
 
-            # Should fail with 400 error due to ValueError during response generation
+            # Should fail with 400 error when product/subproduct value is validated at repository layer
             assert res.status_code == 400, res.data
             response_data = json.loads(res.data)
             assert 'exception_msg' in response_data
             assert 'Invalid product' in response_data['exception_msg']
+            # check that invalid product is caught before warning generation check
             assert 'warnings' not in response_data
 
     @with_context
@@ -913,10 +911,11 @@ class TestProjectWarningsAPI(TestAPI):
             url = '/api/project/%s?api_key=%s' % (project.id, user.api_key)
             res = self.app.put(url, data=json.dumps(update_data))
 
-            # Should fail with 400 error due to ValueError during response generation
+            # Should fail with 400 error when product/subproduct value is validated at repository layer
             assert res.status_code == 400, res.data
             response_data = json.loads(res.data)
             assert 'exception_msg' in response_data
             assert 'Invalid subproduct' in response_data['exception_msg']
+            # check that invalid subproduct is caught before warning generation check
             assert 'warnings' not in response_data
 
