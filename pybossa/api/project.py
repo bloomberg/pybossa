@@ -33,6 +33,7 @@ from pybossa.cache.categories import get_all as get_categories
 from pybossa.util import is_reserved_name, description_from_long_description, validate_ownership_id
 from pybossa.core import auditlog_repo, result_repo, http_signer
 from pybossa.auditlogger import AuditLogger
+from pybossa.messages import DEPRECATED_PRODUCT_SUBPRODUCT_WARNING
 from pybossa.data_access import ensure_user_assignment_to_project, set_default_amp_store
 from sqlalchemy.orm.base import _entity_descriptor
 from pybossa.cache import delete_memoized
@@ -227,3 +228,41 @@ class ProjectAPI(APIBase):
 
     def _after_save(self, original_data, instance):
         delete_memoized(get_project_data, instance.id)
+
+    def _customize_response_dict(self, response_dict):
+        """Customize the response dictionary to include dynamically generated warnings."""
+        # Generate warnings dynamically based on current configuration
+        project_info = response_dict.get('info', {})
+        product = project_info.get('product')
+        subproduct = project_info.get('subproduct')
+
+        if product and subproduct:
+            warnings = self._generate_product_subproduct_warnings(product, subproduct)
+            if warnings:
+                response_dict['warnings'] = warnings
+
+        return response_dict
+
+
+    def _is_product_or_subproduct_deprecated(self, product, subproduct=None):
+        """Check if a product or product/subproduct combination is deprecated."""
+        deprecated_products_subproducts = current_app.config.get('DEPRECATED_PRODUCTS_SUBPRODUCTS', {})
+
+        # Check if product or product/subproduct combination is deprecated
+        if product not in deprecated_products_subproducts:
+            return False  # Valid and not deprecated
+
+        if subproduct and subproduct in deprecated_products_subproducts[product]:
+            return True  # Valid and Deprecated combination
+
+        return False # Valid and not deprecated
+
+
+    def _generate_product_subproduct_warnings(self, product, subproduct):
+        """Generate warnings for product and subproduct selections."""
+        warnings = []
+
+        if product and self._is_product_or_subproduct_deprecated(product, subproduct):
+            warnings.append(DEPRECATED_PRODUCT_SUBPRODUCT_WARNING)
+
+        return warnings

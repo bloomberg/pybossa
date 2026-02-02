@@ -33,6 +33,18 @@ class TestProjectAPI(TestAPI):
         super(TestProjectAPI, self).setUp()
         db.session.query(Project).delete()
 
+        test_config = {
+            'PRODUCTS_SUBPRODUCTS': {
+                'test_product': ['test_subproduct1', 'test_subproduct2'],
+            }
+        }
+        self.config_patcher = patch.dict(self.flask_app.config, test_config)
+        self.config_patcher.start()
+
+    def tearDown(self):
+        self.config_patcher.stop()
+        super(TestProjectAPI, self).tearDown()
+
     def setupProjects(self):
         project = ProjectFactory.create(
             updated='2015-01-01T14:37:30.642119',

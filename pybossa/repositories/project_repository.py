@@ -86,6 +86,7 @@ class ProjectRepository(Repository):
         self._verify_has_password(project)
         self._verify_data_classification(project)
         self._verify_annotation_config(project)
+        self._verify_product_subproduct(project)
         try:
             self.db.session.merge(project)
             self.db.session.commit()
@@ -242,6 +243,8 @@ class ProjectRepository(Repository):
             raise BadRequest("Invalid product")
         if subproduct not in products_subproducts[product]:
             raise BadRequest("Invalid subproduct")
+
+
 
     def _verify_required_fields(self, project):
         if not project.name:

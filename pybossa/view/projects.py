@@ -83,6 +83,7 @@ from pybossa.forms.projects_view_forms import *
 from pybossa.forms.admin_view_forms import SearchForm
 from pybossa.importers import BulkImportException
 from pybossa.pro_features import ProFeatureHandler
+from pybossa.messages import DEPRECATED_PRODUCT_SUBPRODUCT_WARNING
 
 from pybossa.core import (project_repo, user_repo, task_repo, blog_repo,
                           result_repo, webhook_repo, auditlog_repo,
@@ -389,6 +390,9 @@ def new():
     data_classes = [(data_class, data_class, {} if enabled else dict(disabled='disabled'))
         for data_class, enabled in current_app.config.get('DATA_CLASSIFICATION', [('', False)])
     ]
+
+    deprecatedprodssubprods = current_app.config.get('DEPRECATED_PRODUCTS_SUBPRODUCTS', {})
+
     form = dynamic_project_form(ProjectForm, request.body, data_access_levels, prodsubprods, data_classes)
 
     def respond(errors):
@@ -396,7 +400,9 @@ def new():
                         project=None,
                         title=gettext("Create a Project"),
                         form=form, errors=errors,
-                        prodsubprods=prodsubprods)
+                        prodsubprods=prodsubprods,
+                        deprecatedprodssubprods=deprecatedprodssubprods,
+                        deprecationWarningMsg=DEPRECATED_PRODUCT_SUBPRODUCT_WARNING)
         return handle_content_type(response)
 
 
@@ -980,7 +986,9 @@ def update(short_name):
                     pro_features=pro,
                     sync_enabled=sync_enabled,
                     private_instance=bool(data_access_levels),
-                    prodsubprods=prodsubprods)
+                    prodsubprods=prodsubprods,
+                    deprecatedprodssubprods=current_app.config.get('DEPRECATED_PRODUCTS_SUBPRODUCTS', {}),
+                    deprecationWarningMsg=DEPRECATED_PRODUCT_SUBPRODUCT_WARNING)
     return handle_content_type(response)
 
 

@@ -230,7 +230,8 @@ class TestAdmin(web.Helper):
         # Only projects that have been published can be featured
         self.new_task(1)
         project = db.session.query(Project).get(1)
-        project.info = dict(task_presenter="something", data_classification=dict(input_data="L4 - public", output_data="L4 - public"))
+        project.info = dict(task_presenter="something", data_classification=dict(input_data="L4 - public", output_data="L4 - public"),
+                            product='abc', subproduct='def')
         project.set_password('hello')
         db.session.add(project)
         db.session.commit()
