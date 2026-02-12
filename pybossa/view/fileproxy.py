@@ -27,7 +27,7 @@ import json
 from werkzeug.exceptions import Forbidden, BadRequest, InternalServerError, NotFound
 
 from pybossa.cache.projects import get_project_data
-from boto.exception import S3ResponseError
+from botocore.exceptions import ClientError
 from pybossa.contributions_guard import ContributionsGuard
 from pybossa.core import task_repo, signer
 from pybossa.encryption import AESWithGCM
