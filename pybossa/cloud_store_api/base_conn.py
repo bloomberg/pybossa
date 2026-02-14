@@ -237,10 +237,6 @@ class BaseClientKeyAdapter:
         """Returns contents as bytes or string, depending on encoding parameter.
         If encoding is None, returns bytes, otherwise, returns
         a string.
-
-        parameter "encoding" is default to None. This is consistent with boto2
-        get_contents_as_string() method:
-        http://boto.cloudhackers.com/en/latest/ref/s3.html#boto.s3.key.Key.get_contents_as_string
         """
         return self.base_client.get_contents_as_string(
             bucket=self.bucket, path=self.name, encoding=encoding
