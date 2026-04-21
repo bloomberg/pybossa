@@ -10,8 +10,8 @@ parameters:
     schema:
       type: object
       required:
-      - project_id
-        info
+        - project_id
+        - info
       properties:
         project_id:
           type: integer
@@ -41,45 +41,31 @@ parameters:
           type: object
           additionalProperties:
             type: string
+        priority_0:
+          type: number
+          description: priority value between 0.0 and 1.0
+        calibration:
+          type: integer
+          description: set to 1 for calibration/gold tasks
         expiration:
           type: string
+          description: expiration datetime
     examples:
-      project_id: 1185
-      info:
-        col_1: traditional chinese task
-      user_pref:
-        languages:
-        - traditional chinese
+      application/json:
+        project_id: 1185
+        info:
+          col_1: "traditional chinese task"
+        user_pref:
+          languages:
+            - "traditional chinese"
 responses:
   200:
     description: created task info
     schema:
-      $ref: '#definitions/Task'
-    examples:
-      {
-        "info": {
-          "company": "Bloomberg",
-          "task": "2",
-          "set_id": "2"
-        },
-        "fav_user_ids": null,
-        "user_pref": {
-        },
-        "n_answers": 1,
-        "quorum": 0,
-        "links": [
-          "<link rel='parent' title='project' href='https://qa.gigwork.net/api/project/2454'/>"
-        ],
-        "calibration": 0,
-        "expiration": null,
-        "created": "2021-04-30T21:56:30.632483",
-        "worker_filter": null,
-        "state": "completed",
-        "gold_answers": null,
-        "link": "<link rel='self' title='task' href='https://qa.gigwork.net/api/task/7225337'/>",
-        "exported": true,
-        "project_id": 2454,
-        "worker_pref": null,
-        "id": 7225337,
-        "priority_0": 0.99
-      }
+      $ref: '#/definitions/Task'
+  400:
+    description: Bad request - Missing or invalid fields
+  401:
+    description: Unauthorized - User is not logged in
+  403:
+    description: Forbidden - User does not have permission

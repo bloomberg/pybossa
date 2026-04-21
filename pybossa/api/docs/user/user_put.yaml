@@ -1,0 +1,44 @@
+Update a user by user id
+---
+tags:
+  - name: user
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: true
+    description: the user id
+  - name: user_info
+    in: body
+    required: true
+    description: the user fields to update
+    schema:
+      type: object
+      properties:
+        fullname:
+          type: string
+        locale:
+          type: string
+        privacy_mode:
+          type: boolean
+        subscribed:
+          type: boolean
+        info:
+          type: object
+          description: user metadata (admin/subadmin only for other users)
+        user_pref:
+          type: object
+          description: user task preferences (admin/subadmin only for other users)
+responses:
+  200:
+    description: updated user info
+    schema:
+      $ref: '#/definitions/User'
+  400:
+    description: Bad request - Invalid data
+  401:
+    description: Unauthorized - User is not logged in
+  403:
+    description: Forbidden - Can only update own user record unless admin
+  404:
+    description: User not found

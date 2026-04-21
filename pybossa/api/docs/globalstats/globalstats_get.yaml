@@ -1,0 +1,36 @@
+Get global platform statistics
+---
+tags:
+  - name: globalstats
+definitions:
+  GlobalStats:
+    type: object
+    properties:
+      n_projects:
+        type: integer
+        description: total number of projects
+      n_users:
+        type: integer
+        description: total number of users
+      n_tasks:
+        type: integer
+        description: total number of tasks
+      n_task_runs:
+        type: integer
+        description: total number of task runs
+      n_pending_tasks:
+        type: integer
+        description: number of pending tasks
+      n_results:
+        type: integer
+        description: total number of results
+      categories:
+        type: array
+        items:
+          type: object
+        description: list of category counts including featured and draft
+responses:
+  200:
+    description: global platform statistics
+    schema:
+      $ref: '#/definitions/GlobalStats'

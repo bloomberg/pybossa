@@ -127,6 +127,19 @@ class APIBase(MethodView):
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
     @swag_from('docs/task/task_get.yaml', endpoint='api.api_task_oid')
     @swag_from('docs/project/project_get.yaml', endpoint='api.api_project_oid')
+    @swag_from('docs/taskrun/taskrun_get.yaml', endpoint='api.api_taskrun_oid')
+    @swag_from('docs/result/result_get.yaml', endpoint='api.api_result_oid')
+    @swag_from('docs/user/user_get.yaml', endpoint='api.api_user_oid')
+    @swag_from('docs/blogpost/blogpost_get.yaml', endpoint='api.api_blogpost_oid')
+    @swag_from('docs/helpingmaterial/helpingmaterial_get.yaml', endpoint='api.api_helpingmaterial_oid')
+    @swag_from('docs/auditlog/auditlog_get.yaml', endpoint='api.api_auditlog_oid')
+    @swag_from('docs/projectstats/projectstats_get.yaml', endpoint='api.api_projectstats_oid')
+    @swag_from('docs/projectdetails/projectdetails_get.yaml', endpoint='api.api_projectdetails_oid')
+    @swag_from('docs/projectlocks/projectlocks_get.yaml', endpoint='api.api_projectlocks_oid')
+    @swag_from('docs/performancestats/performancestats_get.yaml', endpoint='api.api_performancestats_oid')
+    @swag_from('docs/favorites/favorites_get.yaml', endpoint='api.api_favorites_oid')
+    @swag_from('docs/globalstats/globalstats_get.yaml', endpoint='api.api_globalstats_oid')
+    @swag_from('docs/category/category_get.yaml', endpoint='api.api_category_oid')
     def get(self, oid):
         """Get an object.
 
@@ -319,6 +332,10 @@ class APIBase(MethodView):
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
     @swag_from('docs/task/task_post.yaml', endpoint='api.api_task')
     @swag_from('docs/project/project_post.yaml', endpoint='api.api_project')
+    @swag_from('docs/taskrun/taskrun_post.yaml', endpoint='api.api_taskrun')
+    @swag_from('docs/blogpost/blogpost_post.yaml', endpoint='api.api_blogpost')
+    @swag_from('docs/helpingmaterial/helpingmaterial_post.yaml', endpoint='api.api_helpingmaterial')
+    @swag_from('docs/favorites/favorites_post.yaml', endpoint='api.api_favorites')
     def post(self):
         """Post an item to the DB with the request.data JSON object.
 
@@ -392,6 +409,9 @@ class APIBase(MethodView):
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
     @swag_from('docs/task/task_delete.yaml', endpoint='api.api_task_oid')
     @swag_from('docs/project/project_delete.yaml', endpoint='api.api_project_oid')
+    @swag_from('docs/blogpost/blogpost_delete.yaml', endpoint='api.api_blogpost_oid')
+    @swag_from('docs/helpingmaterial/helpingmaterial_delete.yaml', endpoint='api.api_helpingmaterial_oid')
+    @swag_from('docs/favorites/favorites_delete.yaml', endpoint='api.api_favorites_oid')
     def delete(self, oid):
         """Delete a single item from the DB.
 
@@ -433,6 +453,13 @@ class APIBase(MethodView):
     @jsonpify
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
     @swag_from('docs/project/project_put.yaml', endpoint='api.api_project_oid')
+    @swag_from('docs/task/task_put.yaml', endpoint='api.api_task_oid')
+    @swag_from('docs/taskrun/taskrun_put.yaml', endpoint='api.api_taskrun_oid')
+    @swag_from('docs/result/result_put.yaml', endpoint='api.api_result_oid')
+    @swag_from('docs/user/user_put.yaml', endpoint='api.api_user_oid')
+    @swag_from('docs/blogpost/blogpost_put.yaml', endpoint='api.api_blogpost_oid')
+    @swag_from('docs/helpingmaterial/helpingmaterial_put.yaml', endpoint='api.api_helpingmaterial_oid')
+    @swag_from('docs/bulktasks/bulktasks_put.yaml', endpoint='api.api_bulktasks_oid')
     def put(self, oid):
         """Update a single item in the DB.
 
