@@ -21,7 +21,7 @@ from nose.tools import assert_equal
 
 from test.helper import sched
 from pybossa.core import project_repo, task_repo
-from test.factories import TaskFactory, ProjectFactory, UserFactory
+from test.factories import TaskFactory, ProjectFactory, UserFactory, TaskRunFactory
 from pybossa.sched import (
     Schedulers,
     get_task_users_key,
@@ -636,3 +636,26 @@ class TestLockedSched(sched.Helper):
         assert rec_task2['id'] == rec_task1['id']
         assert guard.return_value.stamp_presented_time.called
         assert guard.return_value.remove_cancelled_timestamp.called
+
+    @with_context
+    def test_master_db_check_prevents_over_assignment(self):
+        """Test that master DB check prevents assigning a task
+        beyond n_answers even if slave DB shows stale counts."""
+        owner = UserFactory.create(id=500)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.locked
+        project_repo.save(project)
+
+        task = TaskFactory.create(project=project, info='task 1', n_answers=3)
+
+        # Simulate 3 completed task runs
+        users = [UserFactory.create() for _ in range(3)]
+        for user in users:
+            TaskRunFactory.create(task=task, project=project, user=user)
+
+        # A 4th user should NOT get this task
+        fourth_user = UserFactory.create()
+        result = get_locked_task(project.id, fourth_user.id)
+        assert not result, (
+            "Expected no task for 4th user but got: {}".format(result)
+        )

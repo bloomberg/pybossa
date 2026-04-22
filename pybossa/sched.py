@@ -272,7 +272,17 @@ def locked_scheduler(query_factory):
         # Iterate a list of tasks but only lock one task and return the locked task
         for task_id, taskcount, n_answers, calibration, _, _, timeout in rows:
             timeout = timeout or TIMEOUT
-            remaining = float('inf') if calibration else n_answers - taskcount
+            if not calibration:
+                actual_count = db.session.query(func.count(TaskRun.id)).filter_by(task_id=task_id).scalar()
+                if actual_count >= n_answers:
+                    current_app.logger.info(
+                        "locked_scheduler. Skipping task %s for user %s: master DB shows %d task_runs >= n_answers %d",
+                        task_id, user_id, actual_count, n_answers
+                    )
+                    continue
+            else:
+                actual_count = taskcount
+            remaining = float('inf') if calibration else n_answers - actual_count
             if acquire_locks(task_id, user_id, remaining, timeout):
                 # reserve tasks
                 acquire_reserve_task_lock(project_id, task_id, user_id, timeout)
