@@ -1,0 +1,31 @@
+Get project details. Returns a filtered view of project information. Requires admin or subadmin role.
+---
+tags:
+  - name: projectdetails
+definitions:
+  ProjectDetails:
+    type: object
+    properties:
+      id:
+        type: integer
+      short_name:
+        type: string
+      product:
+        type: string
+      subproduct:
+        type: string
+      created:
+        type: string
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: false
+    description: the project id. If omitted, returns a list of all project details.
+responses:
+  200:
+    description: filtered project details
+    schema:
+      $ref: '#/definitions/ProjectDetails'
+  401:
+    description: Unauthorized - Requires admin or subadmin role

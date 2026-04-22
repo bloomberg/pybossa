@@ -5,12 +5,15 @@ tags:
 parameters:
   - name: oid
     in: path
-    type: number
+    type: integer
     required: true
     description: the project id
 responses:
   204:
     description: successfully deleted project
-
-
-
+  401:
+    description: Unauthorized - User is not logged in
+  403:
+    description: Forbidden - User does not have permission
+  404:
+    description: Project not found

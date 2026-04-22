@@ -1,0 +1,47 @@
+Get project statistics by project id
+---
+tags:
+  - name: projectstats
+definitions:
+  ProjectStats:
+    type: object
+    properties:
+      id:
+        type: integer
+      project_id:
+        type: integer
+      n_tasks:
+        type: integer
+      n_task_runs:
+        type: integer
+      n_results:
+        type: integer
+      n_completed_tasks:
+        type: integer
+      overall_progress:
+        type: integer
+      n_volunteers:
+        type: integer
+      average_time:
+        type: number
+      info:
+        type: object
+        description: detailed statistics (hours_stats, dates_stats, users_stats included when full=1)
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: true
+    description: the project id
+  - name: full
+    in: query
+    type: integer
+    required: false
+    description: set to 1 to include detailed hours_stats, dates_stats, and users_stats
+responses:
+  200:
+    description: project statistics
+    schema:
+      $ref: '#/definitions/ProjectStats'
+  404:
+    description: Project not found

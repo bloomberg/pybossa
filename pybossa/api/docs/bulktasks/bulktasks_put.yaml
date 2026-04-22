@@ -1,0 +1,45 @@
+Bulk update tasks for a project. Requires admin or subadmin role.
+---
+tags:
+  - name: bulktasks
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: true
+    description: the project id
+  - name: tasks
+    in: body
+    required: true
+    description: list of tasks to update
+    schema:
+      type: array
+      items:
+        type: object
+        required:
+          - id
+        properties:
+          id:
+            type: integer
+            description: the task id
+          priority_0:
+            type: number
+            description: priority value between 0.0 and 1.0
+          n_answers:
+            type: integer
+            description: number of answers to collect
+    examples:
+      application/json:
+        - id: 1
+          priority_0: 0.8
+        - id: 2
+          priority_0: 0.5
+responses:
+  200:
+    description: bulk update result
+  400:
+    description: Bad request - Missing required fields
+  401:
+    description: Unauthorized - User is not logged in
+  403:
+    description: Forbidden - Requires admin or subadmin role
