@@ -30,12 +30,16 @@ class Sentinel(object):
             self.init_app(app)
 
     def init_app(self, app):
+        ssl_enabled = app.config.get('REDIS_SSL', False)
         conn_kwargs = {
             'db': app.config.get('REDIS_DB') or 0,
             'password': app.config.get('REDIS_PWD'),
             'socket_timeout': app.config.get('REDIS_SOCKET_TIMEOUT', 0.1),
-            'retry_on_timeout': app.config.get('REDIS_RETRY_ON_TIMEOUT', True)
+            'retry_on_timeout': app.config.get('REDIS_RETRY_ON_TIMEOUT', True),
+            'ssl': ssl_enabled,
+            'ssl_ca_certs': app.config.get('REDIS_SSL_CA_CERTS'),
         }
+        sentinel_kwargs = {'ssl': ssl_enabled} if ssl_enabled else {}
         if app.config.get('REDIS_MASTER_DNS') and \
             app.config.get('REDIS_SLAVE_DNS') and \
             app.config.get('REDIS_PORT'):
@@ -51,12 +55,14 @@ class Sentinel(object):
             app.config["REDIS_SENTINELS"] = ','.join(':'.join(str(x) for x in s) for s in sentinel_nodes)
             app.logger.info("Configuring redis sentinels. app.config.REDIS_SENTINELS: %s", app.config["REDIS_SENTINELS"])
             self.connection = sentinel.Sentinel(sentinel_nodes,
+                                                sentinel_kwargs=sentinel_kwargs,
                                                 **conn_kwargs)
             redis_master = app.config.get('REDIS_MASTER') or 'mymaster'
             self.master = self.connection.master_for(redis_master)
             self.slave = self.connection.slave_for(redis_master)
         else:
             self.connection = sentinel.Sentinel(app.config['REDIS_SENTINEL'],
+                                                sentinel_kwargs=sentinel_kwargs,
                                                 **conn_kwargs)
             redis_master = app.config.get('REDIS_MASTER') or 'mymaster'
             self.master = self.connection.master_for(redis_master)
