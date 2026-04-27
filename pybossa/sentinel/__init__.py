@@ -36,10 +36,11 @@ class Sentinel(object):
             'password': app.config.get('REDIS_PWD'),
             'socket_timeout': app.config.get('REDIS_SOCKET_TIMEOUT', 0.1),
             'retry_on_timeout': app.config.get('REDIS_RETRY_ON_TIMEOUT', True),
-            'ssl': ssl_enabled,
-            'ssl_ca_certs': app.config.get('REDIS_SSL_CA_CERTS'),
         }
-        sentinel_kwargs = {'ssl': ssl_enabled} if ssl_enabled else {}
+        if ssl_enabled:
+            conn_kwargs['ssl'] = True
+            conn_kwargs['ssl_ca_certs'] = app.config.get('REDIS_SSL_CA_CERTS')
+        sentinel_kwargs = {'ssl': True} if ssl_enabled else {}
         if app.config.get('REDIS_MASTER_DNS') and \
             app.config.get('REDIS_SLAVE_DNS') and \
             app.config.get('REDIS_PORT'):
