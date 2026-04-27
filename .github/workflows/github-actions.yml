@@ -73,7 +73,6 @@ jobs:
             --tls-ca-cert-file /tmp/redis-certs/ca.crt \
             --tls-auth-clients no \
             --daemonize yes
-          redis-server contrib/redis/sentinel-tls.conf --sentinel
 
       - name: Install dependencies
         run: |
