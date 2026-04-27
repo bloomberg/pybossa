@@ -43,10 +43,37 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y libxml2-dev libxmlsec1-dev libsasl2-dev libldap2-dev libssl-dev libkrb5-dev libpq-dev postgresql-client
           redis-server --version
-          redis-server contrib/redis/sentinel.conf --sentinel
-          redis-server&
           cd pybossa && ln -s themes/default/translations && cd ..
           cp settings_test.py.tmpl pybossa/settings_test.py
+
+      - name: Generate Redis TLS certificates
+        run: |
+          mkdir -p /tmp/redis-certs
+          openssl genrsa -out /tmp/redis-certs/ca.key 4096
+          openssl req -new -x509 -days 1 -key /tmp/redis-certs/ca.key \
+            -out /tmp/redis-certs/ca.crt \
+            -subj "/CN=Redis-Test-CA"
+          openssl genrsa -out /tmp/redis-certs/redis.key 2048
+          openssl req -new -key /tmp/redis-certs/redis.key \
+            -out /tmp/redis-certs/redis.csr \
+            -subj "/CN=localhost"
+          openssl x509 -req -days 1 \
+            -in /tmp/redis-certs/redis.csr \
+            -CA /tmp/redis-certs/ca.crt \
+            -CAkey /tmp/redis-certs/ca.key \
+            -CAcreateserial \
+            -out /tmp/redis-certs/redis.crt
+
+      - name: Start Redis with TLS
+        run: |
+          redis-server \
+            --tls-port 6380 --port 0 \
+            --tls-cert-file /tmp/redis-certs/redis.crt \
+            --tls-key-file /tmp/redis-certs/redis.key \
+            --tls-ca-cert-file /tmp/redis-certs/ca.crt \
+            --tls-auth-clients no \
+            --daemonize yes
+          redis-server contrib/redis/sentinel-tls.conf --sentinel
 
       - name: Install dependencies
         run: |
@@ -56,9 +83,9 @@ jobs:
 
       - name: Testing Redis
         run: |
-          redis-cli info
-          redis-cli set foo 1
-          redis-cli get foo
+          redis-cli --tls --cacert /tmp/redis-certs/ca.crt -p 6380 ping
+          redis-cli --tls --cacert /tmp/redis-certs/ca.crt -p 6380 set foo 1
+          redis-cli --tls --cacert /tmp/redis-certs/ca.crt -p 6380 get foo
 
       - name: Setting up PostgreSQL DB
         run: |
