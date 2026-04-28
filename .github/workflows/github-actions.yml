@@ -67,12 +67,13 @@ jobs:
       - name: Start Redis with TLS
         run: |
           redis-server \
-            --tls-port 6380 --port 0 \
+            --port 6379 --tls-port 6380 \
             --tls-cert-file /tmp/redis-certs/redis.crt \
             --tls-key-file /tmp/redis-certs/redis.key \
             --tls-ca-cert-file /tmp/redis-certs/ca.crt \
             --tls-auth-clients no \
             --daemonize yes
+          redis-server contrib/redis/sentinel.conf --sentinel
 
       - name: Install dependencies
         run: |
