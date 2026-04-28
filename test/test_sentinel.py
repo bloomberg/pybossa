@@ -177,7 +177,7 @@ class TestSentinelInitAppSentinelConfig(unittest.TestCase):
 
         mock_sentinel_module.Sentinel.assert_called_once_with(
             [('sentinel1.example.com', 26379)],
-            sentinel_kwargs={'ssl': True},
+            sentinel_kwargs={'ssl': True, 'ssl_ca_certs': '/certs/ca.pem'},
             db=1,
             password='secret',
             socket_timeout=0.2,
@@ -270,7 +270,7 @@ class TestSentinelInitAppDNSResolution(unittest.TestCase):
         expected_nodes = [('sentinel1.example.com.', 26379)]
         mock_sentinel_module.Sentinel.assert_called_once_with(
             expected_nodes,
-            sentinel_kwargs={'ssl': True},
+            sentinel_kwargs={'ssl': True, 'ssl_ca_certs': '/etc/ssl/ca.crt'},
             db=0,
             password=None,
             socket_timeout=0.1,
