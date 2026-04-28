@@ -11,9 +11,9 @@ if all(hasattr(settings, attr) for attr in
     conn = StrictRedis(host=settings.REDIS_MASTER_DNS,
         port=settings.REDIS_PORT, db=db, ssl=ssl, ssl_ca_certs=ssl_ca_certs)
 else:
-    sentinel_kwargs = {'ssl': ssl} if ssl else {}
+    sentinel_kwargs = {'ssl': True, 'ssl_ca_certs': ssl_ca_certs} if ssl else {}
     sentinel = Sentinel(RS, sentinel_kwargs=sentinel_kwargs)
-    conn = sentinel.master_for('mymaster', ssl=ssl, ssl_ca_certs=ssl_ca_certs)
+    conn = sentinel.master_for('mymaster')
 
 cache_items = conn.keys(pattern='{}*'.format(settings.REDIS_KEYPREFIX))
 for item in cache_items:

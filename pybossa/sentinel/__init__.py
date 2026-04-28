@@ -40,7 +40,7 @@ class Sentinel(object):
         if ssl_enabled:
             conn_kwargs['ssl'] = True
             conn_kwargs['ssl_ca_certs'] = app.config.get('REDIS_SSL_CA_CERTS')
-        sentinel_kwargs = {'ssl': True} if ssl_enabled else {}
+        sentinel_kwargs = {'ssl': True, 'ssl_ca_certs': app.config.get('REDIS_SSL_CA_CERTS')} if ssl_enabled else {}
         if app.config.get('REDIS_MASTER_DNS') and \
             app.config.get('REDIS_SLAVE_DNS') and \
             app.config.get('REDIS_PORT'):

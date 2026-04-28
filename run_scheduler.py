@@ -15,15 +15,16 @@ def run_scheduler():
     conn_kwargs = {
         'db': app_settings.config.get('REDIS_DB') or 0,
         'password': app_settings.config.get('REDIS_PWD'),
-        'ssl': ssl_enabled,
-        'ssl_ca_certs': app_settings.config.get('REDIS_SSL_CA_CERTS'),
     }
+    if ssl_enabled:
+        conn_kwargs['ssl'] = True
+        conn_kwargs['ssl_ca_certs'] = app_settings.config.get('REDIS_SSL_CA_CERTS')
     if all(app_settings.config.get(attr) for attr in
         ['REDIS_MASTER_DNS', 'REDIS_PORT']):
         master = StrictRedis(host=app_settings.config['REDIS_MASTER_DNS'],
             port=app_settings.config['REDIS_PORT'], **conn_kwargs)
     else:
-        sentinel_kwargs = {'ssl': ssl_enabled} if ssl_enabled else {}
+        sentinel_kwargs = {'ssl': True, 'ssl_ca_certs': app_settings.config.get('REDIS_SSL_CA_CERTS')} if ssl_enabled else {}
         sentinel = Sentinel(app_settings.config['REDIS_SENTINEL'],
                             sentinel_kwargs=sentinel_kwargs)
         master = sentinel.master_for(app_settings.config['REDIS_MASTER'], **conn_kwargs)
