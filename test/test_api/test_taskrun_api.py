@@ -24,8 +24,11 @@ from nose.tools import nottest
 import time
 
 
+from werkzeug.exceptions import Forbidden
+
 from pybossa.core import db
 from pybossa.model.task_run import TaskRun
+from pybossa.api.task_run import TaskRunAPI
 from pybossa.repositories import ProjectRepository, TaskRepository
 from pybossa.repositories import ResultRepository
 from test import (with_context, mock_contributions_guard,
@@ -1293,3 +1296,35 @@ class TestTaskrunAPI(TestAPI):
         assert err['status'] == 'failed', err
         assert err['status_code'] == 403, err
         assert err['exception_cls'] == 'Forbidden', err
+
+    @with_context
+    def test_check_task_not_over_answered_raises_on_master_count(self):
+        """Test _check_task_not_over_answered raises Forbidden when master DB
+        count >= n_answers, covering the warning log and raise paths."""
+        project = ProjectFactory.create()
+        task = TaskFactory.create(project=project, n_answers=3)
+
+        # Create 3 task_runs so master DB count = 3
+        for _ in range(3):
+            TaskRunFactory.create(task=task, project=project)
+
+        api = TaskRunAPI()
+        try:
+            api._check_task_not_over_answered(task)
+            assert False, "Expected Forbidden to be raised"
+        except Forbidden as e:
+            assert "already received enough submissions" in str(e.description)
+
+    @with_context
+    def test_check_task_not_over_answered_skips_calibration(self):
+        """Test _check_task_not_over_answered returns without error for
+        calibration (gold) tasks even when count >= n_answers."""
+        project = ProjectFactory.create()
+        task = TaskFactory.create(project=project, n_answers=1, calibration=True)
+
+        # Create task_run exceeding n_answers
+        TaskRunFactory.create(task=task, project=project)
+
+        api = TaskRunAPI()
+        # Should not raise for calibration tasks
+        api._check_task_not_over_answered(task)
