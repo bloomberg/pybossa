@@ -1256,3 +1256,40 @@ class TestTaskrunAPI(TestAPI):
         res = self.app.get("/api/taskrun?from_finish_time=" + date_5d_old + "&api_key=" + owner.api_key + "&project_id=" + str(project.id))
         data = json.loads(res.data)
         assert len(data) == 9, data
+
+    @with_context
+    def test_check_task_not_over_answered_rejects_excess_submission(self):
+        """Test that submitting a task_run is rejected with 403 Forbidden
+        when the task already has n_answers task_runs (defense-in-depth
+        check against race conditions from slave DB replication lag)."""
+        project = ProjectFactory.create()
+        task = TaskFactory.create(project=project, n_answers=3)
+
+        # Create 3 task_runs to fill the task to capacity
+        users = [UserFactory.create() for _ in range(3)]
+        for user in users:
+            # Request task and then submit
+            self.app.get('/api/project/%s/newtask?api_key=%s'
+                         % (project.id, user.api_key))
+            data = dict(
+                project_id=project.id,
+                task_id=task.id,
+                info='result')
+            self.app.post('/api/taskrun?api_key=%s' % user.api_key,
+                          data=json.dumps(data))
+
+        # 4th user attempts to submit; should be rejected
+        fourth_user = UserFactory.create()
+        self.app.get('/api/project/%s/newtask?api_key=%s'
+                     % (project.id, fourth_user.api_key))
+        data = dict(
+            project_id=project.id,
+            task_id=task.id,
+            info='excess result')
+        res = self.app.post('/api/taskrun?api_key=%s' % fourth_user.api_key,
+                            data=json.dumps(data))
+        err = json.loads(res.data)
+        assert res.status_code == 403, (res.status_code, err)
+        assert err['status'] == 'failed', err
+        assert err['status_code'] == 403, err
+        assert err['exception_cls'] == 'Forbidden', err

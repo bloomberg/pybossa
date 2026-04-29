@@ -604,7 +604,21 @@ def lock_task_for_user(task_id, project_id, user_id):
                                     task_id=task_id))
     for task_id, taskcount, n_answers, calibration, timeout in rows:
         timeout = timeout or TIMEOUT
-        remaining = float('inf') if calibration else n_answers - taskcount
+        if not calibration:
+            # Re-check against master DB to guard against slave replication lag
+            actual_count = db.session.query(
+                func.count(TaskRun.id)
+            ).filter_by(task_id=task_id).scalar()
+            if actual_count >= n_answers:
+                current_app.logger.warning(
+                    "lock_task_for_user: skipping task %s, "
+                    "master DB shows %d task_runs >= n_answers %d",
+                    task_id, actual_count, n_answers
+                )
+                return []
+            remaining = n_answers - actual_count
+        else:
+            remaining = float('inf')
         if acquire_locks(task_id, user_id, remaining, timeout):
             # reserve tasks
             acquire_reserve_task_lock(project_id, task_id, user_id, timeout)

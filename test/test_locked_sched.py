@@ -639,8 +639,8 @@ class TestLockedSched(sched.Helper):
 
     @with_context
     def test_master_db_check_prevents_over_assignment(self):
-        """Test that master DB check prevents assigning a task
-        beyond n_answers even if slave DB shows stale counts."""
+        """Test that tasks with n_answers fulfilled task_runs are not
+        returned by the locked scheduler for additional users."""
         owner = UserFactory.create(id=500)
         project = ProjectFactory.create(owner=owner)
         project.info['sched'] = Schedulers.locked
