@@ -8,8 +8,11 @@ ssl = getattr(settings, 'REDIS_SSL', False)
 ssl_ca_certs = getattr(settings, 'REDIS_SSL_CA_CERTS', None)
 if all(hasattr(settings, attr) for attr in
     ['REDIS_MASTER_DNS', 'REDIS_PORT']):
-    conn = StrictRedis(host=settings.REDIS_MASTER_DNS,
-        port=settings.REDIS_PORT, db=db, ssl=ssl, ssl_ca_certs=ssl_ca_certs)
+    conn_kwargs = dict(host=settings.REDIS_MASTER_DNS, port=settings.REDIS_PORT, db=db)
+    if ssl:
+        conn_kwargs['ssl'] = True
+        conn_kwargs['ssl_ca_certs'] = ssl_ca_certs
+    conn = StrictRedis(**conn_kwargs)
 else:
     sentinel_kwargs = {'ssl': True, 'ssl_ca_certs': ssl_ca_certs} if ssl else {}
     sentinel = Sentinel(RS, sentinel_kwargs=sentinel_kwargs)
