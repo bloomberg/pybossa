@@ -1320,7 +1320,7 @@ class TestTaskrunAPI(TestAPI):
         """Test _check_task_not_over_answered returns without error for
         calibration (gold) tasks even when count >= n_answers."""
         project = ProjectFactory.create()
-        task = TaskFactory.create(project=project, n_answers=1, calibration=True)
+        task = TaskFactory.create(project=project, n_answers=1, calibration=1)
 
         # Create task_run exceeding n_answers
         TaskRunFactory.create(task=task, project=project)

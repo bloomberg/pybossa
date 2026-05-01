@@ -697,7 +697,7 @@ class TestLockedSched(sched.Helper):
         project_repo.save(project)
 
         task = TaskFactory.create(project=project, info='gold task', n_answers=3,
-                                  calibration=True)
+                                  calibration=1)
         user = UserFactory.create()
 
         # Mock slave session to return a calibration task row
