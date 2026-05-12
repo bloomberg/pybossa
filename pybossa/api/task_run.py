@@ -43,6 +43,8 @@ from pybossa.cloud_store_api.s3 import s3_upload_file_storage
 from pybossa.contributions_guard import ContributionsGuard
 from pybossa.auth import jwt_authorize_project
 from pybossa.sched import can_post
+from pybossa.core import db
+from sqlalchemy.sql import func
 from pybossa.model.completion_event import mark_if_complete
 from pybossa.cache import delete_memoized
 from pybossa.cache.helpers import n_available_tasks_for_user
@@ -111,6 +113,7 @@ class TaskRunAPI(APIBase):
         guard = ContributionsGuard(sentinel.master)
 
         self._validate_project_and_task(taskrun, task)
+        self._check_task_not_over_answered(task)
         self._ensure_task_was_requested(task, guard)
         self._add_user_info(taskrun)
         self._add_timestamps(taskrun, task, guard)
@@ -135,6 +138,27 @@ class TaskRunAPI(APIBase):
             if type(resp) == Response:
                 msg = json.loads(resp.data)['description']
                 raise Forbidden(msg)
+
+    def _check_task_not_over_answered(self, task):
+        """Reject submission if task already has n_answers task_runs.
+
+        This is a defense-in-depth check against race conditions caused by
+        slave DB replication lag during task assignment.
+        """
+        if task.calibration:
+            return
+        actual_count = db.session.query(
+            func.count(TaskRun.id)
+        ).filter_by(task_id=task.id).scalar()
+        if actual_count >= task.n_answers:
+            current_app.logger.warning(
+                "Rejected task_run submission for task %s: "
+                "master DB shows %d task_runs >= n_answers %d",
+                task.id, actual_count, task.n_answers
+            )
+            raise Forbidden(
+                "This task has already received enough submissions."
+            )
 
     def _ensure_task_was_requested(self, task, guard):
         if not guard.check_task_stamped(task, get_user_id_or_ip()):

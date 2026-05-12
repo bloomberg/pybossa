@@ -21,7 +21,7 @@ from nose.tools import assert_equal
 
 from test.helper import sched
 from pybossa.core import project_repo, task_repo
-from test.factories import TaskFactory, ProjectFactory, UserFactory
+from test.factories import TaskFactory, ProjectFactory, UserFactory, TaskRunFactory
 from pybossa.sched import (
     Schedulers,
     get_task_users_key,
@@ -29,7 +29,8 @@ from pybossa.sched import (
     has_lock,
     get_task_id_and_duration_for_project_user,
     get_task_id_project_id_key,
-    get_locked_task
+    get_locked_task,
+    lock_task_for_user
 )
 from pybossa.core import sentinel
 from pybossa.contributions_guard import ContributionsGuard
@@ -636,3 +637,79 @@ class TestLockedSched(sched.Helper):
         assert rec_task2['id'] == rec_task1['id']
         assert guard.return_value.stamp_presented_time.called
         assert guard.return_value.remove_cancelled_timestamp.called
+
+    @with_context
+    def test_master_db_check_prevents_over_assignment(self):
+        """Test that tasks with n_answers fulfilled task_runs are not
+        returned by the locked scheduler for additional users."""
+        owner = UserFactory.create(id=500)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.locked
+        project_repo.save(project)
+
+        task = TaskFactory.create(project=project, info='task 1', n_answers=3)
+
+        # Simulate 3 completed task runs
+        users = [UserFactory.create() for _ in range(3)]
+        for user in users:
+            TaskRunFactory.create(task=task, project=project, user=user)
+
+        # A 4th user should NOT get this task
+        fourth_user = UserFactory.create()
+        result = get_locked_task(project.id, fourth_user.id)
+        assert not result, (
+            "Expected no task for 4th user but got: {}".format(result)
+        )
+
+    @with_context
+    def test_lock_task_for_user_master_db_rejects_over_answered(self):
+        """Test that lock_task_for_user returns [] when slave DB shows task
+        as available but master DB shows it already has n_answers task_runs
+        (simulating slave replication lag)."""
+        owner = UserFactory.create(id=500)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.locked
+        project_repo.save(project)
+
+        task = TaskFactory.create(project=project, info='task 1', n_answers=3)
+        user = UserFactory.create()
+
+        # Mock slave session to return a row as if the task is still available
+        # (taskcount=2, below n_answers=3), simulating stale slave data
+        fake_row = [(task.id, 2, 3, False, None)]
+        with patch('pybossa.sched.session') as mock_slave_session, \
+             patch('pybossa.sched.db') as mock_db:
+            mock_slave_session.execute.return_value = fake_row
+            # Master DB shows 3 task_runs (>= n_answers), so task is full
+            mock_db.session.query.return_value.filter_by.return_value.scalar.return_value = 3
+
+            result = lock_task_for_user(task.id, project.id, user.id)
+            assert result == [], \
+                "Expected empty list when master DB shows task is over-answered, got: {}".format(result)
+
+    @with_context
+    def test_lock_task_for_user_calibration_skips_master_check(self):
+        """Test that lock_task_for_user skips the master DB check for
+        calibration (gold) tasks and sets remaining to inf."""
+        owner = UserFactory.create(id=500)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.locked
+        project_repo.save(project)
+
+        task = TaskFactory.create(project=project, info='gold task', n_answers=3,
+                                  calibration=1)
+        user = UserFactory.create()
+
+        # Mock slave session to return a calibration task row
+        fake_row = [(task.id, 2, 3, True, None)]
+        with patch('pybossa.sched.session') as mock_slave_session, \
+             patch('pybossa.sched.acquire_locks', return_value=True) as mock_acquire, \
+             patch('pybossa.sched.acquire_reserve_task_lock'), \
+             patch('pybossa.sched._lock_task_for_user', return_value=[{'id': task.id}]) as mock_lock:
+            mock_slave_session.execute.return_value = fake_row
+
+            result = lock_task_for_user(task.id, project.id, user.id)
+            # Should call acquire_locks with remaining=inf (not query master DB)
+            mock_acquire.assert_called_once_with(task.id, user.id, float('inf'),
+                                                  mock_acquire.call_args[0][3])
+            assert result == [{'id': task.id}]
