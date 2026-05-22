@@ -127,7 +127,7 @@ requirements = [
     "rax-default-network-flags-python-novaclient-ext==0.4.0",
     "rax-scheduled-images-python-novaclient-ext==0.3.1",
     "readability-lxml==0.8.4.1",
-    "redis==3.5.3",
+    "redis==5.0.8",
     "requests==2.31.0",
     "requests-kerberos==0.12.0",
     "requests-oauthlib==1.1.0",
