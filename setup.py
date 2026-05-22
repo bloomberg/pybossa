@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 requirements = [
-    "alembic==1.7.3",
+    "alembic==1.13.1",
     "arrow==1.1.1",
     "asn1crypto==1.4.0",
     "Babel==2.9.1",
@@ -63,7 +63,7 @@ requirements = [
     "humanize==3.11.0",
     "idna==3.2",
     "iiif-prezi==0.3.0",
-    "importlib-metadata==4.8.1",
+    "importlib-metadata==7.0.1",
     "infinity==1.5",
     "intervals==0.9.2",
     "ip-associations-python-novaclient-ext==0.2",
@@ -77,7 +77,7 @@ requirements = [
     "keystoneauth1==4.4.0",
     "libsass==0.23.0",
     "lxml==5.1.0",
-    "Mako==1.1.5",
+    "Mako==1.3.2",
     "Markdown==3.3.4",
     "MarkupSafe==2.0.1",
     "misaka==2.1.1",
@@ -98,7 +98,7 @@ requirements = [
     "oslo.serialization==4.2.0",
     "oslo.utils==4.10.0",
     "otpauth==1.0.1",
-    "packaging==21.0",
+    "packaging==23.2",
     "pandas==2.1.4",
     "pbr==5.6.0",
     "Pillow==11.1.0",
@@ -141,7 +141,7 @@ requirements = [
     "six==1.16.0",
     "soupsieve==2.2.1",
     "speaklater3==1.4",
-    "SQLAlchemy==1.4.25",
+    "SQLAlchemy==1.4.52",
     "stevedore==3.4.0",
     "text-unidecode==1.3",
     "twitter==1.19.3",
@@ -157,7 +157,7 @@ requirements = [
     "WTForms-Components==0.10.5",
     "xmlsec==1.3.14",
     "yacryptopan==1.0.1",
-    "zipp==3.5.1"
+    "zipp==3.17.0"
 ]
 
 setup(
