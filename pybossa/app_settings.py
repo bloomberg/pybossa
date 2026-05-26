@@ -16,12 +16,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-import imp
+import importlib.util
 import os
 
 
 def _load_module_file_as_dict(path):
-    module = imp.load_source('module', path)
+    spec = importlib.util.spec_from_file_location('module', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
     return {
         name: getattr(module, name)
         for name in dir(module)
@@ -41,7 +43,9 @@ def _load_config():
         config = _load_module_file_as_dict(config_path)
         upref_mdata_path = os.path.join(os.path.dirname(config_path), 'settings_upref_mdata.py')
         if os.path.exists(upref_mdata_path):
-            upref_mdata = imp.load_source('upref_mdata', upref_mdata_path)
+            spec = importlib.util.spec_from_file_location('upref_mdata', upref_mdata_path)
+            upref_mdata = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(upref_mdata)
         else:
             upref_mdata_path = None
     else:
