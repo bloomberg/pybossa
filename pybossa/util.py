@@ -898,7 +898,7 @@ def get_s3_bucket_name(url):
     if found:
         return found.group(1)
     # for 'http://s3.amazonaws.com/bucket'
-    found = re.search('^https?://s3.amazonaws.com/([^\/]+)', url)
+    found = re.search(r'^https?://s3.amazonaws.com/([^\/]+)', url)
     if found:
         return found.group(1)
     return None

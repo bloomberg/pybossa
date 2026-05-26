@@ -272,7 +272,7 @@ def get_inactive_users_jobs(queue='quaterly'):
     from pybossa.model.user import User
     from pybossa.core import db
     # First users that have participated once but more than 3 months ago
-    sql = text('''SELECT user_id FROM task_run
+    sql = text(r'''SELECT user_id FROM task_run
                WHERE user_id IS NOT NULL
                AND to_date(task_run.finish_time, 'YYYY-MM-DD\THH24:MI:SS.US')
                >= NOW() - '12 month'::INTERVAL

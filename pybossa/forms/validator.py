@@ -71,7 +71,7 @@ class UniqueCaseInsensitive(Unique):
 
 class NotAllowedChars(object):
     """Validator that checks field not allowed chars"""
-    not_valid_chars = '$#&\/| \t'
+    not_valid_chars = r'$#&\/| \t'
 
     def __init__(self, message=None):
         if not message:

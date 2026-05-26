@@ -62,7 +62,7 @@ def stats_users(project_id, period=None):
                ORDER BY n_tasks DESC;''')\
         .execution_options(stream=True)
     if period:
-        sql = text('''SELECT task_run.user_id AS user_id,
+        sql = text(r'''SELECT task_run.user_id AS user_id,
                    COUNT(task_run.id) as n_tasks FROM task_run
                    WHERE task_run.user_id IS NOT NULL AND
                    task_run.user_ip IS NULL AND
