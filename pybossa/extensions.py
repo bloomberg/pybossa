@@ -147,19 +147,17 @@ plugin_manager = PluginManager()
 from flask_assets import Environment
 assets = Environment()
 
-from flask.json import JSONEncoder as BaseEncoder
+import json
 from speaklater import _LazyString
 
-class JSONEncoder(BaseEncoder): # pragma: no cover
+class JSONEncoder(json.JSONEncoder): # pragma: no cover
     """JSON Encoder to deal with Babel lazy strings and Decimal."""
     def default(self, o):
         if isinstance(o, _LazyString):
             return str(o)
-        # Resolves the "Object of type Decimal is not JSON serializable" error
         if isinstance(o, Decimal):
             return float(o)
-
-        return BaseEncoder.default(self, o)
+        return super().default(o)
 
 # CORS
 from flask_cors import CORS
