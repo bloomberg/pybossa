@@ -134,7 +134,14 @@ newsletter = Newsletter()
 from .importers import Importer
 importer = Importer()
 
-from flask_plugins import PluginManager
+class PluginManager:
+    """Minimal stub replacing unmaintained flask_plugins (incompatible with Jinja2 3.1+)."""
+    plugins = []
+    def init_app(self, app):
+        pass
+    def install_plugins(self):
+        pass
+
 plugin_manager = PluginManager()
 
 from flask_assets import Environment
