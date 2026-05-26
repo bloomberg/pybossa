@@ -77,7 +77,7 @@ requirements = [
     "libsass==0.23.0",
     "lxml==5.1.0",
     "Mako==1.3.2",
-    "Markdown==3.3.4",
+    "Markdown==3.4.4",
     "MarkupSafe==2.1.5",
     "misaka==2.1.1",
     "msgpack==1.0.2",
