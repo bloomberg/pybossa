@@ -55,7 +55,7 @@ class BulkTaskYoutubeImport(BulkTaskImport):
         if not (url_data.scheme):
             msg = gettext("URL is not valid.")
             raise BulkImportException(msg)
-        pattern = re.compile("^(www\.)?youtu(\.be|be\.com)")
+        pattern = re.compile(r"^(www\.)?youtu(\.be|be\.com)")
         if not (pattern.match(url_data.hostname)):
             msg = gettext("URL is not a youtube domain.")
             raise BulkImportException(msg)
