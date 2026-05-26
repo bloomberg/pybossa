@@ -1,2 +1,2 @@
 #!/bin/bash
-PYBOSSA_SETTINGS="./pybossa/settings_test.py" PYBOSSA_REDIS_CACHE_DISABLED=1 nosetests ${@:-test/}
+PYBOSSA_SETTINGS="./pybossa/settings_test.py" PYBOSSA_REDIS_CACHE_DISABLED=1 python -c "from pybossa import imp_shim; import sys; sys.modules['imp'] = imp_shim; from nose import run_exit; run_exit()" ${@:-test/}

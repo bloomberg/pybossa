@@ -30,15 +30,9 @@ This exports:
 # boto v2 uses 'imp' (removed in 3.12) and a broken vendored 'six'.
 # This must run before any boto import.
 import sys
-import importlib
-import importlib.util
-import types
 
-# Provide a shim for the removed 'imp' module that boto.plugin uses.
 if 'imp' not in sys.modules:
-    imp_shim = types.ModuleType('imp')
-    imp_shim.find_module = lambda name, path=None: (None, None, None)
-    imp_shim.load_module = lambda *args, **kwargs: None
+    from pybossa import imp_shim
     sys.modules['imp'] = imp_shim
 
 # Patch boto's broken vendored six.
