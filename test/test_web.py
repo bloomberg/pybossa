@@ -1909,8 +1909,7 @@ class TestWeb(web.Helper):
         p = project_repo.get(project.id)
         assert p.info['thumbnail'] is not None
         assert p.info['container'] is not None
-        thumbnail_url = '%s/uploads/%s/%s' % (self.flask_app.config['SERVER_NAME'],
-                                              p.info['container'], p.info['thumbnail'])
+        thumbnail_url = '/uploads/%s/%s' % (p.info['container'], p.info['thumbnail'])
         assert p.info['thumbnail_url'].endswith(thumbnail_url)
 
     @with_context
@@ -7097,7 +7096,9 @@ class TestWeb(web.Helper):
         url = "/project/%s/tasks/import?type=flickr" % project.short_name
 
         res = self.app.get(url)
-        login_url = '/flickr/?next=%2Fproject%2F%25E2%259C%2593project1%2Ftasks%2Fimport%3Ftype%3Dflickr'
+        from urllib.parse import quote
+        next_path = '/project/%s/tasks/import?type=flickr' % project.short_name
+        login_url = '/flickr/?next=' + quote(next_path, safe='')
 
         assert login_url in str(res.data)
 

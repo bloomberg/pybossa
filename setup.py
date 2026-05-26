@@ -131,7 +131,7 @@ requirements = [
     "requests-oauthlib==1.1.0",
     "rfc3986==1.5.0",
     "rq==1.16.2",
-    "rq-dashboard==0.6.1",
+    "rq-dashboard==0.6.7.2",
     "rq-scheduler==0.13.1",
     "rsa==4.7.2",
     "SecretStorage==3.3.1",
