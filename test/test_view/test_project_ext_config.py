@@ -74,7 +74,7 @@ class TestProjectExtConfig(web.Helper):
             'ml_service': {
                 'display': 'Active Learning Config',
                 'fields': {
-                    'model': ('TextField', 'Model', None)
+                    'model': ('StringField', 'Model', None)
                 }
             }
         }
@@ -91,7 +91,7 @@ class TestProjectExtConfig(web.Helper):
             'ml_service': {
                 'display': 'Active Learning Config',
                 'fields': {
-                    'model': ('TextField', 'Model', None)
+                    'model': ('StringField', 'Model', None)
                 }
             }
         }
@@ -112,7 +112,7 @@ class TestProjectExtConfig(web.Helper):
                 'ml_service': {
                     'display': 'Active Learning Config',
                     'fields': {
-                        'model': ('TextField', '', None)
+                        'model': ('StringField', '', None)
                     }
                 }
             }
@@ -138,7 +138,7 @@ class TestProjectExtConfig(web.Helper):
                 "service": {
                     'display': 'Response File Location',
                     'fields': {
-                        'file_path': ('TextField', 'Path for responses', None)
+                        'file_path': ('StringField', 'Path for responses', None)
                     }
                 }
             }
