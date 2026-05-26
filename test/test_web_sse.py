@@ -63,7 +63,7 @@ class TestWebSse(web.Helper):
         private_uri = '/project/%s/privatestream' % project.short_name
         self.app.get(private_uri, follow_redirects=True)
         assert mock_sse.called
-        assert mock_sse.called_once_with(project.short_name, 'private')
+        mock_sse.assert_called_once_with(project.short_name, 'private')
 
     @with_context
     def test_stream_uri_private_owner_404(self):
@@ -97,7 +97,7 @@ class TestWebSse(web.Helper):
         self.signin()
         res = self.app.get(private_uri, follow_redirects=True)
         assert mock_sse.called
-        assert mock_sse.called_once_with(project.short_name, 'private')
+        mock_sse.assert_called_once_with(project.short_name, 'private')
         assert res.status_code == 200
         assert res.data.decode() == self.fake_sse_response, res.data
 
@@ -138,7 +138,7 @@ class TestWebSse(web.Helper):
         self.signin()
         res = self.app.get(private_uri, follow_redirects=True)
         assert mock_sse.called
-        assert mock_sse.called_once_with(project.short_name, 'public')
+        mock_sse.assert_called_once_with(project.short_name, 'public')
         assert res.status_code == 200
         assert res.data.decode() == self.fake_sse_response, res.data
 
@@ -155,7 +155,7 @@ class TestWebSse(web.Helper):
         private_uri = '/project/%s/publicstream' % project.short_name
         self.app.get(private_uri, follow_redirects=True)
         assert mock_sse.called
-        assert mock_sse.called_once_with(project.short_name, 'public')
+        mock_sse.assert_called_once_with(project.short_name, 'public')
 
     @with_context
     @patch('pybossa.view.projects.project_event_stream')
@@ -167,7 +167,7 @@ class TestWebSse(web.Helper):
         private_uri = '/project/%s/publicstream' % project.short_name
         self.app.get(private_uri, follow_redirects=True)
         assert mock_sse.called
-        assert mock_sse.called_once_with(project.short_name, 'public')
+        mock_sse.assert_called_once_with(project.short_name, 'public')
 
     @with_context
     def test_stream_uri_public_404(self, ):
@@ -197,7 +197,7 @@ class TestWebSse(web.Helper):
         private_uri = '/project/%s/publicstream' % project.short_name
         res = self.app.get(private_uri, follow_redirects=True)
         assert mock_sse.called
-        assert mock_sse.called_once_with(project.short_name, 'public')
+        mock_sse.assert_called_once_with(project.short_name, 'public')
         assert res.status_code == 200
         assert res.data.decode() == self.fake_sse_response, res.data
 

@@ -20,7 +20,7 @@ import os
 import logging
 import humanize
 from flask import Flask, url_for, request, render_template, \
-    flash, _app_ctx_stack, abort
+    flash, _app_ctx_stack, abort, current_app
 from flask_login import current_user
 from flask_babel import gettext
 from flask_assets import Bundle
@@ -335,12 +335,15 @@ def setup_logging(run_as_server=True):
 
 def setup_login_manager(app):
     """Setup login manager."""
+    import pybossa.model as model
+
     login_manager.login_view = 'account.signin'
     login_manager.login_message = "This feature requires being logged in. If you were previously logged in, your session may have timed out."
 
     @login_manager.user_loader
     def _load_user(username):
         return user_repo.get_by_name(username)
+
     login_manager.setup_app(app)
 
 
@@ -351,9 +354,12 @@ def setup_babel(app):
     @babel.localeselector
     def _get_locale():
         locales = [l[0] for l in app.config.get('LOCALES')]
-        if current_user and current_user.is_authenticated:
-            lang = current_user.locale
-        else:
+        try:
+            if current_user and current_user.is_authenticated:
+                lang = current_user.locale
+            else:
+                lang = request.cookies.get('language')
+        except Exception:
             lang = request.cookies.get('language')
         if (lang is None or lang == '' or
             lang.lower() not in locales):
@@ -406,7 +412,8 @@ def setup_blueprints(app):
         app.register_blueprint(bp['handler'], url_prefix=bp['url_prefix'])
 
     import rq_dashboard
-    rq_dashboard.blueprint.before_request(is_admin)
+    if not rq_dashboard.blueprint._got_registered_once:
+        rq_dashboard.blueprint.before_request(is_admin)
     csrf.exempt(rq_dashboard.blueprint)
     app.register_blueprint(rq_dashboard.blueprint, url_prefix="/admin/rq",
                            redis_conn=sentinel.master)
@@ -565,6 +572,8 @@ def setup_jinja(app):
 
 def setup_error_handlers(app):
     """Setup error handlers."""
+    if app._got_first_request:
+        return
     @app.errorhandler(400)
     def _bad_request(e):
         msg = str(e)
@@ -646,13 +655,16 @@ def setup_hooks(app):
     @app.context_processor
     def _global_template_context():
         notify_admin = False
-        if (current_user and current_user.is_authenticated
-            and current_user.admin):
-            key = NEWS_FEED_KEY + str(current_user.id)
-            if sentinel.slave.get(key):
-                notify_admin = True
-            news = get_news()
-        else:
+        try:
+            if (current_user and current_user.is_authenticated
+                and current_user.admin):
+                key = NEWS_FEED_KEY + str(current_user.id)
+                if sentinel.slave.get(key):
+                    notify_admin = True
+                news = get_news()
+            else:
+                news = None
+        except Exception:
             news = None
 
         # Cookies warning

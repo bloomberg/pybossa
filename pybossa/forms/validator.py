@@ -71,7 +71,7 @@ class UniqueCaseInsensitive(Unique):
 
 class NotAllowedChars(object):
     """Validator that checks field not allowed chars"""
-    not_valid_chars = r'$#&\/| \t'
+    not_valid_chars = '$#&\\/| \t'
 
     def __init__(self, message=None):
         if not message:
@@ -163,7 +163,7 @@ class CheckPasswordStrength(object):
 
     def __call__(self, form, field):
         pwd = field.data
-        if not self.password_required and len(pwd) == 0:
+        if not self.password_required and not pwd:
             return
         valid, message = check_password_strength(
                             pwd, self.min_len, self.max_len,

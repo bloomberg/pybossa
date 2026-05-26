@@ -963,7 +963,7 @@ def mail_with_enabled_users(message):
 def grant_access_with_api_key(secure_app):
     from pybossa.core import user_repo
     import pybossa.model as model
-    from flask_login import login_user
+    from flask import _request_ctx_stack
 
     apikey = None
     if not secure_app:
@@ -975,7 +975,7 @@ def grant_access_with_api_key(secure_app):
         if user and user.enabled:
             user.last_login = model.make_timestamp()
             user_repo.update(user)
-            login_user(user, remember=False)
+            _request_ctx_stack.top.user = user
 
 
 def can_have_super_user_access(user):

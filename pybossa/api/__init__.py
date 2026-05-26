@@ -316,7 +316,7 @@ def _retrieve_new_task(project_id, task_id=None, saved_task_position=None):
         resp = jwt_authorize_project(project,
                                      request.headers.get('Authorization'))
         if resp != True:
-            return resp, lambda x: x
+            return resp, None, lambda x: x
 
     if request.args.get('limit'):
         limit = int(request.args.get('limit'))

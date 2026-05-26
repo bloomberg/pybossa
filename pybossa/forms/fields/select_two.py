@@ -15,7 +15,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
-from wtforms import SelectMultipleField
+from wtforms import SelectMultipleField, ValidationError
 
 
 class Select2Field(SelectMultipleField):
@@ -30,4 +30,4 @@ class Select2Field(SelectMultipleField):
             values = list(c[0] for c in self.choices)
             for d in self.data:
                 if d not in values:
-                    raise ValueError(self.gettext("'%(value)s' is not a valid choice for this field") % dict(value=d))
+                    raise ValidationError(self.gettext("'%(value)s' is not a valid choice for this field") % dict(value=d))

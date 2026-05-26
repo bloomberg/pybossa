@@ -143,13 +143,13 @@ class TestWebHooks(Test):
                        result_id=result.id,
                        fired_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
         assert queue.enqueue.called
-        assert queue.called_with(webhook, url, payload)
+        queue.assert_called_with(webhook, url, payload)
 
         u = '/project/%s/webhook?api_key=%s&all=1' % (project.short_name,
                                                       project.owner.api_key)
         res = self.app.get(u)
         assert queue.enqueue.called
-        assert queue.called_with(webhook, url, payload, True)
+        queue.assert_called_with(webhook, url, payload, True)
 
         wh = WebhookFactory(response_status_code=500, project_id=project.id,
                             payload=payload, response="500")
@@ -157,14 +157,14 @@ class TestWebHooks(Test):
                                                          project.owner.api_key)
         res = self.app.get(u)
         assert queue.enqueue.called
-        assert queue.called_with(webhook, url, payload, True)
+        queue.assert_called_with(webhook, url, payload, True)
 
         u = '/project/%s/webhook/%s?api_key=%s&failed=1' % (wh.id,
                                                             project.short_name,
                                                             project.owner.api_key)
         res = self.app.post(u)
         assert queue.enqueue.called
-        assert queue.called_with(webhook, url, payload, True)
+        queue.assert_called_with(webhook, url, payload, True)
 
         queue.reset_mock()
 

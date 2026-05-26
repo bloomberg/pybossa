@@ -31,9 +31,34 @@ def _load_module_file_as_dict(path):
     }
 
 
+class _UprefMdataFallback:
+    """Fallback when settings_upref_mdata.py is absent — provides empty-dict attributes."""
+    country_name_to_country_code = {}
+    country_code_to_country_name = {}
+
+    def get_upref_mdata_choices(self):
+        return dict(languages=[], locations=[], country_codes=[],
+                    country_names=[], timezones=[], user_types=[])
+
+    def get_valid_user_preferences(self):
+        return {}
+
+    def upref_locations(self):
+        return [('', '')]
+
+    def upref_languages(self):
+        return [('', '')]
+
+    def mdata_user_types(self):
+        return [('', '')]
+
+    def mdata_timezones(self):
+        return [('', '')]
+
+
 def _load_config():
     config_path, config = None, {}
-    upref_mdata_path, upref_mdata = None, {}
+    upref_mdata_path, upref_mdata = None, _UprefMdataFallback()
     if os.environ.get('PYBOSSA_SETTINGS'):
         config_path = os.path.abspath(os.environ.get('PYBOSSA_SETTINGS'))
     else:

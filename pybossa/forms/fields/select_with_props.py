@@ -17,6 +17,7 @@
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 from wtforms import SelectField
 from markupsafe import Markup
+from wtforms import ValidationError
 from wtforms.widgets import Select, html_params
 
 class SelectProps(Select):
@@ -43,4 +44,4 @@ class SelectFieldWithProps(SelectField):
                  if self.data == v:
                      break
              else:
-                 raise ValueError(self.gettext('is not a valid choice'))
+                 raise ValidationError(self.gettext('is not a valid choice'))
