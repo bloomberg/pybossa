@@ -138,7 +138,7 @@ class ProjectForm(ProjectCommonForm):
 class ProjectUpdateForm(ProjectForm):
     id = IntegerField(label=None, widget=HiddenInput())
     description = TextAreaField(lazy_gettext('Description'),
-                            [validators.Required(
+                            [validators.DataRequired(
                                 message=lazy_gettext(
                                     "You must provide a description.")),
                              validators.Length(max=255)])
@@ -329,13 +329,13 @@ class TaskSchedulerForm(Form):
 class AnnouncementForm(Form):
     id = IntegerField(label=None, widget=HiddenInput())
     title = StringField(lazy_gettext('Title'),
-                     [validators.Required(message=lazy_gettext(
+                     [validators.DataRequired(message=lazy_gettext(
                                     "You must enter a title for the post."))])
     body = TextAreaField(lazy_gettext('Body'),
-                           [validators.Required(message=lazy_gettext(
+                           [validators.DataRequired(message=lazy_gettext(
                                     "You must enter some text for the post."))])
     info = StringField(lazy_gettext('Info'),
-                       [validators.Required(message=lazy_gettext(
+                       [validators.DataRequired(message=lazy_gettext(
                                 "You must enter a level for the post.")),
                        is_json(dict)])
     media_url = StringField(lazy_gettext('URL'))
@@ -345,17 +345,17 @@ class AnnouncementForm(Form):
 class BlogpostForm(Form):
     id = IntegerField(label=None, widget=HiddenInput())
     title = StringField(lazy_gettext('Title'),
-                     [validators.Required(message=lazy_gettext(
+                     [validators.DataRequired(message=lazy_gettext(
                                     "You must enter a title for the post."))])
     body = TextAreaField(lazy_gettext('Body'),
-                           [validators.Required(message=lazy_gettext(
+                           [validators.DataRequired(message=lazy_gettext(
                                     "You must enter some text for the post."))])
     published = BooleanField(lazy_gettext('Publish'))
 
 
 class PasswordForm(Form):
     password = PasswordField(lazy_gettext('Password'),
-                        [validators.Required(message=lazy_gettext(
+                        [validators.DataRequired(message=lazy_gettext(
                                     "You must enter a password"))])
 
 
@@ -365,7 +365,7 @@ class BulkTaskCSVImportForm(Form):
     msg_url = lazy_gettext("Oops! That's not a valid URL. "
                            "You must provide a valid URL")
     csv_url = StringField(lazy_gettext('URL'),
-                        [validators.Required(message=msg_required),
+                        [validators.DataRequired(message=msg_required),
                          validators.URL(message=msg_url)])
 
     def get_import_data(self):
@@ -378,7 +378,7 @@ class BulkTaskGDImportForm(Form):
     msg_url = lazy_gettext("Oops! That's not a valid URL. "
                            "You must provide a valid URL")
     googledocs_url = StringField(lazy_gettext('URL'),
-                               [validators.Required(message=msg_required),
+                               [validators.DataRequired(message=msg_required),
                                    validators.URL(message=msg_url)])
 
     def get_import_data(self):
@@ -438,9 +438,9 @@ class BulkTaskEpiCollectPlusImportForm(Form):
     msg_form_required = lazy_gettext("You must provide a Form name "
                                      "for the project")
     epicollect_project = StringField(lazy_gettext('Project Name'),
-                                   [validators.Required(message=msg_required)])
+                                   [validators.DataRequired(message=msg_required)])
     epicollect_form = StringField(lazy_gettext('Form name'),
-                                [validators.Required(message=msg_required)])
+                                [validators.DataRequired(message=msg_required)])
 
     def get_import_data(self):
         return {'type': 'epicollect',
@@ -452,7 +452,7 @@ class BulkTaskFlickrImportForm(Form):
     form_name = StringField(label=None, widget=HiddenInput(), default='flickr')
     msg_required = lazy_gettext("You must provide a valid Flickr album ID")
     album_id = StringField(lazy_gettext('Album ID'),
-                         [validators.Required(message=msg_required)])
+                         [validators.DataRequired(message=msg_required)])
     def get_import_data(self):
         return {'type': 'flickr', 'album_id': self.album_id.data}
 
@@ -468,7 +468,7 @@ class BulkTaskTwitterImportForm(Form):
     form_name = StringField(label=None, widget=HiddenInput(), default='twitter')
     msg_required = lazy_gettext("You must provide some source for the tweets")
     source = StringField(lazy_gettext('Source'),
-                       [validators.Required(message=msg_required)])
+                       [validators.DataRequired(message=msg_required)])
     max_tweets = IntegerField(lazy_gettext('Number of tweets'))
     user_credentials = StringField(label=None)
     def get_import_data(self):
@@ -484,7 +484,7 @@ class BulkTaskYoutubeImportForm(Form):
     form_name = StringField(label=None, widget=HiddenInput(), default='youtube')
     msg_required = lazy_gettext("You must provide a valid playlist")
     playlist_url = URLField(lazy_gettext('Playlist'),
-                             [validators.Required(message=msg_required)])
+                             [validators.DataRequired(message=msg_required)])
     def get_import_data(self):
         return {
           'type': 'youtube',
@@ -496,7 +496,7 @@ class BulkTaskS3ImportForm(Form):
     files = FieldList(StringField(label=None, widget=HiddenInput()))
     msg_required = lazy_gettext("You must provide a valid bucket")
     bucket = StringField(lazy_gettext('Bucket'),
-                       [validators.Required(message=msg_required)])
+                       [validators.DataRequired(message=msg_required)])
     def get_import_data(self):
         return {
             'type': 's3',
@@ -510,7 +510,7 @@ class BulkTaskIIIFImportForm(Form):
     msg_url = lazy_gettext("Oops! That's not a valid URL. "
                            "You must provide a valid URL")
     manifest_uri = StringField(lazy_gettext('URL'),
-                             [validators.Required(message=msg_required),
+                             [validators.DataRequired(message=msg_required),
                              validators.URL(message=msg_url)])
     version = SelectField(lazy_gettext('Presentation API version'), choices=[
         (ctx, ctx) for ctx in ManifestReader.contexts
@@ -553,11 +553,11 @@ class LoginForm(Form):
     """Login Form class for signin into PYBOSSA."""
 
     email = StringField(lazy_gettext('E-mail'),
-                      [validators.Required(
+                      [validators.DataRequired(
                           message=lazy_gettext("The e-mail is required"))])
 
     password = PasswordField(lazy_gettext('Password'),
-                             [validators.Required(
+                             [validators.DataRequired(
                                  message=lazy_gettext(
                                      "You must provide a password"))])
 
@@ -599,13 +599,13 @@ class RegisterForm(Form):
     if enable_strong_password:
         password = PasswordField(
                         lazy_gettext('New Password'),
-                        [validators.Required(err_msg),
+                        [validators.DataRequired(err_msg),
                          validators.EqualTo('confirm', err_msg_2),
                          pb_validator.CheckPasswordStrength()])
     else:
         password = PasswordField(
                         lazy_gettext('New Password'),
-                        [validators.Required(err_msg),
+                        [validators.DataRequired(err_msg),
                             validators.EqualTo('confirm', err_msg_2)])
 
     confirm = PasswordField(lazy_gettext('Repeat Password'))
@@ -675,13 +675,13 @@ class ChangePasswordForm(Form):
     if enable_strong_password:
         new_password = PasswordField(
                         lazy_gettext('New Password'),
-                        [validators.Required(err_msg),
+                        [validators.DataRequired(err_msg),
                             pb_validator.CheckPasswordStrength(),
                             validators.EqualTo('confirm', err_msg_2)])
     else:
         new_password = PasswordField(
                         lazy_gettext('New password'),
-                        [validators.Required(err_msg),
+                        [validators.DataRequired(err_msg),
                             validators.EqualTo('confirm', err_msg_2)])
     confirm = PasswordField(lazy_gettext('Repeat password'))
 
@@ -695,13 +695,13 @@ class ResetPasswordForm(Form):
     if enable_strong_password:
         new_password = PasswordField(
                         lazy_gettext('New Password'),
-                        [validators.Required(err_msg),
+                        [validators.DataRequired(err_msg),
                             pb_validator.CheckPasswordStrength(),
                             validators.EqualTo('confirm', err_msg_2)])
     else:
         new_password = PasswordField(
                         lazy_gettext('New Password'),
-                        [validators.Required(err_msg),
+                        [validators.DataRequired(err_msg),
                             validators.EqualTo('confirm', err_msg_2)])
     confirm = PasswordField(lazy_gettext('Repeat Password'))
 
@@ -721,13 +721,13 @@ class ForgotPasswordForm(Form):
 
 class PasswordResetKeyForm(Form):
     password_reset_key = TextAreaField(lazy_gettext('Password Reset Key'),
-                                       [validators.Required(message=lazy_gettext(
+                                       [validators.DataRequired(message=lazy_gettext(
                                         'You must provide the Password Reset Key.'))])
 
 
 class OTPForm(Form):
     otp = StringField(lazy_gettext('One Time Password'),
-                    [validators.Required(message=lazy_gettext(
+                    [validators.DataRequired(message=lazy_gettext(
                         'You must provide a valid OTP code'))])
 
 
