@@ -61,7 +61,7 @@ class TestNewtaskPasswd(TestAPI):
         c, v, e = get_pwd_cookie(project.short_name, res)
 
         assert c
-        self.app.set_cookie('/', c, v)
+        self.app.set_cookie(c, v)
 
         url = '/api/project/%s/newtask?api_key=%s' % (project.id, user.api_key)
         res = self.app.get(url)
@@ -101,7 +101,7 @@ class TestNewtaskPasswd(TestAPI):
         c, v, e = get_pwd_cookie(project.short_name, res)
 
         assert c
-        self.app.set_cookie('/', c, v)
+        self.app.set_cookie(c, v)
 
         # Resolve the issue: TypeError: can't subtract offset-naive and offset-aware datetimes
         # now = datetime.utcnow()
@@ -134,7 +134,7 @@ class TestNewtaskPasswd(TestAPI):
         c, v, e = get_pwd_cookie(project.short_name, res)
 
         assert c
-        self.app.set_cookie('/', c, v)
+        self.app.set_cookie(c, v)
 
         # Resolve the issue: TypeError: can't subtract offset-naive and offset-aware datetimes
         # now = datetime.utcnow()
@@ -168,7 +168,7 @@ class TestNewtaskPasswd(TestAPI):
             c, v, e = get_pwd_cookie(project.short_name, res)
 
             assert c
-            self.app.set_cookie('/', c, v)
+            self.app.set_cookie(c, v)
             res = self.app.post(url, data=data)
             c, v, e = get_pwd_cookie(project.short_name, res)
 

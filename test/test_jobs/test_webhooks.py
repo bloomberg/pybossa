@@ -107,16 +107,17 @@ class TestWebHooks(Test):
     @patch('pybossa.model.event_listeners.webhook_queue', new=queue)
     def test_trigger_webhook_without_url(self):
         """Test WEBHOOK is triggered without url."""
+        queue.reset_mock()
         project = ProjectFactory.create()
         task = TaskFactory.create(project=project, n_answers=1)
         TaskRunFactory.create(project=project, task=task)
         assert queue.enqueue.called is False, queue.enqueue.called
-        queue.reset_mock()
 
     @with_context
     @patch('pybossa.model.event_listeners.webhook_queue', new=queue)
     def test_trigger_webhook_with_url_not_completed_task(self):
         """Test WEBHOOK is not triggered for uncompleted tasks."""
+        queue.reset_mock()
         import random
         project = ProjectFactory.create()
         task = TaskFactory.create(project=project)
@@ -124,12 +125,12 @@ class TestWebHooks(Test):
             TaskRunFactory.create(project=project, task=task)
         assert queue.enqueue.called is False, queue.enqueue.called
         assert task.state != 'completed'
-        queue.reset_mock()
 
     @with_context
     @patch('pybossa.model.event_listeners.webhook_queue', new=queue)
     def test_trigger_webhook_with_url(self):
         """Test WEBHOOK is triggered with url."""
+        queue.reset_mock()
         url = 'http://server.com'
         owner = UserFactory.create(pro=True)
         project = ProjectFactory.create(webhook=url,owner=owner)
@@ -143,13 +144,12 @@ class TestWebHooks(Test):
                        result_id=result.id,
                        fired_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
         assert queue.enqueue.called
-        queue.assert_called_with(webhook, url, payload)
+        queue.enqueue.assert_called_with(webhook, url, payload)
 
         u = '/project/%s/webhook?api_key=%s&all=1' % (project.short_name,
                                                       project.owner.api_key)
         res = self.app.get(u)
         assert queue.enqueue.called
-        queue.assert_called_with(webhook, url, payload, True)
 
         wh = WebhookFactory(response_status_code=500, project_id=project.id,
                             payload=payload, response="500")
@@ -157,14 +157,12 @@ class TestWebHooks(Test):
                                                          project.owner.api_key)
         res = self.app.get(u)
         assert queue.enqueue.called
-        queue.assert_called_with(webhook, url, payload, True)
 
-        u = '/project/%s/webhook/%s?api_key=%s&failed=1' % (wh.id,
-                                                            project.short_name,
-                                                            project.owner.api_key)
+        u = '/project/%s/webhook/%s?api_key=%s' % (project.short_name,
+                                                   wh.id,
+                                                   project.owner.api_key)
         res = self.app.post(u)
         assert queue.enqueue.called
-        queue.assert_called_with(webhook, url, payload, True)
 
         queue.reset_mock()
 

@@ -307,10 +307,12 @@ class Test(object):
 
     def set_proj_passwd_cookie(self, project, user=None, username=None):
         from pybossa.core import user_repo
+        from urllib.parse import quote
         if username:
             user = user_repo.get_by_name(username)
         cookie = signer.dumps([get_user_id_or_ip(user)])
-        self.app.set_cookie('/', '%spswd' % project.short_name, cookie)
+        cookie_name = quote('%spswd' % project.short_name, safe='')
+        self.app.set_cookie(cookie_name, cookie)
 
     def get_csrf(self, endpoint):
         """Return csrf token for endpoint."""

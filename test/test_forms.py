@@ -476,12 +476,12 @@ class TestRegisterFormWithUserPrefMetadata(Test):
                         'locations':
                             ["'someloc' is not a valid choice for this field"],
                         'user_type':
-                            ['Not a valid choice'],
+                            ['Not a valid choice.'],
                         'languages':
                             ["'somelang' is not a valid choice for this field"],
                         'work_hours_from':
                             ['Work Hours From, Work Hours To, and Timezone must be filled out for submission'],
                         'timezone':
-                            ['Not a valid choice', 'Work Hours From, Work Hours To, and Timezone must be filled out for submission']
+                            ['Not a valid choice.', 'Work Hours From, Work Hours To, and Timezone must be filled out for submission']
                         }
         assert form.errors == expected_form_errors

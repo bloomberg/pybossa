@@ -250,7 +250,7 @@ class Repository(object):
         if hasattr(model, 'finish_time'):
             if from_finish_time:
                 if not to_finish_time:
-                    to_finish_time = datetime.now().isoformat()
+                    to_finish_time = datetime.utcnow().isoformat()
                 query = query.filter(and_(model.finish_time >= from_finish_time,
                                           model.finish_time <= to_finish_time))
 

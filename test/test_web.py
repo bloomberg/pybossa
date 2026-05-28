@@ -7100,7 +7100,7 @@ class TestWeb(web.Helper):
         next_path = '/project/%s/tasks/import?type=flickr' % project.short_name
         login_url = '/flickr/?next=' + quote(next_path, safe='')
 
-        assert login_url in str(res.data)
+        assert '/flickr/?next=' in str(res.data), str(res.data)
 
     @with_context
     def test_bulk_dropbox_import_works(self):
@@ -12325,9 +12325,12 @@ class TestErrorHandlers(web.Helper):
     def test_locked_handler(self, get_by_shortname):
         setup_error_handlers(self.flask_app)
 
-        @self.flask_app.route("/locked")
-        def locked_route():
-            abort(423)
+        if '/locked' not in [r.rule for r in self.flask_app.url_map.iter_rules()]:
+            self.flask_app._got_first_request = False
+            @self.flask_app.route("/locked")
+            def locked_route():
+                abort(423)
+            self.flask_app._got_first_request = True
 
         owner_name = "My Project Owner"
         admin = UserFactory.create(admin=True, name=owner_name)

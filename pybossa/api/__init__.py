@@ -190,10 +190,10 @@ def add_task_signature(tasks):
 def verify_operations(op_type):
     """Verify background job operations"""
     if op_type == "export_tasks":
-        data = request.json or {}
-        project_shortname = data.get("project_shortname")
-        export_type = data.get("export_type") # task, taskrun, consensus
-        filetype = data.get("filetype") # csv, json
+        data = request.get_json(silent=True) or {}
+        project_shortname = data.get("project_shortname") or request.form.get("project_shortname")
+        export_type = data.get("export_type") or request.form.get("export_type")  # task, taskrun, consensus
+        filetype = data.get("filetype") or request.form.get("filetype")  # csv, json
 
         project_shortname = escape(project_shortname) if project_shortname else project_shortname
         export_type = escape(export_type) if export_type else export_type
@@ -208,8 +208,8 @@ def verify_operations(op_type):
         return Response(resp, 200, mimetype="application/json")
 
     if op_type == "email_service":
-        data = request.json or {}
-        email = data.get('email')
+        data = request.get_json(silent=True) or {}
+        email = data.get('email') or request.args.get('email')
         if not email:
             return Response("Missing email parameter", 400, mimetype="application/json")
 
@@ -549,7 +549,7 @@ def update_user_preferences(user_name):
     if not can_update or disabled_fields:
         return abort(403)
 
-    payload = json.loads(request.form['request_json']) if 'request_json' in request.form else request.json
+    payload = json.loads(request.form['request_json']) if 'request_json' in request.form else request.get_json(silent=True)
 
     # User must post a payload or empty json object {}.
     if not payload and payload != {}:
@@ -1100,7 +1100,7 @@ def project_clone(project_id=None, short_name=None):
     if not (current_user.admin or (current_user.subadmin and current_user.id in project.owners_ids)):
         return abort(403)
 
-    payload = request.json
+    payload = request.get_json(silent=True)
 
     if not (payload and payload.get('input_data_class') and payload.get('output_data_class') \
         and payload.get('name') and payload.get('short_name')):

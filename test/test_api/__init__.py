@@ -29,12 +29,14 @@ from test import Test
 
 
 def get_pwd_cookie(short_name, res):
+    from urllib.parse import quote
     cookie = (None, None, None)
     raw_cookie = None
+    cookie_name = quote('%spswd' % short_name, safe='')
     cookies = res.headers.get_all('Set-Cookie')
     for c in cookies:
         for k, v in parse_cookie(c).items():
-            if k == '%spswd' % short_name:
+            if k == cookie_name:
                 cookie = k, v
                 raw_cookie = c
     params = (v.strip().split('=') for v in raw_cookie.split(';'))

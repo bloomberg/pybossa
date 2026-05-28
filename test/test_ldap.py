@@ -112,7 +112,7 @@ class TestLDAP(Test):
         url_for_mock.return_value = 'url'
         with patch.dict(self.flask_app.config, {'LDAP_HOST': '127.0.0.1'}):
             res = self.app.get(url)
-            mock_twitter.authorize.assert_called_with('url')
+            mock_twitter.authorize.assert_called_with(callback='url')
 
     @with_context
     def test_facebook_login(self):

@@ -20,7 +20,7 @@ import os
 import logging
 import humanize
 from flask import Flask, url_for, request, render_template, \
-    flash, _app_ctx_stack, abort, current_app
+    flash, _app_ctx_stack, abort, current_app, g
 from flask_login import current_user
 from flask_babel import gettext
 from flask_assets import Bundle
@@ -54,7 +54,8 @@ def create_app(run_as_server=True):
     talisman = Talisman(app, content_security_policy={
         'default-src': ['*', '\'unsafe-inline\'', '\'unsafe-eval\'', 'data:',
                         'blob:']
-    }, force_https=app.config.get('FORCE_HTTPS', True))
+    }, force_https=app.config.get('FORCE_HTTPS', True),
+       session_cookie_secure=app.config.get('FORCE_HTTPS', True))
     setup_theme(app)
     setup_assets(app)
     setup_cache_timeouts(app)
@@ -134,6 +135,14 @@ def upgrade_rq_config(app):
     for old_name, new_name in RQ_DASHBOARD_LEGACY_CONFIG_OPTIONS.items():
         if old_name in app.config:
             app.config[new_name] = app.config[old_name]
+
+    # Ensure RQ_DASHBOARD_REDIS_URL is always set as a tuple for rq_dashboard
+    if not app.config.get('RQ_DASHBOARD_REDIS_URL'):
+        host = app.config.get('REDIS_MASTER_DNS', 'localhost')
+        port = app.config.get('REDIS_PORT', 6379)
+        app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://{}:{}'.format(host, port),)
+    elif isinstance(app.config.get('RQ_DASHBOARD_REDIS_URL'), str):
+        app.config['RQ_DASHBOARD_REDIS_URL'] = (app.config['RQ_DASHBOARD_REDIS_URL'],)
 
 
 def configure_app(app):
@@ -417,6 +426,9 @@ def setup_blueprints(app):
     csrf.exempt(rq_dashboard.blueprint)
     app.register_blueprint(rq_dashboard.blueprint, url_prefix="/admin/rq",
                            redis_conn=sentinel.master)
+    from rq_dashboard.web import setup_rq_connection
+    with app.app_context():
+        setup_rq_connection(app)
 
 
 def is_admin():
@@ -634,9 +646,14 @@ def setup_hooks(app):
             h.add('X-RateLimit-Reset', str(limit.reset))
         return response
 
+    @app.after_request
+    def _clear_api_key_login(response):
+        return response
+
     @app.before_request
     def _api_authentication():
         """ Attempt API authentication on a per-request basis."""
+        g.pop('_login_user', None)
         secure_app_access = app.config.get('SECURE_APP_ACCESS', False)
         if not secure_app_access:
             grant_access_with_api_key(secure_app_access)

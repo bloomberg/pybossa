@@ -66,7 +66,7 @@ class BulkTasksAPI(TaskAPI):
             raise Unauthorized("Insufficient privilege to the request")
 
         project = project_repo.get(oid)
-        update_info = request.json
+        update_info = request.get_json(silent=True)
         if not (project and update_info):
             raise BadRequest
 
