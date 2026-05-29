@@ -646,10 +646,6 @@ def setup_hooks(app):
             h.add('X-RateLimit-Reset', str(limit.reset))
         return response
 
-    @app.after_request
-    def _clear_api_key_login(response):
-        return response
-
     @app.before_request
     def _api_authentication():
         """ Attempt API authentication on a per-request basis."""
