@@ -1212,7 +1212,7 @@ def process_annex_load(tp_code, response_value):
     odfoa = json.dumps(response_value)
 
     # Looking for loadDocument() or loadDocumentLite() code snippet
-    regex = r"(\w+)\.(loadDocument|loadDocumentLite)\s*\(\s*.*\s*(\))"
+    regex = r"(\w+)\.(loadDocument|loadDocumentLite)\s*\([^)]*(\))"
     matches = re.finditer(regex, tp_code)
     count = 0
     for match in matches:  # matching docx Annex code
@@ -1224,7 +1224,7 @@ def process_annex_load(tp_code, response_value):
 
     # Looking for code snippet like shell = document.getElementById("annex-viewer"); or
     # shell = document.getElementById("shell-container");
-    regex = r"(\w+)\s*=\s*document\.getElementById\s*\(\s*('|\")?(annex-viewer|shell-container)('|\")?\s*\)\s*;"
+    regex = r"(\w+)\s*=\s*document\.getElementById\s*\((['\"]?)(annex-viewer|shell-container)\2\s*\)\s*;"
     matches = re.finditer(regex, tp_code)
     count = 0
     for match in matches:
