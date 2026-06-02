@@ -128,6 +128,32 @@ class TestUpgradeRqConfig(unittest.TestCase):
         logged_msg = app.logger.info.call_args_list[0][0][0]
         self.assertIn('REDIS_SENTINELS_DNS', logged_msg)
 
+    def test_missing_rq_dashboard_redis_url_includes_password(self):
+        """Lines 143-145: when REDIS_PWD is set, URL includes :password@ auth."""
+        app = self._make_app({
+            'REDIS_MASTER_DNS': 'redis.host',
+            'REDIS_PORT': 6379,
+            'REDIS_PWD': 's3cret',
+        })
+
+        upgrade_rq_config(app)
+
+        self.assertEqual(app.config['RQ_DASHBOARD_REDIS_URL'],
+                         ('redis://:s3cret@redis.host:6379',))
+
+    def test_missing_rq_dashboard_redis_url_no_password(self):
+        """Lines 146-147: when REDIS_PWD is empty, URL has no auth segment."""
+        app = self._make_app({
+            'REDIS_MASTER_DNS': 'redis.host',
+            'REDIS_PORT': 6379,
+            'REDIS_PWD': '',
+        })
+
+        upgrade_rq_config(app)
+
+        self.assertEqual(app.config['RQ_DASHBOARD_REDIS_URL'],
+                         ('redis://redis.host:6379',))
+
     def test_multiple_sentinel_dns_records(self):
         """Multiple SRV records produce a comma-separated REDIS_SENTINELS string."""
         records = []

@@ -137,13 +137,14 @@ class TestWebHooks(Test):
         task = TaskFactory.create(project=project, n_answers=1)
         TaskRunFactory.create(project=project, task=task)
         result = result_repo.get_by(project_id=project.id, task_id=task.id)
+        assert queue.enqueue.called
+        actual_payload = queue.enqueue.call_args[0][2]
         payload = dict(event='task_completed',
                        project_short_name=project.short_name,
                        project_id=project.id,
                        task_id=task.id,
                        result_id=result.id,
-                       fired_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
-        assert queue.enqueue.called
+                       fired_at=actual_payload['fired_at'])
         queue.enqueue.assert_called_with(webhook, url, payload)
 
         u = '/project/%s/webhook?api_key=%s&all=1' % (project.short_name,

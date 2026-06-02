@@ -16,6 +16,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
+from unittest.mock import MagicMock
+
 import pybossa.settings_test as settings_test
 from pybossa.jobs import schedule_job
 from rq_scheduler import Scheduler
@@ -100,3 +102,35 @@ class TestSetupScheduledJobs(object):
         stored_values = self.connection.keys('rq:job*')
 
         assert len(stored_values) == 1, len(stored_values)
+
+    def test_schedule_job_handles_cancel_exception(self):
+        """Lines 77-79: exception during cancel() is silently caught."""
+        schedule_job(a_job, self.scheduler)
+
+        jobs = list(self.scheduler.get_jobs())
+        assert len(jobs) == 1
+        jobs[0].cancel = MagicMock(side_effect=Exception("cancel failed"))
+
+        msg = schedule_job(a_job, self.scheduler)
+        assert 'WARNING' in msg
+        assert 'a_function' in msg
+
+
+class TestScheduleJobCancelException:
+    """Standalone test using mocks — does not require Redis."""
+
+    def test_cancel_exception_is_silently_caught(self):
+        """Lines 77-79: exception during cancel() is caught and warning returned."""
+        fake_job = MagicMock()
+        fake_job.description = 'a_function'
+        fake_job.args = []
+        fake_job.kwargs = {}
+        fake_job.cancel.side_effect = Exception("cancel failed")
+
+        scheduler = MagicMock()
+        scheduler.get_jobs.return_value = [fake_job]
+
+        msg = schedule_job(a_job, scheduler)
+        assert 'WARNING' in msg
+        assert 'a_function' in msg
+        fake_job.cancel.assert_called_once()

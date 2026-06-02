@@ -140,7 +140,11 @@ def upgrade_rq_config(app):
     if not app.config.get('RQ_DASHBOARD_REDIS_URL'):
         host = app.config.get('REDIS_MASTER_DNS', 'localhost')
         port = app.config.get('REDIS_PORT', 6379)
-        app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://{}:{}'.format(host, port),)
+        password = app.config.get('REDIS_PWD', '')
+        if password:
+            app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://:{}@{}:{}'.format(password, host, port),)
+        else:
+            app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://{}:{}'.format(host, port),)
     elif isinstance(app.config.get('RQ_DASHBOARD_REDIS_URL'), str):
         app.config['RQ_DASHBOARD_REDIS_URL'] = (app.config['RQ_DASHBOARD_REDIS_URL'],)
 
