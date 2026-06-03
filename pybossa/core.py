@@ -42,6 +42,7 @@ import json
 from pybossa.wizard import Wizard
 from pybossa.util import copy_directory
 from dns import resolver
+from urllib.parse import quote as urlquote
 
 
 def create_app(run_as_server=True):
@@ -142,7 +143,7 @@ def upgrade_rq_config(app):
         port = app.config.get('REDIS_PORT', 6379)
         password = app.config.get('REDIS_PWD', '')
         if password:
-            app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://:{}@{}:{}'.format(password, host, port),)
+            app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://:{}@{}:{}'.format(urlquote(password, safe=''), host, port),)
         else:
             app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://{}:{}'.format(host, port),)
     elif isinstance(app.config.get('RQ_DASHBOARD_REDIS_URL'), str):
@@ -373,6 +374,7 @@ def setup_babel(app):
             else:
                 lang = request.cookies.get('language')
         except Exception:
+            app.logger.debug("setup_babel: failed to get user locale", exc_info=True)
             lang = request.cookies.get('language')
         if (lang is None or lang == '' or
             lang.lower() not in locales):
@@ -682,6 +684,7 @@ def setup_hooks(app):
             else:
                 news = None
         except Exception:
+            app.logger.debug("_global_template_context: failed to load news", exc_info=True)
             news = None
 
         # Cookies warning

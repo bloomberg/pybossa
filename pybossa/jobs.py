@@ -17,6 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Jobs module for running background tasks in PYBOSSA server."""
 import json
+import logging
 import math
 import os
 import time
@@ -76,7 +77,7 @@ def schedule_job(function, scheduler):
             try:
                 sj.cancel()
             except Exception:
-                pass
+                logging.debug("schedule_job: failed to cancel job %s", sj.description, exc_info=True)
             msg = ('WARNING: Job %s(%s, %s) is already scheduled'
                    % (function['name'].__name__, function['args'],
                       function['kwargs']))

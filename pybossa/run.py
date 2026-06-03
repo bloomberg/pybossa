@@ -22,7 +22,6 @@ import ssl
 from http import client as http_client
 import boto
 import boto.connection
-from pybossa.cloud_store_api.connection import CustomConnection
 
 
 def _new_http_connection_py3(self, host, port, is_secure):

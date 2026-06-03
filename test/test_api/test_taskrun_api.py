@@ -1261,6 +1261,22 @@ class TestTaskrunAPI(TestAPI):
         assert len(data) == 9, data
 
     @with_context
+    def test_query_taskrun_finish_time_default_upper_bound_uses_utc(self):
+        """Test that when only from_finish_time is provided, to_finish_time defaults to utcnow."""
+        owner = UserFactory.create()
+        project = ProjectFactory.create(owner=owner)
+
+        utc_now = datetime.utcnow().isoformat()
+        date_1d_old = (datetime.utcnow() - timedelta(1)).isoformat()
+
+        task_runs_now = TaskRunFactory.create_batch(2, project=project, finish_time=utc_now)
+        task_runs_old = TaskRunFactory.create_batch(3, project=project, finish_time=date_1d_old)
+
+        res = self.app.get("/api/taskrun?from_finish_time=" + date_1d_old + "&api_key=" + owner.api_key + "&project_id=" + str(project.id))
+        data = json.loads(res.data)
+        assert len(data) == 5, "Expected 5 task runs (all from yesterday and today), got %d" % len(data)
+
+    @with_context
     def test_check_task_not_over_answered_rejects_excess_submission(self):
         """Test that submitting a task_run is rejected with 403 Forbidden
         when the task already has n_answers task_runs (defense-in-depth

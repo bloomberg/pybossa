@@ -34,6 +34,8 @@ class CookieHandler(object):
         """Create or update cookie."""
         cookie_name = quote('%spswd' % project.short_name, safe='')
         cookie = self.request.cookies.get(cookie_name)
+        if cookie is None:
+            cookie = self.request.cookies.get('%spswd' % project.short_name)
         try:
             cookie = self.signer.loads(cookie, max_age=self.expiration) if cookie else []
         except SignatureExpired:
@@ -54,6 +56,8 @@ class CookieHandler(object):
         """Get cookie from a project."""
         cookie_name = quote('%spswd' % project.short_name, safe='')
         signed_cookie = self.request.cookies.get(cookie_name)
+        if signed_cookie is None:
+            signed_cookie = self.request.cookies.get('%spswd' % project.short_name)
         try:
             cookie = self.signer.loads(signed_cookie, max_age=self.expiration) if signed_cookie else []
         except SignatureExpired:

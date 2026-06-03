@@ -5,14 +5,18 @@ Must be installed into sys.modules before those packages are imported.
 """
 import importlib
 import importlib.util
+import logging
 import os
 import types
+
+logger = logging.getLogger(__name__)
 
 C_EXTENSION = 3
 PKG_DIRECTORY = 5
 PY_SOURCE = 1
 
 def find_module(name, path=None):
+    # Caller is responsible for closing the returned file handle (matching the original imp.find_module contract).
     try:
         if path:
             for dir_ in path:
@@ -43,7 +47,7 @@ def load_module(name, file, filename, details):
             spec.loader.exec_module(module)
             return module
     except Exception:
-        pass
+        logger.warning("imp_shim: failed to load module %r from %s", name, filename, exc_info=True)
     return None
 
 
