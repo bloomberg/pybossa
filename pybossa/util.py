@@ -41,7 +41,7 @@ from pybossa import app_settings
 import dateutil.parser
 import dateutil.tz
 import simplejson
-from flask import abort, request, make_response, current_app, url_for
+from flask import abort, request, make_response, current_app, url_for, g
 from flask import redirect, render_template, jsonify, get_flashed_messages
 from flask_babel import lazy_gettext
 from flask_login import current_user
@@ -898,7 +898,7 @@ def get_s3_bucket_name(url):
     if found:
         return found.group(1)
     # for 'http://s3.amazonaws.com/bucket'
-    found = re.search('^https?://s3.amazonaws.com/([^\/]+)', url)
+    found = re.search(r'^https?://s3.amazonaws.com/([^\/]+)', url)
     if found:
         return found.group(1)
     return None
@@ -963,7 +963,6 @@ def mail_with_enabled_users(message):
 def grant_access_with_api_key(secure_app):
     from pybossa.core import user_repo
     import pybossa.model as model
-    from flask import _request_ctx_stack
 
     apikey = None
     if not secure_app:
@@ -975,7 +974,7 @@ def grant_access_with_api_key(secure_app):
         if user and user.enabled:
             user.last_login = model.make_timestamp()
             user_repo.update(user)
-            _request_ctx_stack.top.user = user
+            g._login_user = user
 
 
 def can_have_super_user_access(user):
@@ -1213,7 +1212,7 @@ def process_annex_load(tp_code, response_value):
     odfoa = json.dumps(response_value)
 
     # Looking for loadDocument() or loadDocumentLite() code snippet
-    regex = r"(\w+)\.(loadDocument|loadDocumentLite)\s*\(\s*.*\s*(\))"
+    regex = r"(\w+)\.(loadDocument|loadDocumentLite)\s*\([^)]*(\))"
     matches = re.finditer(regex, tp_code)
     count = 0
     for match in matches:  # matching docx Annex code
@@ -1225,7 +1224,7 @@ def process_annex_load(tp_code, response_value):
 
     # Looking for code snippet like shell = document.getElementById("annex-viewer"); or
     # shell = document.getElementById("shell-container");
-    regex = r"(\w+)\s*=\s*document\.getElementById\s*\(\s*('|\")?(annex-viewer|shell-container)('|\")?\s*\)\s*;"
+    regex = r"(\w+)\s*=\s*document\.getElementById\s*\((['\"]?)(annex-viewer|shell-container)\2\s*\)\s*;"
     matches = re.finditer(regex, tp_code)
     count = 0
     for match in matches:

@@ -165,12 +165,11 @@ class Helper(Test):
                             content_type=content_type)
 
     def create_categories(self):
-        with self.flask_app.app_context():
-            categories = db.session.query(Category).all()
-            if len(categories) == 0:
-                print("Categories 0")
-                print("Creating default ones")
-                self._create_categories()
+        categories = db.session.query(Category).all()
+        if len(categories) == 0:
+            print("Categories 0")
+            print("Creating default ones")
+            self._create_categories()
 
 
     def new_project(self, method="POST", name="Sample Project",

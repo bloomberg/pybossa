@@ -16,7 +16,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 from wtforms import SelectField
-from wtforms.widgets import Select, html_params, HTMLString
+from markupsafe import Markup
+from wtforms import ValidationError
+from wtforms.widgets import Select, html_params
 
 class SelectProps(Select):
     def __call__(self, field, **kwargs):
@@ -27,7 +29,7 @@ class SelectProps(Select):
         for val, label, selected, props in field.iter_choices():
             html.append(self.render_option(val, label, selected, **props))
         html.append('</select>')
-        return HTMLString(''.join(html))
+        return Markup(''.join(html))
 
 class SelectFieldWithProps(SelectField):
     widget = SelectProps()
@@ -42,4 +44,4 @@ class SelectFieldWithProps(SelectField):
                  if self.data == v:
                      break
              else:
-                 raise ValueError(self.gettext('is not a valid choice'))
+                 raise ValidationError(self.gettext('is not a valid choice'))

@@ -17,6 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Jobs module for running background tasks in PYBOSSA server."""
 import json
+import logging
 import math
 import os
 import time
@@ -73,7 +74,10 @@ def schedule_job(function, scheduler):
         if (function['name'].__name__ in sj.description and
             sj.args == function['args'] and
                 sj.kwargs == function['kwargs']):
-            sj.cancel()
+            try:
+                sj.cancel()
+            except Exception:
+                logging.debug("schedule_job: failed to cancel job %s", sj.description, exc_info=True)
             msg = ('WARNING: Job %s(%s, %s) is already scheduled'
                    % (function['name'].__name__, function['args'],
                       function['kwargs']))
@@ -272,7 +276,7 @@ def get_inactive_users_jobs(queue='quaterly'):
     from pybossa.model.user import User
     from pybossa.core import db
     # First users that have participated once but more than 3 months ago
-    sql = text('''SELECT user_id FROM task_run
+    sql = text(r'''SELECT user_id FROM task_run
                WHERE user_id IS NOT NULL
                AND to_date(task_run.finish_time, 'YYYY-MM-DD\THH24:MI:SS.US')
                >= NOW() - '12 month'::INTERVAL

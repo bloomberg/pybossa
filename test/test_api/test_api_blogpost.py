@@ -340,7 +340,7 @@ class TestBlogpostAPI(TestAPI):
         url = '/api/blogpost/%s?api_key=%s' % (blogpost.id, owner.api_key)
         res = self.app.delete(url)
         assert res.status_code == 204, res.status_code
-        assert mock_delete.called_with(blogpost.info['file_name'],
+        mock_delete.assert_called_with(blogpost.info['file_name'],
                                        blogpost.info['container'])
 
         # As admin

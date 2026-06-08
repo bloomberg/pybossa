@@ -49,7 +49,7 @@ def check_type(filename):
 
 
 def validate_directory(directory_name):
-    invalid_chars = '[^\w\/]'
+    invalid_chars = r'[^\w\/]'
     if re.search(invalid_chars, directory_name):
         raise RuntimeError('Invalid character in directory name')
 

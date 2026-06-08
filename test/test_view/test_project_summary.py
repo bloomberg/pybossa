@@ -92,7 +92,7 @@ class TestSummary(web.Helper):
                 'display': 'Active Learning Config',
                 'fields': [{
                     'name': 'model',
-                    'type': 'TextField'
+                    'type': 'StringField'
                 }]
             }
         }

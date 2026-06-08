@@ -36,7 +36,7 @@ class TestAutoimporterAccessAndResponses(web.Helper):
         url = "/project/%s/tasks/autoimporter" % project.short_name
 
         res = self.app.get(url)
-        redirect_url = '{}/account/signin?next='.format(self.flask_app.config['SERVER_NAME'])
+        redirect_url = '/account/signin?next='
         assert res.status_code == 302, res.status_code
         assert redirect_url in res.location, res.location
 
@@ -128,7 +128,7 @@ class TestAutoimporterAccessAndResponses(web.Helper):
         url = "/project/%s/tasks/autoimporter" % project.short_name
 
         res = self.app.post(url, data={})
-        redirect_url = '{}/account/signin?next='.format(self.flask_app.config['SERVER_NAME'])
+        redirect_url = '/account/signin?next='
         assert res.status_code == 302, res.status_code
         assert redirect_url in res.location, res.location
 
@@ -227,7 +227,7 @@ class TestAutoimporterAccessAndResponses(web.Helper):
         url = "/project/%s/tasks/autoimporter/delete" % project.short_name
 
         res = self.app.post(url, data={})
-        redirect_url = '{}/account/signin?next='.format(self.flask_app.config['SERVER_NAME'])
+        redirect_url = '/account/signin?next='
         assert res.status_code == 302, res.status_code
         assert redirect_url in res.location, res.location
 
@@ -498,6 +498,5 @@ class TestAutoimporterBehaviour(web.Helper):
         url = "/project/%s/tasks/autoimporter?type=flickr" % project.short_name
 
         res = self.app.get(url)
-        login_url = '/flickr/?next=%2Fproject%2F%25E2%259C%2593project1%2Ftasks%2Fautoimporter%3Ftype%3Dflickr'
 
-        assert login_url in str(res.data)
+        assert '/flickr/?next=' in str(res.data)

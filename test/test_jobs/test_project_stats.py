@@ -16,7 +16,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
+import pytest
 from pybossa.jobs import get_project_jobs, create_dict_jobs, get_project_stats
+from pybossa.jobs import get_quarterly_date, get_saturday_4pm_date
 from pybossa.jobs import warm_cache
 from test import Test, with_context, with_request_context
 from test.factories import ProjectFactory
@@ -88,6 +90,22 @@ class TestProjectsStats(Test):
 
         err_msg = "There should be only 1 jobs"
         assert len(jobs) == 1, err_msg
+
+    @with_context
+    def test_get_project_jobs_unknown_queue_returns_empty(self):
+        """Test JOB get project jobs returns empty for unknown queue."""
+        jobs = list(get_project_jobs('unknown'))
+        assert len(jobs) == 0, jobs
+
+    def test_get_quarterly_date_raises_type_error(self):
+        """Test get_quarterly_date raises TypeError for non-datetime input."""
+        with pytest.raises(TypeError):
+            get_quarterly_date("not-a-datetime")
+
+    def test_get_saturday_4pm_date_raises_type_error(self):
+        """Test get_saturday_4pm_date raises TypeError for non-datetime input."""
+        with pytest.raises(TypeError):
+            get_saturday_4pm_date(12345)
 
     @with_request_context
     def test_warm_project(self):

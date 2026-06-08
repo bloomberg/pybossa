@@ -165,4 +165,4 @@ SPAM = []
 # Task routing batch size
 DB_MAXIMUM_BATCH_SIZE = 10000
 
-PVF_FORMAT = "^([A-Z]{1,8}\s\d+)?$"
+PVF_FORMAT = r"^([A-Z]{1,8}\s\d+)?$"

@@ -20,7 +20,7 @@ import os
 import logging
 import humanize
 from flask import Flask, url_for, request, render_template, \
-    flash, _app_ctx_stack, abort
+    flash, _app_ctx_stack, abort, current_app, g
 from flask_login import current_user
 from flask_babel import gettext
 from flask_assets import Bundle
@@ -42,6 +42,7 @@ import json
 from pybossa.wizard import Wizard
 from pybossa.util import copy_directory
 from dns import resolver
+from urllib.parse import quote as urlquote
 
 
 def create_app(run_as_server=True):
@@ -54,7 +55,8 @@ def create_app(run_as_server=True):
     talisman = Talisman(app, content_security_policy={
         'default-src': ['*', '\'unsafe-inline\'', '\'unsafe-eval\'', 'data:',
                         'blob:']
-    }, force_https=app.config.get('FORCE_HTTPS', True))
+    }, force_https=app.config.get('FORCE_HTTPS', True),
+       session_cookie_secure=app.config.get('FORCE_HTTPS', True))
     setup_theme(app)
     setup_assets(app)
     setup_cache_timeouts(app)
@@ -134,6 +136,18 @@ def upgrade_rq_config(app):
     for old_name, new_name in RQ_DASHBOARD_LEGACY_CONFIG_OPTIONS.items():
         if old_name in app.config:
             app.config[new_name] = app.config[old_name]
+
+    # Ensure RQ_DASHBOARD_REDIS_URL is always set as a tuple for rq_dashboard
+    if not app.config.get('RQ_DASHBOARD_REDIS_URL'):
+        host = app.config.get('REDIS_MASTER_DNS', 'localhost')
+        port = app.config.get('REDIS_PORT', 6379)
+        password = app.config.get('REDIS_PWD', '')
+        if password:
+            app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://:{}@{}:{}'.format(urlquote(password, safe=''), host, port),)
+        else:
+            app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://{}:{}'.format(host, port),)
+    elif isinstance(app.config.get('RQ_DASHBOARD_REDIS_URL'), str):
+        app.config['RQ_DASHBOARD_REDIS_URL'] = (app.config['RQ_DASHBOARD_REDIS_URL'],)
 
 
 def configure_app(app):
@@ -335,12 +349,15 @@ def setup_logging(run_as_server=True):
 
 def setup_login_manager(app):
     """Setup login manager."""
+    import pybossa.model as model
+
     login_manager.login_view = 'account.signin'
     login_manager.login_message = "This feature requires being logged in. If you were previously logged in, your session may have timed out."
 
     @login_manager.user_loader
     def _load_user(username):
         return user_repo.get_by_name(username)
+
     login_manager.setup_app(app)
 
 
@@ -351,9 +368,13 @@ def setup_babel(app):
     @babel.localeselector
     def _get_locale():
         locales = [l[0] for l in app.config.get('LOCALES')]
-        if current_user and current_user.is_authenticated:
-            lang = current_user.locale
-        else:
+        try:
+            if current_user and current_user.is_authenticated:
+                lang = current_user.locale
+            else:
+                lang = request.cookies.get('language')
+        except Exception:
+            app.logger.debug("setup_babel: failed to get user locale", exc_info=True)
             lang = request.cookies.get('language')
         if (lang is None or lang == '' or
             lang.lower() not in locales):
@@ -406,10 +427,14 @@ def setup_blueprints(app):
         app.register_blueprint(bp['handler'], url_prefix=bp['url_prefix'])
 
     import rq_dashboard
-    rq_dashboard.blueprint.before_request(is_admin)
+    if not rq_dashboard.blueprint._got_registered_once:
+        rq_dashboard.blueprint.before_request(is_admin)
     csrf.exempt(rq_dashboard.blueprint)
     app.register_blueprint(rq_dashboard.blueprint, url_prefix="/admin/rq",
                            redis_conn=sentinel.master)
+    from rq_dashboard.web import setup_rq_connection
+    with app.app_context():
+        setup_rq_connection(app)
 
 
 def is_admin():
@@ -565,6 +590,8 @@ def setup_jinja(app):
 
 def setup_error_handlers(app):
     """Setup error handlers."""
+    if app._got_first_request:
+        return
     @app.errorhandler(400)
     def _bad_request(e):
         msg = str(e)
@@ -628,6 +655,7 @@ def setup_hooks(app):
     @app.before_request
     def _api_authentication():
         """ Attempt API authentication on a per-request basis."""
+        g.pop('_login_user', None)
         secure_app_access = app.config.get('SECURE_APP_ACCESS', False)
         if not secure_app_access:
             grant_access_with_api_key(secure_app_access)
@@ -646,13 +674,17 @@ def setup_hooks(app):
     @app.context_processor
     def _global_template_context():
         notify_admin = False
-        if (current_user and current_user.is_authenticated
-            and current_user.admin):
-            key = NEWS_FEED_KEY + str(current_user.id)
-            if sentinel.slave.get(key):
-                notify_admin = True
-            news = get_news()
-        else:
+        try:
+            if (current_user and current_user.is_authenticated
+                and current_user.admin):
+                key = NEWS_FEED_KEY + str(current_user.id)
+                if sentinel.slave.get(key):
+                    notify_admin = True
+                news = get_news()
+            else:
+                news = None
+        except Exception:
+            app.logger.debug("_global_template_context: failed to load news", exc_info=True)
             news = None
 
         # Cookies warning

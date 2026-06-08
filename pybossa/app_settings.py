@@ -16,12 +16,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-import imp
+import importlib.util
 import os
 
 
 def _load_module_file_as_dict(path):
-    module = imp.load_source('module', path)
+    spec = importlib.util.spec_from_file_location('module', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
     return {
         name: getattr(module, name)
         for name in dir(module)
@@ -29,9 +31,34 @@ def _load_module_file_as_dict(path):
     }
 
 
+class _UprefMdataFallback:
+    """Fallback when settings_upref_mdata.py is absent — provides empty-dict attributes."""
+    country_name_to_country_code = {}
+    country_code_to_country_name = {}
+
+    def get_upref_mdata_choices(self):
+        return dict(languages=[], locations=[], country_codes=[],
+                    country_names=[], timezones=[], user_types=[])
+
+    def get_valid_user_preferences(self):
+        return {}
+
+    def upref_locations(self):
+        return [('', '')]
+
+    def upref_languages(self):
+        return [('', '')]
+
+    def mdata_user_types(self):
+        return [('', '')]
+
+    def mdata_timezones(self):
+        return [('', '')]
+
+
 def _load_config():
     config_path, config = None, {}
-    upref_mdata_path, upref_mdata = None, {}
+    upref_mdata_path, upref_mdata = None, _UprefMdataFallback()
     if os.environ.get('PYBOSSA_SETTINGS'):
         config_path = os.path.abspath(os.environ.get('PYBOSSA_SETTINGS'))
     else:
@@ -41,7 +68,9 @@ def _load_config():
         config = _load_module_file_as_dict(config_path)
         upref_mdata_path = os.path.join(os.path.dirname(config_path), 'settings_upref_mdata.py')
         if os.path.exists(upref_mdata_path):
-            upref_mdata = imp.load_source('upref_mdata', upref_mdata_path)
+            spec = importlib.util.spec_from_file_location('upref_mdata', upref_mdata_path)
+            upref_mdata = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(upref_mdata)
         else:
             upref_mdata_path = None
     else:
