@@ -47,7 +47,7 @@ from sqlalchemy.sql import and_, or_
 from sqlalchemy import cast, Text, func, desc, text
 from sqlalchemy.types import TIMESTAMP
 from sqlalchemy.orm.base import _entity_descriptor
-from datetime import datetime
+from datetime import datetime, timezone
 
 class Repository(object):
 
@@ -250,7 +250,7 @@ class Repository(object):
         if hasattr(model, 'finish_time'):
             if from_finish_time:
                 if not to_finish_time:
-                    to_finish_time = datetime.utcnow().isoformat()
+                    to_finish_time = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
                 query = query.filter(and_(model.finish_time >= from_finish_time,
                                           model.finish_time <= to_finish_time))
 
