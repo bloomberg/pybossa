@@ -390,7 +390,7 @@ def setup_babel(app):
             else:
                 lang = request.cookies.get('language')
         except Exception:
-            app.logger.debug("setup_babel: failed to get user locale", exc_info=True)
+            app.logger.info("setup_babel: failed to get user locale", exc_info=True)
             lang = request.cookies.get('language')
         if (lang is None or lang == '' or
             lang.lower() not in locales):
@@ -706,7 +706,7 @@ def setup_hooks(app):
             else:
                 news = None
         except Exception:
-            app.logger.debug("_global_template_context: failed to load news", exc_info=True)
+            app.logger.info("_global_template_context: failed to load news", exc_info=True)
             news = None
 
         # Cookies warning
