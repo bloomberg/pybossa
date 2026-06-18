@@ -108,7 +108,7 @@ requirements = [
     "pyasn1-modules==0.2.8",
     "pycparser==2.20",
     "pycryptodome==3.10.4",
-    "PyJWT==2.1.0",
+    "PyJWT==2.13.0",
     "pykerberos==1.2.4",
     "PyLD==1.0.4",  # "PyLD==2.0.3", 1.0.4 version resolves pyld.jsonld.JsonLdError
     "pyOpenSSL==24.1.0",
