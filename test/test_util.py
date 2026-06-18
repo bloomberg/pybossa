@@ -61,7 +61,9 @@ class FakeApp(object):
             self.config = dict(REDIS_MASTER_DNS=settings_test.REDIS_MASTER_DNS,
                 REDIS_SLAVE_DNS=settings_test.REDIS_SLAVE_DNS,
                 REDIS_PORT=settings_test.REDIS_PORT,
-                REDIS_PWD=pwd)
+                REDIS_PWD=pwd,
+                REDIS_SSL=getattr(settings_test, 'REDIS_SSL', False),
+                REDIS_SSL_CA_CERTS=getattr(settings_test, 'REDIS_SSL_CA_CERTS', None))
         else:
             self.config = { 'REDIS_SENTINEL': settings_test.REDIS_SENTINEL,
                 'REDIS_PWD': pwd }

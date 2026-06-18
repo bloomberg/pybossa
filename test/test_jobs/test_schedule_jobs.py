@@ -48,7 +48,9 @@ class TestSetupScheduledJobs(object):
         master = getattr(settings_test, 'REDIS_MASTER_NAME', 'mymaster')
         if all(hasattr(settings_test, attr) for attr in ['REDIS_MASTER_DNS', 'REDIS_PORT']):
             self.connection = StrictRedis(host=settings_test.REDIS_MASTER_DNS,
-                port=settings_test.REDIS_PORT, db=db, password=pwd)
+                port=settings_test.REDIS_PORT, db=db, password=pwd,
+                ssl=getattr(settings_test, 'REDIS_SSL', False),
+                ssl_ca_certs=getattr(settings_test, 'REDIS_SSL_CA_CERTS', None))
         else:
             sentinel = Sentinel(settings_test.REDIS_SENTINEL)
             self.connection = sentinel.master_for(master, db=db, password=pwd)
