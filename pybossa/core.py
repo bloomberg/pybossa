@@ -160,6 +160,8 @@ def upgrade_rq_config(app):
                 else:
                     app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis+sentinel://{}/{}/{}'.format(
                         sentinels_str, master_name, db),)
+            else:
+                app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://localhost:{}'.format(port),)
     elif isinstance(app.config.get('RQ_DASHBOARD_REDIS_URL'), str):
         app.config['RQ_DASHBOARD_REDIS_URL'] = (app.config['RQ_DASHBOARD_REDIS_URL'],)
 

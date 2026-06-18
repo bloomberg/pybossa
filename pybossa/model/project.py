@@ -158,7 +158,7 @@ class Project(db.Model, DomainObject):
             return fields
 
         search_backward_stop = 0
-        for match in re.finditer('\.info\.([a-zA-Z0-9_]+)', task_presenter):
+        for match in re.finditer(r'\.info\.([a-zA-Z0-9_]+)', task_presenter):
             linebreak_index = task_presenter.rfind(
                 '\n', search_backward_stop, match.start())
             if linebreak_index > -1:

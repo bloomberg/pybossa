@@ -386,7 +386,7 @@ class TaskRepository(Repository):
             project, n_answers, conditions, params, task_expiration)
 
         self.update_task_exported_status(project.id, n_answers, conditions, params, task_expiration)
-        sql = text('''
+        sql = text(r'''
                    WITH all_tasks_with_orig_filter AS (
                         SELECT task.id as id,
                         coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
@@ -557,7 +557,7 @@ class TaskRepository(Repository):
         Update exported=False for completed tasks that were exported
         and with new redundancy, they'll be marked as ongoing
         """
-        sql = text('''
+        sql = text(r'''
                    WITH all_tasks_with_orig_filter AS (
                         SELECT task.id as id,
                         coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
@@ -598,7 +598,7 @@ class TaskRepository(Repository):
 
 
     def _get_redundancy_update_msg(self, project, n_answers, conditions, params, task_expiration):
-        sql = text('''
+        sql = text(r'''
                    WITH all_tasks_with_orig_filter AS (
                         SELECT task.id as id,
                         coalesce(ct, 0) as n_task_runs, task.n_answers, ft,
