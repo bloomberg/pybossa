@@ -449,7 +449,7 @@ def setup_blueprints(app):
         return []
     if hasattr(rq_web, 'escape_format_instance_list'):
         rq_web.escape_format_instance_list = _masked_escape
-    if not rq_dashboard.blueprint._got_registered_once:
+    if not getattr(rq_dashboard.blueprint, '_got_registered_once', False):
         rq_dashboard.blueprint.before_request(is_admin)
     csrf.exempt(rq_dashboard.blueprint)
     app.register_blueprint(rq_dashboard.blueprint, url_prefix="/admin/rq",
