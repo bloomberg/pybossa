@@ -81,7 +81,7 @@ requirements = [
     "Markdown==3.4.4",
     "MarkupSafe==2.1.5",
     "misaka==2.1.1",
-    "msgpack==1.0.2",
+    "msgpack==1.2.1",
     "ndg-httpsclient==0.5.1",
     "netaddr==0.8.0",
     "pytest-cov==4.1.0",
