@@ -123,6 +123,29 @@ class TestSentinelInitAppDNS(unittest.TestCase):
             assert c.kwargs.get('ssl') is True
             assert c.kwargs.get('ssl_ca_certs') is None
 
+    @patch('pybossa.sentinel.StrictRedis')
+    def test_direct_dns_skipped_when_slave_missing(self, mock_strict_redis):
+        """If REDIS_SLAVE_DNS is not set, direct DNS path is not taken."""
+        config = {
+            'REDIS_MASTER_DNS': 'redis-master.example.com',
+            'REDIS_PORT': 6379,
+            'REDIS_SENTINEL': [('sentinel1', 26379)],
+            'REDIS_DB': 0,
+            'REDIS_PWD': None,
+            'REDIS_SOCKET_TIMEOUT': 0.1,
+            'REDIS_RETRY_ON_TIMEOUT': True,
+            'REDIS_SSL': False,
+        }
+        app = make_app(config)
+
+        s = Sentinel()
+        s.init_app(app)
+
+        # Should fall through to the sentinel path, not direct DNS
+        for c in mock_strict_redis.call_args_list:
+            if c.kwargs:
+                assert c.kwargs.get('host') != 'redis-master.example.com'
+
 
 class TestSentinelInitAppSentinelConfig(unittest.TestCase):
     """Tests for init_app when REDIS_SENTINEL list is configured (no DNS)."""
@@ -190,6 +213,28 @@ class TestSentinelInitAppSentinelConfig(unittest.TestCase):
     def test_sentinel_mode_master_and_slave_set(self, mock_sentinel_module):
         """init_app calls master_for and slave_for with the configured master name."""
         config = {**self.BASE_CONFIG, 'REDIS_SSL': False}
+        app = make_app(config)
+
+        mock_sentinel_instance = MagicMock()
+        mock_sentinel_module.Sentinel.return_value = mock_sentinel_instance
+
+        s = Sentinel()
+        s.init_app(app)
+
+        mock_sentinel_instance.master_for.assert_called_once_with('mymaster')
+        mock_sentinel_instance.slave_for.assert_called_once_with('mymaster')
+
+    @patch('pybossa.sentinel.sentinel')
+    def test_sentinel_mode_defaults_to_mymaster(self, mock_sentinel_module):
+        """When REDIS_MASTER is not set, defaults to 'mymaster'."""
+        config = {
+            'REDIS_SENTINEL': [('sentinel1.example.com', 26379)],
+            'REDIS_DB': 0,
+            'REDIS_PWD': None,
+            'REDIS_SOCKET_TIMEOUT': 0.1,
+            'REDIS_RETRY_ON_TIMEOUT': True,
+            'REDIS_SSL': False,
+        }
         app = make_app(config)
 
         mock_sentinel_instance = MagicMock()
@@ -298,3 +343,53 @@ class TestSentinelInitAppDNSResolution(unittest.TestCase):
 
         assert app.config['REDIS_SENTINEL'] == [('s1.example.com.', 26379), ('s2.example.com.', 26380)]
         assert app.config['REDIS_SENTINELS'] == 's1.example.com.:26379,s2.example.com.:26380'
+
+    @patch('pybossa.sentinel.sentinel')
+    @patch('pybossa.sentinel.resolver')
+    @patch.dict('os.environ', {'REDIS_SENTINELS_DNS': 'sentinels.example.com'})
+    def test_dns_resolution_defaults_to_mymaster(self, mock_resolver, mock_sentinel_module):
+        """When REDIS_MASTER is not set, DNS resolution path defaults to 'mymaster'."""
+        srv_records = [self._make_srv_record('sentinel1.example.com.', 26379)]
+        mock_resolver.resolve.return_value = srv_records
+
+        config = {
+            'REDIS_DB': 0,
+            'REDIS_PWD': None,
+            'REDIS_SOCKET_TIMEOUT': 0.1,
+            'REDIS_RETRY_ON_TIMEOUT': True,
+            'REDIS_SSL': False,
+        }
+        app = make_app(config)
+
+        mock_sentinel_instance = MagicMock()
+        mock_sentinel_module.Sentinel.return_value = mock_sentinel_instance
+
+        s = Sentinel()
+        s.init_app(app)
+
+        mock_sentinel_instance.master_for.assert_called_once_with('mymaster')
+        mock_sentinel_instance.slave_for.assert_called_once_with('mymaster')
+
+    @patch('pybossa.sentinel.sentinel')
+    @patch('pybossa.sentinel.resolver')
+    @patch.dict('os.environ', {'REDIS_SENTINELS_DNS': 'sentinels.example.com'})
+    def test_dns_resolution_uses_default_conn_kwargs(self, mock_resolver, mock_sentinel_module):
+        """Connection kwargs use defaults when config values are absent."""
+        srv_records = [self._make_srv_record('sentinel1.example.com.', 26379)]
+        mock_resolver.resolve.return_value = srv_records
+        mock_sentinel_module.Sentinel.return_value = MagicMock()
+
+        config = {'REDIS_SSL': False}
+        app = make_app(config)
+
+        s = Sentinel()
+        s.init_app(app)
+
+        mock_sentinel_module.Sentinel.assert_called_once_with(
+            [('sentinel1.example.com.', 26379)],
+            sentinel_kwargs={},
+            db=0,
+            password=None,
+            socket_timeout=0.1,
+            retry_on_timeout=True,
+        )
