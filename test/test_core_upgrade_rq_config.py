@@ -174,3 +174,74 @@ class TestUpgradeRqConfig(unittest.TestCase):
                              [('s1.host.', 26379), ('s2.host.', 26380)])
             self.assertEqual(app.config['REDIS_SENTINELS'],
                              's1.host.:26379,s2.host.:26380')
+
+    # --- Sentinel URL construction (lines 151-162) ---
+
+    def test_sentinel_url_from_redis_sentinels_string_no_password(self):
+        """Line 151,154-162: when REDIS_SENTINELS string is in config, builds sentinel URL."""
+        app = self._make_app({
+            'REDIS_SENTINELS': 'sentinel1:26379,sentinel2:26380',
+            'REDIS_MASTER': 'my-master',
+            'REDIS_DB': 2,
+            'REDIS_PWD': '',
+        })
+
+        upgrade_rq_config(app)
+
+        self.assertEqual(app.config['RQ_DASHBOARD_REDIS_URL'],
+                         ('redis+sentinel://sentinel1:26379,sentinel2:26380/my-master/2',))
+
+    def test_sentinel_url_from_redis_sentinels_string_with_password(self):
+        """Line 157-159: sentinel URL includes password when REDIS_PWD is set."""
+        app = self._make_app({
+            'REDIS_SENTINELS': 'sentinel1:26379',
+            'REDIS_MASTER': 'mymaster',
+            'REDIS_DB': 0,
+            'REDIS_PWD': 'p@ss',
+        })
+
+        upgrade_rq_config(app)
+
+        self.assertEqual(app.config['RQ_DASHBOARD_REDIS_URL'],
+                         ('redis+sentinel://:p%40ss@sentinel1:26379/mymaster/0',))
+
+    def test_sentinel_url_built_from_redis_sentinel_list(self):
+        """Line 152-153: when REDIS_SENTINELS string is absent but REDIS_SENTINEL list
+        exists, sentinels_str is constructed from the list."""
+        app = self._make_app({
+            'REDIS_SENTINEL': [('host1', 26379), ('host2', 26380)],
+            'REDIS_MASTER': 'mymaster',
+            'REDIS_DB': 0,
+            'REDIS_PWD': '',
+        })
+
+        upgrade_rq_config(app)
+
+        self.assertEqual(app.config['RQ_DASHBOARD_REDIS_URL'],
+                         ('redis+sentinel://host1:26379,host2:26380/mymaster/0',))
+
+    def test_sentinel_url_from_list_with_password(self):
+        """Sentinel URL from REDIS_SENTINEL list includes password."""
+        app = self._make_app({
+            'REDIS_SENTINEL': [('sentinel-node', 26379)],
+            'REDIS_MASTER': 'master1',
+            'REDIS_DB': 3,
+            'REDIS_PWD': 'secret',
+        })
+
+        upgrade_rq_config(app)
+
+        self.assertEqual(app.config['RQ_DASHBOARD_REDIS_URL'],
+                         ('redis+sentinel://:secret@sentinel-node:26379/master1/3',))
+
+    def test_sentinel_url_defaults_master_name_and_db(self):
+        """When REDIS_MASTER and REDIS_DB are absent, defaults to 'mymaster' and 0."""
+        app = self._make_app({
+            'REDIS_SENTINELS': 'sentinel1:26379',
+            'REDIS_PWD': '',
+        })
+
+        upgrade_rq_config(app)
+
+        self.assertEqual(app.config['RQ_DASHBOARD_REDIS_URL'],
+                         ('redis+sentinel://sentinel1:26379/mymaster/0',))
