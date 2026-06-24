@@ -20,7 +20,7 @@ requirements = [
     "colorama==0.4.4",
     "coverage==5.5",
     "croniter==1.0.15",
-    "cryptography==42.0.8",
+    "cryptography==48.0.1",
     "cssselect==1.1.0",
     "debtcollector==2.3.0",
     "decorator==5.1.0",
