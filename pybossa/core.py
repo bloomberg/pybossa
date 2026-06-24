@@ -139,13 +139,29 @@ def upgrade_rq_config(app):
 
     # Ensure RQ_DASHBOARD_REDIS_URL is always set as a tuple for rq_dashboard
     if not app.config.get('RQ_DASHBOARD_REDIS_URL'):
-        host = app.config.get('REDIS_MASTER_DNS', 'localhost')
+        host = app.config.get('REDIS_MASTER_DNS')
         port = app.config.get('REDIS_PORT', 6379)
         password = app.config.get('REDIS_PWD', '')
-        if password:
-            app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://:{}@{}:{}'.format(urlquote(password, safe=''), host, port),)
+        if host:
+            if password:
+                app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://:{}@{}:{}'.format(urlquote(password, safe=''), host, port),)
+            else:
+                app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://{}:{}'.format(host, port),)
         else:
-            app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://{}:{}'.format(host, port),)
+            sentinels_str = app.config.get('REDIS_SENTINELS')
+            if not sentinels_str and app.config.get('REDIS_SENTINEL'):
+                sentinels_str = ','.join('{}:{}'.format(h, p) for h, p in app.config['REDIS_SENTINEL'])
+            if sentinels_str:
+                master_name = app.config.get('REDIS_MASTER', 'mymaster')
+                db = app.config.get('REDIS_DB', 0)
+                if password:
+                    app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis+sentinel://:{}@{}/{}/{}'.format(
+                        urlquote(password, safe=''), sentinels_str, master_name, db),)
+                else:
+                    app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis+sentinel://{}/{}/{}'.format(
+                        sentinels_str, master_name, db),)
+            else:
+                app.config['RQ_DASHBOARD_REDIS_URL'] = ('redis://localhost:{}'.format(port),)
     elif isinstance(app.config.get('RQ_DASHBOARD_REDIS_URL'), str):
         app.config['RQ_DASHBOARD_REDIS_URL'] = (app.config['RQ_DASHBOARD_REDIS_URL'],)
 
@@ -374,7 +390,7 @@ def setup_babel(app):
             else:
                 lang = request.cookies.get('language')
         except Exception:
-            app.logger.debug("setup_babel: failed to get user locale", exc_info=True)
+            app.logger.info("setup_babel: failed to get user locale", exc_info=True)
             lang = request.cookies.get('language')
         if (lang is None or lang == '' or
             lang.lower() not in locales):
@@ -427,7 +443,13 @@ def setup_blueprints(app):
         app.register_blueprint(bp['handler'], url_prefix=bp['url_prefix'])
 
     import rq_dashboard
-    if not rq_dashboard.blueprint._got_registered_once:
+    # Hide Redis connection details from rq-dashboard UI for both direct and sentinel-based configs
+    from rq_dashboard import web as rq_web
+    def _masked_escape(url_list):
+        return []
+    if hasattr(rq_web, 'escape_format_instance_list'):
+        rq_web.escape_format_instance_list = _masked_escape
+    if not getattr(rq_dashboard.blueprint, '_got_registered_once', False):
         rq_dashboard.blueprint.before_request(is_admin)
     csrf.exempt(rq_dashboard.blueprint)
     app.register_blueprint(rq_dashboard.blueprint, url_prefix="/admin/rq",
@@ -684,7 +706,7 @@ def setup_hooks(app):
             else:
                 news = None
         except Exception:
-            app.logger.debug("_global_template_context: failed to load news", exc_info=True)
+            app.logger.info("_global_template_context: failed to load news", exc_info=True)
             news = None
 
         # Cookies warning

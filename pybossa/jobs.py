@@ -524,7 +524,7 @@ def get_non_updated_projects():
     from sqlalchemy.sql import text
     from pybossa.model.project import Project
     from pybossa.core import db
-    sql = text('''SELECT id FROM project WHERE TO_DATE(updated,
+    sql = text(r'''SELECT id FROM project WHERE TO_DATE(updated,
                 'YYYY-MM-DD\THH24:MI:SS.US') <= NOW() - '3 month':: INTERVAL
                AND contacted != True AND published = True
                AND project.id NOT IN

@@ -88,7 +88,7 @@ class NotAllowedChars(object):
 
 class CommaSeparatedIntegers(object):
     """Validator that validates input fields that have comma separated values"""
-    not_valid_chars = '$#&\/| '
+    not_valid_chars = r'$#&\/| '
 
     def __init__(self, message=None):
         if not message:
@@ -99,7 +99,7 @@ class CommaSeparatedIntegers(object):
             self.message = message
 
     def __call__(self, form, field):
-        pattern = re.compile('^[\d,]+$')
+        pattern = re.compile(r'^[\d,]+$')
         if pattern.match(field.data) is None:
             raise ValidationError(self.message)
 

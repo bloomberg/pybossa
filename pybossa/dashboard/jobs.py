@@ -46,7 +46,7 @@ def active_users_week():
     if _exists_materialized_view('dashboard_week_users'):
         return _refresh_materialized_view('dashboard_week_users')
     else:
-        sql = text('''CREATE MATERIALIZED VIEW dashboard_week_users AS
+        sql = text(r'''CREATE MATERIALIZED VIEW dashboard_week_users AS
                    WITH crafters_per_day AS
                         (select to_date(task_run.finish_time,
                                         'YYYY-MM-DD\THH24:MI:SS.US') AS day,
@@ -68,7 +68,7 @@ def active_anon_week():
     if _exists_materialized_view('dashboard_week_anon'):
         return _refresh_materialized_view('dashboard_week_anon')
     else:
-        sql = text('''CREATE MATERIALIZED VIEW dashboard_week_anon AS
+        sql = text(r'''CREATE MATERIALIZED VIEW dashboard_week_anon AS
                    WITH crafters_per_day AS
                         (select to_date(task_run.finish_time,
                                         'YYYY-MM-DD\THH24:MI:SS.US') AS day,
@@ -90,7 +90,7 @@ def draft_projects_week():
     if _exists_materialized_view('dashboard_week_project_draft'):
         return _refresh_materialized_view('dashboard_week_project_draft')
     else:
-        sql = text('''CREATE MATERIALIZED VIEW dashboard_week_project_draft AS
+        sql = text(r'''CREATE MATERIALIZED VIEW dashboard_week_project_draft AS
                    SELECT TO_DATE(project.created, 'YYYY-MM-DD\THH24:MI:SS.US') AS day,
                    project.id, short_name, project.name,
                    owner_id, "user".name AS u_name, "user".email_addr
@@ -112,7 +112,7 @@ def published_projects_week():
     if _exists_materialized_view('dashboard_week_project_published'):
         return _refresh_materialized_view('dashboard_week_project_published')
     else:
-        sql = text('''CREATE MATERIALIZED VIEW dashboard_week_project_published AS
+        sql = text(r'''CREATE MATERIALIZED VIEW dashboard_week_project_published AS
                    SELECT TO_DATE(auditlog.created, 'YYYY-MM-DD\THH24:MI:SS.US') AS day,
                    project.id, project.short_name, project.name,
                    owner_id, "user".name AS u_name, "user".email_addr
@@ -136,7 +136,7 @@ def update_projects_week():
     if _exists_materialized_view('dashboard_week_project_update'):
         return _refresh_materialized_view('dashboard_week_project_update')
     else:
-        sql = text('''CREATE MATERIALIZED VIEW dashboard_week_project_update AS
+        sql = text(r'''CREATE MATERIALIZED VIEW dashboard_week_project_update AS
                    SELECT TO_DATE(project.updated, 'YYYY-MM-DD\THH24:MI:SS.US') AS day,
                    project.id, short_name, project.name,
                    owner_id, "user".name AS u_name, "user".email_addr
@@ -157,7 +157,7 @@ def new_tasks_week():
     if _exists_materialized_view('dashboard_week_new_task'):
         return _refresh_materialized_view('dashboard_week_new_task')
     else:
-        sql = text('''CREATE MATERIALIZED VIEW dashboard_week_new_task AS
+        sql = text(r'''CREATE MATERIALIZED VIEW dashboard_week_new_task AS
                       SELECT TO_DATE(task.created,
                                      'YYYY-MM-DD\THH24:MI:SS.US') AS day,
                       COUNT(task.id) AS day_tasks
@@ -175,7 +175,7 @@ def new_task_runs_week():
     if _exists_materialized_view('dashboard_week_new_task_run'):
         return _refresh_materialized_view('dashboard_week_new_task_run')
     else:
-        sql = text('''CREATE MATERIALIZED VIEW dashboard_week_new_task_run AS
+        sql = text(r'''CREATE MATERIALIZED VIEW dashboard_week_new_task_run AS
                       SELECT TO_DATE(task_run.finish_time,
                                      'YYYY-MM-DD\THH24:MI:SS.US') AS day,
                       COUNT(task_run.id) AS day_task_runs
@@ -193,7 +193,7 @@ def new_users_week():
     if _exists_materialized_view('dashboard_week_new_users'):
         return _refresh_materialized_view('dashboard_week_new_users')
     else:
-        sql = text('''CREATE MATERIALIZED VIEW dashboard_week_new_users AS
+        sql = text(r'''CREATE MATERIALIZED VIEW dashboard_week_new_users AS
                       SELECT TO_DATE("user".created,
                                      'YYYY-MM-DD\THH24:MI:SS.US') AS day,
                       COUNT("user".id) AS day_users
@@ -212,7 +212,7 @@ def returning_users_week():
     if _exists_materialized_view('dashboard_week_returning_users'):
         return _refresh_materialized_view('dashboard_week_returning_users')
     else:
-        sql = text('''CREATE MATERIALIZED VIEW dashboard_week_returning_users AS
+        sql = text(r'''CREATE MATERIALIZED VIEW dashboard_week_returning_users AS
                    WITH data AS (
                     SELECT user_id, TO_DATE(task_run.finish_time,
                     'YYYY-MM-DD\THH24:MI:SS.US') AS day

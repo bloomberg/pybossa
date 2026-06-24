@@ -237,7 +237,7 @@ def parse_tasks_browse_args(args):
     if args.get('hide_completed'):
         parsed_args['hide_completed'] = args['hide_completed'].lower() == 'true'
 
-    iso_string_format = '^\d{4}\-\d{2}\-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?$'
+    iso_string_format = r'^\d{4}\-\d{2}\-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?$'
 
     if args.get('created_from'):
         if re.match(iso_string_format, args['created_from']):

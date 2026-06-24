@@ -84,7 +84,7 @@ def stats_users(project_id, period=None):
                task_run.user_ip IS NULL AND
                task_run.project_id=:project_id;''')
     if period:
-        sql = text('''SELECT count(distinct(task_run.user_id)) AS user_id
+        sql = text(r'''SELECT count(distinct(task_run.user_id)) AS user_id
                    FROM task_run WHERE task_run.user_id IS NOT NULL AND
                    task_run.user_ip IS NULL AND
                    task_run.project_id=:project_id AND
@@ -110,7 +110,7 @@ def stats_users(project_id, period=None):
         .execution_options(stream=True)
 
     if period:
-        sql = text('''SELECT task_run.user_ip AS user_ip,
+        sql = text(r'''SELECT task_run.user_ip AS user_ip,
                    COUNT(task_run.id) as n_tasks FROM task_run
                    WHERE task_run.user_ip IS NOT NULL AND
                    task_run.user_id IS NULL AND
@@ -130,7 +130,7 @@ def stats_users(project_id, period=None):
                task_run.user_id IS NULL AND
                task_run.project_id=:project_id;''')
     if period:
-        sql = text('''SELECT COUNT(DISTINCT(task_run.user_ip)) AS user_ip
+        sql = text(r'''SELECT COUNT(DISTINCT(task_run.user_ip)) AS user_ip
                    FROM task_run WHERE task_run.user_ip IS NOT NULL AND
                    task_run.user_id IS NULL AND
                    task_run.project_id=:project_id AND
@@ -176,7 +176,7 @@ def stats_dates(project_id, period='15 day'):
     params = dict(project_id=project_id, period=period)
 
     # Get all tasks with at least 1 task run and its last finish time
-    sql = text('''
+    sql = text(r'''
                SELECT task_id as id, MAX(task_run.finish_time) AS day
                FROM task_run
                WHERE project_id=:project_id AND
@@ -206,7 +206,7 @@ def stats_dates(project_id, period='15 day'):
         return dates, dates_anon, dates_auth
 
     # Get all answers per date for auth
-    sql = text('''
+    sql = text(r'''
                 WITH myquery AS (
                     SELECT TO_DATE(finish_time, 'YYYY-MM-DD\THH24:MI:SS.US')
                     as d, COUNT(id)
@@ -225,7 +225,7 @@ def stats_dates(project_id, period='15 day'):
     dates_auth = _fill_empty_days(list(dates_auth.keys()), dates_auth)
 
     # Get all answers per date for anon
-    sql = text('''
+    sql = text(r'''
                 WITH myquery AS (
                     SELECT TO_DATE(finish_time, 'YYYY-MM-DD\THH24:MI:SS.US')
                     as d, COUNT(id)
@@ -264,7 +264,7 @@ def stats_hours(project_id, period='2 week'):
 
     params = dict(project_id=project_id, period=period)
     # Get hour stats for all users
-    sql = text('''
+    sql = text(r'''
                WITH myquery AS
                 (SELECT to_char(
                     DATE_TRUNC('hour',
@@ -284,7 +284,7 @@ def stats_hours(project_id, period='2 week'):
         hours[row.h] = row.count
 
     # Get maximum stats for all users
-    sql = text('''
+    sql = text(r'''
                WITH myquery AS
                 (SELECT to_char(
                     DATE_TRUNC('hour',
@@ -310,7 +310,7 @@ def stats_hours(project_id, period='2 week'):
             max_hours_auth
 
     # Get hour stats for Anonymous users
-    sql = text('''
+    sql = text(r'''
                WITH myquery AS
                 (SELECT to_char(
                     DATE_TRUNC('hour',
@@ -331,7 +331,7 @@ def stats_hours(project_id, period='2 week'):
         hours_anon[row.h] = row.count
 
     # Get maximum stats for Anonymous users
-    sql = text('''
+    sql = text(r'''
                WITH myquery AS
                 (SELECT to_char(
                     DATE_TRUNC('hour',
@@ -351,7 +351,7 @@ def stats_hours(project_id, period='2 week'):
         max_hours_anon = row.max
 
     # Get hour stats for Auth users
-    sql = text('''
+    sql = text(r'''
                WITH myquery AS
                 (SELECT to_char(
                     DATE_TRUNC('hour',
@@ -372,7 +372,7 @@ def stats_hours(project_id, period='2 week'):
         hours_auth[row.h] = row.count
 
     # Get maximum stats for Auth users
-    sql = text('''
+    sql = text(r'''
                WITH myquery AS
                 (SELECT to_char(
                     DATE_TRUNC('hour',
