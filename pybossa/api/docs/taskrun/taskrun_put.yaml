@@ -1,0 +1,41 @@
+Update a task run by task run id
+---
+tags:
+  - name: taskrun
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: true
+    description: the task run id
+  - name: taskrun_info
+    in: body
+    required: true
+    description: the task run fields to update
+    schema:
+      type: object
+      properties:
+        info:
+          type: object
+          description: updated answer data
+          additionalProperties:
+            type: string
+        media_url:
+          type: string
+          description: URL to uploaded media file
+        external_uid:
+          type: string
+          description: external user identifier
+responses:
+  200:
+    description: updated task run info
+    schema:
+      $ref: '#/definitions/TaskRun'
+  400:
+    description: Bad request - Cannot modify reserved fields (id, created, finish_time) or immutable fields (project_id, task_id)
+  401:
+    description: Unauthorized - User is not logged in
+  403:
+    description: Forbidden - User does not have permission. Requires allow_taskrun_edit on project.
+  404:
+    description: Task run not found

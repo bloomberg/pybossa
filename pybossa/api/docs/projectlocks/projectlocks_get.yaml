@@ -1,0 +1,36 @@
+Get active task locks for a project. Requires admin or project ownership for subadmins.
+---
+tags:
+  - name: projectlocks
+definitions:
+  ProjectLocks:
+    type: object
+    properties:
+      id:
+        type: integer
+      short_name:
+        type: string
+      created:
+        type: string
+      locks:
+        type: array
+        description: list of currently locked tasks
+        items:
+          type: object
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: true
+    description: the project id
+responses:
+  200:
+    description: project lock information
+    schema:
+      $ref: '#/definitions/ProjectLocks'
+  401:
+    description: Unauthorized - User is not logged in
+  403:
+    description: Forbidden - Requires admin or project ownership for subadmins
+  404:
+    description: Project not found

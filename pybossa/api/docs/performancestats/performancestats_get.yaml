@@ -1,0 +1,53 @@
+Get performance statistics for a project. Read-only endpoint.
+---
+tags:
+  - name: performancestats
+definitions:
+  PerformanceStats:
+    type: object
+    properties:
+      id:
+        type: integer
+      project_id:
+        type: integer
+      field:
+        type: string
+        description: the field being measured
+      user_id:
+        type: integer
+      user_key:
+        type: string
+      stat_type:
+        type: string
+        description: type of statistic (confusion_matrix or accuracy)
+        enum:
+          - confusion_matrix
+          - accuracy
+      info:
+        type: object
+        description: performance statistics data
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: false
+    description: the performance stats id
+  - name: project_id
+    in: query
+    type: integer
+    required: false
+    description: filter by project id
+  - name: user_id
+    in: query
+    type: integer
+    required: false
+    description: filter by user id
+responses:
+  200:
+    description: performance statistics
+    schema:
+      $ref: '#/definitions/PerformanceStats'
+  401:
+    description: Unauthorized - User is not logged in
+  404:
+    description: Performance stats not found

@@ -1,0 +1,44 @@
+Create a task run with json data payload
+---
+tags:
+  - name: taskrun
+parameters:
+  - name: taskrun
+    required: true
+    description: the task run to create
+    in: body
+    schema:
+      type: object
+      required:
+        - project_id
+        - task_id
+        - info
+      properties:
+        project_id:
+          type: integer
+          description: the project id (immutable after creation)
+        task_id:
+          type: integer
+          description: the task id (immutable after creation)
+        info:
+          type: object
+          description: answer data for the task
+          additionalProperties:
+            type: string
+        media_url:
+          type: string
+          description: URL to uploaded media file
+        external_uid:
+          type: string
+          description: external user identifier
+responses:
+  200:
+    description: created task run info
+    schema:
+      $ref: '#/definitions/TaskRun'
+  400:
+    description: Bad request - Missing or invalid fields
+  401:
+    description: Unauthorized - User is not logged in
+  403:
+    description: Forbidden - User does not have permission

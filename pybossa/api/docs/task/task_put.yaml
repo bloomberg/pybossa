@@ -1,0 +1,66 @@
+Update a task by task id
+---
+tags:
+  - name: task
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: true
+    description: the task id
+  - name: task_info
+    in: body
+    required: true
+    description: the task fields to update
+    schema:
+      type: object
+      properties:
+        info:
+          type: object
+          additionalProperties:
+            type: string
+        n_answers:
+          type: integer
+        priority_0:
+          type: number
+          description: priority value between 0.0 and 1.0
+        state:
+          type: string
+          description: task state (ongoing, completed, enrich)
+        calibration:
+          type: integer
+          description: set to 1 for calibration/gold tasks
+        gold_answers:
+          type: object
+          additionalProperties:
+            type: string
+        user_pref:
+          type: object
+          additionalProperties:
+            type: string
+        worker_filter:
+          type: object
+          additionalProperties:
+            type: string
+        worker_pref:
+          type: object
+          additionalProperties:
+            type: string
+        expiration:
+          type: string
+          description: expiration datetime
+        exported:
+          type: boolean
+responses:
+  200:
+    description: updated task info
+    schema:
+      $ref: '#/definitions/Task'
+  400:
+    description: Bad request - Invalid data
+  401:
+    description: Unauthorized - User is not logged in
+  403:
+    description: Forbidden - User does not have permission
+  404:
+    description: Task not found
