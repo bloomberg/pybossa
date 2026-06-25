@@ -58,7 +58,7 @@ def get_task_expiration(expiration, create_time):
     Returns the minimum of requested expiration and max allowed expiration.
     If no expiration is provided, uses the default expiration.
     """
-    default_expiration_days = current_app.config.get('TASK_EXPIRATION', 60)
+    default_expiration_days = current_app.config.get('TASK_DEFAULT_EXPIRATION', 60)
     max_expiration_days = current_app.config.get('TASK_MAX_EXPIRATION', 365)
 
     default_expiration = get_time_plus_delta_ts(create_time, days=default_expiration_days)
