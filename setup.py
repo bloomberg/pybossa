@@ -138,7 +138,7 @@ requirements = [
     "SecretStorage==3.3.1",
     "simplejson==3.17.5",
     "six==1.16.0",
-    "soupsieve==2.2.1",
+    "soupsieve==2.8.4",
     "speaklater3==1.4",
     "SQLAlchemy==1.4.52",
     "stevedore==3.4.0",
