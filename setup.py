@@ -100,7 +100,7 @@ requirements = [
     "packaging==23.2",
     "pandas==2.1.4",
     "pbr==5.6.0",
-    "Pillow==11.1.0",
+    "Pillow==12.3.0",
     "prettytable==2.2.1",
     "protobuf==4.25.3",
     "psycopg2==2.9.9",
