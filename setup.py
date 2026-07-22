@@ -104,7 +104,7 @@ requirements = [
     "prettytable==2.2.1",
     "protobuf==4.25.3",
     "psycopg2==2.9.9",
-    "pyasn1==0.4.8",
+    "pyasn1==0.6.4",
     "pyasn1-modules==0.2.8",
     "pycparser==2.20",
     "pycryptodome==3.10.4",
