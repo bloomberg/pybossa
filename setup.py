@@ -58,7 +58,7 @@ requirements = [
     "greenlet==3.0.3",
     "hdfs==2.6.0",
     "html2text==2020.1.16",
-    "httplib2==0.19.1",
+    "httplib2==0.32.0",
     "humanize==4.9.0",
     "idna==3.2",
     "iiif-prezi==0.3.0",
