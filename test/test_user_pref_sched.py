@@ -16,15 +16,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
+from types import SimpleNamespace
 from unittest.mock import patch
 from test.helper import sched
 from test import with_context
-from pybossa.core import project_repo, task_repo, user_repo
+from pybossa.core import project_repo, sentinel, task_repo, user_repo
 from pybossa.jobs import send_email_notifications
 from test.factories import TaskFactory, ProjectFactory, UserFactory, TaskRunFactory
 from pybossa.sched import get_user_pref_task, Schedulers
 from pybossa.cache.helpers import n_available_tasks_for_user
 from pybossa.cache.users import get_user_preferences
+from pybossa.util import SavedTaskPositionEnum
 import datetime
 from test.helper.gig_helper import make_admin, make_subadmin
 import json
@@ -217,8 +219,10 @@ class TestSched(sched.Helper):
 
         map_locations.return_value = self.map_locations
 
-        prefs = get_user_preferences(user.id)
-        assert 'us' in prefs and 'united states' in prefs
+        clause, params = get_user_preferences(user.id)
+        assert 'us' in params.values() or 'us' in str(params)
+        assert 'united states' in str(params)
+        assert 'united states' not in clause
 
     @with_context
     @patch('pybossa.cache.users.map_locations')
@@ -232,9 +236,10 @@ class TestSched(sched.Helper):
 
         map_locations.return_value = self.map_locations
 
-        prefs = get_user_preferences(user.id)
+        clause, params = get_user_preferences(user.id)
 
-        assert 'us' in prefs and 'united states' in prefs
+        assert 'us' in str(params) and 'united states' in str(params)
+        assert 'united states' not in clause
 
     @with_context
     @patch('pybossa.cache.users.map_locations')
@@ -252,9 +257,10 @@ class TestSched(sched.Helper):
         'locations': ['invalid country']
     }
 
-        prefs = get_user_preferences(user.id)
+        clause, params = get_user_preferences(user.id)
 
-        assert 'invalid country' in prefs
+        assert 'invalid country' in str(params)
+        assert 'invalid country' not in clause
 
     @with_context
     def test_get_unique_user_pref(self):
@@ -271,8 +277,46 @@ class TestSched(sched.Helper):
         assert len(duser_prefs) == 3, err_msg
 
         err_msg = 'user_pref mismatch; duplicate user_pref languages as en should be dropped'
-        expected_user_pref = set(['\'{"languages": ["en"]}\'', '\'{"languages": ["ru"]}\'', '\'{"locations": ["us"]}\''])
+        expected_user_pref = set(['{"languages": ["en"]}', '{"languages": ["ru"]}', '{"locations": ["us"]}'])
         assert duser_prefs == expected_user_pref, err_msg
+
+    @with_context
+    def test_scheduler_binds_apostrophe_in_user_preference(self):
+        preference = "reader's choice"
+        owner = UserFactory.create(id=500)
+        owner.user_pref = {'languages': [preference]}
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+        task = TaskFactory.create(
+            project=project, user_pref={'languages': [preference]})
+
+        tasks = get_user_pref_task(project.id, owner.id)
+
+        assert tasks[0].id == task.id
+
+    @with_context
+    def test_recent_contributor_user_pref_is_bound(self):
+        user_pref = {'custom': ["reader's choice"]}
+        encoded_pref = json.dumps(user_pref)
+        query_results = [
+            [SimpleNamespace(user_pref=user_pref)],
+            [],
+            [SimpleNamespace(email_addr='reader@test.com')]
+        ]
+
+        with patch.object(user_repo.db.session, 'execute',
+                          side_effect=query_results) as execute:
+            contributors = user_repo.get_user_pref_recent_contributor_emails(
+                1, '2026-09-04T00:00:00'
+            )
+
+        final_query, final_params = execute.call_args_list[2][0]
+        assert ':pref_0' in str(final_query)
+        assert encoded_pref not in str(final_query)
+        assert final_params['pref_0'] == encoded_pref
+        assert contributors == ['reader@test.com']
 
     @with_context
     def test_recent_contributors_list_as_per_user_pref(self):
@@ -711,6 +755,58 @@ class TestNTaskAvailable(sched.Helper):
         tasks[1].worker_filter = {'geography': [0.5, '>=']}
         task_repo.save(tasks[1])
         assert n_available_tasks_for_user(project, 500) == 1
+
+    @with_context
+    def test_quote_bearing_worker_filter_key_reaches_scheduler(self):
+        profile_key = "reader's \"choice\""
+        preference = "writer's choice"
+        user_info = dict(metadata={
+            "profile": json.dumps({profile_key: 0.6})})
+        owner = UserFactory.create(
+            id=500,
+            info=user_info,
+            user_pref={'languages': [preference]})
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+        task = TaskFactory.create(
+            project=project,
+            n_answers=10,
+            user_pref={'languages': [preference]},
+            worker_filter={profile_key: [0.4, '>=']})
+
+        assert n_available_tasks_for_user(project, owner.id) == 1
+        assert get_user_pref_task(project.id, owner.id)[0].id == task.id
+
+    @with_context
+    @patch('pybossa.sched.get_user_saved_partial_tasks')
+    def test_saved_task_still_requires_worker_filter(self, saved_tasks):
+        user_info = dict(metadata={"profile": json.dumps({"finance": 0.6})})
+        owner = UserFactory.create(id=500, info=user_info)
+        user_repo.save(owner)
+        project = ProjectFactory.create(owner=owner)
+        project.info['sched'] = Schedulers.user_pref
+        project_repo.save(project)
+
+        blocked_task = TaskFactory.create(
+            project=project,
+            priority_0=1.0,
+            worker_filter={'finance': [0.8, '>=']})
+        allowed_task = TaskFactory.create(
+            project=project,
+            priority_0=0,
+            worker_filter={})
+        saved_tasks.return_value = {blocked_task.id: 1000}
+
+        tasks = get_user_pref_task(
+            project.id,
+            owner.id,
+            saved_task_position=SavedTaskPositionEnum.FIRST)
+
+        assert tasks[0].id == allowed_task.id
+        saved_tasks.assert_called_once_with(
+            sentinel, project.id, owner.id, task_repo)
 
     @with_context
     def test_upref_sched_gold_task(self):

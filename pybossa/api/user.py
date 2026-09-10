@@ -121,7 +121,9 @@ class UserAPI(APIBase):
                 action='DEL')
 
     def _forbidden_attributes(self, data):
-        forbidden = ('info', 'user_pref')
+        forbidden = (
+            'admin', 'subadmin', 'pro', 'enabled', 'api_key', 'passwd_hash',
+            'email_addr', 'info', 'user_pref')
         if not current_user.admin and any(attr in data for attr in forbidden):
             raise Forbidden
 

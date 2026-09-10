@@ -16,14 +16,27 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
+import re
+
 import requests
 from xml.dom import minidom
+
+
+# Security allowlist for safely constructing an S3 hostname, not exhaustive
+# AWS bucket validation. Extend it for legitimate buckets as needed, while
+# keeping URL and host delimiters excluded.
+S3_BUCKET_NAME = re.compile(
+    r'^(?!\d{1,3}(?:\.\d{1,3}){3}$)(?!.*\.\.)'
+    r'[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$')
 
 
 class S3Client(object):
 
     def objects(self, bucket_name):
-        response = requests.get('https://%s.s3.amazonaws.com/' % bucket_name)
+        if not S3_BUCKET_NAME.fullmatch(bucket_name):
+            raise InvalidBucketName('Invalid bucket name')
+        response = requests.get('https://%s.s3.amazonaws.com/' % bucket_name,
+                                allow_redirects=False)
         if response.status_code == 404:
             raise NoSuchBucket('Bucket "%s" does not exist' % bucket_name)
         if response.status_code == 403:
@@ -43,3 +56,7 @@ class NoSuchBucket(Exception):
 
 class PrivateBucket(Exception):
     status_code = 403
+
+
+class InvalidBucketName(ValueError):
+    status_code = 400

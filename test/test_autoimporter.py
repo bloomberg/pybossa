@@ -436,21 +436,19 @@ class TestAutoimporterBehaviour(web.Helper):
 
 
     @with_context
-    def test_autoimporter_post_creates_autoimporter_attribute(self):
-        """Test a valid post to autoimporter endpoint sets an autoimporter to
-        the project"""
+    def test_autoimporter_post_rejects_local_csv(self):
+        """Test local CSV cannot be configured as an autoimporter."""
         self.register()
         self.signin()
         owner = user_repo.get(1)
-        autoimporter = {'type': 'localCSV', 'csv_filename': None, 'validate_tp': True}
         project = ProjectFactory.create(owner=owner)
         url = "/project/%s/tasks/autoimporter" % project.short_name
         data = {'form_name': 'localCSV', 'csv_filename': 'http://fakeurl.com'}
 
-        self.app.post(url, data=data, follow_redirects=True)
+        res = self.app.post(url, data=data, follow_redirects=True)
 
-        assert project.has_autoimporter() is True, project.get_autoimporter()
-        assert project.get_autoimporter() == autoimporter, project.get_autoimporter()
+        assert res.status_code == 404, res.status_code
+        assert project.has_autoimporter() is False, project.get_autoimporter()
 
 
     @with_context

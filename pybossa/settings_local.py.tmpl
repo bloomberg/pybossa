@@ -31,8 +31,7 @@ SERVER_TYPE = 'Development QA'
 DISPLAY_PLATFORM_IDENTIFIER = True
 NAVBAR_COLOR = 'linear-gradient(44deg, orange, #4b0f0f)'
 
-SECRET = 'foobar'
-SECRET_KEY = 'my-session-secret'
+SECRET_KEY = None
 
 SQLALCHEMY_DATABASE_URI = 'postgresql://pybossa:tester@localhost/pybossa'
 
@@ -42,7 +41,7 @@ SQLALCHEMY_DATABASE_URI = 'postgresql://pybossa:tester@localhost/pybossa'
 #    'bulkdel': 'postgresql://suser:spassword@server/db'
 #}
 
-ITSDANGEROUSKEY = 'its-dangerous-key'
+ITSDANGEROUSKEY = None
 
 ## project configuration
 BRAND = 'PyBossa'
@@ -373,11 +372,8 @@ EXPORT_MAX_EMAIL_SIZE = 6 * 1024 * 1024 # 6 MB
 # max size of s3 upload
 EXPORT_MAX_UPLOAD_SIZE = 1024 * 1024 * 1024 # 1 GB
 
-# A 32 char string for AES encryption of public IPs.
-# NOTE: this is really important, don't use the following one
-# as anyone with the source code of pybossa will be able to reverse
-# the anonymization of the IPs.
-CRYPTOPAN_KEY = '32-char-str-for-AES-key-and-pad.'
+# A deployment-specific 32-byte string for AES encryption of public IPs.
+CRYPTOPAN_KEY = None
 
 # TTL for ZIP files of personal data
 TTL_ZIP_SEC_FILES = 3

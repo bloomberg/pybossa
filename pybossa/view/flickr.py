@@ -20,7 +20,7 @@ import json
 from flask import (Blueprint, request, url_for, flash, redirect, session,
     current_app, Response)
 from pybossa.core import flickr
-from pybossa.util import url_for_app_type
+from pybossa.util import is_own_url_or_else, url_for_app_type
 from pybossa.flickr_client import FlickrClient
 from flask_oauthlib.client import OAuthException
 
@@ -37,7 +37,9 @@ def login():
 @blueprint.route('/revoke-access')
 def logout():
     """Log out."""
-    next_url = request.args.get('next') or url_for_app_type('home.home')
+    default_url = url_for_app_type('home.home')
+    next_url = is_own_url_or_else(
+        request.args.get('next') or default_url, default_url)
     _remove_credentials(session)
     return redirect(next_url)
 
@@ -46,7 +48,9 @@ def logout():
 def oauth_authorized():
     """Authorize Flickr login."""
     # if next_url is None, redirect(next_url) could throw exception
-    next_url = request.args.get('next') or url_for_app_type('home.home')
+    default_url = url_for_app_type('home.home')
+    next_url = is_own_url_or_else(
+        request.args.get('next') or default_url, default_url)
     resp = flickr.oauth.authorized_response()
     if resp is None:
         flash('You denied the request to sign in.')

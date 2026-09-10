@@ -194,7 +194,7 @@ def browse_tasks(project_id, args, filter_user_prefs=False, user_id=None, **kwar
                 FROM task
                 WHERE task.project_id =:project_id"""
 
-        params["assign_user"] = args["sql_params"]["assign_user"]
+        params.update(args["sql_params"])
 
         order_by =  args.get('order_by') or "priority_0 DESC"
 

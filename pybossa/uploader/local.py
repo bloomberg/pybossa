@@ -23,10 +23,11 @@ This module exports:
     * Local class: for uploading files to a local filesystem.
 
 """
-from werkzeug.utils import secure_filename
+from werkzeug.utils import safe_join, secure_filename
 
 from pybossa.uploader import Uploader
 import os
+import re
 from flask import send_from_directory
 
 
@@ -35,6 +36,7 @@ class LocalUploader(Uploader):
     """Local filesystem uploader class."""
 
     upload_folder = 'uploads'
+    container_pattern = re.compile(r'^(?:user_[0-9]+|anonymous)$')
 
     def init_app(self, app):
         """Config upload folder."""
@@ -85,13 +87,30 @@ class LocalUploader(Uploader):
 
     def get_container_path(self, container):
         """Returns the path of a container."""
-        return os.path.join(
-                self.upload_folder, container)
+        if (not isinstance(container, str) or
+                self.container_pattern.fullmatch(container) is None):
+            raise ValueError('Invalid upload container')
+        upload_folder = os.path.realpath(self.upload_folder)
+        path = safe_join(upload_folder, container)
+        if (path is None or
+                os.path.commonpath([upload_folder,
+                                    os.path.realpath(path)]) != upload_folder):
+            raise ValueError('Upload container escapes upload folder')
+        return path
 
     def get_file_path(self, container, filename):
         """Returns the path of a file."""
-        return os.path.join(
-                self.get_container_path(container), filename)
+        if (not isinstance(filename, str) or not filename or
+                filename != secure_filename(filename)):
+            raise ValueError('Invalid upload filename')
+        container_path = self.get_container_path(container)
+        path = safe_join(container_path, filename)
+        if (path is None or
+                os.path.commonpath([os.path.realpath(container_path),
+                                    os.path.realpath(path)]) !=
+                os.path.realpath(container_path)):
+            raise ValueError('Upload file escapes container')
+        return path
 
     def send_file(self, filename):
         return send_from_directory(self.upload_folder, filename)

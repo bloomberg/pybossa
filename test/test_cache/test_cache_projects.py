@@ -591,6 +591,32 @@ class TestProjectsCache(Test):
         assert len(browse_tasks) == 1, browse_tasks
         assert browse_tasks[0]["id"] == tasks[0].id, "task[1] does not match users profile"
 
+    @with_context
+    def test_browse_tasks_binds_quote_bearing_worker_filter_key(self):
+        profile_key = "reader's \"choice\""
+        preference = "writer's choice"
+        project = ProjectFactory.create()
+        task = TaskFactory.create(
+            project=project,
+            user_pref={'languages': [preference]},
+            worker_filter={profile_key: [0.4, '>=']})
+        user_profile = {profile_key: 0.6}
+        user_info = dict(metadata={"profile": json.dumps(user_profile)})
+        user = UserFactory.create(id=500, info=user_info)
+        args = dict(
+            filter_by_wfilter_upref={
+                "current_user_pref": {'languages': [preference]},
+                "current_user_email": "user@user.com",
+                "current_user_profile": user_profile},
+            sql_params=dict(assign_user=json.dumps({
+                'assign_user': ["user@user.com"]})))
+
+        count, browse_tasks = cached_projects.browse_tasks(
+            project.id, args, True, user.id)
+
+        assert count == 1
+        assert browse_tasks[0]["id"] == task.id
+
 
     @with_context
     def test_browse_tasks_returns_filtered_tasks_for_workers_1(self):
@@ -681,13 +707,23 @@ class TestProjectsCache(Test):
         )
         tasks = TaskFactory.create_batch(3, project=project, info=dict(field_1=1, field_2=2))
 
-        reserve_filter = " AND (task.info->>'field_1' = '1' AND task.info->>'field_2' = '2') IS NOT TRUE"
+        reserve_filter = (
+            " AND (task.info ->> :reserve_category_key_0_0 = "
+            ":reserve_category_value_0_0 AND task.info ->> "
+            ":reserve_category_key_0_1 = :reserve_category_value_0_1) "
+            "IS NOT TRUE"
+        )
         filter_by_wfilter_upref = dict(current_user_pref={},
                                         current_user_email="user@user.com",
                                         current_user_profile={},
                                         reserve_filter=reserve_filter)
         args = dict(filter_by_wfilter_upref=filter_by_wfilter_upref,
-                    sql_params=dict(assign_user=json.dumps({'assign_user': ["user@user.com"]})))
+                    sql_params=dict(
+                        assign_user=json.dumps({'assign_user': ["user@user.com"]}),
+                        reserve_category_key_0_0='field_1',
+                        reserve_category_value_0_0='1',
+                        reserve_category_key_0_1='field_2',
+                        reserve_category_value_0_1='2'))
 
         count, browse_tasks = cached_projects.browse_tasks(project.id, args, True, user.id)
 
@@ -1002,8 +1038,8 @@ class TestProjectsCache(Test):
             ftime_from='2018-01-01T00:00:00.0001', ftime_to='2018-12-12T00:00:00.0001',
             order_by='task_id', filter_by_field=[('CompanyName', 'starts with', 'abc')],
             filter_by_upref=dict(languages=['en'], locations=['us']), state='ongoing')
-        expected_filter_query = ''' AND task.id = :task_id AND task.state=\'ongoing\' AND (coalesce(ct, 0)/float4(task.n_answers)) >= :pcomplete_from AND LEAST(coalesce(ct, 0)/float4(task.n_answers), 1.0) <= :pcomplete_to AND priority_0 >= :priority_from AND priority_0 <= :priority_to AND task.created >= :created_from AND task.created <= :created_to AND ft >= :ftime_from AND ft <= :ftime_to AND state = :state AND (COALESCE(task.info->>\'CompanyName\', \'\') ilike :filter_by_field_0 escape \'\\\') AND ( ( (task.user_pref-> \'locations\' IS NULL AND task.user_pref-> \'languages\' IS NULL) OR (task.user_pref @> \'{"languages": ["en"]}\' OR task.user_pref @> \'{"locations": ["us"]}\') ) )'''
-        expected_params = {'task_id': 1, 'pcomplete_from': '0.5', 'pcomplete_to': '0.7', 'ftime_to': '2018-12-12T05:00:00.000100+00:00', 'created_from': '2018-01-01T05:00:00.000100+00:00', 'ftime_from': '2018-01-01T05:00:00.000100+00:00', 'state':'ongoing', 'priority_to': 0.5, 'priority_from': 0.0, 'filter_by_field_0': 'abc%', 'created_to': '2018-12-12T05:00:00.000100+00:00'}
+        expected_filter_query = ''' AND task.id = :task_id AND task.state=\'ongoing\' AND (coalesce(ct, 0)/float4(task.n_answers)) >= :pcomplete_from AND LEAST(coalesce(ct, 0)/float4(task.n_answers), 1.0) <= :pcomplete_to AND priority_0 >= :priority_from AND priority_0 <= :priority_to AND task.created >= :created_from AND task.created <= :created_to AND ft >= :ftime_from AND ft <= :ftime_to AND state = :state AND (COALESCE(task.info->>\'CompanyName\', \'\') ilike :filter_by_field_0 escape \'\\\') AND ( ( (task.user_pref-> \'locations\' IS NULL AND task.user_pref-> \'languages\' IS NULL) OR (task.user_pref @> :user_pref_0 OR task.user_pref @> :user_pref_1) ) )'''
+        expected_params = {'task_id': 1, 'pcomplete_from': '0.5', 'pcomplete_to': '0.7', 'ftime_to': '2018-12-12T05:00:00.000100+00:00', 'created_from': '2018-01-01T05:00:00.000100+00:00', 'ftime_from': '2018-01-01T05:00:00.000100+00:00', 'state':'ongoing', 'priority_to': 0.5, 'priority_from': 0.0, 'filter_by_field_0': 'abc%', 'created_to': '2018-12-12T05:00:00.000100+00:00', 'user_pref_0': '{"languages": ["en"]}', 'user_pref_1': '{"locations": ["us"]}'}
 
         filters, params = get_task_filters(filters)
         assert filters == expected_filter_query, filters

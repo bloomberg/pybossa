@@ -70,7 +70,7 @@ class TestTaskAPI(TestAPI):
             for t in tmp:
                 tasks.append(t)
 
-        user = UserFactory.create()
+        user = UserFactory.create(admin=True)
         project_ids = [project.id for project in projects]
         url = '/api/task?all=1&project_id=%s&limit=100&api_key=%s' % (project_ids, user.api_key)
         res = self.app.get(url)
@@ -355,7 +355,7 @@ class TestTaskAPI(TestAPI):
         t3 = TaskFactory.create(created='2018-01-01T14:37:30.642119',
                                 info={'question': 'answer'},
                                 fav_user_ids=[1,2])
-        user = UserFactory.create()
+        user = UserFactory.create(admin=True)
 
         tasks.insert(0, t1)
         tasks.append(t2)

@@ -153,7 +153,7 @@ class TestImporterPublicMethods(Test):
     @with_context
     def test_get_autoimporter_names_returns_default_autoimporter_names(self, create):
         importers = self.importer.get_autoimporter_names()
-        expected_importers = ['csv', 'gdocs', 'epicollect', 'localCSV', 'iiif']
+        expected_importers = ['csv', 'gdocs', 'epicollect', 'iiif']
 
         assert set(importers) == set(expected_importers)
 

@@ -26,9 +26,33 @@ class TestAmazonS3API(object):
 
     @with_context
     @patch('pybossa.view.amazon.S3Client')
-    def test_buckets_with_specific_bucket_lists_its_content(self, S3Client):
+    def test_buckets_require_login(self, S3Client):
+        resp = flask_app.test_client().get('/amazon/bucket/test-bucket')
+
+        assert resp.status_code == 302, resp
+        S3Client.assert_not_called()
+
+    @with_context
+    @patch('flask_login.utils._get_user')
+    @patch('pybossa.s3_client.requests')
+    def test_buckets_reject_invalid_bucket_name(self, requests, get_user):
+        get_user.return_value.is_authenticated = True
+
+        resp = flask_app.test_client().get(
+            '/amazon/bucket/bucket%23internal')
+
+        assert resp.status_code == 400, resp
+        assert json.loads(resp.data)['exception_msg'] == 'Unable to access bucket'
+        requests.get.assert_not_called()
+
+    @with_context
+    @patch('flask_login.utils._get_user')
+    @patch('pybossa.view.amazon.S3Client')
+    def test_buckets_with_specific_bucket_lists_its_content(self, S3Client,
+                                                            get_user):
+        get_user.return_value.is_authenticated = True
         objects = ['test.pdf', 'sunset.png']
-        bucket_name = 'Bucket1'
+        bucket_name = 'bucket1'
         client_instance = MagicMock()
         S3Client.return_value = client_instance
         client_instance.objects.return_value = objects
@@ -39,8 +63,11 @@ class TestAmazonS3API(object):
         assert resp.data == json.dumps(objects).encode(), resp.data
 
     @with_context
+    @patch('flask_login.utils._get_user')
     @patch('pybossa.view.amazon.S3Client')
-    def test_buckets_with_non_existing_bucket_returns_error(self, S3Client):
+    def test_buckets_with_non_existing_bucket_returns_error(self, S3Client,
+                                                            get_user):
+        get_user.return_value.is_authenticated = True
         client_instance = MagicMock()
         S3Client.return_value = client_instance
         client_instance.objects.side_effect = NoSuchBucket('Bucket "noSuchBucket" does not exist')
@@ -50,8 +77,11 @@ class TestAmazonS3API(object):
         assert resp.status_code == 404, resp
 
     @with_context
+    @patch('flask_login.utils._get_user')
     @patch('pybossa.view.amazon.S3Client')
-    def test_buckets_with_private_bucket_returns_error(self, S3Client):
+    def test_buckets_with_private_bucket_returns_error(self, S3Client,
+                                                       get_user):
+        get_user.return_value.is_authenticated = True
         client_instance = MagicMock()
         S3Client.return_value = client_instance
         client_instance.objects.side_effect = PrivateBucket('Bucket "noSuchBucket" is private')

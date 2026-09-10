@@ -10,6 +10,7 @@ import magic
 from werkzeug.exceptions import BadRequest
 from pybossa.cloud_store_api.connection import create_connection
 from pybossa.encryption import AESWithGCM
+from pybossa.signer import EMAIL_ATTACHMENT_SIGNATURE_SALT
 import json
 from time import perf_counter
 import time
@@ -262,9 +263,14 @@ def upload_email_attachment(content, filename, user_email, project_id=None):
     from pybossa.redis_lock import register_user_exported_report
     from pybossa.cache.users import get_user_by_email
 
+    timestamp = int(time.time())
+    secure_file_name = secure_filename(filename)
+    attachment_path = f"{timestamp}-{secure_file_name}"
+    s3_path = f"attachments/{attachment_path}"
     payload = {"project_id": project_id} if project_id else {}
-    payload["user_email"] = user_email
-    signature = signer.dumps(payload)
+    payload.update({"user_email": user_email, "s3_key": s3_path})
+    signature = signer.dumps(
+        payload, salt=EMAIL_ATTACHMENT_SIGNATURE_SALT)
 
     # upload contents to s3 storage
     bucket_name = app.config.get("S3_REQUEST_BUCKET_V2")
@@ -276,17 +282,13 @@ def upload_email_attachment(content, filename, user_email, project_id=None):
     conn = create_connection(**conn_kwargs)
     bucket = conn.get_bucket(bucket_name, validate=False)
 
-    # Generate a unique file path using UTC timestamp and secure filename
-    timestamp = int(time.time())
-    secure_file_name = secure_filename(filename)
-    s3_path = f"attachments/{timestamp}-{secure_file_name}"
     app.logger.info("upload email attachment s3 path %s", s3_path)
 
     # Upload content to S3
     key = bucket.new_key(s3_path)
     key.set_contents_from_string(content)
     server_url = app.config.get('SERVER_URL')
-    url = f"{server_url}/attachment/{signature}/{timestamp}-{secure_file_name}"
+    url = f"{server_url}/attachment/{signature}/{attachment_path}"
     app.logger.info("upload email attachment url %s", url)
     user_id = get_user_by_email(user_email).id
     cache_info = register_user_exported_report(user_id, url, sentinel.master)

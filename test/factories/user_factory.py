@@ -26,7 +26,10 @@ class UserFactory(BaseFactory):
 
     @classmethod
     def _create(cls, model_class, *args, **kwargs):
+        password = kwargs.pop('password', None)
         user = model_class(*args, **kwargs)
+        if password is not None:
+            user.set_password(password)
         user_repo.save(user)
         return user
 

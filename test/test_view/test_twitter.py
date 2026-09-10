@@ -228,3 +228,13 @@ class TestTwitter(Test):
 
         redirect.assert_called_once_with(next_url)
         assert user.info == {'twitter_token': token_and_secret}, user.info
+
+    @with_context
+    @patch('pybossa.view.twitter.twitter.oauth')
+    def test_oauth_authorized_rejects_external_next(self, oauth):
+        oauth.authorized_response.return_value = None
+
+        response = self.app.get(
+            '/twitter/oauth-authorized?next=https://evil.example/login')
+
+        assert response.headers['Location'] == '/', response.headers

@@ -303,6 +303,26 @@ class TestUserAPI(Test):
         clean_user_mock.assert_called_with(data['id'])
 
     @with_context
+    def test_user_self_update_rejects_protected_attributes(self):
+        """Test USER cannot update protected attributes on their own record."""
+        UserFactory.create()
+        user = UserFactory.create()
+        protected_attributes = {
+            'admin': True,
+            'subadmin': True,
+            'pro': True,
+            'enabled': False,
+            'api_key': 'replacement-key',
+            'passwd_hash': 'replacement-hash',
+            'email_addr': 'replacement@example.com',
+        }
+        url = 'api/user/%s?api_key=%s' % (user.id, user.api_key)
+
+        res = self.app.put(url, data=json.dumps(protected_attributes))
+
+        assert res.status_code == 403, res.data
+
+    @with_context
     @patch('pybossa.api.api_base.caching')
     def test_user_not_allowed_actions_admin(self, caching_mock):
         """Test POST, PUT and DELETE for ADMIN actions are not allowed for user

@@ -37,6 +37,7 @@ from math import ceil
 from tempfile import NamedTemporaryFile
 
 from pybossa import app_settings
+from pybossa.user_pref import get_unique_user_preferences
 
 import dateutil.parser
 import dateutil.tz
@@ -159,8 +160,26 @@ def handle_content_type(data):
 
 def is_own_url(url):
     from urllib.parse import urlparse
-    domain = urlparse(url).netloc
-    return (not domain) or domain.startswith(current_app.config.get('SERVER_NAME', '-'))
+
+    if not url:
+        return True
+    if not isinstance(url, str):
+        return False
+    if '\\' in url or any(character in url for character in '\r\n\t'):
+        return False
+    if url.startswith('/'):
+        return not url.startswith('//')
+
+    try:
+        parsed_url = urlparse(url)
+        server_name = current_app.config.get('SERVER_NAME') or ''
+        server_hostname = urlparse('//{}'.format(server_name)).hostname
+    except ValueError:
+        return False
+
+    return (parsed_url.scheme in ('http', 'https') and
+            parsed_url.hostname is not None and
+            parsed_url.hostname == server_hostname)
 
 def is_own_url_or_else(url, default):
     return url if is_own_url(url) else default
@@ -975,13 +994,15 @@ def grant_access_with_api_key(secure_app):
             user.last_login = model.make_timestamp()
             user_repo.update(user)
             g._login_user = user
+            g._api_key_authenticated = True
 
 
-def can_have_super_user_access(user):
+def can_have_super_user_access(user, email_addr=None):
     assert(user)
+    email_addr = email_addr or user.email_addr
     wlist_admins = current_app.config.get('SUPERUSER_WHITELIST_EMAILS', None)
     if (wlist_admins and
-        not any(re.search(wl, user.email_addr, re.IGNORECASE)
+        not any(re.search(wl, email_addr, re.IGNORECASE)
             for wl in wlist_admins)):
         user.admin = user.subadmin = False
         current_app.logger.info('User {} {} cannot have admin/subadmin access'.
@@ -1009,17 +1030,6 @@ def s3_get_file_contents(s3_bucket, s3_path,
             headers=headers, encoding=encoding)
 
 
-def get_unique_user_preferences(user_prefs):
-    duser_prefs = set()
-    for user_pref in user_prefs:
-        for k, values in user_pref.items():
-            if isinstance(values, list):
-                for v in values:
-                    pref = '\'{}\''.format(json.dumps({k: [v]}))
-                    duser_prefs.add(pref)
-    return duser_prefs
-
-
 def get_user_pref_db_clause(user_pref, user_email=None):
     # expand user preferences as per sql format for jsonb datatype
     # single user preference with multiple value or
@@ -1030,6 +1040,7 @@ def get_user_pref_db_clause(user_pref, user_email=None):
     assign_key = 'assign_user'
     location_key = 'locations'
     language_key = 'languages'
+    params = {}
 
     if not user_prefs:
         user_pref_sql = '''(task.user_pref IS NULL OR task.user_pref = \'{}\' )'''
@@ -1038,24 +1049,36 @@ def get_user_pref_db_clause(user_pref, user_email=None):
                     AND task.user_pref->\'{}\' IS NOT NULL AND task.user_pref @> :assign_user)
                     '''.format(location_key, language_key, assign_key)
     else:
-        sql = ('task.user_pref @> \'{}\''.format(json.dumps(up).lower())
-                   for up in user_prefs)
+        sql = []
+        for index, user_pref_item in enumerate(user_prefs):
+            param_name = 'user_pref_{}'.format(index)
+            sql.append('task.user_pref @> :{}'.format(param_name))
+            params[param_name] = json.dumps(user_pref_item).lower()
         user_pref_sql = '''( (task.user_pref-> \'{}\' IS NULL AND task.user_pref-> \'{}\' IS NULL) OR ({}) )'''.format(location_key, language_key, ' OR '.join(sql))
         if user_email:
             email_sql = ''' AND (task.user_pref->\'{}\' IS NULL OR task.user_pref @> :assign_user)
                     '''.format(assign_key)
 
-    return user_pref_sql + email_sql if user_email else user_pref_sql
+    clause = user_pref_sql + email_sql if user_email else user_pref_sql
+    return clause, params
 
 
 def get_user_filter_db_clause(user_profile):
     # expand task filter as per sql format and (partially) match user profiles
     # still need further validation to filter good tasks out
+    #
+    # Returns (sql, params). The profile keys are user-controlled - a worker
+    # sets them on their own account page - so they are bound as a query
+    # parameter rather than formatted into the statement. psycopg2 adapts a
+    # Python list of str to a Postgres array. Callers must merge params into
+    # the dict they pass to session.execute().
     sql = """task.worker_filter IS NULL OR task.worker_filter = '{}'""".format("{}")
+    params = {}
     if user_profile:
         user_profile_keys = [str(key) for key in user_profile.keys()]
-        sql += """ OR task.worker_filter ?| ARRAY{}::text[]""".format(user_profile_keys)
-    return sql
+        sql += """ OR task.worker_filter ?| CAST(:worker_filter_keys AS text[])"""
+        params['worker_filter_keys'] = user_profile_keys
+    return sql, params
 
 
 def is_int(s):

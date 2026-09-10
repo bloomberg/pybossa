@@ -21,7 +21,6 @@ from flask import current_app
 from flask_babel import lazy_gettext
 from wtforms.validators import ValidationError
 import re
-import requests
 
 from pybossa.util import is_reserved_name, check_password_strength
 from pybossa.data_access import valid_user_type_based_data_access
@@ -30,9 +29,11 @@ from pybossa.data_access import valid_user_type_based_data_access
 class Unique(object):
     """Validator that checks field uniqueness."""
 
-    def __init__(self, query_function, field_name, message=None):
+    def __init__(self, query_function, field_name, message=None,
+                 current_id_getter=None):
         self.query_function = query_function
         self.field_name = field_name
+        self.current_id_getter = current_id_getter
         if not message:  # pragma: no cover
             message = lazy_gettext('This item already exists')
         self.message = message
@@ -43,7 +44,9 @@ class Unique(object):
             field_value = form_field.data.strip()
         filters = {self.field_name: field_value}
         check = self.query_function(**filters)
-        if 'id' in form:
+        if self.current_id_getter is not None:
+            id = self.current_id_getter()
+        elif 'id' in form:
             if check:
                 id = type(check.id)(form.id.data)
             else:
@@ -115,13 +118,14 @@ class Webhook(object):
             self.message = message
 
     def __call__(self, form, field):
+        from pybossa.ssrf_guard import (
+            validate_url, resolve_and_validate, SSRFError)
         try:
             if field.data:
-                r = requests.get(field.data)
-                if r.status_code != 200:
-                    raise ValidationError(self.message)
-        except requests.exceptions.ConnectionError:
-            raise ValidationError(lazy_gettext("Connection error"))
+                _, hostname, port = validate_url(field.data)
+                resolve_and_validate(hostname, port)
+        except SSRFError:
+            raise ValidationError(self.message)
 
 
 class ReservedName(object):

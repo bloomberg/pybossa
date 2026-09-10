@@ -1,9 +1,11 @@
 # -*- coding: utf8 -*-
 import json
+import re
+from pathlib import Path
 from unittest.mock import patch
 
 from test import db, with_context
-from test.factories import ProjectFactory
+from test.factories import ProjectFactory, UserFactory
 from test.helper import web
 from pybossa.repositories import ProjectRepository, UserRepository
 
@@ -12,6 +14,51 @@ user_repo = UserRepository(db)
 
 
 class TestAnswerFieldConfig(web.Helper):
+
+    @with_context
+    def test_get_config_uses_html_safe_json(self):
+        payload = 'field</script><span>marker</span>'
+        answer_fields = {
+            payload: {
+                'type': 'categorical',
+                'config': {'labels': [payload]}
+            }
+        }
+        consensus_config = {'consensus_method': payload}
+        owner = UserFactory.create(subadmin=True)
+        project = ProjectFactory.create(
+            owner=owner,
+            info={
+                'answer_fields': answer_fields,
+                'consensus_config': consensus_config
+            })
+        url = '/project/%s/answerfieldsconfig?api_key=%s' % (
+            project.short_name, owner.api_key)
+
+        res = self.app.get(url)
+
+        assert res.status_code == 200, res
+        assert b'answerFields: {' in res.data
+        assert b'consensus: {' in res.data
+        assert b'\\u003c/script\\u003e\\u003cspan\\u003emarker' in res.data
+        assert payload.encode() not in res.data
+
+        data = json.loads(self.app_get_json(url).data)
+        assert data['answer_fields'] == answer_fields
+        assert data['consensus_config'] == consensus_config
+
+    def test_source_and_generated_template_use_html_safe_json(self):
+        template_root = (Path(__file__).resolve().parents[2] /
+                         'pybossa/themes/default/templates/projects')
+        templates = (
+            'answerfieldsconfig.webpack.ejs',
+            'answerfieldsconfig.html'
+        )
+        for template in templates:
+            source = (template_root / template).read_text(encoding='utf-8')
+            for variable in ('answer_fields', 'consensus_config'):
+                expression = r'{{\s*%s\s*\|\s*tojson\s*}}' % variable
+                assert re.search(expression, source), (template, variable)
 
     @with_context
     def test_get_config(self):

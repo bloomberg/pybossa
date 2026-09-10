@@ -47,8 +47,11 @@ class TestPerformanceStatsAPI(TestAPI):
 
     @with_context
     def test_query_projectstats_permissions(self):
-        admin, owner, user = UserFactory.create_batch(3)
+        admin = UserFactory.create(admin=True)
+        owner = UserFactory.create(subadmin=True)
+        user, other_user = UserFactory.create_batch(2)
         project = ProjectFactory.create(owner=owner)
+        project.info['project_users'] = [user.id, other_user.id]
 
         url = '/api/performancestats'
         res = self.app.get('{}'.format(url))
@@ -57,7 +60,9 @@ class TestPerformanceStatsAPI(TestAPI):
         res = self.app.get('{}?api_key={}'.format(url, owner.api_key))
         assert json.loads(res.data) == []
 
-        stats = PerformanceStatsFactory.create(user_id=user.id, project_id=project.id)
+        PerformanceStatsFactory.create(user_id=user.id, project_id=project.id)
+        PerformanceStatsFactory.create(
+            user_id=other_user.id, project_id=project.id)
 
         res = self.app.get('{}?api_key={}'.format(url, admin.api_key))
         data = json.loads(res.data)
@@ -65,11 +70,11 @@ class TestPerformanceStatsAPI(TestAPI):
 
         res = self.app.get('{}?api_key={}&all=1'.format(url, admin.api_key))
         data = json.loads(res.data)
-        assert len(data) == 1
+        assert len(data) == 2
 
         res = self.app.get('{}?api_key={}'.format(url, owner.api_key))
         data = json.loads(res.data)
-        assert len(data) == 1
+        assert len(data) == 2
 
         res = self.app.get('{}?api_key={}'.format(url, user.api_key))
         data = json.loads(res.data)
@@ -78,10 +83,12 @@ class TestPerformanceStatsAPI(TestAPI):
         res = self.app.get('{}?api_key={}&all=1'.format(url, user.api_key))
         data = json.loads(res.data)
         assert len(data) == 1
+        assert data[0]['user_id'] == user.id
 
     @with_context
     def test_query_projectstats_filter_user(self):
-        owner, user = UserFactory.create_batch(2)
+        owner = UserFactory.create(subadmin=True)
+        user = UserFactory.create()
         project = ProjectFactory.create(owner=owner)
 
         stats = PerformanceStatsFactory.create(

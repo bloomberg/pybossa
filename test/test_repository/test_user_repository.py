@@ -17,7 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 # Cache global variables for timeouts
 
-from test import Test, db, with_context
+from test import Test, db, with_context, with_context_settings
 from nose.tools import assert_raises
 from test.factories import UserFactory, TaskRunFactory
 from pybossa.repositories import UserRepository, TaskRepository
@@ -287,6 +287,19 @@ class TestUserRepository(Test):
         updated_user = self.user_repo.get(user.id)
 
         assert updated_user.locale == 'it', updated_user
+
+    @with_context_settings(
+        SUPERUSER_WHITELIST_EMAILS=['@bloomberg.net$'])
+    def test_update_checks_super_user_access_against_persisted_email(self):
+        """Test update checks role access against the persisted email."""
+        user = UserFactory.create(email_addr='user@example.com', admin=False)
+        user.email_addr = 'user@bloomberg.net'
+        user.admin = True
+
+        self.user_repo.update(user)
+
+        updated_user = self.user_repo.get(user.id)
+        assert updated_user.admin is False, updated_user
 
 
     @with_context

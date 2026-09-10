@@ -156,6 +156,24 @@ class TestProjectAPI(TestAPI):
         assert data['short_name'] == 'test-app1', data
 
     @with_context
+    def test_project_details_worker_cannot_get_unpublished_by_id(self):
+        UserFactory.create(admin=True)
+        worker = UserFactory.create(admin=False, subadmin=False)
+        project = ProjectFactory.create(published=False, info={
+            'product': 'test_product',
+            'subproduct': 'test_subproduct1',
+        })
+
+        res = self.app.get('/api/projectdetails/{}?api_key={}'.format(
+            project.id, worker.api_key))
+        err = json.loads(res.data)
+
+        assert res.status_code == 403, err
+        assert err['status'] == 'failed', err
+        assert err['exception_cls'] == 'Forbidden', err
+        assert err['action'] == 'GET', err
+
+    @with_context
     def test_project_details_get_by_product(self):
         """ Test search by product when result exists"""
         admin = UserFactory.create(admin=True)

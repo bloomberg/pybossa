@@ -175,6 +175,28 @@ class TestPrivacyWebPublic(web_helper.Helper):
         assert dom.find(id='enforce_privacy') is None, err_msg
         self.signout()
 
+    @patch.dict(flask_app.config, {'ENFORCE_PRIVACY': True})
+    @with_request_context
+    def test_05_app_stats_json_hides_locked_statistics(self):
+        owner = UserFactory.create()
+        viewer = UserFactory.create()
+        contributor = UserFactory.create(fullname='Sensitive Contributor')
+        project = ProjectFactory.create(
+            owner=owner,
+            info={'passwd_hash': None, 'project_users': [viewer.id]})
+        task = TaskFactory.create(project=project, n_answers=3)
+        TaskRunFactory.create_batch(3, task=task, user=contributor)
+        update_stats(project.id)
+        url = '/project/%s/stats?response_format=json&api_key=%s' % (
+            project.short_name, viewer.api_key)
+        response = self.app.get(url)
+        data = json.loads(response.data)
+
+        assert response.status_code == 200, response.status_code
+        assert 'projectStats' not in data, data.keys()
+        assert 'userStats' not in data, data.keys()
+        assert 'Sensitive Contributor' not in response.data.decode()
+
     @with_context
     @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
     @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})

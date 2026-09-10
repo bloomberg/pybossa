@@ -10,7 +10,7 @@ from sqlalchemy.sql import text
 from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
 
-from pybossa.exporter import Exporter
+from pybossa.exporter import Exporter, neutralize_csv_formulas
 from pybossa.core import db, uploader
 from pybossa.cache.task_browse_helpers import get_task_filters
 from pybossa.cache.users import get_user_info
@@ -48,7 +48,8 @@ def csv_formatter(data, filename):
                 row[k] = json.dumps(v)
     df = pd.DataFrame(data)
     cols = sorted(df.columns)
-    df[cols].to_csv(filename, index=False, encoding='utf-8')
+    neutralize_csv_formulas(df[cols]).to_csv(
+        filename, index=False, encoding='utf-8', lineterminator='\r\n')
 
 
 def json_formatter(data, fp):

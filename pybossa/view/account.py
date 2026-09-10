@@ -26,6 +26,7 @@ This module exports the following endpoints:
     * Profile: method to manage user's profile (update data, reset password...)
 
 """
+import hmac
 import json
 
 from itsdangerous import BadData
@@ -45,7 +46,7 @@ from flask import jsonify
 from pybossa.core import signer, uploader, sentinel, newsletter, csrf
 from pybossa.util import Pagination, handle_content_type, admin_required
 from pybossa.util import admin_or_subadmin_required
-from pybossa.util import get_user_signup_method, generate_invitation_email_for_new_user
+from pybossa.util import generate_invitation_email_for_new_user
 from pybossa.util import generate_bsso_account_notification
 from pybossa.util import redirect_content_type, is_own_url_or_else
 from pybossa.util import get_avatar_url
@@ -146,17 +147,8 @@ def signin():
                 msg_1 = gettext('Welcome back') + ' ' + user.fullname
                 flash(msg_1, 'success')
                 return _sign_in_user(user)
-        elif user:
-            msg, method = get_user_signup_method(user)
-            if method == 'local':
-                msg = gettext('Ooops, Incorrect email/password')
-                flash(msg, 'error')
-            else:
-                flash(msg, 'info')
         else:
-            msg = gettext("Ooops, we didn't find you in the system, \
-                          did you sign up?")
-            flash(msg, 'info')
+            flash(gettext('Ooops, Incorrect email/password'), 'error')
 
     if (request.method == 'POST' and form.validate()
             and isLdap):
@@ -225,7 +217,7 @@ def _sign_in_user(user, next_url=None):
     login_user(user, remember=False)
     user.last_login = model.make_timestamp()
     user_repo.update(user)
-    next_url = (next_url or
+    next_url = (is_own_url_or_else(next_url, None) or
                 is_own_url_or_else(request.args.get('next'), url_for('home.home')) or
                 url_for('home.home'))
     if (current_app.config.get('MAILCHIMP_API_KEY') and
@@ -240,9 +232,8 @@ def _email_two_factor_auth(user, invalid_token=False):
     msg = dict(subject=subject.format(current_app.config.get('BRAND')),
                recipients=[user.email_addr])
     otp_code = otp.generate_otp_secret(user.email_addr)
-    current_app.logger.debug('otp code generated before sending email: '
-                             '{}, for email: {}'.format(otp_code,
-                                                        user.email_addr))
+    current_app.logger.debug('otp code generated for email: %s',
+                             user.email_addr)
     msg['body'] = render_template(
                         '/account/email/otp.md',
                         user=user, otpcode=otp_code)
@@ -275,7 +266,11 @@ def otpvalidation(token):
         if type(otp_code) == bytes:
             otp_code = otp_code.decode()
         if otp_code is not None:
-            if otp_code == user_otp:
+            try:
+                otp_matches = hmac.compare_digest(otp_code, user_otp)
+            except TypeError:
+                otp_matches = False
+            if otp_matches:
                 msg = gettext('OTP verified. You are logged in to the system')
                 current_app.logger.info('otp verified for user %s', email)
                 flash(msg, 'success')
@@ -290,8 +285,7 @@ def otpvalidation(token):
                           'time password was sent to your email.')
             flash(msg, 'error')
 
-        current_app.logger.info(('Invalid OTP. retrieved: {}, submitted: {}, '
-                                 'email: {}').format(otp_code, user_otp, email))
+        current_app.logger.info('Invalid OTP for email: %s', email)
         _email_two_factor_auth(user, True)
         form.otp.data = ''
     response = dict(template='/account/otpvalidation.html',
@@ -329,6 +323,15 @@ def get_email_confirmation_url(account):
                                 _external=True)
     else:
         return url_for_app_type('.confirm_account', key=key, _external=True)
+
+
+def _password_reset_binding(passwd_hash):
+    secret = current_app.config['ITSDANGEROUSKEY']
+    if isinstance(secret, str):
+        secret = secret.encode()
+    if isinstance(passwd_hash, str):
+        passwd_hash = passwd_hash.encode()
+    return hmac.new(secret, passwd_hash, 'sha256').hexdigest()[:32]
 
 
 @blueprint.route('/confirm-email')
@@ -410,12 +413,12 @@ def register():
         account['fullname'] = account['fullname'].strip()
 
         ensure_user_data_access_assignment_from_form(account, form)
-        confirm_url = get_email_confirmation_url(account)
         if current_app.config.get('ACCOUNT_CONFIRMATION_DISABLED'):
             project_slugs=form.project_slug.data
             create_account(account, project_slugs=project_slugs)
             flash(gettext('Created user successfully!'), 'success')
             return redirect_content_type(url_for("home.home"))
+        confirm_url = get_email_confirmation_url(account)
         msg = dict(subject='Welcome to %s!' % current_app.config.get('BRAND'),
                    recipients=[account['email_addr']],
                    body=render_template('/account/email/validate_account.md',
@@ -598,7 +601,7 @@ def _show_public_profile(user, form, can_update):
         projects_created.extend(draft_projects)
 
     if user.restrict is False:
-        title = "%s &middot; User Profile" % user_dict['fullname']
+        title = "%s · User Profile" % user_dict['fullname']
     else:
         title = "User data is restricted"
         projects_contributed = []
@@ -843,7 +846,6 @@ def _handle_avatar_update(user, avatar_form):
 def _handle_profile_update(user, update_form):
     acc_conf_dis = current_app.config.get('ACCOUNT_CONFIRMATION_DISABLED')
     if update_form.validate_on_submit():
-        user.id = update_form.id.data
         user.fullname = update_form.fullname.data
         user.name = update_form.name.data
         account, domain = update_form.email_addr.data.split('@')
@@ -953,10 +955,12 @@ def reset_password():
     except BadData:
         abort(403)
     username = userdict.get('user')
-    if not username or not userdict.get('password'):
+    password_binding = userdict.get('password_binding')
+    if not username or not password_binding:
         abort(403)
     user = user_repo.get_by_name(username)
-    if user.passwd_hash != userdict.get('password'):
+    if user is None or not hmac.compare_digest(
+            _password_reset_binding(user.passwd_hash), password_binding):
         abort(403)
     form = ChangePasswordForm(request.body)
     if form.validate_on_submit():
@@ -985,16 +989,17 @@ def forgot_password():
     if form.validate_on_submit():
         email_addr = form.email_addr.data.lower()
         user = user_repo.get_by(email_addr=email_addr)
-        if user and not user.enabled:
-            brand = current_app.config['BRAND']
-            flash(gettext('Your account is disabled. '
-                          'Please contact your {} administrator.'.format(brand)),
-                  'error')
-            return handle_content_type(data)
         if user and user.email_addr:
             msg = dict(subject='Account Recovery',
                        recipients=[user.email_addr])
-            if user.twitter_user_id:
+            if not user.enabled:
+                msg['body'] = render_template(
+                    '/account/email/forgot_password_disabled.md',
+                    user=user)
+                msg['html'] = render_template(
+                    '/account/email/forgot_password_disabled.html',
+                    user=user)
+            elif user.twitter_user_id:
                 msg['body'] = render_template(
                     '/account/email/forgot_password_openid.md',
                     user=user, account_name='Twitter')
@@ -1016,24 +1021,23 @@ def forgot_password():
                     '/account/email/forgot_password_openid.html',
                     user=user, account_name='Google')
             else:
-                userdict = {'user': user.name, 'password': user.passwd_hash}
+                userdict = {
+                    'user': user.name,
+                    'password_binding': _password_reset_binding(user.passwd_hash)
+                }
                 key = signer.dumps(userdict, salt='password-reset')
                 recovery_url = url_for_app_type('.reset_password',
                                                 key=key, _external=True)
                 msg['body'] = render_template(
                     '/account/email/forgot_password.md',
-                    user=user, recovery_url=recovery_url, key=key)
+                    user=user, recovery_url=recovery_url)
                 msg['html'] = render_template(
                     '/account/email/forgot_password.html',
-                    user=user, recovery_url=recovery_url, key=key)
+                    user=user, recovery_url=recovery_url)
             mail_queue.enqueue(send_mail, msg)
-            flash(gettext("We've sent you an email with account "
-                          "recovery instructions!"),
-                  'success')
-        else:
-            flash(gettext("We don't have this email in our records. "
-                          "You may have signed up with a different "
-                          "email"), 'error')
+        flash(gettext("If an account exists for that address, we've sent "
+                      "you an email with account recovery instructions!"),
+              'success')
     if request.method == 'POST':
         if not form.validate():
             flash(gettext('Something went wrong, please correct the errors on the '
@@ -1043,7 +1047,7 @@ def forgot_password():
     return handle_content_type(data)
 
 
-@blueprint.route('/<name>/export')
+@blueprint.route('/<name>/export', methods=['POST'])
 @login_required
 @admin_required
 def start_export(name):
@@ -1091,7 +1095,7 @@ def reset_api_key(name):
         return jsonify(csrf)
 
 
-@blueprint.route('/<name>/delete')
+@blueprint.route('/<name>/delete', methods=['POST'])
 @login_required
 @admin_required
 def delete(name):
@@ -1144,7 +1148,7 @@ def add_metadata(name):
         if current_user.is_authenticated and current_user.admin:
             draft_projects = cached_users.draft_projects(user.id)
             projects_created.extend(draft_projects)
-        title = "%s &middot; User Profile" % user.name
+        title = "%s · User Profile" % user.name
         flash("Please fix the errors", 'message')
         return render_template('/account/public_profile.html',
                                title=title, user=user,
@@ -1359,4 +1363,3 @@ def get_user_pref_and_metadata(user_name, form):
         elif form.locations.data:
             user_pref['locations'] = form.locations.data
         return user_pref, metadata
-

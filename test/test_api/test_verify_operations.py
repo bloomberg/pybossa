@@ -34,11 +34,11 @@ class TestVerifyOpAPI(TestAPI):
     def test_verify_operations_bad_request(self):
         """Test the /api/verify endpoint for a bad input."""
 
-        owner = UserFactory.create(pro=False)
-        owner.set_password("abc")
-        project = ProjectFactory.create(owner=owner)
+        admin = UserFactory.create(pro=False, admin=True)
+        project = ProjectFactory.create(owner=admin)
+        headers = {'Authorization': admin.api_key}
 
-        resp = self.app.post('/api/verify/bad_request')
+        resp = self.app.post('/api/verify/bad_request', headers=headers)
         assert resp.status_code == 400 and resp.data.decode() == "Bad Request"
         
         data = {
@@ -46,7 +46,8 @@ class TestVerifyOpAPI(TestAPI):
             "export_type": "bad_type",
             "filetype": "csv"
         }
-        resp = self.app.post(f"/api/verify/export_tasks", data=data)
+        resp = self.app.post('/api/verify/export_tasks', data=data,
+                             headers=headers)
         assert resp.status_code == 400 and resp.data.decode() == "Invalid export_type parameter"
         
 

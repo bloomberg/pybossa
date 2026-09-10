@@ -100,7 +100,7 @@ def _authorizer_for(resource_name):
     if resource_name in ('auditlog', 'blogpost', 'task',
                          'taskrun', 'webhook', 'result',
                          'helpingmaterial',
-                         'performancestats'):
+                         'performancestats', 'projectstats'):
         kwargs.update({'project_repo': project_repo})
     if resource_name in ('task', 'taskrun'):
         kwargs.update({'result_repo': result_repo})

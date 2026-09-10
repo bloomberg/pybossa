@@ -25,6 +25,7 @@ import tempfile
 from werkzeug.utils import secure_filename
 
 from pybossa.core import project_repo
+from pybossa.exporter import neutralize_csv_formulas
 from pybossa.exporter.csv_export import CsvExporter
 
 
@@ -40,8 +41,9 @@ class ProjectCsvExporter(CsvExporter):
         if dataframe is not None:
             datafile = tempfile.NamedTemporaryFile()
             try:
-                dataframe.to_csv(datafile, index=False,
-                                 encoding='utf-8')
+                neutralize_csv_formulas(dataframe).to_csv(
+                    datafile, index=False, encoding='utf-8',
+                    lineterminator='\r\n')
                 datafile.flush()
                 zipped_datafile = tempfile.NamedTemporaryFile(delete=False)
                 try:

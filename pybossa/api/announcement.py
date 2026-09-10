@@ -38,6 +38,7 @@ class AnnouncementAPI(APIBase):
     __class__ = Announcement
 
     def _forbidden_attributes(self, data):
+        self._forbid_server_managed_upload_info(data)
         for key in data.keys():
             if key in self.reserved_keys:
                 raise BadRequest("Reserved keys in payload")

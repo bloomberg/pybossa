@@ -27,7 +27,7 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from pybossa.core import uploader
-from pybossa.exporter import Exporter
+from pybossa.exporter import Exporter, neutralize_csv_formulas
 
 
 class CsvExporter(Exporter):
@@ -45,10 +45,12 @@ class CsvExporter(Exporter):
             datafile = tempfile.NamedTemporaryFile()
             info_datafile = tempfile.NamedTemporaryFile()
             try:
-                dataframe.to_csv(datafile, index=False,
-                                 encoding='utf-8')
-                info_dataframe.to_csv(
-                    info_datafile, index=False, encoding='utf-8')
+                neutralize_csv_formulas(dataframe).to_csv(
+                    datafile, index=False, encoding='utf-8',
+                    lineterminator='\r\n')
+                neutralize_csv_formulas(info_dataframe).to_csv(
+                    info_datafile, index=False, encoding='utf-8',
+                    lineterminator='\r\n')
                 datafile.flush()
                 info_datafile.flush()
                 zipped_datafile = tempfile.NamedTemporaryFile()

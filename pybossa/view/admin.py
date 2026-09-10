@@ -198,7 +198,7 @@ def export_users():
     return redirect(url_for('.index'))
 
 
-@blueprint.route('/users/add/<int:user_id>')
+@blueprint.route('/users/add/<int:user_id>', methods=['POST'])
 @login_required
 @admin_required
 def add_admin(user_id=None):
@@ -241,7 +241,7 @@ def add_admin(user_id=None):
         return abort(500)
 
 
-@blueprint.route('/users/del/<int:user_id>')
+@blueprint.route('/users/del/<int:user_id>', methods=['POST'])
 @login_required
 @admin_required
 def del_admin(user_id=None):
@@ -659,7 +659,7 @@ def subadminusers():
                            title=gettext("Manage Subadmin Users"), form=form)
 
 
-@blueprint.route('/users/addsubadmin/<int:user_id>')
+@blueprint.route('/users/addsubadmin/<int:user_id>', methods=['POST'])
 @login_required
 @admin_required
 def add_subadmin(user_id=None):
@@ -698,7 +698,7 @@ def add_subadmin(user_id=None):
         return abort(500)
 
 
-@blueprint.route('/users/delsubadmin/<int:user_id>')
+@blueprint.route('/users/delsubadmin/<int:user_id>', methods=['POST'])
 @login_required
 @admin_required
 def del_subadmin(user_id=None):
@@ -839,7 +839,7 @@ def manageusers():
                            timezones=timezone)
 
 
-@blueprint.route('/users/enable_user/<int:user_id>')
+@blueprint.route('/users/enable_user/<int:user_id>', methods=['POST'])
 @login_required
 @admin_or_subadmin_required
 def enable_user(user_id=None):
@@ -864,7 +864,7 @@ def enable_user(user_id=None):
     return format_error(msg, 404)
 
 
-@blueprint.route('/users/disable_user/<int:user_id>')
+@blueprint.route('/users/disable_user/<int:user_id>', methods=['POST'])
 @login_required
 @admin_or_subadmin_required
 def disable_user(user_id=None):
@@ -888,8 +888,8 @@ def disable_user(user_id=None):
     return format_error(msg, 404)
 
 
-@csrf.exempt
 @blueprint.route('/cleanuptasks', methods=['POST'])
+@csrf.exempt
 @login_required
 @admin_required
 def cleanuptasks():

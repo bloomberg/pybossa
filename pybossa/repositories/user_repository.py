@@ -25,7 +25,8 @@ from pybossa.exc import WrongObjectError, DBIntegrityError
 from sqlalchemy.orm.base import _entity_descriptor
 from flask import current_app
 import re
-from pybossa.util import can_have_super_user_access, get_unique_user_preferences
+from pybossa.util import can_have_super_user_access
+from pybossa.user_pref import build_user_pref_filter, get_unique_user_preferences
 from pybossa.model.task_run import TaskRun
 from faker import Faker
 from yacryptopan import CryptoPAn
@@ -117,7 +118,10 @@ class UserRepository(Repository):
     def update(self, new_user):
         self._validate_can_be('updated', new_user)
         try:
-            can_have_super_user_access(new_user)
+            with self.db.session.no_autoflush:
+                persisted_email = self.db.session.query(
+                    User.email_addr).filter(User.id == new_user.id).scalar()
+            can_have_super_user_access(new_user, persisted_email)
             self.lowercase_user_attributes(new_user)
             self.db.session.merge(new_user)
             self.db.session.commit()
@@ -232,8 +236,7 @@ class UserRepository(Repository):
         if not distinct_task_prefs:
             return []
 
-        clauses = ('lower(user_pref::text)::jsonb @> lower({})::jsonb'.format(up) for up in distinct_task_prefs)
-        user_prefs = ' AND ({})'.format(' OR '.join(clauses))
+        user_prefs, user_pref_params = build_user_pref_filter(distinct_task_prefs)
 
         sql = text('''
                     SELECT DISTINCT email_addr
@@ -247,7 +250,9 @@ class UserRepository(Repository):
             \n sql {}'.format(project_id, dtask_prefs, dexclude_task_prefs,
             distinct_task_prefs, str(sql)))
 
-        results = self.db.session.execute(sql, dict(project_id=project_id))
+        query_params = dict(project_id=project_id)
+        query_params.update(user_pref_params)
+        results = self.db.session.execute(sql, query_params)
         contributors = [ row.email_addr for row in results]
         current_app.logger.info('contributors {}'.format(contributors))
         return contributors

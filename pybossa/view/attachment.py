@@ -22,15 +22,17 @@ from werkzeug.exceptions import Forbidden, BadRequest
 
 from pybossa.cloud_store_api.s3 import s3_get_email_attachment
 from pybossa.core import signer
+from pybossa.signer import (EMAIL_ATTACHMENT_SIGNATURE_MAX_AGE,
+                            EMAIL_ATTACHMENT_SIGNATURE_SALT)
 from pybossa.util import admin_or_project_owner
 from itsdangerous import BadSignature
 
 blueprint = Blueprint('attachment', __name__)
 
-TASK_SIGNATURE_MAX_SIZE = 128
+ATTACHMENT_SIGNATURE_MAX_SIZE = 512
 
-@login_required
 @blueprint.route('/<string:signature>/<string:path>', methods=['GET', 'POST'])
+@login_required
 def download_attachment(signature, path):
     """download attachment from storage location"""
 
@@ -38,16 +40,30 @@ def download_attachment(signature, path):
 
     try:
         size_signature = len(signature)
-        if size_signature > TASK_SIGNATURE_MAX_SIZE:
+        if size_signature > ATTACHMENT_SIGNATURE_MAX_SIZE:
             current_app.logger.exception(
                 "Invalid task signature. Signature length exceeds max allowed length. signature %s, path %s",
                 signature, path)
             raise BadRequest('Invalid signature')
         
-        signed_payload = signer.loads(signature)
+        signed_payload = signer.loads(
+            signature,
+            salt=EMAIL_ATTACHMENT_SIGNATURE_SALT,
+            max_age=EMAIL_ATTACHMENT_SIGNATURE_MAX_AGE)
+        if not isinstance(signed_payload, dict):
+            raise Forbidden('Access denied')
         project_id = signed_payload.get("project_id")
         user_email = signed_payload.get("user_email")
-        current_app.logger.info("download attachment url signed info. project id %d, user email %s", project_id, user_email)
+        s3_key = signed_payload.get("s3_key")
+        current_app.logger.info("download attachment url signed info. project id %s, user email %s", project_id, user_email)
+
+        if not user_email or not s3_key:
+            current_app.logger.warning(
+                "Attachment signature is missing required claims. path %s", path)
+            raise Forbidden('Access denied')
+
+        if s3_key != f"attachments/{path}":
+            raise Forbidden('Access denied')
 
         # admins and project owners are authorized to download the attachment
         if project_id:
@@ -61,9 +77,8 @@ def download_attachment(signature, path):
 
         # regular users as coowners can download their own attachments
         # admins or users tagged in signature can download the attachment
-        if user_email:
-            if not (current_user.admin or current_user.email_addr == user_email):
-                raise Forbidden('Access denied')
+        if not (current_user.admin or current_user.email_addr == user_email):
+            raise Forbidden('Access denied')
 
         resp = s3_get_email_attachment(path)
         response = Response(resp["content"], mimetype=resp["type"], status=200)

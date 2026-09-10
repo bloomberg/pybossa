@@ -21,6 +21,8 @@ from test import db, with_context
 from test.test_api import TestAPI
 from test.factories import UserFactory, HelpingMaterialFactory, ProjectFactory
 from pybossa.repositories import HelpingMaterialRepository
+from pybossa.api.helpingmaterial import HelpingMaterialAPI
+from werkzeug.exceptions import BadRequest
 from unittest.mock import patch
 
 helping_repo = HelpingMaterialRepository(db)
@@ -287,6 +289,19 @@ class TestHelpingMaterialAPI(TestAPI):
         url = '/api/helpingmaterial/%s?api_key=%s' % (helpingmaterial2.id, admin.api_key)
         res = self.app.delete(url)
         assert res.status_code == 204, res.status_code
+
+    @with_context
+    def test_helpingmaterial_rejects_client_owned_file_metadata(self):
+        payload = {'info': {'container': 'user_999',
+                            'file_name': 'other.jpg'}}
+
+        with self.flask_app.test_request_context(json=payload):
+            try:
+                HelpingMaterialAPI()._forbidden_attributes(payload)
+            except BadRequest as error:
+                assert 'info.' in error.description
+            else:
+                assert False, 'Server-managed upload metadata was accepted'
 
     @with_context
     def test_helpingmaterial_post_file(self):

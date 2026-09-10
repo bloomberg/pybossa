@@ -18,6 +18,8 @@
 
 import json
 from datetime import timedelta, datetime
+from math import ceil
+import re
 from time import time
 
 from pybossa.contributions_guard import ContributionsGuard
@@ -32,6 +34,19 @@ ACTIVE_USER_KEY = 'pybossa:active_users_in_project:{}'
 EXPIRE_LOCK_DELAY = 5
 EXPIRE_RESERVE_TASK_LOCK_DELAY = 30*60
 USER_EXPORTED_REPORTS_KEY = 'pybossa:user:exported:reports:{}'
+RESERVE_TASK_LOCK_KEY = 'reserve_task:v2:project:{}:user:{}:task:{}'
+LEGACY_RESERVE_TASK_LOCK_KEY = \
+    'reserve_task:project:{}:category:{}:user:{}:task:{}'
+RESERVE_TASK_LOCK_PATTERN = re.compile(
+    r'^reserve_task:v2:project:(?P<project>\d+):user:(?P<user>\d+):'
+    r'task:(?P<task>\d+)$')
+LEGACY_RESERVE_TASK_LOCK_PATTERN = re.compile(
+    r'^reserve_task:project:(?P<project>\d+):category:(?P<category>.+):'
+    r'user:(?P<user>\d+):task:(?P<task>\d+)$')
+
+
+def get_reserve_task_lock_key(project_id, user_id, task_id):
+    return RESERVE_TASK_LOCK_KEY.format(project_id, user_id, task_id)
 
 def get_active_user_key(project_id):
     return ACTIVE_USER_KEY.format(project_id)
@@ -254,8 +269,11 @@ class LockManager(object):
         Get all reservation key/resource_id associated with partial resource information.
         :param resource_id: resource on project/task/user
         """
-        reservations = self._redis.keys(resource_id) or []
-        decoded_reservation_keys = [k.decode() for k in reservations]
+        reservations = self.scan_keys(resource_id)
+        decoded_reservation_keys = [
+            key.decode() if isinstance(key, bytes) else key
+            for key in reservations
+        ]
         return decoded_reservation_keys
 
     def _release_expired_locks(self, resource_id, now):
@@ -269,17 +287,73 @@ class LockManager(object):
             self._redis.hdel(resource_id, *to_delete)
 
     def _release_expired_reserve_for_project(self, project_id):
-        resource_id = "reserve_task:project:{}:category:*:user:*:task:*".format(project_id)
         timestamp = time()
-
-        reservation_keys = self.get_reservation_keys(resource_id)
+        patterns = [
+            LEGACY_RESERVE_TASK_LOCK_KEY.format(project_id, '*', '*', '*'),
+            RESERVE_TASK_LOCK_KEY.format(project_id, '*', '*')
+        ]
+        reservation_keys = []
+        for pattern in patterns:
+            reservation_keys.extend(self.get_reservation_keys(pattern))
         for k in reservation_keys:
             self._release_expired_reserve_task_locks(k, timestamp)
 
     def _release_expired_reserve_task_locks(self, resource_id, now):
-        expiration = self._redis.get(resource_id) or 0
-        if now > float(expiration):
+        try:
+            reservation = self._decode_reserve_task_lock(resource_id)
+        except (TypeError, ValueError):
             self._redis.delete(resource_id)
+            return
+        if reservation is None or now > reservation['expires_at']:
+            self._redis.delete(resource_id)
+
+    @staticmethod
+    def _normalize_reserve_task_category(category):
+        if not isinstance(category, (list, tuple)) or not category:
+            raise ValueError('Invalid reserved task category')
+        normalized = []
+        for pair in category:
+            if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+                raise ValueError('Invalid reserved task category')
+            normalized.append([str(pair[0]), str(pair[1])])
+        return sorted(normalized)
+
+    def _decode_reserve_task_lock(self, resource_id):
+        raw_value = self._redis.get(resource_id)
+        if raw_value is None:
+            return None
+        if isinstance(raw_value, bytes):
+            raw_value = raw_value.decode()
+
+        match = RESERVE_TASK_LOCK_PATTERN.match(resource_id)
+        if match:
+            payload = json.loads(raw_value)
+            if not isinstance(payload, dict) or payload.get('version') != 2:
+                raise ValueError('Invalid reserved task lock version')
+            category = self._normalize_reserve_task_category(
+                payload.get('category'))
+            expiration = float(payload['expires_at'])
+        else:
+            match = LEGACY_RESERVE_TASK_LOCK_PATTERN.match(resource_id)
+            if not match:
+                raise ValueError('Invalid reserved task lock key')
+            category_fields = match.group('category').split(':')
+            if len(category_fields) % 2:
+                raise ValueError('Invalid reserved task category')
+            category = self._normalize_reserve_task_category([
+                category_fields[index:index + 2]
+                for index in range(0, len(category_fields), 2)
+            ])
+            expiration = float(raw_value)
+
+        return {
+            'resource_id': resource_id,
+            'project_id': match.group('project'),
+            'user_id': match.group('user'),
+            'task_id': match.group('task'),
+            'category': category,
+            'expires_at': expiration
+        }
 
 
     @staticmethod
@@ -306,35 +380,54 @@ class LockManager(object):
         # release expired task reservations
         self._release_expired_reserve_for_project(project_id)
 
-        resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
-            project_id,
-            "*" if not category else category,
-            "*" if not user_id or exclude_user else user_id,
-            "*" if not task_id else task_id
-        )
-
-        category_keys = self.get_reservation_keys(resource_id)
-
-        # if key present but for different user, with redundancy = 1, return false
-        # TODO: for redundancy > 1, check if additional task run
-        # available for this user and if so, return category_key else ""
-        if exclude_user:
-            # exclude user_id from list of keys passed
-            drop_user = ":user:{}:task:".format(user_id)
-            category_keys = [ key for key in category_keys if drop_user not in key ]
-        return category_keys
+        category_fields = []
+        if category:
+            if isinstance(category, str):
+                category_fields = category.split(':')[::2]
+            elif isinstance(category[0], (list, tuple)):
+                category_fields = [pair[0] for pair in category]
+            else:
+                category_fields = category
+        category_fields = sorted(str(field) for field in category_fields)
+        selected_user = '*' if not user_id or exclude_user else user_id
+        selected_task = '*' if not task_id else task_id
+        patterns = [
+            LEGACY_RESERVE_TASK_LOCK_KEY.format(
+                project_id, '*', selected_user, selected_task),
+            RESERVE_TASK_LOCK_KEY.format(
+                project_id, selected_user, selected_task)
+        ]
+        reservations = []
+        for pattern in patterns:
+            for resource_id in self.get_reservation_keys(pattern):
+                reservation = self._decode_reserve_task_lock(resource_id)
+                if reservation is None:
+                    continue
+                reservation_fields = sorted(
+                    pair[0] for pair in reservation['category'])
+                if category_fields and reservation_fields != category_fields:
+                    continue
+                if exclude_user and reservation['user_id'] == str(user_id):
+                    continue
+                reservations.append(reservation)
+        return reservations
 
     def acquire_reserve_task_lock(self, project_id, task_id, user_id, category):
         if not(project_id and user_id and task_id and category):
             raise BadRequest('Missing required parameters')
 
-        # check task category reserved by user
-        resource_id = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(project_id, category, user_id, task_id)
-
+        category = self._normalize_reserve_task_category(category)
+        resource_id = get_reserve_task_lock_key(project_id, user_id, task_id)
         timestamp = time()
         self._release_expired_reserve_task_locks(resource_id, timestamp)
         expiration = timestamp + self._duration + EXPIRE_RESERVE_TASK_LOCK_DELAY
-        return self._redis.set(resource_id, expiration)
+        payload = json.dumps({
+            'version': 2,
+            'category': category,
+            'expires_at': expiration
+        }, sort_keys=True, separators=(',', ':'))
+        ttl = max(1, int(ceil(self._duration + EXPIRE_RESERVE_TASK_LOCK_DELAY)))
+        return self._redis.set(resource_id, payload, ex=ttl)
 
     def release_reserve_task_lock(self, resource_id, expiry):
         #cache = pipeline or self._redis # https://pythonrepo.com/repo/andymccurdy-redis-py-python-connecting-and-operating-databases#locks

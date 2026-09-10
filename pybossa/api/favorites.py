@@ -27,12 +27,17 @@ from .api_base import APIBase
 from pybossa.core import task_repo
 from flask_login import current_user
 from flask import Response, abort, request
-from werkzeug.exceptions import MethodNotAllowed, NotFound, Unauthorized
+from werkzeug.exceptions import (
+    Forbidden, MethodNotAllowed, NotFound, Unauthorized)
 from pybossa.core import ratelimits
 from pybossa.util import jsonpify, fuzzyboolean
 from pybossa.ratelimit import ratelimit
 from pybossa.error import ErrorStatus
 from pybossa.model.task import Task
+from pybossa.core import project_repo
+from pybossa.auth import ensure_authorized_to
+from pybossa.auth.task import TaskAuth
+from pybossa.cache.projects import get_project_data
 
 error = ErrorStatus()
 
@@ -42,6 +47,49 @@ class FavoritesAPI(APIBase):
     """Class API for Favorites."""
 
     __class__ = Task
+
+    def _select_attributes(self, data):
+        """Strip gold_answers and calibration for callers below subadmin-owner.
+
+        FavoritesAPI extends APIBase rather than TaskAPI, so it inherited the
+        no-op _select_attributes and returned raw task dictionaries on GET.
+        """
+        return TaskAuth.apply_access_control(
+            data, user=current_user,
+            project_data=get_project_data(data['project_id']))
+
+    @staticmethod
+    def _sanitized(task):
+        """Task dict with access control applied, for the hand-rolled handlers."""
+        return TaskAuth.apply_access_control(
+            task.dictize(), user=current_user,
+            project_data=get_project_data(task.project_id))
+
+    @staticmethod
+    def _ensure_can_read_task(task):
+        """Require that the caller may read the task's project.
+
+        Favoriting accepted any task id and returned the whole task object with
+        no check that the caller may see it. Task ids are sequential, so a loop
+        over them dumped every task on the instance - and appended the caller to
+        fav_user_ids on each, a cross-project write as well as a read.
+
+        In GIGwork ProjectAuth._read is the boundary that enforces data
+        classification: data_access_levels is truthy, so it requires
+        admin/subadmin-owner or project_users membership.
+        """
+        project = project_repo.get(task.project_id)
+        if project is None:
+            raise NotFound
+        ensure_authorized_to('read', project)
+
+    def _verify_auth(self, task):
+        """Omit favorites whose projects the caller can no longer read."""
+        try:
+            self._ensure_can_read_task(task)
+            return True
+        except (Forbidden, NotFound, Unauthorized):
+            return False
 
     @jsonpify
     @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
@@ -90,13 +138,15 @@ class FavoritesAPI(APIBase):
                 task = task_repo.get_task(data['task_id'])
                 if task is None:
                     raise NotFound
+            self._ensure_can_read_task(task)
+            if len(tasks) == 0:
                 if task.fav_user_ids is None:
                     task.fav_user_ids = [uid]
                 else:
                     task.fav_user_ids.append(uid)
                 task_repo.update(task)
                 self._log_changes(None, task)
-            return Response(json.dumps(task.dictize()), 200,
+            return Response(json.dumps(self._sanitized(task)), 200,
                             mimetype='application/json')
         except Exception as e:
             return error.format_exception(
@@ -117,10 +167,11 @@ class FavoritesAPI(APIBase):
                 raise NotFound
             if len(tasks) == 1:
                 task = tasks[0]
+            self._ensure_can_read_task(task)
             idx = task.fav_user_ids.index(uid)
             task.fav_user_ids.pop(idx)
             task_repo.update(task)
-            return Response(json.dumps(task.dictize()), 200,
+            return Response(json.dumps(self._sanitized(task)), 200,
                             mimetype='application/json')
         except Exception as e:
             return error.format_exception(

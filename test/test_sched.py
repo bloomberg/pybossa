@@ -86,20 +86,14 @@ class TestSched(sched.Helper):
 
     @with_context
     def test_external_uid_02_gets_different_tasks_limits(self):
-        """ Test SCHED newtask returns N different list of Tasks
-        for a external User ID."""
-        assigned_tasks = []
-        # Get a Task until scheduler returns None
+        """External UID task retrieval remains retired."""
         project = ProjectFactory.create()
-        tasks = TaskFactory.create_batch(10, project=project, info={})
-
-        headers = self.get_headers_jwt(project)
+        TaskFactory.create_batch(10, project=project, info={})
 
         url = 'api/project/%s/newtask?limit=5&external_uid=%s' % (project.id, '1xa')
 
-        res = self.app.get(url, headers=headers)
-        data = json.loads(res.data)
-        assert 'error' in data['info']
+        res = self.app.get(url)
+        assert res.status_code == 410, res.data
 
     @with_context
     def test_anonymous_03_respects_limit_tasks(self):
@@ -521,34 +515,23 @@ class TestSched(sched.Helper):
 
     @with_context
     def test_task_priority_external_uid(self):
-        """Test SCHED respects priority_0 field for externa uid"""
+        """External UID retrieval is rejected regardless of task priority."""
         project = ProjectFactory.create(owner=UserFactory.create(id=500))
         TaskFactory.create_batch(10, project=project)
 
-        # By default, tasks without priority should be ordered by task.id (FIFO)
-        tasks = db.session.query(Task).filter_by(project_id=1).order_by('id').all()
-        project = project_repo.get(1)
-        headers = self.get_headers_jwt(project)
         url = 'api/project/%s/newtask?external_uid=342' % project.id
-        res = self.app.get(url, headers=headers)
-        task1 = json.loads(res.data)
-        assert 'error' in task1.get('info')
+        res = self.app.get(url)
+        assert res.status_code == 410, res.data
 
     @with_context
     def test_task_priority_external_uid_limit(self):
-        """Test SCHED respects priority_0 field for externa uid with limit"""
+        """External UID retrieval with a limit remains retired."""
         project = ProjectFactory.create(owner=UserFactory.create(id=500))
         TaskFactory.create_batch(10, project=project)
 
-        # By default, tasks without priority should be ordered by task.id (FIFO)
-        tasks = db.session.query(Task).filter_by(project_id=project.id).order_by('id').all()
-        headers = self.get_headers_jwt(project)
         url = 'api/project/%s/newtask?external_uid=342&limit=2' % project.id
-        res = self.app.get(url, headers=headers)
-        tasks1 = json.loads(res.data)
-        # Check that we received a Task
-        err_msg = "Task.id should be the same"
-        assert 'error' in tasks1['info']
+        res = self.app.get(url)
+        assert res.status_code == 410, res.data
 
     def _add_task_run(self, app, task, user=None):
         tr = AnonymousTaskRunFactory.create(project=app, task=task)

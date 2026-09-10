@@ -18,6 +18,7 @@
 
 from test import Test, with_context, with_request_context
 from test.factories import (ProjectFactory, TaskFactory, TaskRunFactory, UserFactory)
+from nose.tools import assert_raises
 from pybossa.cache import helpers
 from pybossa.cache.project_stats import update_stats
 from pybossa.cache.task_browse_helpers import parse_tasks_browse_order_by_args, user_meet_task_requirement
@@ -432,6 +433,47 @@ class TestHelpersCache(Test):
 
         assert order_by_result == "task.info->>'field' desc"
         assert 'field' in order_by_dict
+
+    @with_context
+    def test_order_by_args_rejects_invalid_direction(self):
+        """Test order_by rejects SQL-shaped direction text."""
+        assert_raises(
+            ValueError,
+            parse_tasks_browse_order_by_args,
+            'task_id asc;select/**/1',
+            [])
+
+    @with_context
+    def test_order_by_args_rejects_invalid_display_info_column(self):
+        """Test order_by rejects unsafe task info column names."""
+        assert_raises(
+            ValueError,
+            parse_tasks_browse_order_by_args,
+            "unsafe'column asc",
+            ["unsafe'column"])
+
+    @with_context
+    def test_order_by_args_preserves_valid_direction_case(self):
+        """Test order_by validation preserves accepted direction case."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args(
+            'task_id DESC', [])
+
+        assert order_by_result == 'id DESC'
+        assert order_by_dict == {'task_id': 'DESC'}
+
+    @with_context
+    def test_order_by_args_preserves_special_sort_fields(self):
+        """Test order_by preserves downstream special sort fields."""
+        order_by_result, order_by_dict = parse_tasks_browse_order_by_args(
+            'lock_status asc, assigned_users desc, in_progress asc', [])
+
+        assert order_by_result == \
+            'lock_status asc, assigned_users desc, in_progress asc'
+        assert order_by_dict == {
+            'lock_status': 'asc',
+            'assigned_users': 'desc',
+            'in_progress': 'asc',
+        }
 
     @with_context
     def test_order_by_args_substring1(self):

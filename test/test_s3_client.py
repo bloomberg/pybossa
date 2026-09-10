@@ -18,7 +18,8 @@
 
 from unittest.mock import patch, MagicMock
 from nose.tools import assert_raises
-from pybossa.s3_client import S3Client, NoSuchBucket, PrivateBucket
+from pybossa.s3_client import (S3Client, InvalidBucketName, NoSuchBucket,
+                               PrivateBucket)
 
 
 class TestS3Client(object):
@@ -112,6 +113,29 @@ class TestS3Client(object):
         objects = S3Client().objects('test-pybossa')
 
         assert objects == [], objects
+        requests.get.assert_called_once_with(
+            'https://test-pybossa.s3.amazonaws.com/',
+            allow_redirects=False)
+
+    @patch('pybossa.s3_client.requests')
+    def test_objects_reject_invalid_bucket_names(self, requests):
+        invalid_names = [
+            'ab',
+            'Bucket1',
+            '-bucket',
+            'bucket-',
+            'bucket..name',
+            '192.168.0.1',
+            'bucket#internal',
+            'bucket?internal',
+            'bucket@internal',
+            'bucket:443',
+        ]
+
+        for bucket_name in invalid_names:
+            assert_raises(InvalidBucketName, S3Client().objects, bucket_name)
+
+        requests.get.assert_not_called()
 
     @patch('pybossa.s3_client.requests')
     def test_objects_return_list_of_object_names_in_a_bucket(self, requests):

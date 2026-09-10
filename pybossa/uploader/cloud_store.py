@@ -21,6 +21,10 @@ class CloudStoreUploader(Uploader):
 
     @staticmethod
     def key_name(container, filename):
+        for value in (container, filename):
+            if (not isinstance(value, str) or not value or
+                    value in ('.', '..') or '/' in value or '\\' in value):
+                raise ValueError('Invalid upload key component')
         return '{}/{}'.format(container, filename)
 
     def _lookup_url(self, endpoint, values): # pragma: no cover

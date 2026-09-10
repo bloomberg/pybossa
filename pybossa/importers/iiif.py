@@ -18,7 +18,10 @@
 
 import json
 import requests
+from flask import current_app
 from iiif_prezi.loader import ManifestReader
+
+from pybossa.ssrf_guard import SSRFError, safe_get
 
 from .base import BulkTaskImport, BulkImportException
 
@@ -80,14 +83,19 @@ class BulkTaskIIIFImporter(BulkTaskImport):
 
     def _get_validated_manifest(self, manifest_uri, version):
         """Return a validated manifest."""
-        res = requests.get(manifest_uri)
-        if res.status_code != 200:
-            err_msg = 'Invalid manifest URI: {} error'.format(res.status_code)
-            raise BulkImportException(err_msg)
-        reader = ManifestReader(res.text, version=version)
         try:
+            res = safe_get(manifest_uri)
+        except (SSRFError, requests.exceptions.RequestException, ValueError):
+            raise BulkImportException('Unable to retrieve IIIF manifest')
+
+        if res.status_code != 200:
+            raise BulkImportException('Unable to retrieve IIIF manifest')
+
+        try:
+            reader = ManifestReader(res.text, version=version)
             mf = reader.read()
             mf_json = mf.toJSON()
-        except Exception as e:
-            raise BulkImportException(str(e))
+        except Exception:
+            current_app.logger.exception('Unable to parse IIIF manifest')
+            raise BulkImportException('Unable to parse IIIF manifest')
         return mf_json

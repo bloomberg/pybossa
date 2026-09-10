@@ -18,21 +18,24 @@
 """Amazon view for PYBOSSA."""
 import json
 from flask import Blueprint, Response
-from pybossa.s3_client import S3Client, NoSuchBucket, PrivateBucket
+from flask_login import login_required
+from pybossa.s3_client import (S3Client, InvalidBucketName, NoSuchBucket,
+                               PrivateBucket)
 
 blueprint = Blueprint('amazon', __name__)
 
 
 @blueprint.route('/bucket/<string:bucket>')
+@login_required
 def objects(bucket):
     try:
         bucket_content = S3Client().objects(bucket)
         return Response(json.dumps(bucket_content), mimetype='application/json')
-    except (NoSuchBucket, PrivateBucket) as e:
+    except (InvalidBucketName, NoSuchBucket, PrivateBucket) as e:
         status_code = e.status_code
         error = dict(action='GET',
                      status="failed",
                      status_code=status_code,
-                     exception_msg=str(e))  # Exception doesn't have message attribute
+                     exception_msg='Unable to access bucket')
         return Response(json.dumps(error), status=status_code,
                         mimetype='application/json')

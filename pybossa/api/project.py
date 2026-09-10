@@ -54,7 +54,11 @@ class ProjectAPI(APIBase):
     __class__ = Project
     reserved_keys = set(['id', 'created', 'updated', 'completed', 'contacted', 'secret_key'])
     private_keys = set(['secret_key'])
-    restricted_keys = set(['info::ext_config::authorized_services'])
+    restricted_keys = set([
+        'info::autoimporter',
+        'info::ext_config::authorized_services',
+        'info::ext_config::encryption',
+    ])
 
     def _has_filterable_attribute(self, attribute):
         if attribute not in ["coowner_id"]:
@@ -113,6 +117,26 @@ class ProjectAPI(APIBase):
         enc_config = data.get('info', {}).get('ext_config', {}).get('encryption', {})
         if enc_config:
             raise BadRequest("Creating projects with encryption is deprecated")
+        self._validate_webhook_url(data.get('webhook'))
+
+    @staticmethod
+    def _validate_webhook_url(url):
+        """Reject webhook URLs the delivery job would refuse to call.
+
+        'webhook' is in neither reserved_keys nor immutable_keys, so the API
+        write path sets it directly with no validation -- bypassing the form
+        validator that guards the same field in the web UI. The delivery job
+        later POSTs to it (CWE-918), so the URL is checked here at the point
+        it is stored, using the same guard the job and the reminder-webhook
+        view apply.
+        """
+        if not url:
+            return
+        from pybossa.ssrf_guard import _validate_before_request, SSRFError
+        try:
+            _validate_before_request(url)
+        except SSRFError as e:
+            raise BadRequest('Invalid webhook URL: {}'.format(e))
 
     def _create_instance_from_request(self, data):
         # password required if not syncing
@@ -146,11 +170,20 @@ class ProjectAPI(APIBase):
             obj.owners_ids = owners
 
     def _update_attribute(self, new, old):
-        # updating encryption key is deprecated
-        new_key = new.info.get("ext_config", {}).get("encryption", {}).get("bpv_key_id")
-        old_key = old.info.get("ext_config", {}).get("encryption", {}).get("bpv_key_id")
-        if new_key and new_key != old_key:
-            raise BadRequest("Updating encryption key is deprecated")
+        old_encryption = old.info.get("ext_config", {}).get("encryption")
+        new_ext_config = new.info.get("ext_config", {})
+        if (isinstance(new_ext_config, dict) and
+                "encryption" in new_ext_config and
+                new_ext_config["encryption"] != old_encryption):
+            raise BadRequest("Updating encryption config is deprecated")
+        if old_encryption is not None and isinstance(new_ext_config, dict):
+            new_ext_config.setdefault("encryption", old_encryption)
+
+        # Validate only when the webhook actually changes. A project whose
+        # stored webhook predates this guard must stay editable, otherwise
+        # every unrelated PUT against it would start failing.
+        if new.webhook and new.webhook != old.webhook:
+            self._validate_webhook_url(new.webhook)
 
         for key, value in old.info.items():
             new.info.setdefault(key, value)
@@ -217,10 +250,39 @@ class ProjectAPI(APIBase):
                 del tmp['info'][key]
         return tmp
 
+    def _strip_project_credentials(self, data):
+        """Remove the project's live credentials from a response.
+
+        secret_key is a legacy credential. Project-token minting and the
+        external_uid task paths are retired, but the value remains sensitive
+        while the stored field and project-management UI still exist.
+
+        info['passwd_hash'] is the project password digest, and is
+        offline-crackable.
+
+        Consumes the private_keys set declared at the top of this class, which
+        until now was dead - declared and never read.
+        """
+        tmp = copy.deepcopy(data)
+        for key in self.private_keys:
+            tmp.pop(key, None)
+        if isinstance(tmp.get('info'), dict):
+            tmp['info'].pop('passwd_hash', None)
+        return tmp
+
     def _select_attributes(self, data):
         if (current_user.is_authenticated and
                 (current_user.id in data['owners_ids'] or
                     current_user.admin or current_user.subadmin)):
+            # A subadmin who does not own this project reaches here too - the
+            # branch tests the subadmin flag with no ownership condition - and
+            # received the complete record, credentials included. In GIGwork
+            # that happens for any project they have merely been assigned to as
+            # a worker via info['project_users'], which is an ordinary
+            # situation, not an edge case.
+            if not (current_user.admin or
+                    current_user.id in data['owners_ids']):
+                return self._strip_project_credentials(data)
             return data
         else:
             data = self._filter_private_data(data)

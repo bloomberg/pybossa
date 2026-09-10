@@ -20,6 +20,10 @@ from itsdangerous import URLSafeTimedSerializer
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
+EMAIL_ATTACHMENT_SIGNATURE_SALT = 'email-attachment'
+EMAIL_ATTACHMENT_SIGNATURE_MAX_AGE = 90 * 24 * 60 * 60
+
+
 class Signer(object):
 
     def __init__(self, app=None):

@@ -19,10 +19,13 @@ import json
 from test import with_context
 from test.helper import web
 from unittest.mock import patch, MagicMock
-from test.factories import CategoryFactory
+from test.factories import CategoryFactory, UserFactory
 from pybossa.messages import *
-from pybossa.core import project_repo
+from pybossa.core import project_repo, user_repo
 from pybossa.api.user import data_access
+from pybossa.auth.project import ProjectAuth
+from pybossa.model.project import Project
+from werkzeug.exceptions import Forbidden
 
 
 class TestJsonProject(web.Helper):
@@ -383,6 +386,7 @@ class TestJsonProject(web.Helper):
             'PROJECT_PASSWORD_REQUIRED': False
         }
         with patch.dict(self.flask_app.config, configs):
+            csrf = self.get_csrf('/project/new')
 
             project_mock = MagicMock()
             owner_mock = MagicMock()
@@ -390,12 +394,74 @@ class TestJsonProject(web.Helper):
 
             with patch('pybossa.view.projects.project_by_shortname', return_value=(project_mock, owner_mock, ps_mock)), \
                 patch('pybossa.view.projects.redirect_content_type', return_value='/project/update/testproject'), \
-                patch('pybossa.view.projects.project_repo.update', return_value=True):
+                patch('pybossa.view.projects.project_repo.update', return_value=True), \
+                patch('pybossa.view.projects.ensure_authorized_to') as ensure_authorized, \
+                patch('pybossa.view.projects.auditlogger.log_event') as log_event:
                 short_name = 'testproject'
-                url = f'project/{short_name}/remove-password'
-                res = self.app.post(url)
+                url = f'/project/{short_name}/remove-password'
+                res = self.app.post(url, headers={'X-CSRFToken': csrf})
                 assert res.status_code == 200, res.status_code
+                assert (ensure_authorized.call_count, log_event.call_count) == (1, 1)
+                ensure_authorized.assert_called_with('update', project_mock)
                 project_mock.set_password.assert_called_once_with("")
+                args = log_event.call_args[0]
+                assert args[0] is project_mock
+                assert args[2:] == ('update', 'passwd_hash', 'Set', 'Removed')
+
+    @with_context
+    def test_remove_password_requires_csrf(self):
+        """Test removing a project password requires a CSRF token."""
+        self.register()
+        self.signin()
+        configs = {
+            'WTF_CSRF_ENABLED': True,
+            'PROJECT_PASSWORD_REQUIRED': False
+        }
+        with patch.dict(self.flask_app.config, configs), \
+            patch('pybossa.view.projects.project_by_shortname',
+                  return_value=(MagicMock(), MagicMock(), MagicMock())) as get_project, \
+            patch('pybossa.view.projects.redirect_content_type',
+                  return_value='/project/update/testproject'), \
+            patch('pybossa.view.projects.project_repo.update'):
+            res = self.app.post('/project/testproject/remove-password')
+
+        assert res.status_code == 400, res.status_code
+        get_project.assert_not_called()
+
+    @with_context
+    def test_remove_password_stops_when_update_forbidden(self):
+        """Test a regular user cannot remove another project's password."""
+        user = UserFactory.create()
+        self.signin_user(user)
+        user.admin = False
+        user.subadmin = False
+        user_repo.update(user)
+        owner_id = user.id + 1
+        project = Project(id=42,
+                          name='Protected project',
+                          short_name='protected-project',
+                          owner_id=owner_id,
+                          owners_ids=[owner_id],
+                          published=True,
+                          info={'passwd_hash': 'existing-password-hash'})
+        assert ProjectAuth().can(user, 'update', project) is False
+        configs = {
+            'WTF_CSRF_ENABLED': False,
+            'PROJECT_PASSWORD_REQUIRED': False
+        }
+        with patch.dict(self.flask_app.config, configs), \
+            patch('pybossa.view.projects.project_by_shortname',
+                  return_value=(project, MagicMock(), MagicMock())), \
+            patch('pybossa.view.projects.ensure_authorized_to',
+                  side_effect=Forbidden) as ensure_authorized, \
+            patch('pybossa.view.projects.project_repo.update') as update_project:
+            url = f'/project/{project.short_name}/remove-password'
+            res = self.app.post(url)
+
+        assert res.status_code == 403, (res.status_code, res.location)
+        ensure_authorized.assert_called_once_with('update', project)
+        assert project.get_passwd_hash() == 'existing-password-hash'
+        update_project.assert_not_called()
 
     @with_context
     def test_remove_password_password_required(self):

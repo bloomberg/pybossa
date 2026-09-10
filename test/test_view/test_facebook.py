@@ -250,3 +250,14 @@ class TestFacebook(Test):
         manage_user_login(user, user_data, next_url)
         login_user.assert_called_once_with(user, remember=True)
         redirect.assert_called_once_with(next_url)
+
+    @with_context
+    @patch('pybossa.view.facebook.facebook.oauth')
+    def test_oauth_authorized_rejects_external_next(self, oauth):
+        oauth.authorized_response.return_value = None
+
+        response = self.app.get(
+            '/facebook/oauth-authorized?next=https://evil.example/login&'
+            'error_reason=denied&error_description=denied')
+
+        assert response.headers['Location'] == '/', response.headers

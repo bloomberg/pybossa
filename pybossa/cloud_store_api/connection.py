@@ -17,7 +17,6 @@ from werkzeug.exceptions import BadRequest
 from boto3.session import Session
 from botocore.client import Config
 from pybossa.cloud_store_api.base_conn import BaseConnection
-from os import environ
 
 
 def check_store(store):
@@ -30,22 +29,8 @@ def check_store(store):
         raise BadRequest(f"Unsupported store type {store}")
 
 def create_connection(**kwargs):
-    # TODO: remove later
-    v2_access = environ.get("AWS_V2_ACCESS_KEY_ID")
-    v2_secret = environ.get("AWS_V2_SECRET_ACCESS_KEY")
-    if v2_access and v2_secret:
-        masked_v2_secret = f"{v2_secret[:3]}{'x'*(len(v2_secret)-6)}{v2_secret[-3:]}"
-        current_app.logger.info("v2_access %s, v2_secret %s", v2_access, masked_v2_secret)
-    else:
-        current_app.logger.info("v2_access, v2_secret not found")
-
-    if kwargs.get("aws_secret_access_key"):
-        masked_kwargs = {k:v for k, v in kwargs.items()}
-        secret = kwargs["aws_secret_access_key"]
-        masked_kwargs["aws_secret_access_key"] = f"{secret[:3]}{'x'*(len(secret)-6)}{secret[-3:]}"
-        current_app.logger.info(f"create_connection kwargs: %s", str(masked_kwargs))
-    else:
-        current_app.logger.info(f"create_connection kwargs: %s", str(kwargs))
+    current_app.logger.info(
+        "create_connection keyword arguments: %s", sorted(kwargs))
 
     store = kwargs.pop("store", None)
     check_store(store)
@@ -99,9 +84,13 @@ class CustomConnection(S3Connection):
         kwargs['bucket_class'] = CustomBucket
 
         ssl_no_verify = kwargs.pop('s3_ssl_no_verify', False)
+        ca_certificates_file = kwargs.pop('ca_certificates_file', None)
         self.host_suffix = kwargs.pop('host_suffix', '')
 
         super(CustomConnection, self).__init__(*args, **kwargs)
+
+        if ca_certificates_file is not None:
+            self.ca_certificates_file = ca_certificates_file
 
         if kwargs.get('is_secure', True) and ssl_no_verify:
             self.https_validate_certificates = False
@@ -179,7 +168,9 @@ class ProxiedConnection(CustomConnection):
         headers = headers or {}
         headers['jwt'] = self.create_jwt(method, self.host, bucket, key)
         headers['x-objectservice-id'] = self.provider.object_service.upper()
-        current_app.logger.info("Calling ProxiedConnection.make_request. headers %s", str(headers))
+        current_app.logger.info(
+            "Calling ProxiedConnection.make_request. header names: %s",
+            sorted(headers))
         return super(ProxiedConnection, self).make_request(method, bucket, key,
             headers, data, query_args, sender, override_num_retries,
             retry_handler)

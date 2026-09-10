@@ -17,33 +17,13 @@
 # along with PYBOSSA. If not, see <http://www.gnu.org/licenses/>.
 from werkzeug.middleware.proxy_fix import ProxyFix
 from pybossa.core import create_app
+from pybossa.cloud_store_api.boto_compat import new_http_connection_py3
 import werkzeug.serving
-import ssl
-from http import client as http_client
 import boto
 import boto.connection
 
 
-def _new_http_connection_py3(self, host, port, is_secure):
-    if host is None:
-        host = self.server_name()
-    host = boto.utils.parse_host(host)
-    if is_secure and self.use_proxy and not self.skip_proxy(host):
-        ctx = ssl._create_unverified_context()
-        conn = http_client.HTTPSConnection(
-            self.proxy, int(self.proxy_port), context=ctx)
-        conn.set_tunnel(host, port)
-        return conn
-    elif is_secure:
-        return http_client.HTTPSConnection(host, port)
-    else:
-        if self.use_proxy and not self.skip_proxy(host):
-            host = self.proxy
-            port = int(self.proxy_port)
-        return http_client.HTTPConnection(host, port)
-
-
-boto.connection.AWSAuthConnection.new_http_connection = _new_http_connection_py3
+boto.connection.AWSAuthConnection.new_http_connection = new_http_connection_py3
 werkzeug.serving._log_add_style = False
 
 if __name__ == "__main__":  # pragma: no cover

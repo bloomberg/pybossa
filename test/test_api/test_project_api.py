@@ -1492,6 +1492,125 @@ class TestProjectAPI(TestAPI):
         assert error['exception_msg'] == "Reserved keys in payload", error
 
     @with_context
+    def test_project_put_autoimporter_requires_admin(self):
+        UserFactory.create()
+        owner = UserFactory.create(admin=False)
+        make_subadmin(owner)
+        project = ProjectFactory.create(owner=owner)
+        url = '/api/project/%s?api_key=%s' % (project.id, owner.api_key)
+        data = {
+            'info': {
+                'autoimporter': {
+                    'type': 'localCSV',
+                    'csv_filename': '/path/settings_local.py',
+                    'validate_tp': False,
+                },
+            },
+        }
+
+        res = self.app.put(url, data=json.dumps(data))
+
+        assert res.status_code == 401, res.status_code
+        error = json.loads(res.data)
+        assert error['exception_cls'] == 'Unauthorized', error
+        assert project.get_autoimporter() is None
+
+    @with_context
+    def test_project_put_autoimporter_allows_admin(self):
+        admin = UserFactory.create(admin=True)
+        project = ProjectFactory.create(owner=admin)
+        url = '/api/project/%s?api_key=%s' % (project.id, admin.api_key)
+        autoimporter = {'type': 'csv', 'csv_url': 'https://example.com/tasks.csv'}
+
+        res = self.app.put(url, data=json.dumps({
+            'info': {'autoimporter': autoimporter},
+        }))
+
+        assert res.status_code == 200, res.data
+        assert project.get_autoimporter() == autoimporter
+
+    @with_context
+    def test_project_put_encryption_requires_admin(self):
+        UserFactory.create()
+        owner = UserFactory.create(admin=False)
+        make_subadmin(owner)
+        project = ProjectFactory.create(owner=owner)
+        url = '/api/project/%s?api_key=%s' % (project.id, owner.api_key)
+        data = {
+            'info': {
+                'ext_config': {
+                    'encryption': {'bpv_key_id': 0},
+                },
+            },
+        }
+
+        res = self.app.put(url, data=json.dumps(data))
+
+        assert res.status_code == 401, res.status_code
+        error = json.loads(res.data)
+        assert error['exception_cls'] == 'Unauthorized', error
+        assert 'encryption' not in project.info.get('ext_config', {})
+
+    @with_context
+    def test_project_put_preserves_encryption_on_nested_update(self):
+        owner = UserFactory.create(admin=False)
+        encryption = {'bpv_key_id': 'original-key'}
+        project = ProjectFactory.create(owner=owner, info={
+            'ext_config': {
+                'encryption': encryption,
+                'gigwork_poller': {'target_bucket': 'old-bucket'},
+            },
+        })
+        url = '/api/project/%s' % project.id
+        headers = {'Authorization': owner.api_key}
+        data = {
+            'info': {
+                'ext_config': {
+                    'gigwork_poller': {'target_bucket': 'new-bucket'},
+                },
+            },
+        }
+
+        res = self.app.put(url, data=json.dumps(data), headers=headers)
+
+        assert res.status_code == 200, res.data
+        assert project.info['ext_config']['encryption'] == encryption
+        assert (project.info['ext_config']['gigwork_poller']['target_bucket']
+                == 'new-bucket')
+
+    @with_context
+    def test_project_put_rejects_encryption_config_changes_for_admin(self):
+        admin = UserFactory.create(admin=True)
+        encryption = {
+            'bpv_key_id': 'original-key',
+            'secret_region': 'original-region',
+        }
+        project = ProjectFactory.create(owner=admin, info={
+            'ext_config': {'encryption': encryption},
+        })
+        url = '/api/project/%s?api_key=%s' % (project.id, admin.api_key)
+        data = {
+            'info': {
+                'ext_config': {
+                    'encryption': {
+                        'bpv_key_id': 'original-key',
+                        'secret_region': 'changed-region',
+                    },
+                },
+            },
+        }
+
+        res = self.app.put(url, data=json.dumps(data))
+
+        assert res.status_code == 400, res.status_code
+        error = json.loads(res.data)
+        assert error['exception_msg'] == (
+            'Updating encryption config is deprecated')
+        db.session.rollback()
+        db.session.refresh(project)
+        assert project.info['ext_config']['encryption'] == encryption
+
+    @with_context
     def test_project_post_with_published_attribute_requires_password(self):
         user = UserFactory.create()
         data = dict(
@@ -2847,7 +2966,7 @@ class TestProjectAPI(TestAPI):
         api = ProjectAPI()
         with assert_raises(BadRequest) as e:
             api._update_attribute(new_project, old_project)
-        assert 'Updating encryption key is deprecated' in str(e.exception)
+        assert 'Updating encryption config is deprecated' in str(e.exception)
 
     @with_context
     def test_put_data_encryption_key_same_value_no_exception(self):

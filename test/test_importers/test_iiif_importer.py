@@ -25,7 +25,7 @@ from test import FakeResponse, with_context
 from collections import OrderedDict
 
 
-@patch('pybossa.importers.iiif.requests')
+@patch('pybossa.importers.iiif.safe_get')
 class TestBulkTaskIIIFImport(object):
 
     def setUp(self):
@@ -73,16 +73,17 @@ class TestBulkTaskIIIFImport(object):
             manifest['sequences'][0]['canvases'].append(canvas)
         return manifest
 
-    def test_task_count_returns_1_for_valid_manifest(self, requests):
+    def test_task_count_returns_1_for_valid_manifest(self, safe_get):
         headers = {'Content-Type': 'application/json'}
         manifest = self.create_manifest()
         response = FakeResponse(text=json.dumps(manifest), status_code=200,
                                 headers=headers, encoding='utf-8')
-        requests.get.return_value = response
+        safe_get.return_value = response
         count = self.importer.count_tasks()
         assert_equal(count, 1)
 
-    def test_task_count_raises_exception_for_invalid_manifest(self, requests):
+    @with_context
+    def test_task_count_raises_exception_for_invalid_manifest(self, safe_get):
         headers = {'Content-Type': 'application/json'}
         invalid_manifest = {
             'foo': 'bar'
@@ -90,11 +91,11 @@ class TestBulkTaskIIIFImport(object):
         response = FakeResponse(text=json.dumps(invalid_manifest),
                                 status_code=200, headers=headers,
                                 encoding='utf-8')
-        requests.get.return_value = response
+        safe_get.return_value = response
         assert_raises(BulkImportException, self.importer.count_tasks)
 
     @with_context
-    def test_get_tasks_raises_exception_for_invalid_manifest(self, requests):
+    def test_get_tasks_raises_exception_for_invalid_manifest(self, safe_get):
         headers = {'Content-Type': 'application/json'}
         invalid_manifest = {
             'foo': 'bar'
@@ -102,34 +103,34 @@ class TestBulkTaskIIIFImport(object):
         response = FakeResponse(text=json.dumps(invalid_manifest),
                                 status_code=200, headers=headers,
                                 encoding='utf-8')
-        requests.get.return_value = response
+        safe_get.return_value = response
         assert_raises(BulkImportException, self.importer.tasks)
 
     @with_context
-    def test_task_count_raises_exception_for_non_json_manifest(self, requests):
+    def test_task_count_raises_exception_for_non_json_manifest(self, safe_get):
         headers = {'Content-Type': 'application/json'}
         text = 'bad response'
         response = FakeResponse(text=text, status_code=200)
-        requests.get.return_value = response
+        safe_get.return_value = response
         assert_raises(BulkImportException, self.importer.count_tasks)
 
     @with_context
-    def test_get_tasks_raises_exception_for_non_json_manifest(self, requests):
+    def test_get_tasks_raises_exception_for_non_json_manifest(self, safe_get):
         headers = {'Content-Type': 'application/json'}
         text = 'bad response'
         response = FakeResponse(text=text, status_code=200)
-        requests.get.return_value = response
+        safe_get.return_value = response
         assert_raises(BulkImportException, self.importer.tasks)
 
     @with_context
-    def test_get_tasks_for_valid_manifest(self, requests):
+    def test_get_tasks_for_valid_manifest(self, safe_get):
         n_canvases = 3
         n_images = 2
         manifest = self.create_manifest(canvases=n_canvases, images=n_images)
         headers = {'Content-Type': 'application/json'}
         response = FakeResponse(text=json.dumps(manifest), status_code=200,
                                 headers=headers, encoding='utf-8')
-        requests.get.return_value = response
+        safe_get.return_value = response
         tasks = self.importer.tasks()
 
         # Check task generated for all images of all canvases
@@ -156,20 +157,20 @@ class TestBulkTaskIIIFImport(object):
         # Make sure that we have checked all tasks
         assert_equal(len(tasks), 0)
 
-    def test_validated_manifest_returned_as_json(self, requests):
+    def test_validated_manifest_returned_as_json(self, safe_get):
         headers = {'Content-Type': 'application/json'}
         manifest = self.create_manifest()
         response = FakeResponse(text=json.dumps(manifest), status_code=200,
                                 headers=headers, encoding='utf-8')
-        requests.get.return_value = response
+        safe_get.return_value = response
         returned_manifest = self.importer._get_validated_manifest(None, '2.1')
         assert_equal(type(returned_manifest), OrderedDict)
 
-    def test_exception_when_404_response_for_manifest(self, requests):
+    def test_exception_when_404_response_for_manifest(self, safe_get):
         headers = {'Content-Type': 'application/json'}
         manifest = self.create_manifest()
         response = FakeResponse(text=json.dumps(manifest), status_code=404,
                                 headers=headers, encoding='utf-8')
-        requests.get.return_value = response
+        safe_get.return_value = response
         assert_raises(BulkImportException,
                       self.importer._get_validated_manifest, None, '2.1')

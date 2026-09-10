@@ -15,7 +15,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
-from pybossa.auth import jwt_authorize_project
 from test import with_context
 from test.factories import ProjectFactory
 from test.test_api import TestAPI
@@ -25,31 +24,24 @@ class TestJwtAPI(TestAPI):
 
     @with_context
     def test_jwt_existing_project(self):
-        """Test JWT for non existing project works."""
+        """Project-token access stays retired for every project name."""
         project = ProjectFactory.create()
         url = '/api/auth/project/%s/token' % project.short_name
         resp = self.app.get(url)
-        err_msg = "It should return a 403 as no Authorization headers."
-        assert resp.status_code == 403, err_msg
+        assert resp.status_code == 410, resp.data
 
         url = '/api/auth/project/nonexisting/token'
         resp = self.app.get(url)
-        err_msg = "It should return a 403 as no Authorization headers."
-        assert resp.status_code == 403, err_msg
+        assert resp.status_code == 410, resp.data
 
     @with_context
     def test_jwt_with_auth_headers(self):
-        """Test JWT with Auth headers."""
+        """A valid legacy project secret no longer mints a token."""
         project = ProjectFactory.create()
         headers = {'Authorization': project.secret_key}
         url = '/api/auth/project/%s/token' % project.short_name
         resp = self.app.get(url, headers=headers)
-
-        err_msg = "It should get the token"
-        assert resp.status_code == 200, err_msg
-        bearer = "Bearer %s" % resp.data
-        data = jwt_authorize_project(project, bearer)
-        assert data, err_msg
+        assert resp.status_code == 410, resp.data
 
     @with_context
     def test_jwt_with_auth_headers_nonproject(self):
@@ -59,16 +51,13 @@ class TestJwtAPI(TestAPI):
         url = '/api/auth/project/nnon/token'
         resp = self.app.get(url, headers=headers)
 
-        err_msg = "It should return 404 as project does not exist"
-        assert resp.status_code == 404, err_msg
+        assert resp.status_code == 410, resp.data
 
     @with_context
     def test_jwt_with_auth_headers_wrong_secret(self):
         """Test JWT with Auth headers but wrong project secret."""
         project = ProjectFactory.create()
         headers = {'Authorization': 'foobar'}
-        url = '/api/auth/project/%s/token'
+        url = '/api/auth/project/%s/token' % project.short_name
         resp = self.app.get(url, headers=headers)
-
-        err_msg = "It should return 404 as project does not exist"
-        assert resp.status_code == 404, err_msg
+        assert resp.status_code == 410, resp.data

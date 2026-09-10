@@ -94,7 +94,6 @@ from pybossa.default_settings import TIMEOUT
 from pybossa.forms.admin_view_forms import *
 from pybossa.cache.helpers import n_gold_tasks, n_available_tasks, oldest_available_task, n_completed_tasks_by_user
 from pybossa.cache.helpers import n_available_tasks_for_user, latest_submission_task_date
-from pybossa.util import crossdomain
 from pybossa.error import ErrorStatus
 from pybossa.redis_lock import get_locked_tasks_project
 from pybossa.sched import (Schedulers, select_task_for_gold_mode, lock_task_for_user, fetch_lock_for_user,
@@ -112,8 +111,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from pybossa.util import admin_or_project_owner, validate_ownership_id
 from pybossa.api.project import ProjectAPI
 from pybossa.redis_lock import get_user_exported_reports
-
-cors_headers = ['Content-Type', 'Authorization']
+from pybossa.url_utils import http_url_or_none
 
 blueprint = Blueprint('project', __name__)
 blueprint_projectid = Blueprint('projectid', __name__)
@@ -213,7 +211,7 @@ def project_title(project, page_name):
         return "Project not found"
     if page_name is None:
         return "Project: %s" % (project.name)
-    return "Project: %s &middot; %s" % (project.name, page_name)
+    return "Project: %s · %s" % (project.name, page_name)
 
 
 def project_by_shortname(short_name):
@@ -777,6 +775,38 @@ def task_presenter_editor(short_name):
 
     dict_project = add_custom_contrib_button_to(project_sanitized,
                                                 get_user_id_or_ip())
+
+    project_info = dict_project.get('info') or {}
+    github_info = project_info.get('github') or {}
+    if not isinstance(github_info, dict):
+        github_info = {}
+    guidelines_github = github_info.get('task_guidelines') or {}
+    if not isinstance(guidelines_github, dict):
+        guidelines_github = {}
+    # Keep this fallback aligned with the task_presenter_github assignment in
+    # task_presenter_editor.html.
+    task_presenter_github = github_info.get('task_presenter') or project_info
+    if not isinstance(task_presenter_github, dict):
+        task_presenter_github = {}
+    sync_info = project_info.get('sync') or {}
+    if not isinstance(sync_info, dict):
+        sync_info = {}
+
+    external_link_candidates = {
+        'guidelines_ref_url': guidelines_github.get('ref_url'),
+        'task_presenter_ref_url': task_presenter_github.get('ref_url'),
+        'sync_source_url': sync_info.get('source_url'),
+        'sync_ref_url': sync_info.get('ref_url'),
+    }
+    external_links = {
+        field: http_url_or_none(url)
+        for field, url in external_link_candidates.items()
+    }
+    for field, url in external_links.items():
+        if url is None and external_link_candidates[field]:
+            current_app.logger.warning(
+                'Ignoring non-HTTP(S) %s for project id %s', field, project.id)
+
     response = dict(template='projects/task_presenter_editor.html',
                     title=title,
                     form=form,
@@ -793,6 +823,9 @@ def task_presenter_editor(short_name):
                     guidelines_tab_on=is_task_guidelines_update,
                     pro_features=pro,
                     disable_editor=disable_editor or not is_admin_or_owner)
+    if (request.headers.get('Content-Type') != 'application/json' and
+            request.args.get('response_format') != 'json'):
+        response.update(external_links)
     return handle_content_type(response)
 
 
@@ -994,14 +1027,16 @@ def update(short_name):
 
 @blueprint.route('/<short_name>/remove-password', methods=['POST'])
 @login_required
-@csrf.exempt
 def remove_password(short_name):
     if current_app.config.get('PROJECT_PASSWORD_REQUIRED'):
         flash(gettext('Project password required'), 'error')
         return redirect_content_type(url_for('.update', short_name=short_name))
     project, owner, ps = project_by_shortname(short_name)
+    ensure_authorized_to('update', project)
     project.set_password("")
     project_repo.update(project)
+    auditlogger.log_event(project, current_user, 'update', 'passwd_hash',
+                          'Set', 'Removed')
     flash(gettext('Project password has been removed!'), 'success')
     return redirect_content_type(url_for('.update', short_name=short_name))
 
@@ -1320,7 +1355,7 @@ def password_required(short_name):
                             pro_features=pro_features())
 
 
-@blueprint.route('/<short_name>/make-random-gold')
+@blueprint.route('/<short_name>/make-random-gold', methods=['POST'])
 @login_required
 def make_random_task_gold(short_name):
     project, owner, ps = project_by_shortname(short_name)
@@ -1415,6 +1450,11 @@ def task_presenter(short_name, task_id, task_submitter_id=None):
         "bulk": request.args.get('bulk', False),
         "user_id": user_id
     }
+
+    if task_submitter_id and not (current_user.id == task_submitter_id or
+                                  current_user.admin or
+                                  current_user.id in project.owners_ids):
+        raise abort(403)
 
     if task_submitter_id:
         taskruns = task_repo.filter_task_runs_by(task_id=task_id,
@@ -1757,10 +1797,10 @@ def tasks_browse(short_name, page=1, records_per_page=None):
             user_profile = json.loads(user_profile) if user_profile else {}
             # get task bundling sql filters
             reserve_task_config = project.info.get("reserve_tasks", {}).get("category", [])
-            reserve_task_filter, _ = sched.get_reserve_task_category_info(reserve_task_config, project.id,
-                                                                        project.info.get("timeout"),
-                                                                        current_user.id,
-                                                                        True)
+            reserve_task_filter, reserve_task_params, _ = \
+                sched.get_reserve_task_category_info(
+                    reserve_task_config, project.id,
+                    project.info.get("timeout"), current_user.id, True)
             # parse args
             dict_args = request.args.to_dict()
             dict_args["display_info_columns"] = project.info.get('tasklist_columns', [])
@@ -1773,6 +1813,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
                                                 current_user_profile=user_profile,
                                                 reserve_filter=reserve_task_filter)
             args["sql_params"] = dict(assign_user=json.dumps({'assign_user': [user_email]}))
+            args["sql_params"].update(reserve_task_params)
             args["display_columns"] = ['task_id', 'priority', 'created', 'in_progress']
             args["view"] = view_type
             args["regular_user"] = regular_user
@@ -1794,6 +1835,7 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         # This has to be a list and not a set because it is JSON stringified in the template
         # and sets are not stringifiable.
         args['display_columns'] = list(set(args['display_columns']) - {'gold_task'})
+        args.pop('gold_task', None)
 
     def respond():
         offset = (page - 1) * per_page
@@ -1864,6 +1906,12 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         language_options = valid_user_preferences.get('languages')
         location_options = valid_user_preferences.get('locations')
         rdancy_upd_exp = current_app.config.get('TASK_MAX_EXPIRATION', 365)
+
+        if not can_know_task_is_gold and \
+                request.args.get('response_format') == 'json':
+            page_tasks = [dict(task) for task in page_tasks]
+            for task in page_tasks:
+                task.pop('calibration', None)
 
         data = dict(template='/projects/tasks_browse.html',
                     users=[],
@@ -1978,7 +2026,6 @@ def tasks_browse(short_name, page=1, records_per_page=None):
         return respond()
 
 
-@crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/priorityupdate', methods=['POST'])
 @login_required
 def bulk_priority_update(short_name):
@@ -2016,7 +2063,6 @@ def bulk_priority_update(short_name):
     except Exception as e:
         return ErrorStatus().format_exception(e, 'priorityupdate', 'POST')
 
-@crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/assign-workersupdate', methods=['POST'])
 @login_required
 def bulk_update_assign_worker(short_name):
@@ -2125,7 +2171,6 @@ def bulk_update_assign_worker(short_name):
 
     return Response(json.dumps(response), 200, mimetype='application/json')
 
-@crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/redundancyupdate', methods=['POST'])
 @login_required
 def bulk_redundancy_update(short_name):
@@ -2197,7 +2242,6 @@ def _update_task_redundancy(project_id, task_ids, n_answers):
                 tasks_updated = True
     return tasks_updated
 
-@crossdomain(origin='*', headers=cors_headers)
 @blueprint.route('/<short_name>/tasks/deleteselected', methods=['POST'])
 @login_required
 @admin_or_subadmin_required
@@ -2587,16 +2631,9 @@ def show_stats(short_name):
                                                                 current_user,
                                                                 ps)
 
-    # Handle JSON project stats depending of output
-    # (needs to be escaped for HTML)
-    if request.headers.get('Content-Type') == 'application/json':
-        handle_projectStats = projectStats
-    else:   # HTML
-        handle_projectStats = json.dumps(projectStats)
-
     response = dict(template='/projects/stats.html',
                     title=title,
-                    projectStats=handle_projectStats,
+                    projectStats=projectStats,
                     userStats=userStats,
                     project=project_sanitized,
                     owner=owner_sanitized,
@@ -2607,6 +2644,15 @@ def show_stats(short_name):
                     avg_contrib_time=formatted_contrib_time,
                     pro_features=pro,
                     private_instance=bool(current_app.config.get('PRIVATE_INSTANCE')))
+
+    privacy_locked = (
+        current_app.config.get('ENFORCE_PRIVACY')
+        and current_user.id not in project.owners_ids
+        and not current_user.admin
+        and not current_user.subadmin)
+    if privacy_locked:
+        response.pop('projectStats')
+        response.pop('userStats')
 
     return handle_content_type(response)
 
@@ -3260,20 +3306,20 @@ def webhook_handler(short_name, oid=None):
     if not pro['webhooks_enabled']:
         raise abort(403)
 
+    ensure_authorized_to('read', Webhook, project_id=project.id)
+    redirect_to_password = _check_if_redirect_to_password(project)
+    if redirect_to_password:
+        return redirect_to_password
+
     responses = webhook_repo.filter_by(project_id=project.id)
     if request.method == 'POST' and oid:
-        tmp = webhook_repo.get(oid)
+        tmp = webhook_repo.get_by(id=oid, project_id=project.id)
         if tmp:
             webhook_queue.enqueue(webhook, project.webhook,
                                   tmp.payload, tmp.id, True)
             return json.dumps(tmp.dictize())
         else:
             abort(404)
-
-    ensure_authorized_to('read', Webhook, project_id=project.id)
-    redirect_to_password = _check_if_redirect_to_password(project)
-    if redirect_to_password:
-        return redirect_to_password
 
     if request.method == 'GET' and request.args.get('all'):
         for wh in responses:
@@ -3495,7 +3541,7 @@ def coowners(short_name):
     return handle_content_type(response)
 
 
-@blueprint.route('/<short_name>/add_coowner/<user_name>')
+@blueprint.route('/<short_name>/add_coowner/<user_name>', methods=['POST'])
 @login_required
 def add_coowner(short_name, user_name=None):
     """Add project co-owner."""
@@ -3519,7 +3565,7 @@ def add_coowner(short_name, user_name=None):
     return abort(404)
 
 
-@blueprint.route('/<short_name>/del_coowner/<user_name>')
+@blueprint.route('/<short_name>/del_coowner/<user_name>', methods=['POST'])
 @login_required
 def del_coowner(short_name, user_name=None):
     """Delete project co-owner."""
@@ -4101,8 +4147,8 @@ def answerfieldsconfig(short_name):
     response = {
         'template': '/projects/answerfieldsconfig.html',
         'project': project_sanitized,
-        answer_fields_key : json.dumps(answer_fields),
-        consensus_config_key : json.dumps(consensus_config),
+        answer_fields_key : answer_fields,
+        consensus_config_key : consensus_config,
         'pro_features': pro,
         'csrf': generate_csrf()
     }
@@ -4171,7 +4217,7 @@ def configure_enrichment(short_name):
         enrichments = project_sanitized.get('info', {}).get('enrichments', [])
         response = dict(template='projects/enrichment.html',
                         title=gettext("Configure enrichment"),
-                        enrichments=json.dumps(enrichments),
+                        enrichments=enrichments,
                         project=project_sanitized,
                         pro_features=pro,
                         csrf=generate_csrf(),

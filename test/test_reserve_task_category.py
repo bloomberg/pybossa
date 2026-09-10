@@ -16,11 +16,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import patch
+import json
+import time
+from unittest.mock import MagicMock, patch
 from test import with_context
 from test.helper import sched
 from test.factories import TaskFactory, ProjectFactory, UserFactory
-from pybossa.core import project_repo, sentinel
+from pybossa.core import db, project_repo, sentinel
+from pybossa.redis_lock import LockManager
 from pybossa.sched import (
     Schedulers,
     reserve_task_sql_filters,
@@ -28,34 +31,166 @@ from pybossa.sched import (
     acquire_reserve_task_lock,
     release_reserve_task_lock_by_keys,
     release_reserve_task_lock_by_id,
-    get_reserve_task_key
+    get_reserve_task_category
 )
-import time
 from nose.tools import assert_raises
 from werkzeug.exceptions import BadRequest
+from sqlalchemy.sql import text
 
 
 class TestReserveTaskCategory(sched.Helper):
+
+    def test_reservation_keys_use_incremental_scan(self):
+        redis_connection = MagicMock()
+        redis_connection.scan_iter.return_value = iter([
+            b'reserve_task:v2:project:1:user:2:task:3'])
+        lock_manager = LockManager(redis_connection, 100)
+
+        reservation_keys = lock_manager.get_reservation_keys(
+            'reserve_task:v2:project:1:user:*:task:*')
+
+        assert reservation_keys == [
+            'reserve_task:v2:project:1:user:2:task:3']
+        redis_connection.scan_iter.assert_called_once_with(
+            'reserve_task:v2:project:1:user:*:task:*')
+        redis_connection.keys.assert_not_called()
+
+    @with_context
+    def test_task_category_sql_filter_binds_keys_and_values(self):
+        project = ProjectFactory.create()
+        task = TaskFactory.create(project=project,
+                                  info={'name1': "john's value"})
+        project_id = str(project.id)
+        reserve_task_keys = [
+            "reserve_task:project:{}:category:name1:john's value:"
+            "user:1008:task:454".format(project_id)
+        ]
+
+        result = reserve_task_sql_filters(project_id, reserve_task_keys, False)
+        filters = result[0]
+        params = result[1] if len(result) == 3 else {}
+
+        assert 'name1' not in filters
+        assert "john's value" not in filters
+        assert set(params.values()) == {'name1', "john's value"}
+
+        params['project_id'] = project.id
+        query = text(
+            "SELECT task.id FROM task WHERE project_id=:project_id {}".format(
+                filters))
+        rows = db.session.execute(query, params)
+        assert [row.id for row in rows] == [task.id]
+
+    @with_context
+    def test_task_category_sql_filter_rejects_invalid_keys(self):
+        project_id = "202"
+        reserve_task_keys = [
+            "reserve_task:project:{}:category:name1:value1:bad'key:value2:"
+            "user:1008:task:454".format(project_id)
+        ]
+
+        with assert_raises(ValueError):
+            reserve_task_sql_filters(project_id, reserve_task_keys, False)
+
+    @with_context
+    def test_structured_category_round_trips_colons(self):
+        user = UserFactory.create()
+        project = ProjectFactory.create(
+            owner=user,
+            info=dict(
+                sched=Schedulers.task_queue,
+                reserve_tasks=dict(category=['field_1', 'field_2'])
+            )
+        )
+        task = TaskFactory.create(
+            project=project,
+            info={'field_1': 'desk:west', 'field_2': 'user:8:task:9'})
+        expected_key = 'reserve_task:v2:project:{}:user:{}:task:{}'.format(
+            project.id, user.id, task.id)
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': False}):
+            assert acquire_reserve_task_lock(
+                project.id, task.id, user.id, 100)
+            filters, params, category_keys = get_reserve_task_category_info(
+                ['field_1', 'field_2'], project.id, 100, user.id)
+
+        assert category_keys == [expected_key]
+        assert set(params.values()) == {
+            'field_1', 'field_2', 'desk:west', 'user:8:task:9'}
+        params['project_id'] = project.id
+        rows = db.session.execute(text(
+            'SELECT task.id FROM task WHERE project_id=:project_id {}'.format(
+                filters)), params)
+        assert [row.id for row in rows] == [task.id]
+        assert b'desk:west' not in expected_key.encode()
+        sentinel.master.delete(expected_key)
+
+    @with_context
+    def test_reads_legacy_and_structured_category_locks(self):
+        user = UserFactory.create()
+        project = ProjectFactory.create(
+            owner=user,
+            info=dict(
+                sched=Schedulers.task_queue,
+                reserve_tasks=dict(category=['field_1', 'field_2'])
+            )
+        )
+        tasks = TaskFactory.create_batch(
+            2, project=project,
+            info={'field_1': 'abc', 'field_2': 123})
+        legacy_key = (
+            'reserve_task:project:{}:category:field_2:123:field_1:abc:'
+            'user:{}:task:{}').format(project.id, user.id, tasks[0].id)
+        structured_key = 'reserve_task:v2:project:{}:user:{}:task:{}'.format(
+            project.id, user.id, tasks[1].id)
+        sentinel.master.set(legacy_key, time.time() + 100)
+        assert acquire_reserve_task_lock(
+            project.id, tasks[1].id, user.id, 100)
+
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': False}):
+            _, _, category_keys = get_reserve_task_category_info(
+                ['field_1', 'field_2'], project.id, 100, user.id)
+
+        assert set(category_keys) == {legacy_key, structured_key}
+        release_reserve_task_lock_by_id(
+            project.id, tasks[0].id, user.id, 100, expiry=1)
+        assert 0 <= sentinel.master.ttl(legacy_key) <= 1
+        sentinel.master.delete(legacy_key, structured_key)
 
     @with_context
     def test_task_category_to_sql_filter(self):
         # default behavior; returns null filters, category_keys for no category_keys passed
         project_id, task_category_key, exclude = "", "", False
-        filters, category_keys = reserve_task_sql_filters(project_id, task_category_key, exclude)
-        assert filters == "" and category_keys == [], "filters, category_keys must be []"
+        filters, params, category_keys = reserve_task_sql_filters(
+            project_id, task_category_key, exclude)
+        assert filters == "" and params == {} and category_keys == [], \
+            "filters, params, category_keys must be empty"
 
         # passing garbage category returns null filters, category_keys
         project_id, reserve_task_keys, exclude = "202", ["bad-category-key"], False
-        filters, category_keys = reserve_task_sql_filters(project_id, reserve_task_keys, exclude)
-        assert filters == "" and category_keys == [], "filters, category must be '', []"
+        filters, params, category_keys = reserve_task_sql_filters(
+            project_id, reserve_task_keys, exclude)
+        assert filters == "" and params == {} and category_keys == [], \
+            "filters, params, category must be empty"
 
         # task category key exists, returns sql filter and its associated category_keys
         project_id, exclude = "202", False
         task_info = dict(name1="value1", name2="value2")
-        expected_sql_filter = " AND ((task.info->>'name1' = 'value1' AND task.info->>'name2' = 'value2')) "
+        expected_sql_filter = (
+            " AND ((task.info ->> :reserve_category_key_0_0 = "
+            ":reserve_category_value_0_0 AND task.info ->> "
+            ":reserve_category_key_0_1 = :reserve_category_value_0_1)) "
+        )
+        expected_params = {
+            'reserve_category_key_0_0': 'name1',
+            'reserve_category_value_0_0': 'value1',
+            'reserve_category_key_0_1': 'name2',
+            'reserve_category_value_0_1': 'value2'
+        }
         reserve_task_keys = ["reserve_task:project:{}:category:name1:value1:name2:value2:user:1008:task:454".format(project_id)]
-        filters, category_keys = reserve_task_sql_filters(project_id, reserve_task_keys, exclude)
-        assert filters == expected_sql_filter and \
+        filters, params, category_keys = reserve_task_sql_filters(
+            project_id, reserve_task_keys, exclude)
+        assert filters == expected_sql_filter and params == expected_params and \
             category_keys == reserve_task_keys, "filters, category must be non empty"
 
         # test exlude=True, multiple task category keys
@@ -69,11 +204,26 @@ class TestReserveTaskCategory(sched.Helper):
             "reserve_task:project:{}:category:{}:user:1008:task:454".format(project_id, expected_key),
             "reserve_task:project:{}:category:{}:user:1008:task:454".format(project_id, expected_key_2)
         ]
-        filters, category_keys = reserve_task_sql_filters(project_id, reserve_task_keys, exclude)
-        expected_sql_filter_1 = ["task.info->>'{}' = '{}'".format(field, task_info[field]) for field in sorted(task_info)]
-        expected_sql_filter_2 = ["task.info->>'{}' = '{}'".format(field, task_info_2[field]) for field in sorted(task_info_2)]
+        filters, params, category_keys = reserve_task_sql_filters(
+            project_id, reserve_task_keys, exclude)
+        expected_sql_filter_1 = [
+            "task.info ->> :reserve_category_key_0_{} = "
+            ":reserve_category_value_0_{}".format(index, index)
+            for index, _ in enumerate(sorted(task_info))]
+        expected_sql_filter_2 = [
+            "task.info ->> :reserve_category_key_1_{} = "
+            ":reserve_category_value_1_{}".format(index, index)
+            for index, _ in enumerate(sorted(task_info_2))]
         expected_sql_filter = " AND (({}) OR ({})) IS NOT TRUE ".format(" AND ".join(expected_sql_filter_1), " AND ".join(expected_sql_filter_2))
+        expected_params = {}
+        for category_index, info in enumerate((task_info, task_info_2)):
+            for field_index, field in enumerate(sorted(info)):
+                expected_params['reserve_category_key_{}_{}'.format(
+                    category_index, field_index)] = field
+                expected_params['reserve_category_value_{}_{}'.format(
+                    category_index, field_index)] = str(info[field])
         assert filters == expected_sql_filter and \
+            params == expected_params and \
             category_keys == [
                 "reserve_task:project:202:category:name1:value1:name2:value2:user:1008:task:454",
                 "reserve_task:project:202:category:x:1:y:2:z:3:user:1008:task:454"
@@ -82,10 +232,21 @@ class TestReserveTaskCategory(sched.Helper):
         # task category key exists, returns sql filter and its associated category_keys
         project_id, exclude = "202", False
         task_info = dict(name1="john's value", name2="john's baker's value")
-        expected_sql_filter = " AND ((task.info->>'name1' = 'john''s value' AND task.info->>'name2' = 'john''s baker''s value')) "
+        expected_sql_filter = (
+            " AND ((task.info ->> :reserve_category_key_0_0 = "
+            ":reserve_category_value_0_0 AND task.info ->> "
+            ":reserve_category_key_0_1 = :reserve_category_value_0_1)) "
+        )
+        expected_params = {
+            'reserve_category_key_0_0': 'name1',
+            'reserve_category_value_0_0': "john's value",
+            'reserve_category_key_0_1': 'name2',
+            'reserve_category_value_0_1': "john's baker's value"
+        }
         reserve_task_keys = ["reserve_task:project:{}:category:name1:john's value:name2:john's baker's value:user:1008:task:454".format(project_id)]
-        filters, category_keys = reserve_task_sql_filters(project_id, reserve_task_keys, exclude)
-        assert filters == expected_sql_filter and \
+        filters, params, category_keys = reserve_task_sql_filters(
+            project_id, reserve_task_keys, exclude)
+        assert filters == expected_sql_filter and params == expected_params and \
             category_keys == reserve_task_keys, "filters, category must be non empty"
 
 
@@ -99,21 +260,27 @@ class TestReserveTaskCategory(sched.Helper):
 
         # test bad project id, user id returns empty sql_filters, category_keys
         project_id, user_id = -52, 9999
-        sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project_id, timeout, user_id)
-        assert sql_filters == "" and category_keys == [], "sql_filters, category_keys must be '', []"
+        sql_filters, params, category_keys = get_reserve_task_category_info(
+            reserve_task_config, project_id, timeout, user_id)
+        assert sql_filters == "" and params == {} and category_keys == [], \
+            "sql_filters, params, category_keys must be empty"
 
         # empty sql_filters, category_keys for projects with scheduler other than task_queue
         project.info['sched'] = Schedulers.locked
         project_repo.save(project)
-        sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project.id, timeout, owner.id)
-        assert sql_filters == "" and category_keys == [], "sql_filters, category_keys must be '', []"
+        sql_filters, params, category_keys = get_reserve_task_category_info(
+            reserve_task_config, project.id, timeout, owner.id)
+        assert sql_filters == "" and params == {} and category_keys == [], \
+            "sql_filters, params, category_keys must be empty"
 
         # with no categories configured under project config
         # empty sql_filters, category_keys for projects with task queue scheduler
         project.info['sched'] = Schedulers.task_queue
         project_repo.save(project)
-        sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project.id, timeout, owner.id)
-        assert sql_filters == "" and category_keys == [], "sql_filters, category_keys must be '', []"
+        sql_filters, params, category_keys = get_reserve_task_category_info(
+            reserve_task_config, project.id, timeout, owner.id)
+        assert sql_filters == "" and params == {} and category_keys == [], \
+            "sql_filters, params, category_keys must be empty"
 
 
         # with categories configured under project config
@@ -125,8 +292,10 @@ class TestReserveTaskCategory(sched.Helper):
         }
         project_repo.save(project)
         get_task_category_lock.return_value = []
-        sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project.id, timeout, owner.id)
-        assert sql_filters == "" and category_keys == [], "sql_filters, category_keys must be '', []"
+        sql_filters, params, category_keys = get_reserve_task_category_info(
+            reserve_task_config, project.id, timeout, owner.id)
+        assert sql_filters == "" and params == {} and category_keys == [], \
+            "sql_filters, params, category_keys must be empty"
 
         # with categories configured under project config
         # sql_filters, category_keys for projects with task queue scheduler
@@ -145,17 +314,35 @@ class TestReserveTaskCategory(sched.Helper):
             "reserve_task:project:{}:category:{}:user:1008:task:2344".format(project.id, expected_key_2)
         ]
         get_task_category_lock.return_value = expected_category_keys
-        sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project.id, timeout, owner.id)
-        expected_sql_filter_1 = ["task.info->>'{}' = '{}'".format(field, task_info[field]) for field in sorted(task_info)]
-        expected_sql_filter_2 = ["task.info->>'{}' = '{}'".format(field, task_info_2[field]) for field in sorted(task_info_2)]
+        sql_filters, params, category_keys = get_reserve_task_category_info(
+            reserve_task_config, project.id, timeout, owner.id)
+        expected_sql_filter_1 = [
+            "task.info ->> :reserve_category_key_0_{} = "
+            ":reserve_category_value_0_{}".format(index, index)
+            for index, _ in enumerate(sorted(task_info))]
+        expected_sql_filter_2 = [
+            "task.info ->> :reserve_category_key_1_{} = "
+            ":reserve_category_value_1_{}".format(index, index)
+            for index, _ in enumerate(sorted(task_info_2))]
         expected_sql_filter = " AND (({}) OR ({})) ".format(" AND ".join(expected_sql_filter_1), " AND ".join(expected_sql_filter_2))
+        expected_params = {}
+        for category_index, info in enumerate((task_info, task_info_2)):
+            for field_index, field in enumerate(sorted(info)):
+                expected_params['reserve_category_key_{}_{}'.format(
+                    category_index, field_index)] = field
+                expected_params['reserve_category_value_{}_{}'.format(
+                    category_index, field_index)] = str(info[field])
         assert sql_filters == expected_sql_filter and \
+            params == expected_params and \
             category_keys == expected_category_keys, "sql_filters, category_keys must be non empty"
 
         # reserve task disabled for private instance,
         with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': True}):
-            sql_filters, category_keys = get_reserve_task_category_info(reserve_task_config, project.id, timeout, owner.id)
+            sql_filters, params, category_keys = \
+                get_reserve_task_category_info(
+                    reserve_task_config, project.id, timeout, owner.id)
             assert not sql_filters, "sql_filters must be empty for private instance"
+            assert not params, "sql params must be empty for private instance"
             assert not category_keys, "sql_filters must be empty for private instance"
 
 
@@ -182,11 +369,13 @@ class TestReserveTaskCategory(sched.Helper):
         }
         project_repo.save(project)
         acquire_reserve_task_lock(project.id, task.id, user.id, timeout)
-        category_key = ":".join(["{}:{}".format(field, task.info[field]) for field in category_fields])
-        expected_reserve_task_key = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
-            project.id, category_key, user.id, task.id
-        )
+        expected_reserve_task_key = \
+            "reserve_task:v2:project:{}:user:{}:task:{}".format(
+                project.id, user.id, task.id)
         assert expected_reserve_task_key.encode() in sentinel.master.keys(), "reserve task key must exist in redis cache"
+        payload = json.loads(sentinel.master.get(expected_reserve_task_key))
+        assert payload['category'] == [['field_1', 'abc'], ['field_2', '123']]
+        assert sentinel.master.ttl(expected_reserve_task_key) > 0
 
         # release reserve task lock
         expiry = 1
@@ -205,7 +394,8 @@ class TestReserveTaskCategory(sched.Helper):
         with assert_raises(BadRequest):
             get_reserve_task_category_info(["x", "y"], 1, 1, user_id=None, exclude_user=True)
 
-        _, category_keys = get_reserve_task_category_info(["x", "y"], 1, 1, 1)
+        _, _, category_keys = get_reserve_task_category_info(
+            ["x", "y"], 1, 1, 1)
         assert not category_keys, "reserve task category keys should not be present"
 
         user = UserFactory.create()
@@ -249,10 +439,10 @@ class TestReserveTaskCategory(sched.Helper):
         acquire_reserve_task_lock(project.id, tasks[0].id, user.id, 1)
         acquire_reserve_task_lock(project.id, tasks[1].id, non_excluded_user_id, 1)
         expected_category_keys = [
-            "reserve_task:project:{}:category:field_1:abc:field_2:123:user:{}:task:{}".format(
-                project.id, non_excluded_user_id, tasks[1].id
-            )]
-        _, category_keys = get_reserve_task_category_info(reserve_task_config, 1, 1, user.id, exclude_user=True)
+            "reserve_task:v2:project:{}:user:{}:task:{}".format(
+                project.id, non_excluded_user_id, tasks[1].id)]
+        _, _, category_keys = get_reserve_task_category_info(
+            reserve_task_config, 1, 1, user.id, exclude_user=True)
         assert category_keys == expected_category_keys, "reserve task category keys should exclude user {} reserve category key".format(user.id)
         # cleanup; release reserve task lock
         expiry = 1
@@ -280,10 +470,9 @@ class TestReserveTaskCategory(sched.Helper):
             info=dict(field_1="abc", field_2=123)
         )[0]
         acquire_reserve_task_lock(project.id, task.id, user.id, timeout)
-        category_key = ":".join(["{}:{}".format(field, task.info[field]) for field in category_fields])
-        expected_reserve_task_key = "reserve_task:project:{}:category:{}:user:{}:task:{}".format(
-            project.id, category_key, user.id, task.id
-        )
+        expected_reserve_task_key = \
+            "reserve_task:v2:project:{}:user:{}:task:{}".format(
+                project.id, user.id, task.id)
         assert expected_reserve_task_key.encode() in sentinel.master.keys(), "reserve task key must exist in redis cache"
 
         # release reserve task lock
@@ -300,23 +489,23 @@ class TestReserveTaskCategory(sched.Helper):
         )
         for task in tasks:
             acquire_reserve_task_lock(project.id, task.id, user.id, timeout)
-            category_key = ":".join([f"{field}:{task.info[field]}" for field in category_fields])
-            expected_reserve_task_key = f"reserve_task:project:{project.id}:category:{category_key}:user:{user.id}:task:{task.id}"
+            expected_reserve_task_key = \
+                f"reserve_task:v2:project:{project.id}:user:{user.id}:task:{task.id}"
             assert expected_reserve_task_key.encode() in sentinel.master.keys(), "reserve task key must exist in redis cache"
 
         release_reserve_task_lock_by_id(project.id, tasks[0].id, user.id, timeout,
                                         expiry=expiry, release_all_task=True)
         time.sleep(expiry + 0.1)
         for task in tasks:
-            category_key = ":".join([f"{field}:{task.info[field]}" for field in category_fields])
-            expected_reserve_task_key = f"reserve_task:project:{project.id}:category:{category_key}:user:{user.id}:task:{task.id}"
+            expected_reserve_task_key = \
+                f"reserve_task:v2:project:{project.id}:user:{user.id}:task:{task.id}"
             assert expected_reserve_task_key.encode() not in sentinel.master.keys(), "reserve task key should not exist in redis cache"
 
     @with_context
-    def test_get_reserve_task_key(self):
+    def test_get_reserve_task_category(self):
         category_fields = ["field_1", "field_2"]
         task_info = dict(field_1="abc", field_2=123)
-        expected_key = ":".join(["{}:{}".format(field, task_info[field]) for field in sorted(category_fields)])
+        expected_category = [['field_1', 'abc'], ['field_2', '123']]
         user = UserFactory.create()
         # project w/o reserve_tasks configured don't acquire lock
         project = ProjectFactory.create(
@@ -332,8 +521,8 @@ class TestReserveTaskCategory(sched.Helper):
             1, project=project, n_answers=1,
             info=task_info
         )[0]
-        reserve_key = get_reserve_task_key(task.id)
-        assert reserve_key == expected_key, "reserve key expected to be {}".format(expected_key)
+        category = get_reserve_task_category(task.id)
+        assert category == expected_category
 
     @with_context
     @patch('pybossa.sched.release_reserve_task_lock_by_keys')
@@ -366,8 +555,8 @@ class TestReserveTaskCategory(sched.Helper):
             f"reserve_task:project:{project.id}:category:field_1:abc:field_2:123:user:{user.id}:task:999"
         ]
         mock_get_category_info.side_effect = [
-            (" AND (task.info->>'field_1' = 'nonexistent') ", initial_category_keys),  # First call - filter that matches nothing
-            ("", [])  # Second call with exclude_user=True - no filter
+            (" AND (task.info->>'field_1' = 'nonexistent') ", {}, initial_category_keys),  # First call - filter that matches nothing
+            ("", {}, [])  # Second call with exclude_user=True - no filter
         ]
 
         # Call the scheduler - it should retry when first query returns no results
@@ -399,4 +588,3 @@ class TestReserveTaskCategory(sched.Helper):
         if not second_exclude_user and len(second_call_args.args) > 4:
             second_exclude_user = second_call_args.args[4]
         assert second_exclude_user == True, f"Second call exclude_user should be True, got {second_exclude_user}"
-

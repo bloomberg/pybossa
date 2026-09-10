@@ -23,6 +23,8 @@ from test.test_api import TestAPI
 from test.factories import UserFactory, BlogpostFactory, ProjectFactory
 
 from pybossa.repositories import BlogRepository
+from pybossa.api.blogpost import BlogpostAPI
+from werkzeug.exceptions import BadRequest
 from unittest.mock import patch
 from test.helper.gig_helper import make_subadmin
 blog_repo = BlogRepository(db)
@@ -347,6 +349,19 @@ class TestBlogpostAPI(TestAPI):
         url = '/api/blogpost/%s?api_key=%s' % (blogpost2.id, admin.api_key)
         res = self.app.delete(url)
         assert res.status_code == 204, res.status_code
+
+    @with_context
+    def test_blogpost_rejects_client_owned_file_metadata(self):
+        payload = {'info': {'container': 'user_999',
+                            'file_name': 'other.jpg'}}
+
+        with self.flask_app.test_request_context(json=payload):
+            try:
+                BlogpostAPI()._forbidden_attributes(payload)
+            except BadRequest as error:
+                assert 'info.' in error.description
+            else:
+                assert False, 'Server-managed upload metadata was accepted'
 
     @with_context
     def test_blogpost_post_file(self):

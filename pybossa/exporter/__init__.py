@@ -36,6 +36,20 @@ from pybossa.core import uploader, task_repo, result_repo
 from pybossa.uploader import local
 
 
+CSV_FORMULA_PREFIXES = ('=', '+', '-', '@', '\t', '\r')
+
+
+def neutralize_csv_formulas(dataframe):
+    def neutralize_cell(value):
+        if isinstance(value, str) and value.startswith(CSV_FORMULA_PREFIXES):
+            return "'{}".format(value)
+        return value
+
+    sanitized = dataframe.map(neutralize_cell)
+    sanitized.columns = [neutralize_cell(column) for column in dataframe.columns]
+    return sanitized
+
+
 @contextmanager
 def make_zip_context(zip_result):
     yield zip_result

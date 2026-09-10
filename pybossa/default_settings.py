@@ -22,10 +22,9 @@ DEBUG = False
 HOST = '0.0.0.0'
 PORT = 5000
 
-SECRET = 'foobar'
-SECRET_KEY = 'my-session-secret'
+SECRET_KEY = None
 
-ITSDANGEROUSKEY = 'its-dangerous-key'
+ITSDANGEROUSKEY = None
 
 ## project configuration
 BRAND = 'PYBOSSA'
@@ -155,8 +154,8 @@ UNPUBLISH_PROJECTS = True
 # TTL for ZIP files of personal data
 TTL_ZIP_SEC_FILES = 3
 
-# Default cryptopan key
-CRYPTOPAN_KEY = '32-char-str-for-AES-key-and-pad.'
+# CryptoPAn requires a 32-byte deployment-specific key.
+CRYPTOPAN_KEY = None
 
 # Instruct PYBOSSA to generate absolute paths or not for avatars
 AVATAR_ABSOLUTE = True
@@ -168,3 +167,15 @@ SPAM = []
 DB_MAXIMUM_BATCH_SIZE = 10000
 
 PVF_FORMAT = r"^([A-Z]{1,8}\s\d+)?$"
+
+# SSRF protection for outbound webhook requests
+WEBHOOK_ALLOWED_DOMAINS = []
+WEBHOOK_CONNECT_TIMEOUT = 5
+WEBHOOK_READ_TIMEOUT = 10
+WEBHOOK_HTTPS_ONLY = True
+WEBHOOK_BLOCK_PRIVATE_IPS = True
+# Do not persist webhook response bodies: the target is owner-controlled, so a
+# stored body is read back from the webhook status page. Enable only to debug,
+# and only with a small WEBHOOK_RESPONSE_MAX_LENGTH.
+WEBHOOK_STORE_RESPONSE_BODY = False
+WEBHOOK_RESPONSE_MAX_LENGTH = 256

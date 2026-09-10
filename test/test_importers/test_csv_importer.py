@@ -19,16 +19,41 @@
 from unittest.mock import patch
 from nose.tools import assert_raises
 from pybossa.importers import BulkImportException
-from pybossa.importers.csv import BulkTaskCSVImport
+from pybossa.importers.csv import (BulkTaskCSVImport, BulkTaskGDImport,
+                                   get_value)
+from pybossa.ssrf_guard import SSRFError
 from test import FakeResponse, with_context, with_request_context
 
 
-@patch('pybossa.importers.csv.requests.get')
+@patch('pybossa.ssrf_guard.requests.Session.request')
 class TestBulkTaskCSVImport(object):
 
     def setUp(self):
-        url = 'http://myfakecsvurl.com'
+        url = 'https://93.184.216.34/tasks.csv'
         self.importer = BulkTaskCSVImport(csv_url=url)
+
+    @with_request_context
+    def test_remote_importers_reject_private_addresses(self, request):
+        importers = [
+            BulkTaskCSVImport(csv_url='https://127.0.0.1/tasks.csv'),
+            BulkTaskGDImport(
+                googledocs_url='https://127.0.0.1/spreadsheets/edit')
+        ]
+
+        for importer in importers:
+            with assert_raises(SSRFError):
+                importer.count_tasks()
+
+        assert request.called is False
+
+    @with_context
+    def test_get_value_does_not_echo_invalid_cell_content(self, request):
+        secret_value = 'internal-response-secret'
+
+        with assert_raises(BulkImportException) as context:
+            get_value('count', secret_value, 'number')
+
+        assert secret_value not in str(context.exception)
 
     @with_context
     def test_count_tasks_returns_0_if_no_rows_other_than_header(self, request):

@@ -21,6 +21,8 @@ from test import db, with_context
 from test.test_api import TestAPI
 from test.factories import AnnouncementFactory, UserFactory
 from pybossa.repositories import AnnouncementRepository
+from pybossa.api.announcement import AnnouncementAPI
+from werkzeug.exceptions import BadRequest
 from unittest.mock import patch
 
 announcement_repo = AnnouncementRepository(db)
@@ -217,6 +219,35 @@ class TestAnnouncementAPI(TestAPI):
         url = '/api/announcement/%s?api_key=%s' % (announcement2.id, admin.api_key)
         res = self.app.delete(url)
         assert res.status_code == 204, res.status_code
+
+    @with_context
+    def test_announcement_rejects_client_owned_file_metadata(self):
+        payload = {'info': {'container': 'user_999',
+                            'file_name': 'other.jpg'}}
+
+        with self.flask_app.test_request_context(json=payload):
+            try:
+                AnnouncementAPI()._forbidden_attributes(payload)
+            except BadRequest as error:
+                assert 'info.' in error.description
+            else:
+                assert False, 'Server-managed upload metadata was accepted'
+
+    @with_context
+    @patch('pybossa.api.api_base.uploader.delete_file')
+    def test_delete_announcement_skips_empty_file_metadata(self, mock_delete):
+        admin = UserFactory.create(admin=True)
+        announcement = AnnouncementFactory.create(
+            user_id=admin.id,
+            info={'container': 'user_%s' % admin.id, 'file_name': ''})
+
+        url = '/api/announcement/%s?api_key=%s' % (announcement.id,
+                                                   admin.api_key)
+        res = self.app.delete(url)
+
+        assert res.status_code == 204, res.status_code
+        assert announcement_repo.get(announcement.id) is None
+        mock_delete.assert_not_called()
 
 
     @with_context

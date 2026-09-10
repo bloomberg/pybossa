@@ -16,30 +16,40 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
+from pybossa.auth.project import ProjectAuth
+
 
 class ProjectStatsAuth(object):
 
     _specific_actions = []
 
-    def __init__(self):
-        pass
+    def __init__(self, project_repo):
+        self.project_repo = project_repo
 
     @property
     def specific_actions(self):
         return self._specific_actions
 
-    def can(self, user, action, webhook=None, project_id=None):
+    def can(self, user, action, project_stats=None, project_id=None):
         action = ''.join(['_', action])
-        return getattr(self, action)(user, webhook, project_id)
+        return getattr(self, action)(user, project_stats, project_id)
 
-    def _create(self, user, webhook, project_id=None):
+    def _create(self, user, project_stats, project_id=None):
         return False
 
-    def _read(self, user, webhook=None, project_id=None):
-        return True
+    def _read(self, user, project_stats=None, project_id=None):
+        if project_stats is None and project_id is None:
+            return ProjectAuth().can(user, 'read')
+        project = self._get_project(project_stats, project_id)
+        return bool(project and ProjectAuth().can(user, 'read', project))
 
-    def _update(self, user, webhook, project_id=None):
+    def _update(self, user, project_stats, project_id=None):
         return False
 
-    def _delete(self, user, webhook, project_id=None):
+    def _delete(self, user, project_stats, project_id=None):
         return False
+
+    def _get_project(self, project_stats, project_id):
+        if project_stats is not None:
+            project_id = project_stats.project_id
+        return self.project_repo.get(project_id)

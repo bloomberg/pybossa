@@ -29,6 +29,7 @@ from flask_talisman import Talisman
 from flask_wtf.csrf import CSRFError
 from flasgger import Swagger
 from pybossa import default_settings
+from pybossa.config_security import validate_secret_keys
 from pybossa.extensions import *
 from pybossa.ratelimit import get_view_rate_limit
 from raven.contrib.flask import Sentry
@@ -171,6 +172,7 @@ def configure_app(app):
     app.config.from_object(default_settings)
     if app_settings.config_path:
         app.config.from_pyfile(app_settings.config_path)
+    validate_secret_keys(app.config)
     upgrade_rq_config(app)
     app.logger.info("Post upgrade_rq_config redis config. REDIS_SENTINELS %s, RQ_DASHBOARD_REDIS_SENTINELS %s",
                     app.config.get("REDIS_SENTINELS"), app.config.get("RQ_DASHBOARD_REDIS_SENTINELS"))
@@ -678,6 +680,7 @@ def setup_hooks(app):
     def _api_authentication():
         """ Attempt API authentication on a per-request basis."""
         g.pop('_login_user', None)
+        g.pop('_api_key_authenticated', None)
         secure_app_access = app.config.get('SECURE_APP_ACCESS', False)
         if not secure_app_access:
             grant_access_with_api_key(secure_app_access)

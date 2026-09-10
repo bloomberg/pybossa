@@ -98,8 +98,10 @@ def get_task_filters(args):
     if args.get('filter_by_upref'):
         user_pref = args['filter_by_upref']
         if user_pref['languages'] or user_pref['locations']:
-            user_pref_db_clause = get_user_pref_db_clause(user_pref)
+            user_pref_db_clause, user_pref_params = \
+                get_user_pref_db_clause(user_pref)
             filters += " AND ( {} )".format(user_pref_db_clause)
+            params.update(user_pref_params)
 
     # for regular user, only include tasks that user has worked on
     if args.get("allow_taskrun_edit"):
@@ -120,13 +122,16 @@ def get_task_filters(args):
         # include additional filters
         user_pref = args["filter_by_wfilter_upref"]["current_user_pref"]
         user_email = args["filter_by_wfilter_upref"]["current_user_email"]
-        user_pref_db_clause = get_user_pref_db_clause(user_pref, user_email)
+        user_pref_db_clause, user_pref_params = \
+            get_user_pref_db_clause(user_pref, user_email)
         filters += " AND ( {} )".format(user_pref_db_clause)
-        params["assign_user"] = args["sql_params"]["assign_user"]
+        params.update(args["sql_params"])
+        params.update(user_pref_params)
 
         user_profile = args["filter_by_wfilter_upref"]["current_user_profile"]
-        user_filter_db_clause = get_user_filter_db_clause(user_profile)
+        user_filter_db_clause, user_filter_params = get_user_filter_db_clause(user_profile)
         filters += " AND ( {} )".format(user_filter_db_clause)
+        params.update(user_filter_params)
 
     return filters, params
 
@@ -219,6 +224,18 @@ allowed_fields = {
     'assigned_users': 'assigned_users',
     'in_progress': 'in_progress'
 }
+
+
+def parse_order_by(order_by, allowed_sort_fields):
+    fields_and_directions = []
+    for clause in order_by.split(','):
+        field_and_direction = clause.strip().split(' ')
+        if (len(field_and_direction) != 2 or
+                field_and_direction[0] not in allowed_sort_fields or
+                field_and_direction[1].lower() not in ('asc', 'desc')):
+            raise ValueError('order_by value sent by the user is invalid: %s'.format(order_by))
+        fields_and_directions.append(field_and_direction)
+    return fields_and_directions
 
 
 def parse_tasks_browse_args(args):
@@ -330,24 +347,24 @@ def parse_tasks_browse_order_by_args(order_by, display_info_columns):
         order_by = re.sub("[{}:'\"]", '', str(order_by)) if type(order_by).__name__ == 'dict' else order_by
         order_by_result = order_by.strip()
 
+        if not all(is_valid_searchable_column(col) for col in display_info_columns):
+            raise ValueError('display_info_columns contains an invalid column')
+
         # allowing custom user added task.info columns to be sortable
         allowed_sort_fields = allowed_fields.copy()
         allowed_sort_fields.update({col: "task.info->>'{}'".format(col) for col in display_info_columns})
-        for clause in order_by.split(','):
-            clause = clause.strip()
-            order_by_field = clause.split(' ')
-            if len(order_by_field) != 2 or order_by_field[0] not in allowed_sort_fields:
-                raise ValueError('order_by value sent by the user is invalid: %s'.format(order_by))
-            if order_by_field[0] in order_by_dict:
+        fields_and_directions = parse_order_by(order_by, allowed_sort_fields)
+        for field_and_direction in fields_and_directions:
+            if field_and_direction[0] in order_by_dict:
                 raise ValueError('order_by field is duplicated: %s'.format(order_by))
-            order_by_dict[order_by_field[0]] = order_by_field[1]
+            order_by_dict[field_and_direction[0]] = field_and_direction[1]
 
         # Update order_by value to use query format.
         for key, value in allowed_sort_fields.items():
             # Sort by single field: bi desc -> task.info->>'bi' desc
-            order_by_result = re.sub(r'^' + key + ' ', value + ' ', order_by_result)
+            order_by_result = re.sub(r'^' + re.escape(key) + ' ', value + ' ', order_by_result)
             # Sort by multiple fields: bi desc, companyId asc -> task.info->>'bi' desc, task.info->>'companyId' asc
-            order_by_result = re.sub(r',\s{0,1}' + key + ' ', ', ' + value + ' ', order_by_result)
+            order_by_result = re.sub(r',\s{0,1}' + re.escape(key) + ' ', ', ' + value + ' ', order_by_result)
 
     return (order_by_result, order_by_dict)
 
