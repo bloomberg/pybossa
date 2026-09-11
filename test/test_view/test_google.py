@@ -181,3 +181,13 @@ class TestGoogle(Test):
             'scope': 'profile email'
         }
         url_for.assert_called_with('.oauth_authorized', _external=True)
+
+    @with_context
+    @patch('pybossa.view.google.google.oauth')
+    def test_oauth_authorized_rejects_external_next(self, oauth):
+        oauth.authorized_response.return_value = None
+
+        response = self.app.get(
+            '/google/oauth_authorized?next=https://evil.example/login&error=')
+
+        assert response.headers['Location'] == '/', response.headers

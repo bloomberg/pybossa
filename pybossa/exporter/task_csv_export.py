@@ -28,6 +28,7 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.utils import safe_join, secure_filename
 
 from pybossa.core import uploader
+from pybossa.exporter import neutralize_csv_formulas
 from pybossa.exporter.csv_export import CsvExporter
 from pybossa.uploader import local
 from .export_helpers import browse_tasks_export, filter_task_info_headers
@@ -211,7 +212,9 @@ class TaskCsvExporter(CsvExporter):
 
         name = self._project_name_latin_encoded(project)
         with tempfile.NamedTemporaryFile(mode='w+t') as datafile:
-            dataframe.to_csv(datafile, index=False, encoding='utf-8')
+            neutralize_csv_formulas(dataframe).to_csv(
+                datafile, index=False, encoding='utf-8',
+                lineterminator='\r\n')
             datafile.flush()
 
             zipped_datafile = tempfile.NamedTemporaryFile()

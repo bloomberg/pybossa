@@ -23,7 +23,7 @@ from pybossa.importers.csv import BulkTaskGDImport
 from test import FakeResponse, with_context, with_request_context
 
 
-@patch('pybossa.importers.csv.requests.get')
+@patch('pybossa.importers.csv.safe_get')
 class TestBulkTaskGDImport(object):
 
     def setUp(self):

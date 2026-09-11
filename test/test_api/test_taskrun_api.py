@@ -634,66 +634,42 @@ class TestTaskrunAPI(TestAPI):
         assert success.status_code == 200, success.data
 
     @with_context
-    def test_taskrun_post_requires_newtask_first_external_uid(self):
-        """Test API TaskRun post fails if task was not previously requested for
-        external user"""
-        '''
+    def test_taskrun_external_uid_body_is_gone(self):
+        """External UID submission in the request body remains retired."""
         project = ProjectFactory.create()
-        url = '/api/auth/project/%s/token' % project.short_name
-        headers = {'Authorization': project.secret_key}
-        token = self.app.get(url, headers=headers)
-        headers['Authorization'] = 'Bearer %s' % token.data
         task = TaskFactory.create(project=project)
+        data = dict(project_id=project.id,
+                    task_id=task.id,
+                    info='my task result',
+                    external_uid='as2d-4cab-3daf-234a-2344x')
+        url = '/api/taskrun?api_key=%s' % project.owner.api_key
 
-        # As anon add a taskrun for the current task
+        response = self.app.post(url, data=json.dumps(data))
+        error = json.loads(response.data)
 
-        res = self.app.get('/api/project/%s/newtask' % project.id)
+        assert response.status_code == 410, response.data
+        assert error['status_code'] == 410, error
+        assert error['exception_cls'] == 'Gone', error
+        assert error['target'] == 'taskrun', error
 
-        tmp = json.loads(res.data)
+    @with_context
+    def test_taskrun_external_uid_query_is_gone(self):
+        """External UID submission in the query string remains retired."""
+        project = ProjectFactory.create()
+        task = TaskFactory.create(project=project)
+        data = dict(project_id=project.id,
+                    task_id=task.id,
+                    info='my task result')
+        url = '/api/taskrun?api_key=%s&external_uid=%s' % (
+            project.owner.api_key, 'as2d-4cab-3daf-234a-2344x')
 
-        datajson = json.dumps(dict(project_id=project.id,
-                                   task_id=tmp['id'],
-                                   info='my task result'))
-        res = self.app.post('/api/taskrun', data=datajson)
+        response = self.app.post(url, data=json.dumps(data))
+        error = json.loads(response.data)
 
-        tmp = json.loads(res.data)
-
-        assert res.status_code == 200
-
-        external_uid = 'as2d-4cab-3daf-234a-2344x'
-        data = dict(
-            project_id=project.id,
-            task_id=task.id,
-            info='my task result',
-            external_uid=external_uid)
-        datajson = json.dumps(data)
-        url = '/api/taskrun?external_uid={}'.format(external_uid)
-        fail = self.app.post(url, data=datajson, headers=headers)
-        err = json.loads(fail.data)
-
-        assert fail.status_code == 403, (fail.status_code, fail.data)
-        assert err['status'] == 'failed', err
-        assert err['status_code'] == 403, err
-        assert err['exception_msg'] == 'You must request a task first!', err
-        assert err['exception_cls'] == 'Forbidden', err
-        assert err['target'] == 'taskrun', err
-
-        # Succeeds after requesting a task
-        res = self.app.get('/api/project/%s/newtask?external_uid=%s' %
-                           (project.id, external_uid))
-        assert res.status_code == 401
-        assert json.loads(res.data) == INVALID_HEADER_MISSING
-
-        # Succeeds after requesting a task
-        url = '/api/project/%s/newtask?external_uid=%s' % (project.id,
-                                                           external_uid)
-        res = self.app.get(url, headers=headers)
-        newtask = json.loads(res.data)
-        assert newtask['id'] == task.id
-        url = '/api/taskrun?external_uid={}'.format(external_uid)
-        success = self.app.post(url, data=datajson, headers=headers)
-        assert success.status_code == 200, success.data
-        '''
+        assert response.status_code == 410, response.data
+        assert error['status_code'] == 410, error
+        assert error['exception_cls'] == 'Gone', error
+        assert error['target'] == 'taskrun', error
 
 
     @with_context

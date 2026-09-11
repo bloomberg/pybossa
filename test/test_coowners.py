@@ -24,7 +24,7 @@ class TestCoowners(web.Helper):
                       password="passwd")
         self.signout()
         self.signin()
-        res = self.app.get("/admin/users/addsubadmin/2", follow_redirects=True)
+        res = self.app.post("/admin/users/addsubadmin/2", follow_redirects=True)
         self.signout()
         self.signin(email="john2@john.com", password="passwd")
         self.new_project()
@@ -50,25 +50,25 @@ class TestCoowners(web.Helper):
                       password="passwd")
         self.signout()
         self.signin()
-        res = self.app.get("/admin/users/addsubadmin/2", follow_redirects=True)
-        res = self.app.get("/admin/users/addsubadmin/3", follow_redirects=True)
+        res = self.app.post("/admin/users/addsubadmin/2", follow_redirects=True)
+        res = self.app.post("/admin/users/addsubadmin/3", follow_redirects=True)
         self.signout()
         self.signin(email="john2@john.com", password="passwd")
         self.new_project()
 
-        res = self.app.get('/project/sampleapp/add_coowner/John3', follow_redirects=True)
+        res = self.app.post('/project/sampleapp/add_coowner/John3', follow_redirects=True)
         assert "John3" in str(res.data), res.data
 
-        res = self.app.get('/project/sampleapp/del_coowner/John3', follow_redirects=True)
+        res = self.app.post('/project/sampleapp/del_coowner/John3', follow_redirects=True)
         assert "John3" not in str(res.data), res.data
 
         self.signout()
         self.signin()
 
-        res = self.app.get('/project/sampleapp/add_coowner/John3', follow_redirects=True)
+        res = self.app.post('/project/sampleapp/add_coowner/John3', follow_redirects=True)
         assert "John3" in str(res.data), res.data
 
-        res = self.app.get('/project/sampleapp/del_coowner/John3', follow_redirects=True)
+        res = self.app.post('/project/sampleapp/del_coowner/John3', follow_redirects=True)
         assert "John3" not in str(res.data), res.data
 
     @with_context
@@ -84,13 +84,13 @@ class TestCoowners(web.Helper):
         self.signout()
         self.signin()
         self.new_project()
-        res = self.app.get("/admin/users/addsubadmin/2", follow_redirects=True)
-        res = self.app.get('/project/sampleapp/add_coowner/John2', follow_redirects=True)
+        res = self.app.post("/admin/users/addsubadmin/2", follow_redirects=True)
+        res = self.app.post('/project/sampleapp/add_coowner/John2', follow_redirects=True)
         self.signout()
         self.signin(email="john3@john.com", password="passwd")
 
-        res = self.app.get('/project/sampleapp/add_coowner/John3', follow_redirects=True)
-        res = self.app.get('/project/sampleapp/del_coowner/John2', follow_redirects=True)
+        res = self.app.post('/project/sampleapp/add_coowner/John3', follow_redirects=True)
+        res = self.app.post('/project/sampleapp/del_coowner/John2', follow_redirects=True)
 
         self.signout()
         self.signin()
@@ -108,36 +108,36 @@ class TestCoowners(web.Helper):
         self.signin()
         self.register(name="John2", email="john2@john.com",
                       password="passwd")
-        self.app.get("/admin/users/addsubadmin/2", follow_redirects=True)
+        self.app.post("/admin/users/addsubadmin/2", follow_redirects=True)
         self.register(name="John3", email="john3@john.com",
                       password="passwd")
-        self.app.get("/admin/users/addsubadmin/3", follow_redirects=True)
+        self.app.post("/admin/users/addsubadmin/3", follow_redirects=True)
         self.register(name="John4", email="john4@john.com",
                       password="passwd")
-        self.app.get("/admin/users/addsubadmin/4", follow_redirects=True)
+        self.app.post("/admin/users/addsubadmin/4", follow_redirects=True)
         self.signin(email="john2@john.com", password="passwd")
         self.new_project()
 
-        res = self.app.get('/project/sampleapp/add_coowner/John2',
+        res = self.app.post('/project/sampleapp/add_coowner/John2',
                            follow_redirects=True)
         assert "User is already an owner" in str(res.data), res.data
 
-        res = self.app.get('/project/sampleapp/del_coowner/John2',
+        res = self.app.post('/project/sampleapp/del_coowner/John2',
                            follow_redirects=True)
         assert "Cannot remove project creator" in str(res.data), res.data
 
-        res = self.app.get('/project/sampleapp/add_coowner/John3',
+        res = self.app.post('/project/sampleapp/add_coowner/John3',
                            follow_redirects=True)
         assert "John3" in str(res.data), res.data
 
         self.signout()
         self.signin(email="john3@john.com", password="passwd")
 
-        res = self.app.get('/project/sampleapp/del_coowner/John2',
+        res = self.app.post('/project/sampleapp/del_coowner/John2',
                            follow_redirects=True)
         assert "Cannot remove project creator" in str(res.data), res.data
 
-        res = self.app.get('/project/sampleapp/del_coowner/John4',
+        res = self.app.post('/project/sampleapp/del_coowner/John4',
                            follow_redirects=True)
         assert "User is not a project owner" in str(res.data), res.data
 
@@ -155,8 +155,8 @@ class TestCoowners(web.Helper):
         self.signin()
         self.new_project()
         self.new_task(1)
-        self.app.get("/admin/users/addsubadmin/2", follow_redirects=True)
-        res = self.app.get('/project/sampleapp/add_coowner/John2',
+        self.app.post("/admin/users/addsubadmin/2", follow_redirects=True)
+        res = self.app.post('/project/sampleapp/add_coowner/John2',
                            follow_redirects=True)
         assert "John2" in str(res.data), res.data
         self.signout()
@@ -450,11 +450,11 @@ class TestCoowners(web.Helper):
         self.new_project()
 
         # add non-existing user.
-        res = self.app.get('/project/sampleapp/add_coowner/John2',
+        res = self.app.post('/project/sampleapp/add_coowner/John2',
                            follow_redirects=True)
         assert res.status_code == 404, res.status_code
         # delete non-existing user.
-        res = self.app.get('/project/sampleapp/del_coowner/John2',
+        res = self.app.post('/project/sampleapp/del_coowner/John2',
                            follow_redirects=True)
         assert res.status_code == 404, res.status_code
 

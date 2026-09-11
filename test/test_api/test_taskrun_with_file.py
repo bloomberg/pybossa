@@ -217,6 +217,47 @@ class TestTaskrunWithSensitiveFile(TestAPI):
 
     @with_context
     @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
+    def test_taskrun_edit_keeps_updated_response_encrypted(self, set_content):
+        with patch.dict(self.flask_app.config, self.patch_config):
+            project = ProjectFactory.create(
+                info={'allow_taskrun_edit': True})
+            task = TaskFactory.create(project=project)
+            self.app.get(
+                '/api/project/{}/newtask?api_key={}'.format(
+                    project.id, project.owner.api_key)
+            )
+            create_response = self.app.post(
+                '/api/taskrun?api_key={}'.format(project.owner.api_key),
+                data=json.dumps({
+                    'project_id': project.id,
+                    'task_id': task.id,
+                    'info': {'answer': 'original'}
+                })
+            )
+            assert create_response.status_code == 200, create_response.data
+            taskrun_id = json.loads(create_response.data)['id']
+            set_content.reset_mock()
+
+            update_response = self.app.put(
+                '/api/taskrun/{}?api_key={}'.format(
+                    taskrun_id, project.owner.api_key),
+                data=json.dumps({
+                    'project_id': project.id,
+                    'task_id': task.id,
+                    'info': {'answer': 'updated'}
+                })
+            )
+
+            assert update_response.status_code == 200, update_response.data
+            response_info = json.loads(update_response.data)['info']
+            assert set(response_info) == {'pyb_answer_url'}
+            set_content.assert_called_once()
+            encrypted = set_content.call_args[0][0].read()
+            content = AESWithGCM('testkey').decrypt(encrypted)
+            assert json.loads(content) == {'answer': 'updated'}
+
+    @with_context
+    @patch('pybossa.cloud_store_api.s3.boto.s3.key.Key.set_contents_from_file')
     @patch('pybossa.api.task_run.s3_upload_from_string', wraps=s3_upload_from_string)
     def test_taskrun_with_upload(self, upload_from_string, set_content):
         with patch.dict(self.flask_app.config, self.patch_config):

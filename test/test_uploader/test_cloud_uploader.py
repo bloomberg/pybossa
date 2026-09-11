@@ -23,6 +23,7 @@ from pybossa.uploader.cloud_proxy import CloudProxyUploader
 from unittest.mock import patch, MagicMock
 from werkzeug.datastructures import FileStorage
 from io import StringIO
+from nose.tools import assert_raises
 
 
 class TestCloudUploader(Test):
@@ -106,6 +107,18 @@ class TestCloudUploader(Test):
                 'S3_UPLOAD': self.conn_args
             }):
             assert not u.delete_file('hello', 'cont')
+
+    def test_cloud_uploader_rejects_untrusted_key_components(self):
+        for container, filename in (
+                ('', 'file.jpg'),
+                ('..', 'file.jpg'),
+                ('user_1/other', 'file.jpg'),
+                ('user_1', ''),
+                ('user_1', '../file.jpg'),
+                ('user_1', '/file.jpg'),
+                ('user_1', 'folder\\file.jpg')):
+            assert_raises(ValueError, CloudStoreUploader.key_name,
+                          container, filename)
 
     @with_context
     @patch('pybossa.uploader.cloud_store.create_connection')

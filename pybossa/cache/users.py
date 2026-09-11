@@ -391,6 +391,7 @@ def delete_taskbrowse_bookmarks(user):
 
 
 def get_user_preferences(user_id):
+    """Return the user-preference SQL clause and its bound parameters."""
     user = get_user_by_id(user_id)
     user_pref = user.user_pref or {} if user else {}
     user_email = user.email_addr if user else None
@@ -400,6 +401,10 @@ def get_user_preferences(user_id):
 
 
 def get_user_filters(user_id):
+    """Return (sql, params) for the current user's worker-filter clause.
+
+    params must be merged into the dict passed to session.execute().
+    """
     user_profile = get_user_profile_metadata(user_id)
     user_profile = json.loads(user_profile) if user_profile else {}
     return get_user_filter_db_clause(user_profile)

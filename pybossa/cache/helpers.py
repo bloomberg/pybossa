@@ -192,6 +192,9 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
     if scheduler == Schedulers.task_queue and reserve_task_config:
         return 10
 
+    reserve_task_params = {}
+    user_pref_params = {}
+    user_filter_params = {}
     if scheduler not in [Schedulers.user_pref, Schedulers.task_queue]:
         sql = '''
                SELECT COUNT(*) AS n_tasks FROM task
@@ -202,11 +205,14 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
                project_id=:project_id AND user_id=:user_id)
                ; '''
     else:
-        user_pref_list = cached_users.get_user_preferences(user_id)
-        user_filter_list = cached_users.get_user_filters(user_id)
+        user_pref_list, user_pref_params = \
+            cached_users.get_user_preferences(user_id)
+        user_filter_list, user_filter_params = cached_users.get_user_filters(user_id)
 
         timeout = project_info.get("timeout", TIMEOUT)
-        reserve_task_filter, _ = get_reserve_task_category_info(reserve_task_config, project_id, timeout, user_id, True)
+        reserve_task_filter, reserve_task_params, _ = \
+            get_reserve_task_category_info(
+                reserve_task_config, project_id, timeout, user_id, True)
         sql = '''
                SELECT task.id, worker_filter FROM task
                WHERE project_id=:project_id AND state !='completed'
@@ -220,7 +226,12 @@ def n_available_tasks_for_user(project, user_id=None, user_ip=None):
                ;'''.format(reserve_task_filter, user_pref_list, user_filter_list)
     sqltext = text(sql)
     try:
-        result = session.execute(sqltext, dict(project_id=project_id, user_id=user_id, assign_user=assign_user))
+        query_params = dict(project_id=project_id, user_id=user_id,
+                            assign_user=assign_user)
+        query_params.update(reserve_task_params)
+        query_params.update(user_pref_params)
+        query_params.update(user_filter_params)
+        result = session.execute(sqltext, query_params)
         current_app.logger.info("n_available_tasks_for_user making db request for project_id %d. user_id %d", project_id, user_id)
         if scheduler not in [Schedulers.user_pref, Schedulers.task_queue]:
             for row in result:

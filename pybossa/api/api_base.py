@@ -32,11 +32,14 @@ from flask_login import current_user
 from flask.views import MethodView
 from flasgger import swag_from
 from werkzeug.exceptions import NotFound, Unauthorized, Forbidden, BadRequest
+from werkzeug.utils import secure_filename
 from werkzeug.exceptions import MethodNotAllowed
 from pybossa.util import jsonpify, fuzzyboolean, get_avatar_url
 from pybossa.util import get_user_id_or_ip
 from pybossa.core import ratelimits, uploader
-from pybossa.auth import ensure_authorized_to
+from pybossa.auth import ensure_authorized_to, is_authorized
+from pybossa.auth.task import TaskAuth
+from pybossa.cache.projects import get_project_data
 from pybossa.hateoas import Hateoas
 from pybossa.ratelimit import ratelimit
 from pybossa.error import ErrorStatus
@@ -104,6 +107,8 @@ class APIBase(MethodView):
                               'announcement']
 
     immutable_keys = set(['short_name'])
+
+    server_managed_upload_info_keys = set(['container', 'file_name'])
 
     def refresh_cache(self, cls_name, oid):
         """Refresh the cache."""
@@ -190,19 +195,44 @@ class APIBase(MethodView):
     def _create_dict_from_model(self, model):
         return self._select_attributes(self._add_hateoas_links(model))
 
+    @staticmethod
+    def _embedded_task_dict(task):
+        """Serialise a Task embedded via related=1, with access control.
+
+        is_authorized(..., 'read', task) is not sufficient on its own here:
+        TaskAuth._read is `user.is_authenticated`, so a bare dictize() would
+        still hand over gold_answers and calibration to any logged-in caller.
+        """
+        return TaskAuth.apply_access_control(
+            task.dictize(), user=current_user,
+            project_data=get_project_data(task.project_id))
+
     def _add_hateoas_links(self, item):
         obj = item.dictize()
         related = request.args.get('related')
         if related:
+            # Every embed below is authorized per object. Before this, related=1
+            # embedded task runs and results inside the response without
+            # re-checking anything, even though TaskRunAuth._read and
+            # ResultAuth._read both restrict their own endpoints to
+            # admin/subadmin/project-owner. Combined with all=1, which drops the
+            # owner_id scoping, that exposed every contributor's answers plus
+            # their user_id and user_ip across the whole instance.
+            #
+            # Filtering per object rather than rejecting the whole request:
+            # an unauthorized caller gets an empty list instead of a 403, so
+            # existing callers degrade rather than break.
             if item.__class__.__name__ == 'Task':
                 obj['task_runs'] = []
                 obj['result'] = None
                 task_runs = task_repo.filter_task_runs_by(task_id=item.id)
                 results = result_repo.filter_by(task_id=item.id, last_version=True)
                 for tr in task_runs:
-                    obj['task_runs'].append(tr.dictize())
+                    if is_authorized(current_user, 'read', tr):
+                        obj['task_runs'].append(tr.dictize())
                 for r in results:
-                    obj['result'] = r.dictize()
+                    if is_authorized(current_user, 'read', r):
+                        obj['result'] = r.dictize()
 
             if item.__class__.__name__ == 'TaskRun':
                 tasks = task_repo.filter_tasks_by(id=item.task_id)
@@ -210,18 +240,22 @@ class APIBase(MethodView):
                 obj['task'] = None
                 obj['result'] = None
                 for t in tasks:
-                    obj['task'] = t.dictize()
+                    if is_authorized(current_user, 'read', t):
+                        obj['task'] = self._embedded_task_dict(t)
                 for r in results:
-                    obj['result'] = r.dictize()
+                    if is_authorized(current_user, 'read', r):
+                        obj['result'] = r.dictize()
 
             if item.__class__.__name__ == 'Result':
                 tasks = task_repo.filter_tasks_by(id=item.task_id)
                 task_runs = task_repo.filter_task_runs_by(task_id=item.task_id)
                 obj['task_runs'] = []
                 for t in tasks:
-                    obj['task'] = t.dictize()
+                    if is_authorized(current_user, 'read', t):
+                        obj['task'] = self._embedded_task_dict(t)
                 for tr in task_runs:
-                    obj['task_runs'].append(tr.dictize())
+                    if is_authorized(current_user, 'read', tr):
+                        obj['task_runs'].append(tr.dictize())
 
         stats = request.args.get('stats')
         if stats:
@@ -375,6 +409,13 @@ class APIBase(MethodView):
         perform preprocessing on the POST data"""
         pass
 
+    def _preprocess_put_data(self, data, existing):
+        """Method to be overridden by inheriting classes that will
+        perform preprocessing on PUT data after authorization."""
+        if self.__class__.__name__.lower() in self.allowed_classes_upload:
+            self._forbid_server_managed_upload_info(data, existing)
+        return data
+
     def _preprocess_request(self, request):
         """Method to be overridden by inheriting classes that will
         perform preprocessong on the POST and PUT request"""
@@ -484,12 +525,14 @@ class APIBase(MethodView):
         data = self.hateoas.remove_links(data)
         # may be missing the id as we allow partial updates
         self.__class__(**data)
+        for key in self.immutable_keys.intersection(data):
+            if not (getattr(existing, key) == data[key]):
+                raise Forbidden('Cannot change {} via API'.format(key))
+        data = self._preprocess_put_data(data, existing)
         old = self.__class__(**existing.dictize())
         for key in data:
             if key not in self.immutable_keys:
                 setattr(existing, key, data[key])
-            elif not (getattr(existing, key) == data[key]):
-                raise Forbidden('Cannot change {} via API'.format(key))
 
         if new_upload:
             existing.media_url = new_upload['media_url']
@@ -563,6 +606,22 @@ class APIBase(MethodView):
         certain fields to be used in PUT or POST requests for certain users"""
         pass
 
+    def _forbid_server_managed_upload_info(self, data, existing=None):
+        """Reject client-provided attachment location metadata."""
+        if (request.mimetype == 'multipart/form-data' and
+                request.files.get('file') is not None):
+            return
+        if request.method == 'PUT' and existing is None:
+            return
+        info = data.get('info')
+        if not isinstance(info, dict):
+            return
+        existing_info = existing.info if existing is not None else {}
+        for key in self.server_managed_upload_info_keys:
+            if key in info and info[key] != existing_info.get(key):
+                raise BadRequest(
+                    "Reserved keys in payload: info.%s" % key)
+
     def _file_upload(self, data):
         """Method that must be overriden by the class to allow file uploads for
         only a few classes."""
@@ -602,6 +661,10 @@ class APIBase(MethodView):
                         container = "user_%s" % current_user.id
                 else:
                     container = "anonymous"
+            filename = secure_filename(_file.filename)
+            if not filename:
+                raise BadRequest("Invalid upload filename")
+            _file.filename = filename
             uploader.upload_file(_file,
                                  container=container)
             avatar_absolute = current_app.config.get('AVATAR_ABSOLUTE')
@@ -613,7 +676,7 @@ class APIBase(MethodView):
             if tmp.get('info') is None:
                 tmp['info'] = dict()
             tmp['info']['container'] = container
-            tmp['info']['file_name'] = _file.filename
+            tmp['info']['file_name'] = filename
             return tmp
         else:
             return None
@@ -622,11 +685,18 @@ class APIBase(MethodView):
         """Delete file object."""
         cls_name = self.__class__.__name__.lower()
         if cls_name in self.allowed_classes_upload:
-            keys = obj.info.keys()
-            if 'file_name' in keys and 'container' in keys:
-                ensure_authorized_to('delete', obj)
-                uploader.delete_file(obj.info['file_name'],
-                                     obj.info['container'])
+            info = obj.info if isinstance(obj.info, dict) else {}
+            filename = info.get('file_name')
+            container = info.get('container')
+            if (not isinstance(filename, str) or not filename or
+                    filename != secure_filename(filename)):
+                current_app.logger.warning(
+                    "Skipping unsafe upload deletion for %s id %s: "
+                    "invalid filename metadata", cls_name, obj.id)
+                return False
+            ensure_authorized_to('delete', obj)
+            return uploader.delete_file(filename, container)
+        return False
 
     def _verify_auth(self, item):
         """Method to be overriden in inheriting classes for additional checks

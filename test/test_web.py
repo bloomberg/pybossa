@@ -19,6 +19,7 @@
 import re
 import codecs
 import copy
+import hmac
 import json
 import os
 import shutil
@@ -32,11 +33,12 @@ from test import db, Fixtures, with_context, with_context_settings, \
 from test.helper import web
 from test.test_authorization import mock_current_user
 from unittest.mock import patch, Mock, call, MagicMock
-from flask import redirect, abort
+from flask import redirect, abort, current_app
 from itsdangerous import BadSignature
 from pybossa.util import get_user_signup_method, unicode_csv_reader
 from bs4 import BeautifulSoup
 from requests.exceptions import ConnectionError
+from pybossa.ssrf_guard import SSRFError
 from pybossa.model.project import Project
 from pybossa.model.category import Category
 from pybossa.model.task import Task
@@ -65,6 +67,17 @@ from pybossa.task_creator_helper import get_gold_answers
 from pybossa.core import setup_error_handlers
 from pybossa.task_creator_helper import generate_checksum
 from pybossa.task_creator_helper import set_task_filter_fields, get_task_contents_for_processing
+
+
+def _password_reset_data(user):
+    secret = current_app.config['ITSDANGEROUSKEY']
+    if isinstance(secret, str):
+        secret = secret.encode()
+    return {
+        'user': user.name,
+        'password_binding': hmac.new(
+            secret, user.passwd_hash.encode(), 'sha256').hexdigest()[:32]
+    }
 
 
 class TestWeb(web.Helper):
@@ -405,6 +418,11 @@ class TestWeb(web.Helper):
         err_msg = 'Field should not be private'
         assert 'id' in data['owner'], err_msg
         assert res.status_code == 200, res.status_code
+
+        query_res = self.app.get(url + '?response_format=json')
+        query_data = json.loads(query_res.data)
+        assert isinstance(query_data['projectStats'], dict), query_data
+        assert query_data['projectStats'] == data['projectStats'], query_data
 
         url = '/project/%s/stats' % project.short_name
         res = self.app_get_json(url)
@@ -1318,12 +1336,12 @@ class TestWeb(web.Helper):
 
 
         # Non-existant user
-        msg = "t find you in the system"
+        msg = "Ooops, Incorrect email/password"
         res = self.signin(email='wrongemail', content_type="application/json",
                           follow_redirects=False, csrf=csrf)
         data = json.loads(res.data)
         assert msg in data.get('flash'), (msg, data)
-        assert data.get('status') == INFO, (data)
+        assert data.get('status') == ERROR, (data)
 
         res = self.signin(email='wrongemail', password='wrongpassword')
         res = self.signin(email='wrongemail', password='wrongpassword',
@@ -1331,7 +1349,7 @@ class TestWeb(web.Helper):
                           follow_redirects=False, csrf=csrf)
         data = json.loads(res.data)
         assert msg in data.get('flash'), (msg, data)
-        assert data.get('status') == INFO, (data)
+        assert data.get('status') == ERROR, (data)
 
         # Real user but wrong password or username
         msg = "Ooops, Incorrect email/password"
@@ -1389,6 +1407,38 @@ class TestWeb(web.Helper):
         # assert self.html_title("Profile") in str(res.data), res
         # assert "Welcome back %s" % "John Doe" in str(res.data), res
 
+    @with_context
+    def test_signin_failure_responses_do_not_disclose_accounts(self):
+        self.register()
+        self.signout()
+
+        known_account = self.signin(
+            password='wrong-password',
+            content_type='application/json',
+            follow_redirects=False)
+        unknown_account = self.signin(
+            email='unknown@example.com',
+            password='wrong-password',
+            content_type='application/json',
+            follow_redirects=False)
+
+        known_payload = json.loads(known_account.data)
+        unknown_payload = json.loads(unknown_account.data)
+        known_observables = (
+            known_account.status_code,
+            known_account.mimetype,
+            known_payload.get('flash'),
+            known_payload.get('status'),
+            known_payload.get('next'))
+        unknown_observables = (
+            unknown_account.status_code,
+            unknown_account.mimetype,
+            unknown_payload.get('flash'),
+            unknown_payload.get('status'),
+            unknown_payload.get('next'))
+
+        assert known_observables == unknown_observables
+
 
     @with_context
     @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
@@ -1418,7 +1468,7 @@ class TestWeb(web.Helper):
         assert "You must provide a password" in str(res.data), res
 
         # Non-existant user
-        msg = "t find you in the system"
+        msg = "Ooops, Incorrect email/password"
         res = self.signin(email='wrongemail')
         assert msg in str(res.data), res.data
 
@@ -1574,6 +1624,62 @@ class TestWeb(web.Helper):
     @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
     @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_05_update_profile_ignores_submitted_id(self, upref_mdata):
+        """Test WEB profile updates do not trust a submitted user id."""
+        self.register()
+        self.signin()
+
+        res = self.update_profile(method="GET", content_type="application/json")
+        form = json.loads(res.data)['form']
+        user = user_repo.get_by(email_addr='johndoe@example.com')
+        original_id = user.id
+
+        with patch('pybossa.view.account.user_repo.update') as update_user:
+            res = self.update_profile(id=original_id + 1000,
+                                      new_name='johndoe-new',
+                                      email_addr='johndoe-new@example.com',
+                                      content_type="application/json",
+                                      csrf=form['csrf'])
+
+        data = json.loads(res.data)
+        assert data.get('status') == SUCCESS, data
+        update_user.assert_called_once()
+        assert update_user.call_args[0][0].id == original_id
+        assert 'id' not in form
+
+    @with_context
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_05_update_profile_rejects_submitted_identity_bypass(self,
+                                                                 upref_mdata):
+        """Test WEB profile uniqueness uses the signed-in user's id."""
+        self.register()
+        self.signin()
+        user = user_repo.get_by(email_addr='johndoe@example.com')
+        victim = UserFactory.create(id=user.id + 1000,
+                                    name='victim',
+                                    email_addr='victim@example.com')
+
+        res = self.update_profile(method="GET", content_type="application/json")
+        csrf = json.loads(res.data)['form']['csrf']
+
+        with patch('pybossa.view.account.user_repo.update') as update_user:
+            res = self.update_profile(id=victim.id,
+                                      new_name=victim.name,
+                                      email_addr=victim.email_addr,
+                                      content_type="application/json",
+                                      csrf=csrf)
+
+        data = json.loads(res.data)
+        assert not update_user.called
+        assert data['form']['errors']['name']
+        assert data['form']['errors']['email_addr']
+
+    @with_context
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
     def test_05_update_user_profile_json(self, upref_mdata):
         """Test WEB update user profile JSON"""
 
@@ -1712,7 +1818,7 @@ class TestWeb(web.Helper):
         msg = "Update your profile: %s" % "John Doe"
         assert self.html_title(msg) in str(res.data), res.data
         msg = 'input id="id" name="id" type="hidden" value="1"'
-        assert msg in str(res.data), res
+        assert msg not in str(res.data), res
         assert "John Doe" in str(res.data), res
         assert "Save the changes" in str(res.data), res
 
@@ -2597,7 +2703,7 @@ class TestWeb(web.Helper):
     @with_context
     @patch('pybossa.ckan.requests.get')
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    @patch('pybossa.forms.validator.requests.get')
+    @patch('pybossa.ssrf_guard.resolve_and_validate')
     def test_12_update_project(self, Mock, mock, mock_webhook):
         """Test WEB update project works"""
         html_request = FakeResponse(text=json.dumps(self.pkg_json_not_found),
@@ -2613,8 +2719,8 @@ class TestWeb(web.Helper):
 
         # Get the Update Project web page
         res = self.update_project(method="GET")
-        msg = "Project: Sample Project &middot; Update"
-        assert self.html_title(msg) in str(res.data), res
+        msg = "Project: Sample Project · Update"
+        assert self.html_title(msg) in res.data.decode(), res
         msg = 'input id="id" name="id" type="hidden" value="1"'
         assert msg in str(res.data), res
         assert "Save the changes" in str(res.data), res
@@ -2643,7 +2749,7 @@ class TestWeb(web.Helper):
         assert project.long_description == "New long desc", err_msg
 
     @with_context
-    @patch('pybossa.forms.validator.requests.get')
+    @patch('pybossa.ssrf_guard.resolve_and_validate')
     def test_webhook_to_project(self, mock):
         """Test WEB update sets a webhook for the project"""
         html_request = FakeResponse(text=json.dumps(self.pkg_json_not_found),
@@ -2657,7 +2763,7 @@ class TestWeb(web.Helper):
         owner = db.session.query(User).first()
         project = ProjectFactory.create(owner=owner)
 
-        new_webhook = 'http://mynewserver.com/'
+        new_webhook = 'https://mynewserver.com/'
 
         self.update_project(id=project.id, short_name=project.short_name,
                             new_webhook=new_webhook)
@@ -2666,20 +2772,20 @@ class TestWeb(web.Helper):
         assert project.webhook == new_webhook, err_msg
 
     @with_context
-    @patch('pybossa.forms.validator.requests.get')
+    @patch('pybossa.ssrf_guard.resolve_and_validate')
     def test_webhook_to_project_fails(self, mock):
         """Test WEB update does not set a webhook for the project"""
         html_request = FakeResponse(text=json.dumps(self.pkg_json_not_found),
                                     status_code=404,
                                     headers={'content-type': 'application/json'},
                                     encoding='utf-8')
-        mock.return_value = html_request
+        mock.side_effect = SSRFError('unreachable target')
 
         self.register()
         owner = db.session.query(User).first()
         project = ProjectFactory.create(owner=owner)
 
-        new_webhook = 'http://mynewserver.com/'
+        new_webhook = 'https://mynewserver.com/'
 
         self.update_project(id=project.id, short_name=project.short_name,
                             new_webhook=new_webhook)
@@ -2688,17 +2794,16 @@ class TestWeb(web.Helper):
         assert project.webhook != new_webhook, err_msg
 
     @with_context
-    @patch('pybossa.forms.validator.requests.get')
+    @patch('pybossa.ssrf_guard.resolve_and_validate')
     def test_webhook_to_project_conn_err(self, mock):
         """Test WEB update does not set a webhook for the project"""
-        from requests.exceptions import ConnectionError
-        mock.side_effect = ConnectionError
+        mock.side_effect = SSRFError('unreachable target')
 
         self.register()
         owner = db.session.query(User).first()
         project = ProjectFactory.create(owner=owner)
 
-        new_webhook = 'http://mynewserver.com/'
+        new_webhook = 'https://mynewserver.com/'
 
         res = self.update_project(id=project.id, short_name=project.short_name,
                                   new_webhook=new_webhook)
@@ -2707,7 +2812,7 @@ class TestWeb(web.Helper):
         assert project.webhook != new_webhook, err_msg
 
     @with_context
-    @patch('pybossa.forms.validator.requests.get')
+    @patch('pybossa.ssrf_guard.resolve_and_validate')
     def test_add_password_to_project(self, mock_webhook):
         """Test WEB update sets a password for the project"""
         html_request = FakeResponse(text=json.dumps(self.pkg_json_not_found),
@@ -2726,7 +2831,7 @@ class TestWeb(web.Helper):
 
 
     @with_context
-    @patch('pybossa.forms.validator.requests.get')
+    @patch('pybossa.ssrf_guard.resolve_and_validate')
     def test_remove_password_from_project(self, mock_webhook):
         """Test WEB update removes the password of the project"""
         html_request = FakeResponse(text=json.dumps(self.pkg_json_not_found),
@@ -2751,7 +2856,7 @@ class TestWeb(web.Helper):
         assert project.needs_password(), 'Password deleted'
 
     @with_context
-    @patch('pybossa.forms.validator.requests.get')
+    @patch('pybossa.ssrf_guard.resolve_and_validate')
     def test_update_project_errors(self, mock_webhook):
         """Test WEB update form validation issues the errors"""
         self.register()
@@ -2788,14 +2893,14 @@ class TestWeb(web.Helper):
         self.create()
         self.new_project()
         res = self.delete_project(method="GET")
-        msg = "Project: Sample Project &middot; Delete"
-        assert self.html_title(msg) in str(res.data), res
+        msg = "Project: Sample Project · Delete"
+        assert self.html_title(msg) in res.data.decode(), res
         assert "No, do not delete it" in str(res.data), res
 
         project = db.session.query(Project).filter_by(short_name='sampleapp').first()
         res = self.delete_project(method="GET")
-        msg = "Project: Sample Project &middot; Delete"
-        assert self.html_title(msg) in str(res.data), res
+        msg = "Project: Sample Project · Delete"
+        assert self.html_title(msg) in res.data.decode(), res
         assert "No, do not delete it" in str(res.data), res
 
         res = self.delete_project()
@@ -3585,6 +3690,33 @@ class TestWeb(web.Helper):
         assert res.status_code == 200, res.status_code
 
     @with_context
+    @patch('pybossa.auth.project.ProjectAuth._read', return_value=True)
+    def test_task_presenter_with_allow_taskrun_edit_rejects_other_user(self, read_project):
+        """Test WEB with taskrun edit rejects another user's task response."""
+        self.register()
+        self.signin()
+        self.create()
+        project = db.session.query(Project).get(1)
+        project.info = dict(allow_taskrun_edit=True)
+        db.session.commit()
+        self.new_task(project.id)
+
+        task = db.session.query(Task).filter(Task.project_id == project.id).first()
+        task_submitter = UserFactory.create(id=998, subadmin=False, admin=False)
+        regular_user = UserFactory.create(id=999, subadmin=False, admin=False)
+        regular_user.set_password('1234')
+        user_repo.save(regular_user)
+        task_run = TaskRun(project_id=project.id, task_id=task.id,
+                           info={'answer': 1}, user_id=task_submitter.id)
+        db.session.add(task_run)
+        db.session.commit()
+        self.signin(email=regular_user.email_addr, password='1234')
+
+        res = self.app.get('/project/%s/task/%s/%s' %
+                           (project.short_name, task.id, task_submitter.id))
+        assert res.status_code == 403, res.status_code
+
+    @with_context
     def test_task_presenter_with_allow_taskrun_edit_raises_forbidden(self):
         """Test WEB with taskrun edit permitted, task_submitter_id not passed raises 423"""
         self.register()
@@ -3952,7 +4084,7 @@ class TestWeb(web.Helper):
         db.session.add(user)
         db.session.commit()
         res = self.signin()
-        assert "Ooops, we didn&#39;t find you in the system" in str(res.data), res.data
+        assert "Ooops, Incorrect email/password" in str(res.data), res.data
 
     @with_context
     def test_39_google_oauth_creation(self):
@@ -4100,7 +4232,7 @@ class TestWeb(web.Helper):
         assert user.email_addr == response_user.email_addr, response_user
 
         res = self.signin(email=user.email_addr, password='wrong')
-        msg = "It seems like you signed up with your Twitter account"
+        msg = "Ooops, Incorrect email/password"
         assert msg in str(res.data), msg
 
     @with_context
@@ -4250,7 +4382,7 @@ class TestWeb(web.Helper):
         self.signin()
         admin = user_repo.get(1)
         user = UserFactory.create(id=100)
-        res = self.app.get('/account/%s/delete' % user.name)
+        res = self.app.post('/account/%s/delete' % user.name)
         assert res.status_code == 302, res.status_code
         assert '/admin' in str(res.data)
         mock.assert_called_with(delete_account, user.id, admin.email_addr)
@@ -4262,7 +4394,7 @@ class TestWeb(web.Helper):
         from pybossa.jobs import delete_account
         self.register()
         self.signout()
-        res = self.app.get('/account/johndoe/delete')
+        res = self.app.post('/account/johndoe/delete')
         assert res.status_code == 302, res.status_code
         assert 'account/signin?next' in str(res.data)
 
@@ -4273,7 +4405,7 @@ class TestWeb(web.Helper):
         from pybossa.jobs import delete_account
         self.register()
         self.signout()
-        res = self.app_get_json('/account/johndoe/delete')
+        res = self.app_post_json('/account/johndoe/delete')
         assert res.status_code == 302, res.status_code
         assert 'account/signin?next' in str(res.data)
 
@@ -4285,7 +4417,7 @@ class TestWeb(web.Helper):
         user = UserFactory.create(id=5000)
         self.register()
         self.signin()
-        res = self.app.get('/account/%s/delete' % user.name)
+        res = self.app.post('/account/%s/delete' % user.name)
         assert res.status_code == 403, res.status_code
 
     @with_context
@@ -4296,7 +4428,7 @@ class TestWeb(web.Helper):
         user = UserFactory.create(id=5001)
         self.register()
         self.signin()
-        res = self.app_get_json('/account/%s/delete' % user.name)
+        res = self.app_post_json('/account/%s/delete' % user.name)
         assert res.status_code == 403, (res.status_code, res.data)
 
     @with_context
@@ -4306,7 +4438,7 @@ class TestWeb(web.Helper):
         from pybossa.jobs import delete_account
         self.register()
         self.signin()
-        res = self.app.get('/account/juan/delete')
+        res = self.app.post('/account/juan/delete')
         assert res.status_code == 404, res.status_code
 
     @with_context
@@ -4316,7 +4448,7 @@ class TestWeb(web.Helper):
         from pybossa.jobs import delete_account
         self.register()
         self.signin()
-        res = self.app_get_json('/account/asdafsdlw/delete')
+        res = self.app_post_json('/account/asdafsdlw/delete')
         assert res.status_code == 404, (res.status_code, res.data)
 
     @with_context
@@ -4328,7 +4460,7 @@ class TestWeb(web.Helper):
         self.signin()
         admin = user_repo.get(1)
         user = UserFactory.create(id=100)
-        res = self.app_get_json('/account/%s/delete' % user.name)
+        res = self.app_post_json('/account/%s/delete' % user.name)
         data = json.loads(res.data)
         assert data['job'] == 'enqueued', data
         mock.assert_called_with(delete_account, user.id, admin.email_addr)
@@ -4341,7 +4473,7 @@ class TestWeb(web.Helper):
         self.register()
         self.signin()
         admin = user_repo.get(1)
-        res = self.app_get_json('/account/%s/delete' % admin.name)
+        res = self.app_post_json('/account/%s/delete' % admin.name)
         data = json.loads(res.data)
         assert res.status_code == 403, (res.status_code, res.data)
 
@@ -4374,13 +4506,62 @@ class TestWeb(web.Helper):
 
 
     @with_context
+    @patch('pybossa.view.account.mail_queue', autospec=True)
+    def test_password_reset_token_hides_password_hash(self, queue):
+        self.register()
+        queue.reset_mock()
+        user = User.query.get(1)
+        original_hash = user.passwd_hash
+
+        self.app.post('/account/forgot-password',
+                      data={'email_addr': user.email_addr},
+                      follow_redirects=True)
+
+        message = queue.enqueue.call_args[0][1]
+        match = re.search(r'/reset-password\?key=([A-Za-z0-9_.-]+)',
+                          message['body'])
+        assert match is not None, message['body']
+        key = match.group(1)
+        timeout = self.flask_app.config.get('ACCOUNT_LINK_EXPIRATION')
+        payload = signer.loads(key, max_age=timeout, salt='password-reset')
+
+        assert payload == _password_reset_data(user)
+        assert original_hash not in payload.values()
+        assert message['body'].count(key) == 1
+        assert message['html'].count(key) == 1
+        assert self.app.get('/account/reset-password?key=%s' % key).status_code == 200
+
+        user.set_password('a-new-strong-password')
+        user_repo.update(user)
+        assert self.app.get('/account/reset-password?key=%s' % key).status_code == 403
+
+    @with_context
+    @patch('pybossa.view.account.get_email_confirmation_url')
+    def test_register_does_not_sign_password_when_confirmation_disabled(self,
+                                                                        confirmation_url):
+        import pybossa.app_settings as app_settings
+        current_app.config['ACCOUNT_CONFIRMATION_DISABLED'] = True
+        self.register()
+        self.signin()
+        data = dict(fullname='Jane Doe', name='janedoe',
+                    password='p4ssw0rd', confirm='p4ssw0rd',
+                    email_addr='janedoe@example.com')
+
+        with patch.object(app_settings, 'upref_mdata', False):
+            response = self.app.post('/account/register', data=data)
+
+        assert response.status_code == 302, response.data
+        assert user_repo.get_by_name('janedoe') is not None
+        confirmation_url.assert_not_called()
+
+    @with_context
     @patch('pybossa.view.account.signer.loads')
     def test_44_password_reset_json_key_errors(self, Mock):
         """Test WEB password reset JSON key errors are caught"""
         self.register()
         user = User.query.get(1)
-        userdict = {'user': user.name, 'password': user.passwd_hash}
-        fakeuserdict = {'user': user.name, 'password': 'wronghash'}
+        userdict = _password_reset_data(user)
+        fakeuserdict = {'user': user.name, 'password_binding': 'wronghash'}
         fakeuserdict_err = {'user': user.name, 'passwd': 'some'}
         fakeuserdict_form = {'user': user.name, 'passwd': 'p4ssw0rD'}
         key = signer.dumps(userdict, salt='password-reset')
@@ -4466,9 +4647,38 @@ class TestWeb(web.Helper):
         mock_signer_loads.return_value = {}
         res = self.app.post('/account/password-reset-key', data={'password_reset_key': 'asdf'}, follow_redirects=True)
         assert res.status_code == 403, res
-        mock_signer_loads.return_value = {'user': user.name, 'password': user.passwd_hash}
+        mock_signer_loads.return_value = _password_reset_data(user)
         res = self.app.post('/account/password-reset-key', data={'password_reset_key': 'asdf'}, follow_redirects=True)
         assert res.status_code == 200, res
+
+    @with_context
+    @patch('pybossa.view.account.mail_queue', autospec=True)
+    @patch('pybossa.view.account.signer')
+    def test_forgot_password_responses_do_not_disclose_accounts(self, signer, queue):
+        self.register()
+        self.signout()
+        user = User.query.get(1)
+        queue.reset_mock()
+
+        def request_reset(email_addr):
+            response = self.app.post(
+                '/account/forgot-password',
+                data=json.dumps({'email_addr': email_addr}),
+                follow_redirects=False,
+                content_type='application/json')
+            return response.status_code, response.mimetype, json.loads(response.data)
+
+        enabled_account = request_reset(user.email_addr)
+        unknown_account = request_reset('unknown@example.com')
+        user.enabled = False
+        db.session.commit()
+        disabled_account = request_reset(user.email_addr)
+
+        assert enabled_account == unknown_account == disabled_account
+        assert queue.enqueue.call_count == 2
+        disabled_message = queue.enqueue.call_args_list[-1][0][1]
+        assert 'disabled' in disabled_message['body'].lower()
+        assert 'disabled' in disabled_message['html'].lower()
 
     @with_context
     @patch('pybossa.view.account.signer.loads')
@@ -4476,8 +4686,8 @@ class TestWeb(web.Helper):
         """Test WEB password reset key errors are caught"""
         self.register()
         user = User.query.get(1)
-        userdict = {'user': user.name, 'password': user.passwd_hash}
-        fakeuserdict = {'user': user.name, 'password': 'wronghash'}
+        userdict = _password_reset_data(user)
+        fakeuserdict = {'user': user.name, 'password_binding': 'wronghash'}
         fakeuserdict_err = {'user': user.name, 'passwd': 'some'}
         fakeuserdict_form = {'user': user.name, 'passwd': 'p4ssw0rD'}
         key = signer.dumps(userdict, salt='password-reset')
@@ -4540,8 +4750,8 @@ class TestWeb(web.Helper):
         assert res.mimetype == 'application/json', err_msg
         err_msg = "Flash message should be included"
         assert data.get('flash'), err_msg
-        assert ("We don't have this email in our records. You may have"
-                " signed up with a different email") in data.get('flash'), err_msg
+        assert ("If an account exists for that address, we've sent you an email"
+                " with account recovery instructions!") in data.get('flash'), err_msg
 
         self.register()
         self.register(name='janedoe')
@@ -4557,7 +4767,7 @@ class TestWeb(web.Helper):
         db.session.add_all([jane, google, facebook])
         db.session.commit()
 
-        data = {'password': user.passwd_hash, 'user': user.name}
+        data = _password_reset_data(user)
         csrf = self.get_csrf('/account/forgot-password')
         res = self.app.post('/account/forgot-password',
                             data=json.dumps({'email_addr': user.email_addr}),
@@ -4579,7 +4789,7 @@ class TestWeb(web.Helper):
         assert resdata.get('flash'), err_msg
         assert "sent you an email" in resdata.get('flash'), err_msg
 
-        data = {'password': jane.passwd_hash, 'user': jane.name}
+        data = _password_reset_data(jane)
         csrf = self.get_csrf('/account/forgot-password')
         res = self.app.post('/account/forgot-password',
                             data=json.dumps({'email_addr': 'janedoe@example.com'}),
@@ -4600,7 +4810,7 @@ class TestWeb(web.Helper):
         assert resdata.get('flash'), err_msg
         assert "sent you an email" in resdata.get('flash'), err_msg
 
-        data = {'password': google.passwd_hash, 'user': google.name}
+        data = _password_reset_data(google)
         csrf = self.get_csrf('/account/forgot-password')
         res = self.app.post('/account/forgot-password',
                             data=json.dumps({'email_addr': 'google@example.com'}),
@@ -4621,7 +4831,7 @@ class TestWeb(web.Helper):
         assert resdata.get('flash'), err_msg
         assert "sent you an email" in resdata.get('flash'), err_msg
 
-        data = {'password': facebook.passwd_hash, 'user': facebook.name}
+        data = _password_reset_data(facebook)
         csrf = self.get_csrf('/account/forgot-password')
         res = self.app.post('/account/forgot-password',
                             data=json.dumps({'email_addr': 'facebook@example.com'}),
@@ -4655,7 +4865,7 @@ class TestWeb(web.Helper):
 
         with patch.dict(self.flask_app.config, {'SPA_SERVER_NAME':
                                                 'http://local.com'}):
-            data = {'password': user.passwd_hash, 'user': user.name}
+            data = _password_reset_data(user)
             csrf = self.get_csrf('/account/forgot-password')
             res = self.app.post('/account/forgot-password',
                                 data=json.dumps({'email_addr': user.email_addr}),
@@ -4683,8 +4893,8 @@ class TestWeb(web.Helper):
         res = self.app.post('/account/forgot-password',
                             data={'email_addr': "johndoe@example.com"},
                             follow_redirects=True)
-        assert ("We don&#39;t have this email in our records. You may have"
-                " signed up with a different email") in str(res.data)
+        assert ("If an account exists for that address, we&#39;ve sent you an email"
+                " with account recovery instructions!") in str(res.data)
 
         self.register()
         self.register(name='janedoe')
@@ -4700,7 +4910,7 @@ class TestWeb(web.Helper):
         db.session.add_all([jane, google, facebook])
         db.session.commit()
 
-        data = {'password': user.passwd_hash, 'user': user.name}
+        data = _password_reset_data(user)
         self.app.post('/account/forgot-password',
                       data={'email_addr': user.email_addr},
                       follow_redirects=True)
@@ -4713,7 +4923,7 @@ class TestWeb(web.Helper):
         assert 'Click here to recover your account' in enqueue_call[0][1]['body']
         assert 'To recover your password' in enqueue_call[0][1]['html']
 
-        data = {'password': jane.passwd_hash, 'user': jane.name}
+        data = _password_reset_data(jane)
         self.app.post('/account/forgot-password',
                       data={'email_addr': 'janedoe@example.com'},
                       follow_redirects=True)
@@ -4725,7 +4935,7 @@ class TestWeb(web.Helper):
         assert 'your Twitter account to ' in enqueue_call[0][1]['body']
         assert 'your Twitter account to ' in enqueue_call[0][1]['html']
 
-        data = {'password': google.passwd_hash, 'user': google.name}
+        data = _password_reset_data(google)
         self.app.post('/account/forgot-password',
                       data={'email_addr': 'google@example.com'},
                       follow_redirects=True)
@@ -4737,7 +4947,7 @@ class TestWeb(web.Helper):
         assert 'your Google account to ' in enqueue_call[0][1]['body']
         assert 'your Google account to ' in enqueue_call[0][1]['html']
 
-        data = {'password': facebook.passwd_hash, 'user': facebook.name}
+        data = _password_reset_data(facebook)
         self.app.post('/account/forgot-password',
                       data={'email_addr': 'facebook@example.com'},
                       follow_redirects=True)
@@ -5101,7 +5311,7 @@ class TestWeb(web.Helper):
     @with_context
     @patch('pybossa.ckan.requests.get')
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    @patch('pybossa.forms.validator.requests.get')
+    @patch('pybossa.ssrf_guard.resolve_and_validate')
     def test_48_update_app_info(self, Mock, mock, mock_webhook):
         """Test WEB project update/edit works keeping previous info values"""
         html_request = FakeResponse(text=json.dumps(self.pkg_json_not_found),
@@ -5202,27 +5412,27 @@ class TestWeb(web.Helper):
         root, user, other = UserFactory.create_batch(3)
         uri = 'account/%s/export' % user.name
         # As anon
-        res = self.app.get(uri)
+        res = self.app.post(uri)
         assert res.status_code == 302
 
         # As admin
-        res = self.app.get(uri + '?api_key=%s' % root.api_key,
+        res = self.app.post(uri + '?api_key=%s' % root.api_key,
                            follow_redirects=True)
         assert res.status_code == 200, res.status_code
 
         # As other
-        res = self.app.get(uri + '?api_key=%s' % other.api_key,
+        res = self.app.post(uri + '?api_key=%s' % other.api_key,
                            follow_redirects=True)
         assert res.status_code == 403, res.status_code
 
         # As owner
-        res = self.app.get(uri + '?api_key=%s' % user.api_key,
+        res = self.app.post(uri + '?api_key=%s' % user.api_key,
                            follow_redirects=True)
         assert res.status_code == 403, res.status_code
 
         # As non existing user
         uri = 'account/algo/export'
-        res = self.app.get(uri + '?api_key=%s' % user.api_key,
+        res = self.app.post(uri + '?api_key=%s' % user.api_key,
                            follow_redirects=True)
         assert res.status_code == 403, res.status_code
 
@@ -5233,27 +5443,27 @@ class TestWeb(web.Helper):
         root, user, other = UserFactory.create_batch(3)
         uri = 'account/%s/export' % user.name
         # As anon
-        res = self.app_get_json(uri)
+        res = self.app_post_json(uri)
         assert res.status_code == 302
 
         # As admin
-        res = self.app_get_json(uri + '?api_key=%s' % root.api_key,
+        res = self.app_post_json(uri + '?api_key=%s' % root.api_key,
                                 follow_redirects=True)
         assert res.status_code == 200, res.status_code
 
         # As other
-        res = self.app_get_json(uri + '?api_key=%s' % other.api_key,
+        res = self.app_post_json(uri + '?api_key=%s' % other.api_key,
                                 follow_redirects=True)
         assert res.status_code == 403, res.status_code
 
         # As owner
-        res = self.app_get_json(uri + '?api_key=%s' % user.api_key,
+        res = self.app_post_json(uri + '?api_key=%s' % user.api_key,
                                 follow_redirects=True)
         assert res.status_code == 403, res.status_code
 
         # As non existing user
         uri = 'account/algo/export'
-        res = self.app_get_json(uri + '?api_key=%s' % user.api_key,
+        res = self.app_post_json(uri + '?api_key=%s' % user.api_key,
                                 follow_redirects=True)
         assert res.status_code == 403, res.status_code
 
@@ -6813,7 +7023,7 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.view.projects.redirect_content_type', wraps=redirect)
-    @patch('pybossa.importers.csv.requests.get')
+    @patch('pybossa.importers.csv.safe_get')
     def test_import_tasks_redirects_on_success(self, request, redirect):
         """Test WEB when importing tasks succeeds, user is redirected to tasks main page"""
         csv_file = FakeResponse(text='Foo,Bar,Baz\n1,2,3', status_code=200,
@@ -6877,7 +7087,7 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    @patch('pybossa.importers.csv.requests.get')
+    @patch('pybossa.importers.csv.safe_get')
     def test_bulk_csv_import_works(self, Mock, mock):
         """Test WEB bulk import works"""
         csv_file = FakeResponse(text='Foo,Bar,priority_0\n1,2,3', status_code=200,
@@ -6919,7 +7129,7 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    @patch('pybossa.importers.csv.requests.get')
+    @patch('pybossa.importers.csv.safe_get')
     def test_bulk_csv_import_error(self, Mock, mock):
         """Test WEB bulk import works without data access"""
         csv_file = FakeResponse(text='Foo,Bar,priority_0\n1,2,3', status_code=200,
@@ -6940,7 +7150,7 @@ class TestWeb(web.Helper):
 
     @with_context
     @patch('pybossa.view.projects.uploader.upload_file', return_value=True)
-    @patch('pybossa.importers.csv.requests.get')
+    @patch('pybossa.importers.csv.safe_get')
     def test_bulk_gdocs_import_works(self, Mock, mock):
         """Test WEB bulk GDocs import works."""
         csv_file = FakeResponse(text='Foo,Bar,priority_0\n1,2,3', status_code=200,
@@ -7655,6 +7865,31 @@ class TestWeb(web.Helper):
     @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
     @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
     @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
+    def test_70_public_user_profile_escapes_fullname_in_title(self, upref_mdata):
+        """Test WEB public user profile escapes the fullname in the title."""
+        Fixtures.create()
+        payload = 'member</title><span>marker</span>'
+        profile_user = user_repo.get_by_name(name=Fixtures.name)
+        profile_user.fullname = payload
+        db.session.add(profile_user)
+        db.session.commit()
+
+        viewer = user_repo.get_by_name(name=Fixtures.name2)
+        self.signin_user(viewer)
+        url = '/account/%s/' % Fixtures.name
+        res = self.app.get(url, follow_redirects=True)
+        html = res.data.decode()
+        escaped_title = (
+            'member&lt;/title&gt;&lt;span&gt;marker&lt;/span&gt; · User Profile'
+        )
+
+        assert self.html_title(escaped_title) in html, html
+        assert payload not in html, html
+
+    @with_context
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_name_to_country_code', new={})
+    @patch('pybossa.view.account.app_settings.upref_mdata.country_code_to_country_name', new={})
+    @patch('pybossa.cache.task_browse_helpers.app_settings.upref_mdata')
     def test_71_public_user_profile_json(self, upref_mdata):
         """Test JSON WEB public user profile works"""
 
@@ -7674,7 +7909,7 @@ class TestWeb(web.Helper):
         assert res.status_code == 200, res.status_code
         data = json.loads(res.data)
         err_msg = 'there should be a title for the user page'
-        assert data['title'] == 'T Tester &middot; User Profile', err_msg
+        assert data['title'] == 'T Tester · User Profile', err_msg
         err_msg = 'there should be a user name'
         assert data['user']['name'] == 'tester', err_msg
         err_msg = 'there should not be a user id'
@@ -8812,8 +9047,12 @@ class TestWeb(web.Helper):
         otp_secret = OtpAuth.return_value
         otp_secret.totp.return_value = OTP
 
-        res = self.signin(content_type="application/json",
-                          csrf=csrf, follow_redirects=True)
+        with patch.object(self.flask_app.logger, 'debug') as debug_log, \
+                patch.object(self.flask_app.logger, 'info') as info_log:
+            res = self.signin(content_type="application/json",
+                              csrf=csrf, follow_redirects=True)
+        generated_otp_logs = debug_log.call_args_list + info_log.call_args_list
+        assert OTP not in str(generated_otp_logs)
         data = json.loads(res.data)
         msg = "an email has been sent to you with one time password"
         err_msg = 'Should redirect to otp validation page'
@@ -8837,8 +9076,13 @@ class TestWeb(web.Helper):
         assert data['flash'] == 'Please sign in.', (err_msg, data)
 
         # pass wrong otp
-        res = self.otpvalidation(token=token, follow_redirects=True,
-                                 content_type='application/json')
+        with patch.object(self.flask_app.logger, 'debug') as debug_log, \
+                patch.object(self.flask_app.logger, 'info') as info_log:
+            res = self.otpvalidation(token=token, follow_redirects=True,
+                                     content_type='application/json')
+        invalid_otp_logs = debug_log.call_args_list + info_log.call_args_list
+        assert OTP not in str(invalid_otp_logs)
+        assert '-1' not in str(invalid_otp_logs)
         data = json.loads(res.data)
         err_msg = 'There should be an invalid OTP error message'
         assert data['status'] == 'error', (err_msg, data)
@@ -8846,8 +9090,10 @@ class TestWeb(web.Helper):
         assert data['flash'] == msg, (err_msg, data)
 
         # pass right otp
-        res = self.otpvalidation(token=token, follow_redirects=True, otp=OTP,
-                                 content_type='application/json')
+        with patch('hmac.compare_digest', return_value=True) as compare_digest:
+            res = self.otpvalidation(token=token, follow_redirects=True, otp=OTP,
+                                     content_type='application/json')
+        assert call(OTP, OTP) in compare_digest.call_args_list
         data = json.loads(res.data)
         err_msg = 'There should not be an invalid OTP error message'
         assert data['status'] == 'success', (err_msg, data)
@@ -8860,6 +9106,34 @@ class TestWeb(web.Helper):
         assert data.get('flash') == msg, (msg, data)
         assert data.get('status') == SUCCESS, data
         assert data.get('next') == '/', data
+
+    @patch('pybossa.view.account.mail_queue')
+    @patch('pybossa.otp.OtpAuth')
+    @with_context_settings(ENABLE_TWO_FACTOR_AUTH=True)
+    def test_otp_validation_rejects_non_ascii_json(self, OtpAuth, mail_queue):
+        """Test non-ASCII OTP input returns the invalid OTP response."""
+        self.register()
+        self.signout()
+
+        res = self.signin(method="GET", content_type="application/json",
+                          follow_redirects=False)
+        csrf = json.loads(res.data)['form'].get('csrf')
+
+        otp_secret = OtpAuth.return_value
+        otp_secret.totp.return_value = '1234'
+        res = self.signin(content_type="application/json",
+                          csrf=csrf, follow_redirects=True)
+        token = json.loads(res.data).get('next').split('/')[-2]
+
+        res = self.otpvalidation(token=token, follow_redirects=True,
+                                 otp='１２３４',
+                                 content_type='application/json')
+        data = json.loads(res.data)
+
+        err_msg = 'Non-ASCII OTP input should fail gracefully'
+        assert data['status'] == ERROR, (err_msg, data)
+        assert data['flash'].startswith('Invalid one time password'), \
+            (err_msg, data)
 
     @patch('pybossa.view.account.otp.retrieve_user_otp_secret')
     @patch('pybossa.otp.OtpAuth')
@@ -10014,13 +10288,13 @@ class TestWeb(web.Helper):
         user = project.owner
         # with no tasks available
         url = '/project/{}/make-random-gold?api_key={}'.format(project.short_name, user.api_key)
-        res = self.app_get_json(url)
+        res = self.app_post_json(url)
         data = json.loads(res.data)
         assert data['flash'] == 'There Are No Tasks Avaiable!'
 
         # with tasks available
         task = TaskFactory.create(project=project)
-        res = self.app_get_json(url)
+        res = self.app_post_json(url)
         data = json.loads(res.data)
         assert '/task/1?' in data['next'], data['next']
 
@@ -10090,7 +10364,8 @@ class TestWeb(web.Helper):
             )
         )
         task = TaskFactory.create_batch(3, project=project, info=dict(x=1, y=2))
-        res = self.app.get('api/project/%s/newtask' % project.id)
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': False}):
+            res = self.app.get('api/project/%s/newtask' % project.id)
         data = json.loads(res.data)
         assert data["id"] == task[0].id, "First available task to be presented when no task exist with reserver category"
 
@@ -10119,7 +10394,8 @@ class TestWeb(web.Helper):
         ], []]
 
         task = TaskFactory.create_batch(3, project=project, info=dict(x=1, y=2))
-        res = self.app.get('api/project/%s/newtask' % project.id)
+        with patch.dict(self.flask_app.config, {'PRIVATE_INSTANCE': False}):
+            res = self.app.get('api/project/%s/newtask' % project.id)
         data = json.loads(res.data)
         assert data["id"] == task[0].id, "First available task to be presented when all tasks with reserver category are consumed"
 
@@ -11338,7 +11614,7 @@ class TestWebUserMetadataUpdate(web.Helper):
 
     @with_context
     def test_release_category_locks_without_auth(self):
-        """Test cancel task without auth"""
+        """Test category lock release requires sign-in."""
 
         url = "/api/task/1/release_category_locks"
 
@@ -11347,8 +11623,7 @@ class TestWebUserMetadataUpdate(web.Helper):
                             data=payload,
                             follow_redirects=False,
                             )
-        data = json.loads(res.data)
-        assert data.get('status_code') == 401, data
+        assert res.status_code == 302, res.status_code
 
     @with_context
     @patch('pybossa.api.release_reserve_task_lock_by_id')
@@ -11528,7 +11803,7 @@ class TestWebUserMetadataUpdate(web.Helper):
 
     @with_context
     def test_partial_answer_user_exception(self):
-        """Test partial answer API with exception as user doesn't sign in """
+        """Test partial answer API requires sign-in."""
         user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
         project = ProjectFactory.create(
             info={
@@ -11541,7 +11816,7 @@ class TestWebUserMetadataUpdate(web.Helper):
         )
         url = f"/api/project/{project.short_name}/task/123/partial_answer"
         resp = self.app_get_json(url)
-        assert resp.status_code == 415
+        assert resp.status_code == 302
 
     @with_context
     def test_partial_answer_project_exception(self):
@@ -11569,8 +11844,9 @@ class TestWebUserMetadataUpdate(web.Helper):
         )
 
         task_id_map_mock.return_value = {123: 1002, 456: 1004}
+        task = TaskFactory.create(project=project)
 
-        url = f"/api/project/{project.short_name}/task/123/partial_answer"
+        url = f"/api/project/{project.short_name}/task/{task.id}/partial_answer"
         data = {"my_answer": {"k1: ": "test", "k2": [1, 2, "abc"]}}
         # Set MAX_SAVED_ANSWERS to 2 so the mock with 2 entries exceeds the limit
         with patch.dict(self.flask_app.config, {'MAX_SAVED_ANSWERS': 2}):
@@ -11591,8 +11867,9 @@ class TestWebUserMetadataUpdate(web.Helper):
             },
             owner=user
         )
+        task = TaskFactory.create(project=project)
 
-        url = f"/api/project/{project.short_name}/task/123/partial_answer"
+        url = f"/api/project/{project.short_name}/task/{task.id}/partial_answer"
         data = {"my_answer": {"k1: ": "test", "k2": [1, 2, "abc"]}}
         resp = self.app_post_json(url, data=data, follow_redirects=False)
         assert json.loads(resp.data).get('success')
@@ -11602,6 +11879,23 @@ class TestWebUserMetadataUpdate(web.Helper):
 
         resp = self.app.delete(url)
         assert json.loads(resp.data).get('success')
+
+    @with_context
+    def test_partial_answer_rejects_task_from_other_project(self):
+        user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
+        self.signin_user(user)
+        project = ProjectFactory.create(owner=user)
+        other_project = ProjectFactory.create()
+        other_task = TaskFactory.create(project=other_project)
+
+        data = {"my_answer": {"answer": "draft"}}
+        csrf_token = self.get_csrf('/account/register')
+        for task_id in [other_task.id, other_task.id + 1000]:
+            url = f"/api/project/{project.short_name}/task/{task_id}/partial_answer"
+            resp = self.app_post_json(
+                url, data=data, follow_redirects=False,
+                headers={'X-CSRFToken': csrf_token})
+            assert resp.status_code == 404
 
     @with_context
     def test_user_has_partial_answer(self):
@@ -11624,7 +11918,7 @@ class TestWebUserMetadataUpdate(web.Helper):
 
     @with_context
     def test_user_has_partial_answer_without_auth(self):
-        """Test user_has_partial_answer without auth"""
+        """Test user_has_partial_answer requires sign-in."""
 
         user = UserFactory.create(email_addr='a@a.com', fullname="test_user")
         project = ProjectFactory.create(
@@ -11639,7 +11933,7 @@ class TestWebUserMetadataUpdate(web.Helper):
 
         url = f"/api/project/{project.short_name}/has_partial_answer"
         resp = self.app_get_json(url)
-        assert resp.status_code == 401, resp
+        assert resp.status_code == 302, resp
 
     def generate_sample_bookmarks(self, target_project="project1"):
         bookmark_1_data = {
@@ -12403,7 +12697,9 @@ class TestEmailAttachment(web.Helper):
         self.signin(email=admin.email_addr, password="1234")
 
         # invalid signature
-        with patch('pybossa.view.attachment.TASK_SIGNATURE_MAX_SIZE', 2):
+        from pybossa.signer import EMAIL_ATTACHMENT_SIGNATURE_SALT
+
+        with patch('pybossa.view.attachment.ATTACHMENT_SIGNATURE_MAX_SIZE', 2):
             res = self.app.get("/attachment/sign/path", follow_redirects=True)
             assert res.data.decode() == "An internal error has occurred.", res.data
 
@@ -12417,7 +12713,9 @@ class TestEmailAttachment(web.Helper):
             "project_id": 123,
             "user_email": "a@a.com"
         }
-        signature = signer.dumps(sign_payload)
+        sign_payload['s3_key'] = 'attachments/path'
+        signature = signer.dumps(
+            sign_payload, salt=EMAIL_ATTACHMENT_SIGNATURE_SALT)
         res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
         assert res.data.decode() == "An internal error has occurred.", res.data
 
@@ -12427,19 +12725,24 @@ class TestEmailAttachment(web.Helper):
         self.signin(email=reguser.email_addr, password="abc")
 
         sign_payload["project_id"] = project.id
-        signature = signer.dumps(sign_payload)
+        signature = signer.dumps(
+            sign_payload, salt=EMAIL_ATTACHMENT_SIGNATURE_SALT)
         res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
         assert "An internal error has occurred." in res.data.decode(), res.data
 
         # not a project report. however signed in user is not part of signature.
-        sign_payload = {"user_email": "aaa@a.com"}
-        signature = signer.dumps(sign_payload)
+        sign_payload = {"user_email": "aaa@a.com",
+                        "s3_key": "attachments/path"}
+        signature = signer.dumps(
+            sign_payload, salt=EMAIL_ATTACHMENT_SIGNATURE_SALT)
         res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
         assert "An internal error has occurred." in res.data.decode(), res.data
 
         # not a project report. signed in user not admin can download attachment
-        sign_payload = {"user_email": reguser.email_addr}
-        signature = signer.dumps(sign_payload)
+        sign_payload = {"user_email": reguser.email_addr,
+                        "s3_key": "attachments/path"}
+        signature = signer.dumps(
+            sign_payload, salt=EMAIL_ATTACHMENT_SIGNATURE_SALT)
         res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
         assert res.status_code == 200 and "" in res.data.decode(), res.data
 
@@ -12447,15 +12750,19 @@ class TestEmailAttachment(web.Helper):
         # however s3 bucket not configured resulting empty response
         self.register(name=admin.name)
         self.signin(email=admin.email_addr, password="1234")
-        sign_payload = {"user_email": reguser.email_addr}
-        signature = signer.dumps(sign_payload)
+        sign_payload = {"user_email": reguser.email_addr,
+                        "s3_key": "attachments/path"}
+        signature = signer.dumps(
+            sign_payload, salt=EMAIL_ATTACHMENT_SIGNATURE_SALT)
         res = self.app.get(f"/attachment/{signature}/path", follow_redirects=True)
         assert res.status_code == 200 and res.data.decode() == "", "bucket not configured should return empty response"
 
         self.register(name=admin.name)
         self.signin(email=admin.email_addr, password="1234")
-        sign_payload = {"user_email": reguser.email_addr}
-        signature = signer.dumps(sign_payload)
+        sign_payload = {"user_email": reguser.email_addr,
+                        "s3_key": "attachments/path"}
+        signature = signer.dumps(
+            sign_payload, salt=EMAIL_ATTACHMENT_SIGNATURE_SALT)
 
         key = type('Key', (object,), {'name': 'filename.zip', 'content_type': 'application/zip'})()
         with patch.dict(self.flask_app.config, {"S3_REQUEST_BUCKET_V2": "attachment-bucket"}), \

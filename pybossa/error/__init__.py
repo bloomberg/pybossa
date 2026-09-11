@@ -46,6 +46,7 @@ class ErrorStatus(object):
                     "NotFound": 404,
                     "MethodNotAllowed": 405,
                     "Conflict": 409,
+                    "Gone": 410,
                     "TypeError": 415,
                     "ValueError": 415,
                     "DataError": 415,
@@ -67,7 +68,7 @@ class ErrorStatus(object):
         else:  # pragma: no cover
             status = 500
         if exception_cls in ('BadRequest', 'Forbidden', 'Unauthorized',
-                             'Conflict'):
+                             'Conflict', 'Gone'):
             if message is None:
                 message = e.description
         elif exception_cls in ('DataError'):

@@ -22,6 +22,11 @@ from test.factories import UserFactory
 
 class TestUserTaskPreferenceAPI(Test):
 
+    def _sign_in_session(self, user):
+        with self.app.session_transaction() as session:
+            session['_user_id'] = user.name
+            session['_fresh'] = True
+
     @with_context
     def test_user_get_preferences_valid_user(self):
         admin = UserFactory.create()
@@ -91,7 +96,7 @@ class TestUserTaskPreferenceAPI(Test):
         url = 'api/preferences/%s' % restricted.name
 
         res = self.app.get(url)
-        assert res.status_code == 404, res.status_code
+        assert res.status_code == 302, res.status_code
 
     @with_context
     def test_user_get_preferences_cannot_update_user(self):
@@ -128,7 +133,7 @@ class TestUserTaskPreferenceAPI(Test):
         url = 'api/preferences/%s' % restricted.name
 
         res = self.app.post(url)
-        assert res.status_code == 404, res.status_code
+        assert res.status_code == 302, res.status_code
 
     @with_context
     def test_user_set_preferences_missing_user(self):
@@ -220,3 +225,53 @@ class TestUserTaskPreferenceAPI(Test):
 
         data = json.loads(res.data)
         assert data['profile'] == '', "Invalid json response returned.";
+
+    @with_context
+    def test_session_user_set_preferences_requires_csrf(self):
+        admin = UserFactory.create(admin=True)
+        user = UserFactory.create()
+        self._sign_in_session(admin)
+
+        url = 'api/preferences/%s' % user.name
+        payload = json.dumps({"test": 1})
+
+        with patch.dict(self.flask_app.config, {
+                'SECURE_APP_ACCESS': True,
+                'WTF_CSRF_ENABLED': True}):
+            res = self.app.post(url, data={'request_json': payload})
+
+        assert res.status_code == 400, res.status_code
+
+    @with_context
+    def test_session_user_set_preferences_accepts_csrf(self):
+        admin = UserFactory.create(admin=True)
+        user = UserFactory.create()
+        self._sign_in_session(admin)
+
+        url = 'api/preferences/%s' % user.name
+        payload = json.dumps({"test": 1})
+
+        with patch.dict(self.flask_app.config, {
+                'SECURE_APP_ACCESS': True,
+                'WTF_CSRF_ENABLED': True}):
+            csrf = self.get_csrf('/account/register')
+            res = self.app.post(url, data={'request_json': payload},
+                                headers={'X-CSRFToken': csrf})
+
+        assert res.status_code == 200, res.status_code
+
+    @with_context
+    def test_api_key_user_set_preferences_does_not_require_csrf(self):
+        admin = UserFactory.create(admin=True)
+        user = UserFactory.create()
+
+        url = 'api/preferences/%s' % user.name
+        payload = json.dumps({"test": 1})
+
+        with patch.dict(self.flask_app.config, {
+                'SECURE_APP_ACCESS': True,
+                'WTF_CSRF_ENABLED': True}):
+            res = self.app.post(url, data={'request_json': payload},
+                                headers={'Authorization': admin.api_key})
+
+        assert res.status_code == 200, res.status_code

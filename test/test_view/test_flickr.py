@@ -50,12 +50,12 @@ class TestFlickrOauth(object):
 
     @with_context
     @patch('pybossa.view.flickr.redirect')
-    def test_logout_redirects_to_url_specified_by_next_param(self, redirect):
+    def test_logout_rejects_external_next_param(self, redirect):
         # Resolves TypeError: 'int' object is not iterable by using status=302
         redirect.return_value = Response(status=302)
         flask_app.test_client().get('/flickr/revoke-access?next=http://mynext_url')
 
-        redirect.assert_called_with('http://mynext_url')
+        redirect.assert_called_with('/')
 
 
     @with_context
@@ -83,7 +83,7 @@ class TestFlickrOauth(object):
     @with_context
     @patch('pybossa.view.flickr.flickr.oauth')
     @patch('pybossa.view.flickr.redirect')
-    def test_oauth_authorized_redirects_to_url_next_param_on_authorization(
+    def test_oauth_authorized_rejects_external_next_on_authorization(
             self, redirect, oauth):
         fake_resp = {'oauth_token_secret': 'secret',
                      'username': 'palotespaco',
@@ -94,19 +94,19 @@ class TestFlickrOauth(object):
         redirect.return_value = Response(status=302)
         flask_app.test_client().get('/flickr/oauth-authorized?next=http://next')
 
-        redirect.assert_called_with('http://next')
+        redirect.assert_called_with('/')
 
 
     @with_context
     @patch('pybossa.view.flickr.flickr.oauth')
     @patch('pybossa.view.flickr.redirect')
-    def test_oauth_authorized_redirects_to_url_next_param_on_user_no_authorizing(
+    def test_oauth_authorized_rejects_external_next_on_user_no_authorizing(
             self, redirect, oauth):
         oauth.authorized_response.return_value = None
         redirect.return_value = Response(status=302)
         flask_app.test_client().get('/flickr/oauth-authorized?next=http://next')
 
-        redirect.assert_called_with('http://next')
+        redirect.assert_called_with('/')
 
 
 class TestFlickrAPI(object):

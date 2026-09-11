@@ -16,7 +16,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
-from test import Test, assert_not_raises, with_context, with_request_context
+from test import Test, assert_not_raises, with_request_context
+from pybossa import data_access
 from pybossa.auth import ensure_authorized_to
 from nose.tools import assert_raises
 from werkzeug.exceptions import Forbidden, Unauthorized
@@ -32,17 +33,17 @@ class TestProjectStatsAuthorization(Test):
     mock_authenticated = mock_current_user(anonymous=False, admin=False, id=2)
     mock_admin = mock_current_user(anonymous=False, admin=True, id=1)
 
-    def prepare_stats(self):
-      project = ProjectFactory.create()
-      stats.update_stats(project.id)
-      return stats.get_stats(project.id, full=True)
+    def prepare_stats(self, project=None):
+        project = project or ProjectFactory.create()
+        stats.update_stats(project.id)
+        return stats.get_stats(project.id, full=True)
 
     @with_request_context
     @patch('pybossa.auth.current_user', new=mock_anonymous)
-    def test_anonymous_user_can_read_projectstats(self):
-        """Test anonymous users can read projectstats"""
+    def test_anonymous_user_cannot_read_projectstats(self):
+        """Test anonymous users cannot read projectstats"""
         ps = self.prepare_stats()
-        assert_not_raises(Exception, ensure_authorized_to, 'read', ps)
+        assert_raises(Unauthorized, ensure_authorized_to, 'read', ps)
 
     @with_request_context
     @patch('pybossa.auth.current_user', new=mock_authenticated)
@@ -57,6 +58,35 @@ class TestProjectStatsAuthorization(Test):
         """Test admin users can read projectstats"""
         ps = self.prepare_stats()
         assert_not_raises(Exception, ensure_authorized_to, 'read', ps)
+
+    @with_request_context
+    @patch('pybossa.auth.current_user', new=mock_authenticated)
+    def test_user_cannot_read_unpublished_projectstats(self):
+        """Test users cannot read stats for an unpublished project"""
+        project = ProjectFactory.create(published=False)
+        ps = self.prepare_stats(project)
+
+        assert_raises(Forbidden, ensure_authorized_to, 'read', ps)
+
+    @with_request_context
+    @patch('pybossa.auth.current_user', new=mock_authenticated)
+    def test_project_user_can_read_private_gigwork_projectstats(self):
+        """Test assigned users can read stats for a private GIGwork project"""
+        project = ProjectFactory.create(info={'project_users': [2]})
+        ps = self.prepare_stats(project)
+
+        with patch.object(data_access, 'data_access_levels', {'enabled': True}):
+            assert_not_raises(Exception, ensure_authorized_to, 'read', ps)
+
+    @with_request_context
+    @patch('pybossa.auth.current_user', new=mock_authenticated)
+    def test_unassigned_user_cannot_read_private_gigwork_projectstats(self):
+        """Test unassigned users cannot read private GIGwork project stats"""
+        project = ProjectFactory.create(info={'project_users': []})
+        ps = self.prepare_stats(project)
+
+        with patch.object(data_access, 'data_access_levels', {'enabled': True}):
+            assert_raises(Forbidden, ensure_authorized_to, 'read', ps)
 
     @with_request_context
     @patch('pybossa.auth.current_user', new=mock_anonymous)

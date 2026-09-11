@@ -16,11 +16,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 
+from hashlib import sha256
+from math import ceil
+from time import time
+from urllib.parse import urlparse
+
 from flask import Blueprint, request, flash, url_for, redirect, current_app, abort
 from flask_babel import gettext
-from pybossa.core import user_repo, csrf
+from pybossa.core import user_repo, csrf, sentinel
 from pybossa.view.account import _sign_in_user, create_account
-from urllib.parse import urlparse
 from pybossa.util import generate_bsso_account_notification
 from pybossa.util import is_own_url_or_else, generate_password
 from pybossa.jobs import send_mail
@@ -29,6 +33,24 @@ from pybossa.data_access import data_access_levels
 from onelogin.saml2.auth import OneLogin_Saml2_Auth
 
 blueprint = Blueprint('bloomberg', __name__)
+
+
+def _claim_saml_assertion(auth, redis_connection, current_time=None):
+    assertion_id = auth.get_last_assertion_id()
+    assertion_not_on_or_after = auth.get_last_assertion_not_on_or_after()
+    if not isinstance(assertion_id, str) or not assertion_id or \
+            assertion_not_on_or_after is None:
+        return False
+    try:
+        now = time() if current_time is None else current_time
+        ttl = ceil(float(assertion_not_on_or_after) - now)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    if ttl <= 0:
+        return False
+    assertion_digest = sha256(assertion_id.encode('utf-8')).hexdigest()
+    key = 'bsso:saml-assertion:{}'.format(assertion_digest)
+    return bool(redis_connection.set(key, 1, nx=True, ex=ttl))
 
 
 @blueprint.route('/login', methods=['GET', 'POST'])
@@ -75,7 +97,18 @@ def handle_bloomberg_response():
         current_app.logger.error('BSSO auth error(s): %s %s', errors, error_reason)
         flash(gettext('There was a problem during the sign in process.'), 'error')
         return redirect(url_for('home.home'))
-    elif auth.is_authenticated:
+    elif auth.is_authenticated():
+        try:
+            assertion_claimed = _claim_saml_assertion(auth, sentinel.master)
+        except Exception:
+            current_app.logger.exception(
+                'BSSO assertion replay protection failed')
+            assertion_claimed = False
+        if not assertion_claimed:
+            current_app.logger.warning(
+                'BSSO assertion replay protection rejected authentication')
+            flash(gettext('There was a problem during the sign in process.'), 'error')
+            return redirect(url_for('home.home'))
         # User is authenticated on BSSO, load user from GIGwork API.
         attributes = auth.get_attributes()
         user = user_repo.get_by(email_addr=str(attributes['emailAddress'][0]).lower())

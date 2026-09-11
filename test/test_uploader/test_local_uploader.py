@@ -124,7 +124,7 @@ class TestLocalUploader(Test):
         u = LocalUploader()
         u.upload_folder = tempfile.mkdtemp()
         file = FileStorage(filename='test.jpg')
-        container = 'mycontainer'
+        container = 'user_3'
         res = u.upload_file(file, container=container)
         path = os.path.join(u.upload_folder, container)
         err_msg = "This local path should exist: %s" % path
@@ -135,19 +135,19 @@ class TestLocalUploader(Test):
         """Test LOCAL UPLOADER delete works."""
         u = LocalUploader()
         err_msg = "Delete should return true"
-        assert u.delete_file('file', 'container') is True, err_msg
+        assert u.delete_file('file', 'user_3') is True, err_msg
 
     @patch('os.remove', side_effect=OSError)
     def test_local_folder_delete_fails(self, mock):
         """Test LOCAL UPLOADER delete fail works."""
         u = LocalUploader()
         err_msg = "Delete should return False"
-        assert u.delete_file('file', 'container') is False, err_msg
+        assert u.delete_file('file', 'user_3') is False, err_msg
 
     def test_file_exists_for_missing_file(self):
         """Test LOCAL UPLOADER file_exists returns False if the file does not exist"""
         u = LocalUploader()
-        container = 'mycontainer'
+        container = 'user_3'
 
         assert u.file_exists('noexist.txt', container) is False
 
@@ -156,7 +156,28 @@ class TestLocalUploader(Test):
         u = LocalUploader()
         u.upload_folder = tempfile.mkdtemp()
         file = FileStorage(filename='test.jpg')
-        container = 'mycontainer'
+        container = 'user_3'
         u.upload_file(file, container=container)
 
         assert u.file_exists('test.jpg', container) is True
+
+    def test_local_uploader_rejects_untrusted_paths(self):
+        u = LocalUploader()
+        u.upload_folder = tempfile.mkdtemp()
+
+        for container, filename in (
+                ('../user_3', 'test.jpg'),
+                ('user_3', '../test.jpg'),
+                ('user_3', '/tmp/test.jpg'),
+                ('other', 'test.jpg')):
+            assert_raises(ValueError, u.get_file_path, container, filename)
+            assert u.delete_file(filename, container) is False
+            assert u.file_exists(filename, container) is False
+
+    def test_local_uploader_rejects_container_symlink_escape(self):
+        u = LocalUploader()
+        u.upload_folder = tempfile.mkdtemp()
+        outside = tempfile.mkdtemp()
+        os.symlink(outside, os.path.join(u.upload_folder, 'user_3'))
+
+        assert_raises(ValueError, u.get_file_path, 'user_3', 'test.jpg')

@@ -486,7 +486,7 @@ class TestAuditlogWEB(web.Helper):
             assert log.user_id == 1, log.user_id
 
     @with_context
-    @patch('pybossa.forms.validator.requests.get')
+    @patch('pybossa.ssrf_guard.resolve_and_validate')
     def test_project_webhook(self, mock):
         html_request = FakeRequest(json.dumps(self.data), 200,
                                    {'content-type': 'projectlication/json'})
@@ -501,7 +501,7 @@ class TestAuditlogWEB(web.Helper):
 
         attribute = 'webhook'
 
-        new_string = 'http://google.com'
+        new_string = 'https://google.com'
 
         old_value = ''
 

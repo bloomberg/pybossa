@@ -43,8 +43,10 @@ from pybossa.cache.users import get_users_for_report
 from pybossa.cloud_store_api.connection import create_connection
 from pybossa.core import mail, task_repo, importer
 from pybossa.core import user_repo, auditlog_repo
+from pybossa.exporter import neutralize_csv_formulas
 from pybossa.leaderboard.jobs import leaderboard
 from pybossa.model.webhook import Webhook
+from pybossa.ssrf_guard import safe_post
 from pybossa.util import with_cache_disabled, publish_channel, \
     mail_with_enabled_users
 from pybossa.core import email_service
@@ -399,9 +401,15 @@ def get_autoimport_jobs(queue='low'):
     for project_dict in projects:
         project = project_repo.get(project_dict['id'])
         if project.has_autoimporter():
+            autoimporter = project.get_autoimporter()
+            if (isinstance(autoimporter, dict) and
+                    autoimporter.get('type') not in importer.get_autoimporter_names()):
+                current_app.logger.warning(
+                    "Skipping unsupported autoimporter for project %d", project.id)
+                continue
             job = dict(name=import_tasks,
                        args=[project.id, True],
-                       kwargs=project.get_autoimporter(),
+                       kwargs=autoimporter,
                        timeout=timeout,
                        queue=queue)
             yield job
@@ -912,6 +920,10 @@ def import_tasks(project_id, current_user_fullname, from_auto=False, **form_data
         recipients.append(user.email_addr)
 
     try:
+        if (from_auto and
+                form_data.get('type') not in importer.get_autoimporter_names()):
+            raise ValueError(
+                '{} is not allowed for autoimport'.format(form_data.get('type')))
         with current_app.test_request_context():
             report = importer.create_tasks(task_repo, project, **form_data)
     except JobTimeoutException:
@@ -1063,10 +1075,31 @@ def export_tasks(current_user_email_addr, short_name,
         raise
 
 
+def summarize_webhook_response(response):
+    """Build a bounded record of a webhook response for storage.
+
+    The response body is deliberately not persisted by default. The webhook
+    target is chosen by the project owner, so an attacker-controlled request
+    (CWE-918) whose body is stored becomes a full read: the stored value is
+    rendered on the webhook status page and mailed to ADMINS on failure.
+    Storing only the status code keeps the delivery record useful without
+    carrying content back from the target.
+
+    Set WEBHOOK_STORE_RESPONSE_BODY to re-enable storage of a truncated,
+    plain-text excerpt (WEBHOOK_RESPONSE_MAX_LENGTH characters).
+    """
+    from flask import current_app
+    status = response.status_code
+    if not current_app.config.get('WEBHOOK_STORE_RESPONSE_BODY', False):
+        return 'HTTP {}'.format(status)
+    limit = current_app.config.get('WEBHOOK_RESPONSE_MAX_LENGTH', 256)
+    excerpt = (response.text or '')[:limit]
+    return 'HTTP {}: {}'.format(status, excerpt)
+
+
 def webhook(url, payload=None, oid=None, rerun=False):
     """Post to a webhook."""
     from flask import current_app
-    from readability.readability import Document
     try:
         import json
         from pybossa.core import sentinel, webhook_repo, project_repo
@@ -1081,10 +1114,10 @@ def webhook(url, payload=None, oid=None, rerun=False):
             params = dict()
             if rerun:
                 params['rerun'] = True
-            response = requests.post(url, params=params,
-                                     data=json.dumps(payload),
-                                     headers=headers)
-            webhook.response = Document(response.text).summary()
+            response = safe_post(url, params=params,
+                                 data=json.dumps(payload),
+                                 headers=headers)
+            webhook.response = summarize_webhook_response(response)
             webhook.response_status_code = response.status_code
         else:
             raise requests.exceptions.ConnectionError('Not URL')
@@ -1100,9 +1133,14 @@ def webhook(url, payload=None, oid=None, rerun=False):
     finally:
         if project.published and webhook.response_status_code != 200 and current_app.config.get('ADMINS'):
             subject = "Broken: %s webhook failed" % project.name
-            body = 'Sorry, but the webhook failed'
+            # The stored response is not mailed as HTML: it derives from a
+            # target the project owner chooses, so sending it to ADMINS both
+            # carries response content off the server and injects unescaped
+            # markup into the message. The status code is enough to triage.
+            body = 'Sorry, but the webhook failed. HTTP status: {}'.format(
+                webhook.response_status_code)
             mail_dict = dict(recipients=current_app.config.get('ADMINS'),
-                             subject=subject, body=body, html=webhook.response)
+                             subject=subject, body=body)
             send_mail(mail_dict)
     if current_app.config.get('SSE'):
         publish_channel(sentinel, payload['project_short_name'],
@@ -1665,7 +1703,8 @@ def export_all_users(fmt, email_addr):
     def respond_csv():
         users = get_users_for_report()
         df = pd.DataFrame.from_dict(users)
-        user_csv = df.to_csv(columns=exportable_attributes, index=False)
+        user_csv = neutralize_csv_formulas(df).to_csv(
+            columns=exportable_attributes, index=False)
         return user_csv
 
     recipients = email_addr if isinstance(email_addr, list) else [email_addr]

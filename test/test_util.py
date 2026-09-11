@@ -27,13 +27,14 @@ from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
 from bs4 import BeautifulSoup
+from flask import current_app
 from flask_wtf import FlaskForm as Form
 from nose.tools import nottest, assert_raises
 
 import pybossa.util as util
 from pybossa.importers import BulkImportException
 from pybossa.importers.csv import BulkTaskCSVImport
-from test import with_context, Test, with_request_context
+from test import with_context, Test, with_request_context, with_context_settings
 from test.factories import UserFactory, ProjectFactory, TaskFactory
 from pybossa.model.user import User
 from pybossa.model.project import Project
@@ -70,6 +71,41 @@ class FakeApp(object):
 
 
 test_sentinel = Sentinel(app=FakeApp())
+
+
+class TestOwnUrl:
+
+    @with_context
+    def test_is_own_url(self):
+        server_name = current_app.config.get('SERVER_NAME')
+        cases = [
+            (None, True),
+            ('', True),
+            ('/home', True),
+            ('/', True),
+            ('https://{}/home'.format(server_name), True),
+            ('http://{}:8443/home'.format(server_name), True),
+            ('https://{}.evil.net/home'.format(server_name), False),
+            ('https://{}@evil.net/home'.format(server_name), False),
+            (r'/\evil.net', False),
+            (r'https:/\evil.net', False),
+            (r'https://evil.net\@{}/home'.format(server_name), False),
+            ('{}/home'.format(server_name), False),
+            ('//{}/home'.format(server_name), False),
+            ('ftp://{}/home'.format(server_name), False),
+            ('/\n/evil.net', False),
+            ('https://google.com', False),
+            ('https://[invalid', False),
+        ]
+
+        for url, expected in cases:
+            assert util.is_own_url(url) is expected, url
+
+    @with_context_settings(SERVER_NAME=None)
+    def test_absolute_url_rejected_without_server_name(self):
+        assert util.is_own_url('/home')
+        assert not util.is_own_url('https://example.com/home')
+
 
 class TestPybossaUtil(Test):
 
@@ -333,18 +369,6 @@ class TestPybossaUtil(Test):
         assert code == 404, err_msg
         err_msg = "There should not be code key"
         assert data.get('code') is None, err_msg
-
-    @with_context
-    def test_is_own_url(self):
-        assert util.is_own_url('/home')
-        assert util.is_own_url('{}/home'.format(self.flask_app.config.get('SERVER_NAME')))
-        assert util.is_own_url('https://{}/home'.format(self.flask_app.config.get('SERVER_NAME')))
-        assert util.is_own_url(util.url_for('home.home'))
-        url = util.url_for('home.home', _external=True)
-        assert util.is_own_url(url), url
-        assert not util.is_own_url('https://google.com')
-        assert util.is_own_url(None)
-        assert util.is_own_url('')
 
     @with_request_context
     @patch('pybossa.util.request')
@@ -1980,3 +2004,73 @@ class TestCopyDirectory(Test):
             copy_directory(self.source, self.target)
             mock_shutil.assert_called_with(self.source, self.target)
             mock_mkdir.assert_called_once()
+
+
+class TestGetUserFilterDbClause(Test):
+    """Regression tests for worker-filter query construction.
+
+    A worker's Task Preferences profile is free-form JSON they save on their own
+    account page. The profile's key names used to be formatted into the SQL with
+    Python's repr(), which escapes a single quote as \\' - not an escape in
+    PostgreSQL under standard_conforming_strings=on. A key holding both quote
+    characters therefore closed the array literal and everything after it ran as
+    SQL. The keys are now bound as a query parameter.
+    """
+
+    # A key containing BOTH quote characters. With only a single quote, repr()
+    # switches to double-quote delimiters and Postgres reads a quoted
+    # identifier - an error, not an injection.
+    INJECTION_KEY = '''a']::text[] OR (SELECT 1=1) --"'''
+
+    @with_context
+    def test_returns_sql_and_params(self):
+        sql, params = util.get_user_filter_db_clause({'english': 1})
+        assert isinstance(sql, str), type(sql)
+        assert isinstance(params, dict), type(params)
+
+    @with_context
+    def test_empty_profile_adds_no_clause_and_no_params(self):
+        sql, params = util.get_user_filter_db_clause({})
+        assert 'worker_filter ?|' not in sql, sql
+        assert params == {}, params
+
+    @with_context
+    def test_none_profile_adds_no_clause_and_no_params(self):
+        sql, params = util.get_user_filter_db_clause(None)
+        assert 'worker_filter ?|' not in sql, sql
+        assert params == {}, params
+
+    @with_context
+    def test_profile_keys_are_bound_not_interpolated(self):
+        sql, params = util.get_user_filter_db_clause({'english': 1, 'finance': 2})
+        assert ':worker_filter_keys' in sql, sql
+        assert 'english' not in sql, sql
+        assert 'finance' not in sql, sql
+        assert sorted(params['worker_filter_keys']) == ['english', 'finance'], params
+
+    @with_context
+    def test_injection_key_does_not_reach_the_statement(self):
+        sql, params = util.get_user_filter_db_clause({self.INJECTION_KEY: 1})
+        # Assert on fragments of the payload rather than the key itself. The
+        # The previous implementation emitted repr(), which backslash-escapes the quote, so
+        # the raw key never appeared verbatim even while it WAS interpolated -
+        # `self.INJECTION_KEY not in sql` passes against the bug and is no test
+        # at all. These fragments did appear, and must not now.
+        assert '(SELECT 1=1)' not in sql, sql
+        assert ']::text[] OR' not in sql, sql
+        assert params['worker_filter_keys'] == [self.INJECTION_KEY], params
+
+    @with_context
+    def test_statement_carries_no_injected_sql(self):
+        sql, _ = util.get_user_filter_db_clause({self.INJECTION_KEY: 1})
+        # No statement boundary and no comment introducer can be created,
+        # because no part of the key is in the statement text.
+        assert ';' not in sql, sql
+        assert '--' not in sql, sql
+        assert 'SELECT' not in sql.upper(), sql
+
+    @with_context
+    def test_non_string_keys_are_coerced_and_bound(self):
+        sql, params = util.get_user_filter_db_clause({1: 'a', 2: 'b'})
+        assert ':worker_filter_keys' in sql, sql
+        assert sorted(params['worker_filter_keys']) == ['1', '2'], params

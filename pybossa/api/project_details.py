@@ -42,6 +42,8 @@ class ProjectDetailsAPI(APIBase):
         return APIBase._filter_query(self, repo_info, limit, offset, orderby)
 
     def _create_json_response(self, query_result, oid):
+        if oid is not None:
+            return APIBase._create_json_response(self, query_result, oid)
         if len(query_result) == 1 and query_result[0] is None:
             raise abort(404)
         items = []
@@ -52,9 +54,6 @@ class ProjectDetailsAPI(APIBase):
                 items.append(datum)
             except Exception:  # pragma: no cover
                 raise
-        if oid is not None:
-            self._sign_item(items[0])
-            items = items[0]
         return json.dumps(items)
 
 

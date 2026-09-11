@@ -291,7 +291,7 @@ class Importer(object):
 
     def get_autoimporter_names(self):
         """Get autoimporter names."""
-        no_autoimporters = ('dropbox', 's3')
+        no_autoimporters = ('dropbox', 's3', 'localCSV')
         return [name for name in self._importers.keys() if name not in no_autoimporters]
 
     def set_importers(self, importers):

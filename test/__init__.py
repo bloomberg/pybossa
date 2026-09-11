@@ -310,7 +310,9 @@ class Test(object):
         from urllib.parse import quote
         if username:
             user = user_repo.get_by_name(username)
-        cookie = signer.dumps([get_user_id_or_ip(user)])
+        cookie = signer.dumps(
+            [get_user_id_or_ip(user)],
+            salt='project-password-%s' % project.id)
         cookie_name = quote('%spswd' % project.short_name, safe='')
         self.app.set_cookie(cookie_name, cookie)
 

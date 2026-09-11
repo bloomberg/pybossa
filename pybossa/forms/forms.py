@@ -624,8 +624,6 @@ class UpdateProfileForm(Form):
 
     """Form Class for updating PYBOSSA's user Profile."""
 
-    id = IntegerField(label=None, widget=HiddenInput())
-
     err_msg = lazy_gettext("Full name must be between 3 and %(fullname)s "
                            "characters long" , fullname=USER_FULLNAME_MAX_LENGTH)
     fullname = StringField(lazy_gettext('Full name'),
@@ -637,7 +635,9 @@ class UpdateProfileForm(Form):
     name = StringField(lazy_gettext('Username'),
                      [validators.Length(min=3, max=USER_NAME_MAX_LENGTH, message=err_msg),
                       pb_validator.NotAllowedChars(),
-                      pb_validator.Unique(user_repo.get_by, 'name', err_msg_2),
+                      pb_validator.Unique(
+                          user_repo.get_by, 'name', err_msg_2,
+                          current_id_getter=lambda: current_user.id),
                       pb_validator.ReservedName('account', current_app)])
 
     err_msg = lazy_gettext("Email must be between 3 and %(email_length)s "
@@ -648,7 +648,9 @@ class UpdateProfileForm(Form):
                                               max=EMAIL_MAX_LENGTH,
                                               message=err_msg),
                             validators.Email(),
-                            pb_validator.Unique(user_repo.get_by, 'email_addr', err_msg_2)])
+                            pb_validator.Unique(
+                                user_repo.get_by, 'email_addr', err_msg_2,
+                                current_id_getter=lambda: current_user.id)])
     subscribed = BooleanField(lazy_gettext('Get email notifications'))
 
     locale = SelectField(lazy_gettext('Language'))

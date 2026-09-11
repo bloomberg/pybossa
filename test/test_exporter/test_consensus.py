@@ -17,17 +17,39 @@
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from io import BytesIO
+from io import BytesIO, StringIO
 from zipfile import ZipFile
 
 from test import Test, with_context
-from pybossa.exporter.consensus_exporter import export_consensus, format_consensus
+from pybossa.exporter.consensus_exporter import csv_formatter, export_consensus, format_consensus
 from unittest.mock import patch
 from test.factories import ProjectFactory, TaskFactory, TaskRunFactory
 import pandas as pd
 
 
 class TestConsensusExporter(Test):
+
+    def test_csv_formatter_neutralizes_spreadsheet_formulas(self):
+        output = StringIO()
+        csv_formatter([{
+            '=formula_header': '=formula_value',
+            'plus': '+formula_value',
+            'minus': '-formula_value',
+            'at': '@formula_value',
+            'tab': '\tformula_value',
+            'carriage_return': '\rformula_value',
+            'number': -1,
+        }], output)
+
+        dataframe = pd.read_csv(StringIO(output.getvalue()), keep_default_na=False)
+        assert "'=formula_header" in dataframe.columns
+        assert dataframe.iloc[0]["'=formula_header"] == "'=formula_value"
+        assert dataframe.iloc[0]['plus'] == "'+formula_value"
+        assert dataframe.iloc[0]['minus'] == "'-formula_value"
+        assert dataframe.iloc[0]['at'] == "'@formula_value"
+        assert dataframe.iloc[0]['tab'] == "'\tformula_value"
+        assert dataframe.iloc[0]['carriage_return'] == "'\rformula_value"
+        assert dataframe.iloc[0]['number'] == -1
 
     @with_context
     def test_export_consesus(self):

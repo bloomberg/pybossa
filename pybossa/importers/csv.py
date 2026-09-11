@@ -23,12 +23,12 @@ import re
 import codecs
 from io import StringIO
 
-import requests
 from flask import current_app as app
 from flask_babel import gettext
 from werkzeug.datastructures import FileStorage
 
 from pybossa.data_access import data_access_levels
+from pybossa.ssrf_guard import safe_get
 from pybossa.util import get_import_csv_file
 from pybossa.util import unicode_csv_reader, validate_required_fields
 from .base import BulkTaskImport, BulkImportException
@@ -43,7 +43,8 @@ type_map = {
 
 def get_value(header, value_string, data_type):
     def error():
-        raise BulkImportException('Column {} contains a non-{} value {}'.format(header, data_type, value_string))
+        raise BulkImportException(
+            'Column {} contains a non-{} value'.format(header, data_type))
 
     if not data_type:
         return value_string
@@ -310,7 +311,7 @@ class BulkTaskCSVImport(BulkTaskCSVImportBase):
         """Get CSV data from a request."""
         url = self._get_data_url()
 
-        r = requests.get(url)
+        r = safe_get(url)
         if r.status_code == 403:
             msg = ("Oops! It looks like you don't have permission to access"
                    " that file")

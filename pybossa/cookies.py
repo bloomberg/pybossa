@@ -17,7 +17,7 @@
 # along with PYBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 """Cookie module for PYBOSSA."""
 from urllib.parse import quote
-from itsdangerous import SignatureExpired
+from itsdangerous import BadSignature
 
 
 class CookieHandler(object):
@@ -30,19 +30,25 @@ class CookieHandler(object):
         self.signer = signer
         self.expiration = expiration
 
+    def _get_salt(self, project):
+        """Return the signing salt for a project's password cookie."""
+        return 'project-password-%s' % project.id
+
     def _create_or_update_cookie(self, project, user):
         """Create or update cookie."""
         cookie_name = quote('%spswd' % project.short_name, safe='')
         cookie = self.request.cookies.get(cookie_name)
         if cookie is None:
             cookie = self.request.cookies.get('%spswd' % project.short_name)
+        salt = self._get_salt(project)
         try:
-            cookie = self.signer.loads(cookie, max_age=self.expiration) if cookie else []
-        except SignatureExpired:
+            cookie = self.signer.loads(cookie, max_age=self.expiration,
+                                       salt=salt) if cookie else []
+        except BadSignature:
             cookie = []
         if user not in cookie:
             cookie.append(user)
-        cookie = self.signer.dumps(cookie)
+        cookie = self.signer.dumps(cookie, salt=salt)
         return cookie
 
     def add_cookie_to(self, response, project, user):
@@ -59,7 +65,9 @@ class CookieHandler(object):
         if signed_cookie is None:
             signed_cookie = self.request.cookies.get('%spswd' % project.short_name)
         try:
-            cookie = self.signer.loads(signed_cookie, max_age=self.expiration) if signed_cookie else []
-        except SignatureExpired:
+            cookie = self.signer.loads(signed_cookie,
+                                       max_age=self.expiration,
+                                       salt=self._get_salt(project)) if signed_cookie else []
+        except BadSignature:
             cookie = []
         return cookie

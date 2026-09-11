@@ -40,6 +40,7 @@ class BlogpostAPI(APIBase):
     __class__ = Blogpost
 
     def _forbidden_attributes(self, data):
+        self._forbid_server_managed_upload_info(data)
         for key in data.keys():
             if key in self.reserved_keys:
                 msg = "Reserved keys in payload: %s" % key

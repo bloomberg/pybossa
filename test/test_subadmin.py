@@ -24,26 +24,26 @@ class TestSubAdmin(web.Helper):
         # Signin with admin user
         self.signin()
         # Add user.id=1000 (it does not exist)
-        res = self.app.get("/admin/users/addsubadmin/1000", follow_redirects=True)
+        res = self.app.post("/admin/users/addsubadmin/1000", follow_redirects=True)
         err = json.loads(res.data)
         assert res.status_code == 404, res.status_code
         assert err['error'] == "User not found", err
         assert err['status_code'] == 404, err
 
         # Add user.id=2 to admin group
-        res = self.app.get("/admin/users/addsubadmin/2", follow_redirects=True)
+        res = self.app.post("/admin/users/addsubadmin/2", follow_redirects=True)
         assert "Current Users with Subadmin privileges" in str(res.data)
         err_msg = "User.id=2 should be listed as an subadmin"
         assert "Juan Jose" in str(res.data), err_msg
         
         # Remove user.id=2 from subadmin group
-        res = self.app.get("/admin/users/delsubadmin/2", follow_redirects=True)
+        res = self.app.post("/admin/users/delsubadmin/2", follow_redirects=True)
         assert "Current Users with Subadmin privileges" not in str(res.data)
         err_msg = "User.id=2 should be listed as an subadmin"
         assert "Juan Jose" not in str(res.data), err_msg
         
         # Delete a non existant user should return an error
-        res = self.app.get("/admin/users/delsubadmin/5000", follow_redirects=True)
+        res = self.app.post("/admin/users/delsubadmin/5000", follow_redirects=True)
         err = json.loads(res.data)
         assert res.status_code == 404, res.status_code
         assert err['error'] == "User.id not found", err
@@ -62,10 +62,10 @@ class TestSubAdmin(web.Helper):
         self.signout()
         self.signin(email="juan2@juan.com", password="juan2")
         # Add user.id=2 to subadmin group
-        res = self.app.get("/admin/users/addsubadmin/2", follow_redirects=True)
+        res = self.app.post("/admin/users/addsubadmin/2", follow_redirects=True)
         assert res.status == "403 FORBIDDEN",\
             "This action should be forbidden, not enought privileges"
         # Remove user.id=2 from subadmin group
-        res = self.app.get("/admin/users/delsubadmin/2", follow_redirects=True)
+        res = self.app.post("/admin/users/delsubadmin/2", follow_redirects=True)
         assert res.status == "403 FORBIDDEN",\
             "This action should be forbidden, not enought privileges"

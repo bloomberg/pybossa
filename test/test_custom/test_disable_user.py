@@ -31,13 +31,13 @@ class TestWeb(web.Helper):
         self.signin()
         self.register(name='tyrion')
         user = user_repo.get_by_name('tyrion')
-        self.app.get('/admin/users/disable_user/{}'.format(user.id))
+        self.app.post('/admin/users/disable_user/{}'.format(user.id))
         self.signout()
         res = self.signin(email='tyrion@example.com')
         assert b'Your account is disabled. ' in res.data, res.data
 
         self.signin()
-        self.app.get('/admin/users/enable_user/{}'.format(user.id))
+        self.app.post('/admin/users/enable_user/{}'.format(user.id))
         self.signout()
         res = self.signin(email='tyrion@example.com')
         assert b'Welcome back ' in res.data, res.data
@@ -47,10 +47,10 @@ class TestWeb(web.Helper):
         """Test disable non existing user returns 404"""
         self.register()
         self.signin()
-        res = self.app.get('/admin/users/disable_user/3')
+        res = self.app.post('/admin/users/disable_user/3')
         assert res.status_code == 404, res.status
 
-        self.app.get('/admin/users/enable_user/3')
+        self.app.post('/admin/users/enable_user/3')
         assert res.status_code == 404, res.status
 
     @with_context
@@ -65,10 +65,10 @@ class TestWeb(web.Helper):
         self.signin(email='tywin@example.com')
         tyrion = user_repo.get_by_name('tyrion')
 
-        res = self.app.get('/admin/users/disable_user/{}'.format(tyrion.id))
+        res = self.app.post('/admin/users/disable_user/{}'.format(tyrion.id))
         assert res.status_code == 403, res.status
 
-        res = self.app.get('/admin/users/enable_user/{}'.format(tyrion.id))
+        res = self.app.post('/admin/users/enable_user/{}'.format(tyrion.id))
         assert res.status_code == 403, res.status
 
     @with_context
@@ -83,10 +83,10 @@ class TestWeb(web.Helper):
         self.signin(email='tyrion@example.com')
         tyrion = user_repo.get_by_name('tyrion')
 
-        res = self.app.get('/admin/users/disable_user/{}'.format(tyrion.id))
+        res = self.app.post('/admin/users/disable_user/{}'.format(tyrion.id))
         assert res.status_code == 403, res.status
 
-        res = self.app.get('/admin/users/enable_user/{}'.format(tyrion.id))
+        res = self.app.post('/admin/users/enable_user/{}'.format(tyrion.id))
         assert res.status_code == 403, res.status
 
     @with_context
@@ -102,11 +102,11 @@ class TestWeb(web.Helper):
         self.signin(email='tyrion@example.com')
         tywin = user_repo.get_by_name('tywin')
 
-        res = self.app.get('/admin/users/disable_user/{}'.format(tywin.id),
+        res = self.app.post('/admin/users/disable_user/{}'.format(tywin.id),
                            follow_redirects=True)
         assert res.status_code == 200, res.status
 
-        res = self.app.get('/admin/users/enable_user/{}'.format(tywin.id),
+        res = self.app.post('/admin/users/enable_user/{}'.format(tywin.id),
                            follow_redirects=True)
         assert res.status_code == 200, res.status
 
@@ -124,9 +124,9 @@ class TestWeb(web.Helper):
         self.signout()
 
         self.signin()
-        self.app.get('/admin/users/disable_user/{}'.format(user.id))
+        self.app.post('/admin/users/disable_user/{}'.format(user.id))
 
-        self.app.get('/admin/users/enable_user/{}'.format(user.id))
+        self.app.post('/admin/users/enable_user/{}'.format(user.id))
         self.signout()
 
         user = user_repo.get_by_name('tyrion')

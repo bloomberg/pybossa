@@ -24,7 +24,8 @@ from flask_oauthlib.client import OAuthException
 
 from pybossa.core import twitter, user_repo, newsletter
 from pybossa.model.user import User
-from pybossa.util import get_user_signup_method, url_for_app_type
+from pybossa.util import (get_user_signup_method, is_own_url_or_else,
+                          url_for_app_type)
 
 blueprint = Blueprint('twitter', __name__)
 
@@ -74,7 +75,9 @@ def oauth_authorized():  # pragma: no cover
     redirect back unless the user clicks on the application name.
     """
     resp = twitter.oauth.authorized_response()
-    next_url = request.args.get('next') or url_for_app_type('home.home')
+    default_url = url_for_app_type('home.home')
+    next_url = is_own_url_or_else(
+        request.args.get('next') or default_url, default_url)
     if resp is None:
         flash('You denied the request to sign in.', 'error')
         return redirect(next_url)

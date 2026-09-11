@@ -31,17 +31,17 @@ from datetime import datetime
 from flask import request, Response, current_app
 from flask import current_app as app
 from flask_login import current_user
-from werkzeug.exceptions import Forbidden, BadRequest
+from werkzeug.exceptions import BadRequest, Forbidden, Gone
 
 from .api_base import APIBase
 from pybossa.model.task_run import TaskRun
 from pybossa.util import get_user_id_or_ip
 from pybossa.core import task_repo, sentinel, anonymizer, project_repo, user_repo, task_repo
 from pybossa.core import performance_stats_repo
+from pybossa.auth.task import TaskAuth
 from pybossa.cloud_store_api.s3 import s3_upload_from_string
 from pybossa.cloud_store_api.s3 import s3_upload_file_storage
 from pybossa.contributions_guard import ContributionsGuard
-from pybossa.auth import jwt_authorize_project
 from pybossa.sched import can_post
 from pybossa.core import db
 from sqlalchemy.sql import func
@@ -68,18 +68,30 @@ class TaskRunAPI(APIBase):
     immutable_keys = set(['project_id', 'task_id'])
 
     def _preprocess_post_data(self, data):
+        if 'external_uid' in request.args or 'external_uid' in data:
+            raise Gone('External UID task submission is no longer supported')
+
+        if current_user.is_anonymous:
+            raise Forbidden('')
+        self.check_can_post(data['project_id'], data['task_id'])
+        self._preprocess_taskrun_data(
+            data, data['project_id'], data['task_id'], current_user.id)
+
+    def _preprocess_put_data(self, data, existing):
+        if 'info' in data:
+            self._preprocess_taskrun_data(
+                data, existing.project_id, existing.task_id,
+                existing.user_id or current_user.id)
+        return data
+
+    def _preprocess_taskrun_data(self, data, project_id, task_id, user_id):
         with_encryption = app.config.get('ENABLE_ENCRYPTION')
         upload_root_dir = app.config.get('S3_UPLOAD_DIRECTORY')
         conn_name = "S3_TASKRUN_V2" if app.config.get("S3_CONN_TYPE_V2") else "S3_TASKRUN"
-        if current_user.is_anonymous:
-            raise Forbidden('')
-        task_id = data['task_id']
-        project_id = data['project_id']
-        self.check_can_post(project_id, task_id)
         preprocess_task_run(project_id, task_id, data)
         if with_encryption:
             info = data['info']
-            path = "{0}/{1}/{2}".format(project_id, task_id, current_user.id)
+            path = "{0}/{1}/{2}".format(project_id, task_id, user_id)
 
             # for tasks with private_json_encrypted_payload, generate
             # encrypted response payload under private_json__encrypted_response
@@ -132,13 +144,6 @@ class TaskRunAPI(APIBase):
             raise Forbidden('Invalid task_id')
         if (task.project_id != taskrun.project_id):
             raise Forbidden('Invalid project_id')
-        if taskrun.external_uid:
-            resp = jwt_authorize_project(task.project,
-                                         request.headers.get('Authorization'))
-            if type(resp) == Response:
-                msg = json.loads(resp.data)['description']
-                raise Forbidden(msg)
-
     def _check_task_not_over_answered(self, task):
         """Reject submission if task already has n_answers task_runs.
 
@@ -171,6 +176,18 @@ class TaskRunAPI(APIBase):
                                                 '127.0.0.1')
             else:
                 taskrun.user_id = current_user.id
+                # Discard any caller-supplied user_ip for an authenticated
+                # worker. TaskRunAuth._create decides whether this is a
+                # duplicate by counting rows matching
+                # (project_id, task_id, user_id, user_ip, external_uid).
+                # user_ip is a real column, is not in reserved_keys, and so
+                # survives from the request body into the instance. A worker
+                # who sent a different fake user_ip on each POST made that
+                # count zero every time and could fill every redundancy slot
+                # on a task by themselves. Clearing it restores the gate: the
+                # count then filters on user_ip IS NULL and finds their
+                # earlier row.
+                taskrun.user_ip = None
         else:
             taskrun.user_ip = None
             taskrun.user_id = None
@@ -180,6 +197,8 @@ class TaskRunAPI(APIBase):
         guard._remove_task_stamped(task, get_user_id_or_ip())
 
     def _after_save(self, original_data, instance):
+        # Gold scoring is based on the first submission. PUT edits intentionally
+        # do not call this hook, so a worker cannot improve a gold score later.
         if mark_if_complete(instance.task_id, instance.project_id):
             delete_memoized(n_available_tasks_for_user)
         task = task_repo.get_task(instance.task_id)
@@ -219,8 +238,21 @@ class TaskRunAPI(APIBase):
         return deepcopy(item)
 
     def _customize_response_dict(self, response_dict):
+        # Only admins and subadmin project owners see gold answers.
+        #
+        # This was unconditional, so every worker's submission response carried
+        # the task's correct answer. On a gold task - a hidden quality probe,
+        # reused across workers - that hands over the answer key. get_gold_answers
+        # DECRYPTS via the app's own S3 credentials when ENABLE_ENCRYPTION is on,
+        # bypassing fileproxy.check_allowed entirely, so the plaintext answer was
+        # returned. It also contradicts TaskAuth.apply_access_control, which
+        # strips gold_answers for everyone below subadmin-owner.
+        #
+        # Skipping the call also avoids an S3 round-trip and decrypt on every
+        # single task-run submission.
         task = task_repo.get_task(response_dict['task_id'])
-        response_dict['gold_answers'] = get_gold_answers(task)
+        if TaskAuth(project_repo)._only_admin_or_subadminowners(current_user, task):
+            response_dict['gold_answers'] = get_gold_answers(task)
 
 
 def _upload_files_from_json(task_run_info, upload_path, with_encryption):

@@ -24,7 +24,8 @@ from flask_oauthlib.client import OAuthException
 
 from pybossa.core import facebook, user_repo, newsletter
 from pybossa.model.user import User
-from pybossa.util import get_user_signup_method, username_from_full_name
+from pybossa.util import (get_user_signup_method, is_own_url_or_else,
+                          username_from_full_name)
 from pybossa.util import url_for_app_type
 # Required to access the config parameters outside a context as we are using
 # Flask 0.8
@@ -59,13 +60,16 @@ def get_facebook_token():  # pragma: no cover
 def oauth_authorized():  # pragma: no cover
     """Authorize facebook login."""
     resp = facebook.oauth.authorized_response()
-    next_url = request.args.get('next') or url_for_app_type('home.home')
+    default_url = url_for_app_type('home.home')
+    next_url = is_own_url_or_else(
+        request.args.get('next') or default_url, default_url)
     if resp is None:
         flash('You denied the request to sign in.', 'error')
         flash('Reason: ' + request.args['error_reason'] +
               ' ' + request.args['error_description'], 'error')
-        next_url = (request.args.get('next') or
-                    url_for_app_type('home.home', _hash_last_flash=True))
+        default_url = url_for_app_type('home.home', _hash_last_flash=True)
+        next_url = is_own_url_or_else(
+            request.args.get('next') or default_url, default_url)
         return redirect(next_url)
     if isinstance(resp, OAuthException):
         flash('Access denied: %s' % resp.message)

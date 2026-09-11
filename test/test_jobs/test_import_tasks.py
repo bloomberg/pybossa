@@ -90,6 +90,28 @@ class TestImportTasksJob(Test):
 
     @with_context
     @patch('pybossa.jobs.send_mail')
+    @patch('pybossa.jobs.importer.create_tasks')
+    def test_autoimport_rejects_local_csv(self, create, send_mail):
+        project = ProjectFactory.create()
+        form_data = {
+            'type': 'localCSV',
+            'csv_filename': '/path/settings_local.py',
+            'validate_tp': False,
+        }
+
+        assert_raises(
+            ValueError,
+            import_tasks,
+            project.id,
+            True,
+            from_auto=True,
+            **form_data
+        )
+
+        create.assert_not_called()
+
+    @with_context
+    @patch('pybossa.jobs.send_mail')
     @patch('pybossa.jobs.importer')
     def test_create_tasks_throws_timeout_exception(self, importer, send_mail):
         importer.create_tasks.side_effect = JobTimeoutException()
@@ -166,6 +188,20 @@ class TestAutoimportJobs(Test):
         assert job['args'][1] == True, msg
         msg = "There sould be the kwargs."
         assert job['kwargs'] == 'foobar', msg
+
+    @with_context
+    def test_autoimport_jobs_reject_local_csv(self):
+        user = UserFactory.create(pro=True)
+        autoimporter = {
+            'type': 'localCSV',
+            'csv_filename': '/path/settings_local.py',
+            'validate_tp': False,
+        }
+        ProjectFactory.create(owner=user, info=dict(autoimporter=autoimporter))
+
+        jobs = list(get_autoimport_jobs())
+
+        assert jobs == []
 
     @with_context
     @patch.dict(flask_app.config, {'PRO_FEATURES': {'autoimporter': True}})

@@ -261,7 +261,7 @@ class Helper(Test):
                        new_category_id=1,
                        new_long_description="Long desc",
                        new_sched="random",
-                       new_webhook='http://server.com',
+                       new_webhook='https://server.com',
                        new_protect=False,
                        new_password=None,
                        new_product='abc',

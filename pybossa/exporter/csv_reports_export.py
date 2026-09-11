@@ -25,6 +25,7 @@ from werkzeug.utils import secure_filename
 from pybossa.cache.projects import get_project_report_projectdata
 from pybossa.cache.users import get_project_report_userdata
 from pybossa.core import project_repo
+from pybossa.exporter import neutralize_csv_formulas
 from pybossa.exporter.csv_export import CsvExporter
 
 
@@ -53,8 +54,10 @@ class ProjectReportCsvExporter(CsvExporter):
             end_date = kwargs.get("end_date")
             project_data = get_project_report_projectdata(project_id, start_date, end_date)
 
-            project_csv = pd.DataFrame([project_data],
-                                       columns=project_header).to_csv(index=False)
+            project_dataframe = pd.DataFrame([project_data],
+                                             columns=project_header)
+            project_csv = neutralize_csv_formulas(
+                project_dataframe).to_csv(index=False, lineterminator='\r\n')
 
             user_section = 'User Statistics'
             user_header = ['Id', 'Name', 'Fullname', 'Email', 'Admin', 'Subadmin', 'Enabled', 'Languages',
@@ -65,9 +68,12 @@ class ProjectReportCsvExporter(CsvExporter):
             # get user data for report
             users_project_data = get_project_report_userdata(project_id, start_date, end_date)
             if users_project_data and users_project_data[0]:
-                users_csv = pd.DataFrame(users_project_data, columns=user_header).to_csv(index=False)
+                users_dataframe = pd.DataFrame(users_project_data,
+                                               columns=user_header)
             else:
-                users_csv = pd.DataFrame(columns=user_header).to_csv(index=False)
+                users_dataframe = pd.DataFrame(columns=user_header)
+            users_csv = neutralize_csv_formulas(
+                users_dataframe).to_csv(index=False, lineterminator='\r\n')
 
             csv_txt = f'{project_section}\n{project_csv}\n{user_section}\n{users_csv}'
 

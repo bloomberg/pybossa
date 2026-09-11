@@ -206,7 +206,7 @@ class TestAdmin(web.Helper):
 
     @with_context
     @patch('pybossa.core.uploader.upload_file', return_value=True)
-    @patch('pybossa.forms.validator.requests.get')
+    @patch('pybossa.ssrf_guard.resolve_and_validate')
     def test_06_admin_featured_apps_add_remove_app(self, mock, mock_webhook):
         """Test ADMIN featured projects add-remove works as an admin user"""
         html_request = FakeRequest(json.dumps(self.pkg_json_not_found), 200,
@@ -488,14 +488,14 @@ class TestAdmin(web.Helper):
         # Signin with admin user
         self.signin()
         # Add user.id=1000 (it does not exist)
-        res = self.app.get("/admin/users/add/1000", follow_redirects=True)
+        res = self.app.post("/admin/users/add/1000", follow_redirects=True)
         err = json.loads(res.data)
         assert res.status_code == 404, res.status_code
         assert err['error'] == "User not found", err
         assert err['status_code'] == 404, err
 
         # Add user.id=2 to admin group
-        res = self.app.get("/admin/users/add/2", follow_redirects=True)
+        res = self.app.post("/admin/users/add/2", follow_redirects=True)
 
         first_call = mail_queue_mock.enqueue.call_args_list[0]
         args, kwargs = first_call
@@ -512,7 +512,7 @@ class TestAdmin(web.Helper):
         assert "Juan Jose" in str(res.data), err_msg
 
         # Remove user.id=2 from admin group
-        res = self.app.get("/admin/users/del/2", follow_redirects=True)
+        res = self.app.post("/admin/users/del/2", follow_redirects=True)
         assert "Current Users with Admin privileges" not in str(res.data)
         err_msg = "User.id=2 should be listed as an admin"
         assert "Juan Jose" not in str(res.data), err_msg
@@ -521,11 +521,11 @@ class TestAdmin(web.Helper):
         user = user_repo.get_by(name='juan')
         user.enabled = False
         user_repo.update(user)
-        res = self.app.get("/admin/users/add/2", follow_redirects=True)
+        res = self.app.post("/admin/users/add/2", follow_redirects=True)
         assert "<strong>User account </strong> Juan Jose <strong> is disabled</strong>" in str(res.data)
 
         # Delete a non existant user should return an error
-        res = self.app.get("/admin/users/del/5000", follow_redirects=True)
+        res = self.app.post("/admin/users/del/5000", follow_redirects=True)
         err = json.loads(res.data)
         assert res.status_code == 404, res.status_code
         assert err['error'] == "User.id not found", err
@@ -542,25 +542,25 @@ class TestAdmin(web.Helper):
         # Signin with admin user
         self.signin()
         # Add user.id=1000 (it does not exist)
-        res = self.app_get_json("/admin/users/add/1000")
+        res = self.app_post_json("/admin/users/add/1000")
         err = json.loads(res.data)
         assert res.status_code == 404, res.status_code
         assert err['error'] == "User not found", err
         assert err['status_code'] == 404, err
 
         # Add user.id=2 to admin group
-        res = self.app_get_json("/admin/users/add/2")
+        res = self.app_post_json("/admin/users/add/2")
         res = self.app_get_json("/admin/users")
         err_msg = "User.id=2 should be listed as an admin"
         data = json.loads(res.data)
         assert data['users'][0]['id'] == 2, data
         # Remove user.id=2 from admin group
-        res = self.app_get_json("/admin/users/del/2", follow_redirects=True)
+        res = self.app_post_json("/admin/users/del/2", follow_redirects=True)
         res = self.app_get_json("/admin/users")
         data = json.loads(res.data)
         assert len(data['users']) == 0, data
         # Delete a non existant user should return an error
-        res = self.app_get_json("/admin/users/del/5000")
+        res = self.app_post_json("/admin/users/del/5000")
         err = json.loads(res.data)
         assert res.status_code == 404, res.status_code
         assert err['error'] == "User.id not found", err
@@ -576,11 +576,11 @@ class TestAdmin(web.Helper):
                       email="juan@juan.com", password="juan")
         self.signout()
         # Add user.id=2 to admin group
-        res = self.app.get("/admin/users/add/2", follow_redirects=True)
+        res = self.app.post("/admin/users/add/2", follow_redirects=True)
         err_msg = "User should be redirected to signin"
         assert "This feature requires being logged in." in str(res.data), err_msg
         # Remove user.id=2 from admin group
-        res = self.app.get("/admin/users/del/2", follow_redirects=True)
+        res = self.app.post("/admin/users/del/2", follow_redirects=True)
         err_msg = "User should be redirected to signin"
         assert "This feature requires being logged in." in str(res.data), err_msg
 
@@ -597,11 +597,11 @@ class TestAdmin(web.Helper):
         self.signout()
         self.signin(email="juan2@juan.com", password="juan2")
         # Add user.id=2 to admin group
-        res = self.app.get("/admin/users/add/2", follow_redirects=True)
+        res = self.app.post("/admin/users/add/2", follow_redirects=True)
         assert res.status == "403 FORBIDDEN",\
             "This action should be forbidden, not enought privileges"
         # Remove user.id=2 from admin group
-        res = self.app.get("/admin/users/del/2", follow_redirects=True)
+        res = self.app.post("/admin/users/del/2", follow_redirects=True)
         assert res.status == "403 FORBIDDEN",\
             "This action should be forbidden, not enought privileges"
 
@@ -693,7 +693,7 @@ class TestAdmin(web.Helper):
 
     @patch('pybossa.ckan.requests.get')
     @patch('pybossa.core.uploader.upload_file', return_value=True)
-    @patch('pybossa.forms.validator.requests.get')
+    @patch('pybossa.ssrf_guard.resolve_and_validate')
     def test_19_admin_update_app(self, Mock, Mock2, mock_webhook):
         """Test ADMIN can update a project that belongs to another user"""
         '''

@@ -29,16 +29,15 @@ This package adds GET, POST, PUT and DELETE methods for:
 
 from functools import partial
 import json
-import jwt
-from flask import Blueprint, request, abort, Response, make_response
+from flask import Blueprint, request, abort, Response, make_response, g
 from flask import current_app
 from flask_login import current_user, login_required
 from flasgger import swag_from
 from time import time
 from datetime import datetime, timedelta
-from werkzeug.exceptions import NotFound
+from werkzeug.exceptions import Gone, NotFound
 from pybossa.exc.repository import DBIntegrityError
-from pybossa.util import jsonpify, get_user_id_or_ip, fuzzyboolean, \
+from pybossa.util import get_user_id_or_ip, fuzzyboolean, \
     PARTIAL_ANSWER_KEY, SavedTaskPositionEnum, PARTIAL_ANSWER_POSITION_KEY, \
     get_user_saved_partial_tasks
 from pybossa.util import get_disqus_sso_payload, grant_access_with_api_key
@@ -68,7 +67,7 @@ from .project_stats import ProjectStatsAPI
 from .helpingmaterial import HelpingMaterialAPI
 from pybossa.core import auditlog_repo, project_repo, task_repo, user_repo
 from pybossa.contributions_guard import ContributionsGuard
-from pybossa.auth import jwt_authorize_project
+from pybossa.auth import ensure_authorized_to
 from werkzeug.exceptions import MethodNotAllowed, Forbidden
 from .completed_task import CompletedTaskAPI
 from .completed_task_run import CompletedTaskRunAPI
@@ -85,9 +84,11 @@ from pybossa.task_creator_helper import set_gold_answers
 from pybossa.auth.task import TaskAuth
 from pybossa.service_validators import ServiceValidators
 import requests
+from sqlalchemy import func
 from sqlalchemy.sql import text
 from sqlalchemy.orm.attributes import flag_modified
 from pybossa.core import db
+from pybossa.model.task import Task
 from pybossa.cache import users as cached_users, ONE_MONTH
 from pybossa.cache.task_browse_helpers import get_searchable_columns
 from pybossa.cache.users import get_user_pref_metadata
@@ -127,6 +128,10 @@ def _api_authentication_with_api_key():
     secure_app_access = current_app.config.get('SECURE_APP_ACCESS', False)
     if secure_app_access:
         grant_access_with_api_key(secure_app_access)
+    if (current_app.config.get('WTF_CSRF_ENABLED', True) and
+            current_user.is_authenticated and
+            not getattr(g, '_api_key_authenticated', False)):
+        csrf.protect()
 
 
 def register_api(view, endpoint, url, pk='id', pk_type='int'):
@@ -183,10 +188,14 @@ def add_task_signature(tasks):
             sign_task(task)
 
 
-@jsonpify
+# login_required precedes admin_required: admin_required reads
+# current_user.admin, which raises AttributeError on Flask-Login's anonymous
+# user and surfaces as a 500 rather than a 401. Every other admin_required site
+# in the tree is paired this way; this was the only one that was not.
+@blueprint.route('/verify/<string:op_type>', methods=['POST'])
+@login_required
 @admin_required
 @csrf.exempt
-@blueprint.route('/verify/<string:op_type>', methods=['POST'])
 def verify_operations(op_type):
     """Verify background job operations"""
     if op_type == "export_tasks":
@@ -203,6 +212,19 @@ def verify_operations(op_type):
         valid_export_types = ["task", "taskrun", "consensus"]
         if export_type not in valid_export_types:
             return Response("Invalid export_type parameter", 400, mimetype="application/json")
+
+        # Resolve and authorize the project before exporting it. export_tasks
+        # resolves the shortname itself and performs no ownership check, so
+        # without this the endpoint exports any project named by shortname.
+        # @admin_required above already gates the whole view; this is a second
+        # layer so the export cannot be reached by a caller who is not
+        # authorized to read the project.
+        if not project_shortname:
+            return Response("Missing project_shortname parameter", 400, mimetype="application/json")
+        project = project_repo.get_by_shortname(project_shortname)
+        if not project:
+            return Response("Project not found", 404, mimetype="application/json")
+        ensure_authorized_to('read', project)
 
         resp = export_tasks(current_user.email_addr, project_shortname, export_type, False, filetype)
         return Response(resp, 200, mimetype="application/json")
@@ -223,7 +245,6 @@ def verify_operations(op_type):
     return Response("Bad Request", 400, mimetype="application/json")
 
 
-@jsonpify
 @blueprint.route('/project/<project_id>/newtask')
 @blueprint.route('/project/<project_id>/newtask/<int:task_id>')
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
@@ -291,6 +312,9 @@ def new_task(project_id, task_id=None):
 
 
 def _retrieve_new_task(project_id, task_id=None, saved_task_position=None):
+    if 'external_uid' in request.args:
+        raise Gone('External UID task access is no longer supported')
+
     project = project_repo.get(project_id)
     if project is None or not(project.published or current_user.admin
         or current_user.id in project.owners_ids):
@@ -311,12 +335,6 @@ def _retrieve_new_task(project_id, task_id=None, saved_task_position=None):
     user_id_or_ip = get_user_id_or_ip()
     if pwd_manager.password_needed(project, user_id_or_ip):
         raise Forbidden("No project password provided")
-
-    if request.args.get('external_uid'):
-        resp = jwt_authorize_project(project,
-                                     request.headers.get('Authorization'))
-        if resp != True:
-            return resp, None, lambda x: x
 
     if request.args.get('limit'):
         limit = int(request.args.get('limit'))
@@ -399,7 +417,6 @@ def _guidelines_updated(project_id, user_id):
 
     return last_task_run_time < last_guidelines_update if last_task_run_time and last_guidelines_update else False
 
-@jsonpify
 @blueprint.route('/app/<short_name>/userprogress')
 @blueprint.route('/project/<short_name>/userprogress')
 @blueprint.route('/app/<int:project_id>/userprogress')
@@ -454,7 +471,6 @@ def user_progress(project_id=None, short_name=None):
     else:  # pragma: no cover
         return abort(404)
 
-@jsonpify
 @blueprint.route('/app/<short_name>/taskprogress')
 @blueprint.route('/project/<short_name>/taskprogress')
 @blueprint.route('/app/<int:project_id>/taskprogress')
@@ -477,35 +493,32 @@ def task_progress(project_id=None, short_name=None):
     if not project:
         return abort(404)
 
-    sql_text = "SELECT COUNT(*) FROM task WHERE project_id=" + str(project.id)
+    query = db.slave_session.query(func.count(Task.id)).filter(
+        Task.project_id == project.id)
     task_info_fields = get_searchable_columns(project.id)
 
-    # create sql query from filter fields received on request.args
+    # Add filter fields received on request.args.
     for key in filter_fields.keys():
         if key in task_fields:
-            sql_text += " AND {0}=:{1}".format(key, key)
+            query = query.filter(getattr(Task, key) == filter_fields[key])
         elif key in task_info_fields:
+            info_value = Task.info[key].astext
             # include support for empty string and null in URL
             if filter_fields[key].lower() in ["null", ""]:
-                sql_text +=  " AND info ->> '{0}' is Null".format(key)
+                query = query.filter(info_value.is_(None))
             else:
-                sql_text += " AND info ->> '{0}'=:{1}".format(key, key)
+                query = query.filter(info_value == filter_fields[key])
         else:
             raise Exception("invalid key: the field that you are filtering by does not exist")
-    sql_text += ';'
-    sql_query = text(sql_text)
-    results = db.slave_session.execute(sql_query, filter_fields)
     timeout = current_app.config.get('TIMEOUT')
 
-    # results are stored as a sqlalchemy resultProxy
-    num_tasks = results.first()[0]
+    num_tasks = query.scalar()
     task_count_dict = dict(task_count=num_tasks)
     return Response(json.dumps(task_count_dict), mimetype="application/json")
 
 
-@jsonpify
-@login_required
 @blueprint.route('/preferences/<user_name>', methods=['GET'])
+@login_required
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def get_user_preferences(user_name):
     """API endpoint for loading account user preferences.
@@ -528,10 +541,9 @@ def get_user_preferences(user_name):
     return Response(json.dumps(user_preferences), mimetype="application/json")
 
 
-@jsonpify
+@blueprint.route('/preferences/<user_name>', methods=['POST'])
 @login_required
 @csrf.exempt
-@blueprint.route('/preferences/<user_name>', methods=['POST'])
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def update_user_preferences(user_name):
     """API endpoint for updating account user preferences.
@@ -588,28 +600,15 @@ def update_user_preferences(user_name):
     return Response(json.dumps(user_preferences), mimetype="application/json")
 
 
-@jsonpify
 @blueprint.route('/auth/project/<short_name>/token')
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def auth_jwt_project(short_name):
-    """Create a JWT for a project via its secret KEY."""
-    project_secret_key = None
-    if 'Authorization' in request.headers:
-        project_secret_key = request.headers.get('Authorization')
-    if project_secret_key:
-        project = project_repo.get_by_shortname(short_name)
-        if project and project.secret_key == project_secret_key:
-            token = jwt.encode({'short_name': short_name,
-                                'project_id': project.id},
-                               project.secret_key, algorithm='HS256')
-            return token
-        else:
-            return abort(404)
-    else:
-        return abort(403)
+    """Reject use of the retired project-token integration."""
+    message = 'Project token access is no longer supported'
+    return Response(json.dumps({'description': message}), status=410,
+                    mimetype='application/json')
 
 
-@jsonpify
 @blueprint.route('/disqus/sso')
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def get_disqus_sso_api():
@@ -631,9 +630,8 @@ def get_disqus_sso_api():
         return error.format_exception(e, target='DISQUS_SSO', action='GET')
 
 
-@jsonpify
-@csrf.exempt
 @blueprint.route('/task/<int:task_id>/canceltask', methods=['POST'])
+@csrf.exempt
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def cancel_task(task_id=None):
     """Unlock task upon cancel so that same task can be presented again."""
@@ -670,10 +668,9 @@ def cancel_task(task_id=None):
     return Response(json.dumps({'success': True}), 200, mimetype="application/json")
 
 
-@jsonpify
+@blueprint.route('/task/<int:task_id>/release_category_locks', methods=['POST'])
 @csrf.exempt
 @login_required
-@blueprint.route('/task/<int:task_id>/release_category_locks', methods=['POST'])
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def release_category_locks(task_id=None):
     """Unlock all category (reservation) locks reserved by this user"""
@@ -692,7 +689,6 @@ def release_category_locks(task_id=None):
     return Response(json.dumps({'success': True}), 200, mimetype="application/json")
 
 
-@jsonpify
 @blueprint.route('/task/<int:task_id>/lock', methods=['GET'])
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def fetch_lock(task_id):
@@ -726,9 +722,8 @@ def fetch_lock(task_id):
     return Response(res, 200, mimetype='application/json')
 
 
-@jsonpify
-@csrf.exempt
 @blueprint.route('/project/<int:project_id>/taskgold', methods=['GET', 'POST'])
+@csrf.exempt
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def task_gold(project_id=None):
     """Make task gold"""
@@ -765,10 +760,9 @@ def task_gold(project_id=None):
         return error.format_exception(e, target='taskgold', action=request.method)
 
 
-@jsonpify
+@blueprint.route('/task/<task_id>/services/<service_name>/<major_version>/<minor_version>', methods=['POST'])
 @login_required
 @csrf.exempt
-@blueprint.route('/task/<task_id>/services/<service_name>/<major_version>/<minor_version>', methods=['POST'])
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def get_service_request(task_id, service_name, major_version, minor_version):
     """Proxy service call"""
@@ -826,10 +820,9 @@ def _get_valid_service(task_id, service_name, payload, proxy_service_config):
     return abort(403, 'The request data failed validation')
 
 
-@jsonpify
+@blueprint.route('/task/<int:task_id>/assign', methods=['POST'])
 @login_required
 @csrf.exempt
-@blueprint.route('/task/<int:task_id>/assign', methods=['POST'])
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def assign_task(task_id=None):
     """Assign/Un-assign task to users for locked, user_pref and task_queue schedulers."""
@@ -888,10 +881,9 @@ def assign_task(task_id=None):
     return Response(json.dumps({'success': True}), 200, mimetype="application/json")
 
 
-@jsonpify
+@blueprint.route('/project/<short_name>/task/<int:task_id>/partial_answer', methods=['POST', 'GET', 'DELETE'])
 @login_required
 @csrf.exempt
-@blueprint.route('/project/<short_name>/task/<int:task_id>/partial_answer', methods=['POST', 'GET', 'DELETE'])
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def partial_answer(task_id=None, short_name=None):
     """Save/Get/Delete partial answer to Redis - this API might be called heavily.
@@ -902,6 +894,10 @@ def partial_answer(task_id=None, short_name=None):
 
     if not project_id:
         return abort(400, f"Invalid project name {short_name}")
+
+    if request.method == 'POST' and not task_repo.get_task_by(
+            project_id=project_id, id=task_id):
+        return abort(404)
 
     response = {'success': True}
     try:
@@ -927,9 +923,8 @@ def partial_answer(task_id=None, short_name=None):
     return Response(json.dumps(response), status=200, mimetype="application/json")
 
 
-@jsonpify
-@login_required
 @blueprint.route('/project/<short_name>/has_partial_answer')
+@login_required
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def user_has_partial_answer(short_name=None):
     """Check whether the user has any saved partial answer for the project
@@ -969,10 +964,9 @@ def get_prompt_data():
     return prompts
 
 
-@jsonpify
-@csrf.exempt
 @blueprint.route('/llm', defaults={'model_name': None}, methods=['POST'])
 @blueprint.route('/llm/<model_name>', methods=['POST'])
+@csrf.exempt
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def large_language_model(model_name):
     """Large language model endpoint
@@ -1037,7 +1031,6 @@ def large_language_model(model_name):
     return Response(json.dumps(response), status=r.status_code, mimetype="application/json")
 
 
-@jsonpify
 @blueprint.route('/project/<project_id>/gold_annotations')
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
 def get_gold_annotations(project_id):
@@ -1055,7 +1048,6 @@ def get_gold_annotations(project_id):
     return Response(json.dumps(tasks), status=200, mimetype="application/json")
 
 
-@jsonpify
 @blueprint.route('/project/<int:project_id>/projectprogress')
 @blueprint.route('/project/<short_name>/projectprogress')
 @ratelimit(limit=ratelimits.get('LIMIT'), per=ratelimits.get('PER'))
@@ -1081,10 +1073,9 @@ def get_project_progress(project_id=None, short_name=None):
         return abort(403)
 
 
-@jsonpify
-@csrf.exempt
 @blueprint.route('/project/<int:project_id>/clone',  methods=['POST'])
 @blueprint.route('/project/<short_name>/clone',  methods=['POST'])
+@csrf.exempt
 @login_required
 @swag_from('docs/project/project_clone.yaml')
 def project_clone(project_id=None, short_name=None):
