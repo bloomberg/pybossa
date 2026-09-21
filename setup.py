@@ -150,7 +150,7 @@ requirements = [
     "validators==0.18.2",
     "wcwidth==0.2.5",
     "webassets==2.0",
-    "Werkzeug==2.3.8",
+    "Werkzeug==3.1.6",
     "wrapt==1.16.0",
     "WTForms==3.1.2",
     "WTForms-Components==0.10.5",
