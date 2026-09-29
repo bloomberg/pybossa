@@ -87,7 +87,7 @@ requirements = [
     "pytest-cov==4.1.0",
     "nose-py3==1.9.0",
     "numpy==1.26.4",
-    "oauthlib==2.1.0",
+    "oauthlib==4.0.0",
     "os-diskconfig-python-novaclient-ext==0.1.3",
     "os-networksv2-python-novaclient-ext==0.26",
     "os-service-types==1.7.0",
