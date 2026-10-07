@@ -76,7 +76,7 @@ requirements = [
     "keystoneauth1==4.4.0",
     "libsass==0.23.0",
     "lxml==5.1.0",
-    "lxml-html-clean==0.4.1",
+    "lxml-html-clean==0.4.4",
     "Mako==1.3.2",
     "Markdown==3.4.4",
     "MarkupSafe==2.1.5",
