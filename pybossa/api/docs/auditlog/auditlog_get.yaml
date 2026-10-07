@@ -1,0 +1,55 @@
+Get audit log entries by id or list. Read-only endpoint.
+---
+tags:
+  - name: auditlog
+definitions:
+  Auditlog:
+    type: object
+    properties:
+      id:
+        type: integer
+      project_id:
+        type: integer
+      project_short_name:
+        type: string
+      user_id:
+        type: integer
+      user_name:
+        type: string
+      created:
+        type: string
+      action:
+        type: string
+        description: the action performed
+      caller:
+        type: string
+        description: API or WEB
+      attribute:
+        type: string
+        description: the attribute that was changed
+      old_value:
+        type: string
+      new_value:
+        type: string
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: false
+    description: the audit log entry id
+  - name: project_id
+    in: query
+    type: integer
+    required: false
+    description: filter by project id
+responses:
+  200:
+    description: audit log entries
+    schema:
+      $ref: '#/definitions/Auditlog'
+  401:
+    description: Unauthorized - User is not logged in
+  403:
+    description: Forbidden - Requires admin or project ownership for subadmins
+  404:
+    description: Audit log entry not found

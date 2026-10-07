@@ -21,7 +21,7 @@ definitions:
       long_description:
         type: string
       webhook:
-        type: null
+        type: string
       allow_anonymous_contributors:
         type: boolean
       published:
@@ -87,9 +87,9 @@ definitions:
               sent:
                 type: boolean
               webhook:
-                type: null
+                type: string
               target_remaining:
-                type: null
+                type: integer
           allow_taskrun_edit:
             type: boolean
           data_classification:
@@ -120,12 +120,13 @@ definitions:
 parameters:
   - name: oid
     in: path
-    type: number
+    type: integer
     required: true
     description: the project id
 responses:
   200:
     description: project info
     schema:
-      $ref: '#definitions/Project'
-
+      $ref: '#/definitions/Project'
+  404:
+    description: Project not found

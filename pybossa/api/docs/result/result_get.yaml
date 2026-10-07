@@ -1,0 +1,45 @@
+Get result information by result id
+---
+tags:
+  - name: result
+definitions:
+  Result:
+    type: object
+    properties:
+      id:
+        type: integer
+      created:
+        type: string
+        description: UTC timestamp
+      project_id:
+        type: integer
+      task_id:
+        type: integer
+      task_run_ids:
+        type: array
+        items:
+          type: integer
+      last_version:
+        type: boolean
+      info:
+        type: object
+        description: aggregated result data
+      links:
+        type: array
+        items:
+          type: string
+      link:
+        type: string
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: true
+    description: the result id
+responses:
+  200:
+    description: result info
+    schema:
+      $ref: '#/definitions/Result'
+  404:
+    description: Result not found

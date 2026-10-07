@@ -1,0 +1,54 @@
+Get task run information by task run id
+---
+tags:
+  - name: taskrun
+definitions:
+  TaskRun:
+    type: object
+    properties:
+      id:
+        type: integer
+      created:
+        type: string
+        description: UTC timestamp when task was delivered to user
+      project_id:
+        type: integer
+      task_id:
+        type: integer
+      user_id:
+        type: integer
+      user_ip:
+        type: string
+      finish_time:
+        type: string
+        description: UTC timestamp when task run was saved
+      timeout:
+        type: integer
+      calibration:
+        type: integer
+      external_uid:
+        type: string
+      media_url:
+        type: string
+      info:
+        type: object
+        description: answer data submitted by the user
+      links:
+        type: array
+        items:
+          type: string
+      link:
+        type: string
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: true
+    description: the task run id
+responses:
+  200:
+    description: task run info
+    schema:
+      $ref: '#/definitions/TaskRun'
+  404:
+    description: Task run not found

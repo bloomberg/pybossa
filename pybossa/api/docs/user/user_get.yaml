@@ -1,0 +1,63 @@
+Get user information by user id
+---
+tags:
+  - name: user
+definitions:
+  User:
+    type: object
+    properties:
+      id:
+        type: integer
+      created:
+        type: string
+      name:
+        type: string
+        description: username / nickname
+      fullname:
+        type: string
+      locale:
+        type: string
+      email_addr:
+        type: string
+        description: only visible to admins, subadmins, or the user themselves
+      admin:
+        type: boolean
+        description: only visible to admins, subadmins, or the user themselves
+      subadmin:
+        type: boolean
+        description: only visible to admins, subadmins, or the user themselves
+      enabled:
+        type: boolean
+        description: only visible to admins, subadmins, or the user themselves
+      privacy_mode:
+        type: boolean
+      info:
+        type: object
+      n_answers:
+        type: integer
+        description: total task runs by this user
+      rank:
+        type: integer
+      score:
+        type: integer
+      registered_ago:
+        type: string
+      links:
+        type: array
+        items:
+          type: string
+      link:
+        type: string
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: true
+    description: the user id
+responses:
+  200:
+    description: user info. Fields returned depend on requester permissions and user privacy settings.
+    schema:
+      $ref: '#/definitions/User'
+  404:
+    description: User not found

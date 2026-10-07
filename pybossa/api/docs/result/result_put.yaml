@@ -1,0 +1,35 @@
+Update a result by result id
+---
+tags:
+  - name: result
+parameters:
+  - name: oid
+    in: path
+    type: integer
+    required: true
+    description: the result id
+  - name: result_info
+    in: body
+    required: true
+    description: the result fields to update
+    schema:
+      type: object
+      properties:
+        info:
+          type: object
+          description: updated result data
+          additionalProperties:
+            type: string
+responses:
+  200:
+    description: updated result info
+    schema:
+      $ref: '#/definitions/Result'
+  400:
+    description: Bad request - Cannot modify reserved fields (id, created, project_id, task_run_ids, last_version) or immutable fields (project_id, task_id)
+  401:
+    description: Unauthorized - User is not logged in
+  403:
+    description: Forbidden - User does not have permission. Requires project ownership for subadmins.
+  404:
+    description: Result not found

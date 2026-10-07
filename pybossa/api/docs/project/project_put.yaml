@@ -5,32 +5,68 @@ tags:
 parameters:
   - name: oid
     in: path
-    type: number
+    type: integer
     required: true
     description: the project id
   - name: project_info
     in: body
-    type: object
-    properties:
-      name:
-        type: string
-      short_name:
-        type: string
-      description:
-        type: string
-      long_description:
-        type: string
-      published:
-        type: boolean
-      task_presenter:
-        type: string
     required: true
     description: the new project info
-
+    schema:
+      type: object
+      properties:
+        name:
+          type: string
+        short_name:
+          type: string
+        description:
+          type: string
+        long_description:
+          type: string
+        published:
+          type: boolean
+        password:
+          type: string
+        webhook:
+          type: string
+        category_id:
+          type: integer
+        info:
+          type: object
+          properties:
+            task_presenter:
+              type: string
+            task_guidelines:
+              type: string
+            sched:
+              type: string
+            timeout:
+              type: integer
+            kpi:
+              type: integer
+            default_n_answers:
+              type: integer
+            data_classification:
+              type: object
+              properties:
+                input_data:
+                  type: string
+                output_data:
+                  type: string
+            data_access:
+              type: array
+              items:
+                type: string
 responses:
   200:
-    description: new project info
+    description: updated project info
     schema:
-      $ref: '#definitions/Project'
-
-
+      $ref: '#/definitions/Project'
+  400:
+    description: Bad request - Invalid data
+  401:
+    description: Unauthorized - User is not logged in
+  403:
+    description: Forbidden - User does not have permission
+  404:
+    description: Project not found
