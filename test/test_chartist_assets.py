@@ -43,7 +43,8 @@ class ChartistAssetsTest(unittest.TestCase):
         for filename in DASHBOARDS:
             with self.subTest(dashboard=filename):
                 source = (THEME / 'templates/admin' / filename).read_text()
-                tags = re.findall(r'<(?:script|link)\b[^>]*>', source)
+                tags = re.findall(r'<(?:script|link)\b[^>]*>', source,
+                                  flags=re.IGNORECASE)
                 markup = '\n'.join(tag for tag in tags
                                    if 'chartist' in tag.lower())
                 with self.app.test_request_context('/'):
