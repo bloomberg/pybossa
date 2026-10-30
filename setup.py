@@ -24,7 +24,7 @@ requirements = [
     "cssselect==1.1.0",
     "debtcollector==2.3.0",
     "decorator==5.1.0",
-    "dnspython==2.7.0",
+    "dnspython==2.9.0",
     "docopt==0.6.2",
     "email-validator==1.1.3",
     "entrypoints==0.3",
